@@ -16,7 +16,7 @@ import {
   listOf,
   object,
 } from '@raven/core'
-import { CACHE_POLICIES, CONTENT_TYPES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import { INTEGRITY_FAILURES, IntegrityFailure, authFailure } from '@/auth/authFailure'
 import { AUTH_FETCH, AUTH_REDIRECT_POLICY, type AuthFetch } from '@/auth/tokenVerifier'
 import { AUTH_STATE } from '@/auth/effectiveAuth'
@@ -115,7 +115,7 @@ export class AuthBackend {
     })
     const value: unknown = await response.json().catch(() => null)
     if (!response.ok) {
-      if (response.status === 401) throw authFailure(AUTH_REFUSALS.signedOut)
+      if (response.status === HTTP_STATUSES.unauthorized) throw authFailure(AUTH_REFUSALS.signedOut)
       const code = isRecord(value) && isString(value.code) ? value.code : null
       if (code === SQL_ERRORS.forbidden && name !== RPCS.current)
         throw authFailure(AUTH_REFUSALS.notOwner)

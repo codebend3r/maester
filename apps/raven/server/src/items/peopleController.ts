@@ -15,7 +15,6 @@ import { sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { Filmographies } from '@/people/filmographies'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { ROUTE_PARAMS } from '@/requestParts'
@@ -32,7 +31,6 @@ const SEARCH_RESULTS = 10
 @Public()
 export class PeopleController {
   constructor(
-    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(LockService) private readonly lock: LockService,
     @Inject(PeopleRepository) private readonly people: PeopleRepository,
@@ -56,11 +54,7 @@ export class PeopleController {
       .map((person) => ({
         ...person,
         // A director who also acts in a title is credited on it twice.
-        titles: new Set(
-          (this.metadata.person(person.id)?.credits ?? [])
-            .map((credit) => credit.item.id)
-            .filter(viewer.seesItem),
-        ).size,
+        titles: new Set(this.people.creditedItemIds(person.id).filter(viewer.seesItem)).size,
       }))
       .filter((person) => person.titles > 0)
       .toSorted(
@@ -80,7 +74,7 @@ export class PeopleController {
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
   ): Promise<PersonDetails> {
-    const person = this.metadata.person(id)
+    const person = this.people.person(id)
     if (!person) throw new NotFoundException(`No person ${id}`)
     const viewer = this.lock.viewer({ request })
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
@@ -113,7 +107,7 @@ export class PeopleController {
     @Query(QUERY_PARAMS.version) version: unknown,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const photo = this.metadata.photo(id)
+    const photo = this.people.photo(id)
     const path =
       photo == null ? null : await this.images.tmdb({ path: photo, width: IMAGE_WIDTHS.photo })
     await sendImage({

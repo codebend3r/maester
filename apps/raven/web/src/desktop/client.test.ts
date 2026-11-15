@@ -5,8 +5,9 @@ import {
   DESKTOP_REQUESTS,
   DESKTOP_PLATFORMS,
   type DesktopEvent,
+  type DesktopReply,
 } from '@raven/core'
-import { clientFor } from '@/desktop/client'
+import { clientFor, readMain } from '@/desktop/client'
 
 const REFUSED = {
   type: DESKTOP_REPLIES.refused,
@@ -74,5 +75,31 @@ describe('clientFor', () => {
     bridge.push({ type: 'unknown' })
     expect(heard).toEqual([notice])
     expect(warn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('readMain', () => {
+  const request = { type: DESKTOP_REQUESTS.listRecents } as const
+  const clientAnswering = (reply: DesktopReply) => ({ request: async () => reply })
+
+  it('hands back the reply main gives the request', async () => {
+    const recents: DesktopReply = { type: DESKTOP_REPLIES.recents, recents: [] }
+    expect(
+      await readMain({ client: clientAnswering(recents), request, fallback: 'No recents.' }),
+    ).toEqual(recents)
+  })
+
+  it("throws a refusal in main's words, and another kind of reply in the fallback's", async () => {
+    const refused = { type: DESKTOP_REPLIES.refused, message: 'Main said no.' } as const
+    await expect(
+      readMain({ client: clientAnswering(refused), request, fallback: 'No recents.' }),
+    ).rejects.toThrow('Main said no.')
+    await expect(
+      readMain({
+        client: clientAnswering({ type: DESKTOP_REPLIES.done }),
+        request,
+        fallback: 'No recents.',
+      }),
+    ).rejects.toThrow('No recents.')
   })
 })

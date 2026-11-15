@@ -5,9 +5,10 @@ import {
   type LibraryKind,
   PATH_LAYOUTS,
   type PathLayout,
-} from '@/contract'
-import { matchTypeFor } from '@/libraryKinds'
-import { seasonFolderNumber, yearOf } from '@/naming'
+  matchTypeFor,
+  seasonFolderNumber,
+  yearOf,
+} from '@raven/core'
 
 /** A letter folder: one letter, `#`, `0-9`, or a run of letters such as `A-C`. */
 export const isLetterFolder = (name: string): boolean =>

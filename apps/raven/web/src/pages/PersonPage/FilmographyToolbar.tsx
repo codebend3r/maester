@@ -1,4 +1,8 @@
-import { FILMOGRAPHY_TABS, type FilmographyTab, FILMOGRAPHY_TAB_NAMES } from '@raven/core'
+import {
+  FILMOGRAPHY_TABS,
+  type FilmographyTab,
+  FILMOGRAPHY_TAB_NAMES,
+} from '@/pages/PersonPage/filmographyTabs'
 import { Icon } from '@raven/ui'
 import { useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'

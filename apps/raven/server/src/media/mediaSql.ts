@@ -1,4 +1,4 @@
-/** SQL the media queries share, written once. Fragments assume `media m` and `libraries l`. */
+/** SQL the media queries share, written once. Fragments assume `media m` and `libraries l`, `under` aside. */
 
 /** `%`, `_` and `\` escaped, for a LIKE with `ESCAPE '\'`. */
 export const escapeLike = (text: string): string => text.replace(/[\\%_]/g, (char) => `\\${char}`)
@@ -56,3 +56,13 @@ type ScoreProps = { item: string; source: string }
 export const score = ({ item, source }: ScoreProps): string =>
   `COALESCE((SELECT r.value FROM ratings r WHERE r.item_id = ${item} AND r.source = ${source}),
             (SELECT r.value FROM ratings r WHERE r.item_id = ${item} AND r.source = 'tmdb'))`
+
+/**
+ * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
+ * itself), and every item beneath it. "A file somewhere under it" is then
+ * one join to `media_items`, whichever level the file is linked at: a show,
+ * a season or an episode.
+ */
+export const under = (roots: string): string => `under(root, id) AS (
+  ${roots}
+  UNION SELECT u.root, i.id FROM items i JOIN under u ON i.parent_id = u.id)`

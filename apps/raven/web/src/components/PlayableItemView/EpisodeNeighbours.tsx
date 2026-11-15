@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
 import {
   type EpisodeSummary,
@@ -67,7 +68,7 @@ type NeighbourListProps = {
 
 const NeighbourList = ({ neighbours, libraryId, className }: NeighbourListProps) => (
   <nav
-    className={[styles.neighbours, className ?? ''].join(' ')}
+    className={classNames([styles.neighbours, className])}
     aria-label={PLAYABLE_ITEM_VIEW_COPY.neighbours}
   >
     <ul className={styles.list}>

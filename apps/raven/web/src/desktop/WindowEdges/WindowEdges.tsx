@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import type { ComponentType, PointerEvent } from 'react'
 import {
   DESKTOP_REQUESTS,
@@ -57,7 +58,7 @@ const DrawnEdges = () => {
       {EDGES.map(({ edge, className }) => (
         <span
           key={edge}
-          className={[styles.handle, className].filter(Boolean).join(' ')}
+          className={classNames([styles.handle, className])}
           onPointerDown={startResize(edge)}
           onPointerMove={moveResize}
         />

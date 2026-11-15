@@ -3,19 +3,17 @@ import {
   type MixKind,
   QUEUE_SOURCE_KINDS,
   RADIO_SEED_KINDS,
-  ROUTE_STATES,
-  type RouteQuery,
   isMixKind,
   routeState,
 } from '@raven/core'
 import { BUTTON_TONES, Button } from '@raven/ui'
-import { KeyedView, type ViewOf, type ViewsOf, useAudioQueue } from '@raven/ui/headless'
+import { useAudioQueue } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { useParams } from 'react-router-dom'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { MixCovers } from '@/components/MixGrid/MixGrid'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
@@ -101,29 +99,6 @@ const MixSkeleton = () => (
   </>
 )
 
-const MIX_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type MixPageViewProps = {
-  [MIX_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [MIX_VIEW_KEYS.ready]: MixViewProps
-}
-
-const MIX_VIEWS = {
-  [MIX_VIEW_KEYS.pending]: RouteState,
-  [MIX_VIEW_KEYS.ready]: MixView,
-} as const satisfies ViewsOf<MixPageViewProps>
-
-type MixPageViewOfProps = { page: RouteQuery<MixDetails> }
-
-const mixPageViewOf = ({ page }: MixPageViewOfProps): ViewOf<MixPageViewProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: MIX_VIEW_KEYS.pending,
-      props: { state: page, noun: MIX_PAGE_COPY.noun, shape: <MixSkeleton /> },
-    }
-  return { key: MIX_VIEW_KEYS.ready, props: { details: page.data } }
-}
-
 /** The mix kind the address names, or null for anything else: the address is the viewer's to type. */
 const useRouteMix = (): MixKind | null => {
   const id = useParams().id
@@ -135,5 +110,9 @@ export const MixPage = () => {
   const kind = useRouteMix()
   const mix = useQuery(mixQuery(kind))
   const page = routeState({ id: kind, query: mix })
-  return <KeyedView<MixPageViewProps> views={MIX_VIEWS} view={mixPageViewOf({ page })} />
+  return (
+    <RouteView page={page} noun={MIX_PAGE_COPY.noun} shape={<MixSkeleton />}>
+      {(details) => <MixView details={details} />}
+    </RouteView>
+  )
 }

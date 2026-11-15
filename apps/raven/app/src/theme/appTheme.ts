@@ -7,31 +7,19 @@ import {
   type ThemeTone,
   themeOf,
 } from '@raven/core'
-import { nativeTokens } from '@raven/native/headless'
-import { designTokens, themeTokens } from '@raven/ui/designTokens'
+import { tokenReaderOf } from '@raven/native/headless'
+import { designTokenValues, themeTokens } from '@raven/ui/designTokens'
 
 import { CHIP_TOKENS, OVER_PICTURE_TOKENS, PALETTE_TOKENS, RATING_TOKENS } from '@/theme/tokenNames'
 
-const { numbers, colours: rootColours } = nativeTokens(
-  Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
-)
+const READER = "raven's app"
 
-type TokenOfProps<T> = { tokens: Readonly<Record<string, T>>; name: string }
+const root = tokenReaderOf({ tokens: designTokenValues, owner: READER })
 
-/**
- * The token `name` from `tokens`. One the stylesheets dropped or renamed fails the app as
- * it loads, and every render test with it, rather than painting the screen with nothing.
- */
-const tokenOf = <T>({ tokens, name }: TokenOfProps<T>): T => {
-  const value = tokens[name]
-  if (value === undefined) throw new Error(`raven's app has no design token ${name}`)
-  return value
-}
-
-const size = (name: string): number => tokenOf({ tokens: numbers, name })
+const { size } = root
 
 /** A colour globals.scss gives every theme alike. */
-const fixed = (name: string): string => tokenOf({ tokens: rootColours, name })
+const fixed = root.colour
 
 export type Palette = Record<keyof typeof PALETTE_TOKENS, string>
 
@@ -66,8 +54,7 @@ export type AppTheme = { id: ThemeId; palette: Palette; overPicture: Palette; to
 
 /** A theme's colours, read from themes.scss through the built `themeTokens`, never copied. */
 const paletteOf = (id: ThemeId): Palette => {
-  const { colours } = nativeTokens(themeTokens[id] ?? {})
-  const colour = (name: string): string => tokenOf({ tokens: colours, name })
+  const { colour } = tokenReaderOf({ tokens: themeTokens[id] ?? {}, owner: READER })
   return {
     ground: colour(PALETTE_TOKENS.ground),
     deep: colour(PALETTE_TOKENS.deep),

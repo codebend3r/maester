@@ -76,6 +76,7 @@ export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
 /** A change sends any of the fields; each given must be a value the setting takes. */
 export const isPlaybackSettingsChange = exactPartial(isPlaybackSettings.shape)
 
+/** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
 export const ENCODER_KINDS = {
   software: 'software',
   vaapi: 'vaapi',
@@ -83,9 +84,6 @@ export const ENCODER_KINDS = {
 } as const
 
 export const isEncoderKind = oneOf(Object.values(ENCODER_KINDS))
-
-/** What transcodes encode with: the CPU, or a GPU through VAAPI or VideoToolbox. */
-export type EncoderKind = Infer<typeof isEncoderKind>
 
 /** The settings as kept, with what they come to on this machine. */
 export const isPlaybackSettingsState = object({

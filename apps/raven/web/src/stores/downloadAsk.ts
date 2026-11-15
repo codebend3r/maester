@@ -1,7 +1,6 @@
 import { DESKTOP_REQUESTS, type DownloadAsk } from '@raven/core'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 import { handled } from '@/lib/handled'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
 
@@ -24,23 +23,18 @@ export const declineAsk = (ask: DownloadAsk): void => {
  * one still shown, which is declined, as its dialog goes without answering.
  */
 export const useDownloadAsk = create<DownloadAskState>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        shown: null,
-        show: (ask) => {
-          const replaced = get().shown?.ask ?? null
-          if (replaced !== null && replaced.askId !== ask.askId) declineAsk(replaced)
-          set((last) => ({ shown: { ask, instance: (last.shown?.instance ?? 0) + 1 } }))
-        },
-        close: () => set({ shown: null }),
-      }),
-      {
-        name: STORE_KEYS.downloadAsk,
-        storage: createJSONStorage(() => window.localStorage),
-        partialize: ({ shown }) => ({ shown }),
+  keptInStorage({
+    key: STORE_KEYS.downloadAsk,
+    name: 'raven/downloadAsk',
+    state: (set, get) => ({
+      shown: null,
+      show: (ask) => {
+        const replaced = get().shown?.ask ?? null
+        if (replaced !== null && replaced.askId !== ask.askId) declineAsk(replaced)
+        set((last) => ({ shown: { ask, instance: (last.shown?.instance ?? 0) + 1 } }))
       },
-    ),
-    { name: 'raven/downloadAsk' },
-  ),
+      close: () => set({ shown: null }),
+    }),
+    keep: ({ shown }) => ({ shown }),
+  }),
 )

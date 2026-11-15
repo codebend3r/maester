@@ -66,7 +66,6 @@ class Episode:
 class Sonarr(Arr, Protocol):
     async def series(self) -> list[Series]: ...
     async def series_by_tvdb(self, tvdb_id: int) -> Series | None: ...
-    async def lookup(self, term: str) -> list[Series]: ...
     async def episodes(self, series_id: int) -> list[Episode]: ...
     async def follow(self, series_id: int) -> None: ...
 
@@ -84,12 +83,6 @@ class SonarrClient(ArrClient):
     async def series_by_tvdb(self, tvdb_id: int) -> Series | None:
         rows = await self.get_json(f"{self.api}/series", params={"tvdbId": tvdb_id})
         return Series.from_api(rows[0]) if rows else None
-
-    async def lookup(self, term: str) -> list[Series]:
-        return [
-            Series.from_api(s)
-            for s in await self.get_json(f"{self.api}/series/lookup", params={"term": term})
-        ]
 
     async def episodes(self, series_id: int) -> list[Episode]:
         return [
@@ -127,9 +120,6 @@ class FakeSonarrClient(FakeArr):
 
     async def series_by_tvdb(self, tvdb_id: int) -> Series | None:
         return next((s for s in self.series_list if s.tvdb_id == tvdb_id), None)
-
-    async def lookup(self, term: str) -> list[Series]:
-        return [s for s in self.series_list if term.lower() in s.title.lower()]
 
     async def episodes(self, series_id: int) -> list[Episode]:
         return [e for e in self.episode_list if e.series_id == series_id]

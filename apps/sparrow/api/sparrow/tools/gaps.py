@@ -22,7 +22,7 @@ from pydantic import Field
 from sparrow.agent.tools import Ok, Refused, Result, Tier, ToolContext, tool
 from sparrow.clients.sonarr import Episode
 from sparrow.library import NotLocated, show_owner_on
-from sparrow.media import episode_code
+from sparrow.media import MediaType, episode_code
 from sparrow.notify import AdminPost
 
 
@@ -85,7 +85,7 @@ async def find_gaps(
     host: Annotated[str, Field(description="The Sonarr host that owns the show.")],
     season: Annotated[int | None, Field(description="Only this season.")] = None,
 ) -> dict[str, Any] | Result:
-    details = await ctx.services.seerr.media_details("tv", tmdb_id)
+    details = await ctx.services.seerr.media_details(MediaType.TV, tmdb_id)
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:

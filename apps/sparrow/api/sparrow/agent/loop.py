@@ -105,7 +105,6 @@ class AgentReply:
     titles: list[Title] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
-    cache_read_tokens: int = 0
     iterations: int = 0
 
 
@@ -232,7 +231,6 @@ class Agent:
             reply.iterations += 1
             reply.input_tokens += response.usage.input_tokens
             reply.output_tokens += response.usage.output_tokens
-            reply.cache_read_tokens += response.usage.cache_read_input_tokens or 0
 
             tool_uses = [b for b in response.content if isinstance(b, ToolUseBlock)]
             said = self._text_of(response)

@@ -1,4 +1,4 @@
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 /**
@@ -43,9 +43,6 @@ export type RateVerdict =
   | { verdict: typeof RATE_VERDICTS.allowed }
   | { verdict: typeof RATE_VERDICTS.limited; retryAfterS: number }
   | { verdict: typeof RATE_VERDICTS.overflowed; retryAfterS: number }
-
-/** The status a limited request is answered with. */
-export const TOO_MANY_REQUESTS = 429
 
 /** What a refusal says, by whose budget ran out. */
 export const TOO_MANY_MESSAGES = {
@@ -188,6 +185,8 @@ export const limitRequests = <Tier extends string>({
       message: TOO_MANY_MESSAGES.address,
     })
     // Returning the reply ends the request here instead of running the route.
-    return reply.code(TOO_MANY_REQUESTS).send({ statusCode: TOO_MANY_REQUESTS, message })
+    return reply
+      .code(HTTP_STATUSES.tooManyRequests)
+      .send({ statusCode: HTTP_STATUSES.tooManyRequests, message })
   })
 }

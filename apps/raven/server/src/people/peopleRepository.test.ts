@@ -119,10 +119,10 @@ describe("the people store's filmographies", () => {
         knownFor: 'Acting',
       },
     })
-    expect(repositories(database.get()).metadata.person(state.personId)).toMatchObject({
+    expect(repositories(database.get()).people.person(state.personId)).toMatchObject({
       name: 'Keanu Charles Reeves',
     })
-    expect(repositories(database.get()).metadata.photo(state.personId)).toBe('/keanu-new.jpg')
+    expect(repositories(database.get()).people.photo(state.personId)).toBe('/keanu-new.jpg')
     expect(people().filmographyRows(state.personId)).toEqual([
       {
         type: 'movie',
@@ -177,7 +177,7 @@ describe("the people store's filmographies", () => {
     })
     expect(people().profile(state.personId)).toEqual(before)
     expect(people().filmographyRows(state.personId)).toEqual(rows)
-    expect(repositories(database.get()).metadata.person(state.personId)?.name).toBe(
+    expect(repositories(database.get()).people.person(state.personId)?.name).toBe(
       'Keanu Charles Reeves',
     )
   })

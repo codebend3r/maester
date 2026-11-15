@@ -1,13 +1,7 @@
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  RATE_VERDICTS,
-  RequestCounts,
-  TOO_MANY_REQUESTS,
-  WHEN_FULL,
-  limitRequests,
-} from '@/rateLimits/limitRequests'
+import { RATE_VERDICTS, RequestCounts, WHEN_FULL, limitRequests } from '@/rateLimits/limitRequests'
 
 const TIERS = { tight: 'tight', loose: 'loose' } as const
 
@@ -87,11 +81,11 @@ describe('limitRequests', () => {
     ).resolves.toEqual([200, 200])
     advance(2_500)
     const refused = await fastify.inject({ url: PATHS.tight, remoteAddress: '198.51.100.1' })
-    expect(refused.statusCode).toBe(TOO_MANY_REQUESTS)
+    expect(refused.statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     expect(refused.headers[HEADERS.retryAfter]).toBe('8')
     expect(refused.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(refused.json()).toEqual({
-      statusCode: TOO_MANY_REQUESTS,
+      statusCode: HTTP_STATUSES.tooManyRequests,
       message: 'Too many requests. Try again in 8 seconds.',
     })
   })
@@ -104,7 +98,7 @@ describe('limitRequests', () => {
     ).resolves.toEqual([200, 200])
     await expect(
       statuses({ fastify, url: PATHS.loose, from: '198.51.100.1', times: 6 }),
-    ).resolves.toEqual([200, 200, 200, 200, 200, TOO_MANY_REQUESTS])
+    ).resolves.toEqual([200, 200, 200, 200, 200, HTTP_STATUSES.tooManyRequests])
   })
 
   it('never counts a request it has no tier for', async () => {
@@ -117,15 +111,15 @@ describe('limitRequests', () => {
     const { fastify, advance } = booted()
     await expect(
       statuses({ fastify, url: PATHS.tight, from: '198.51.100.1', times: 3 }),
-    ).resolves.toEqual([200, 200, TOO_MANY_REQUESTS])
+    ).resolves.toEqual([200, 200, HTTP_STATUSES.tooManyRequests])
     advance(9_999)
     await expect(
       statuses({ fastify, url: PATHS.tight, from: '198.51.100.1', times: 1 }),
-    ).resolves.toEqual([TOO_MANY_REQUESTS])
+    ).resolves.toEqual([HTTP_STATUSES.tooManyRequests])
     advance(1)
     await expect(
       statuses({ fastify, url: PATHS.tight, from: '198.51.100.1', times: 3 }),
-    ).resolves.toEqual([200, 200, TOO_MANY_REQUESTS])
+    ).resolves.toEqual([200, 200, HTTP_STATUSES.tooManyRequests])
   })
 })
 
@@ -226,7 +220,7 @@ describe('limitRequests per tier', () => {
       async (all, from) => [...(await all), await sent({ fastify, url: PATHS.tight, from })],
       Promise.resolve([]),
     )
-    expect(tights).toEqual([200, 200, 200, TOO_MANY_REQUESTS])
+    expect(tights).toEqual([200, 200, 200, HTTP_STATUSES.tooManyRequests])
     const loose = ['198.51.100.3', '198.51.100.4', '198.51.100.5']
     const looses = await loose.reduce<Promise<number[]>>(
       async (all, from) => [...(await all), await sent({ fastify, url: PATHS.loose, from })],

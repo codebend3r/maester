@@ -9,7 +9,7 @@ import {
   Post,
 } from '@nestjs/common'
 import { type LiveStream, STREAM_PURPOSES } from '@raven/core'
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import { AdminOnly } from '@/admin/adminGuard'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { Public } from '@/lock/lockGuard'
@@ -70,7 +70,7 @@ export class StreamsController {
    */
   @Public()
   @Post(':id/stop')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   stop(@Param(ROUTE_PARAMS.id) id: string): void {
     if (!this.sessions.stop(id)) throw new NotFoundException('That stream is not live any more')
   }

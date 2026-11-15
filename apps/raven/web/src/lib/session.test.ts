@@ -6,7 +6,7 @@ import { type AuthClient, createAuthClient } from '@/lib/authClient'
 import { callAuth, resendConfirmation, signOut } from '@/lib/session'
 import { useAuthSession } from '@/stores/authSession'
 import { useSelectionScopes } from '@/stores/selectionScope'
-import { createSelectionStore } from '@raven/ui/headless'
+import { createSelectionStore } from '@/stores/selection'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { answer, clearCookies, heldCookies, sessionOf } from '@/test/authCookies'
 

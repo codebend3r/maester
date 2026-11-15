@@ -14,7 +14,7 @@ import {
 import { BUTTON_TONES, Button, type IconName } from '@raven/ui'
 import { useAudioQueue, QueryView, keptRead } from '@raven/ui/headless'
 import { type ComponentType, useId, useRef, useState } from 'react'
-import { isInProgress, useChangeDownloads, useDownloads, useSpace } from '@/desktop/downloadsApi'
+import { isInProgress, useChangeDownloads, useSpace } from '@/desktop/downloadsApi'
 import { handled } from '@/lib/handled'
 import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { DownloadActivity } from '@/desktop/DownloadsPage/DownloadActivity'
@@ -22,13 +22,9 @@ import { DownloadArtwork } from '@/desktop/DownloadsPage/DownloadArtwork'
 import { DownloadRow, ROW_PLAYS, type RowPlay } from '@/desktop/DownloadsPage/DownloadRow'
 import { LibrarySection, ShowBar } from '@/desktop/DownloadsPage/DownloadsShow'
 import { DownloadsWatch } from '@/desktop/DownloadsPage/DownloadsWatch'
-import {
-  type DownloadsSection,
-  sectionsOf,
-  visibleDownloadsOf,
-} from '@/desktop/DownloadsPage/libraries'
+import { type DownloadsSection, sectionsOf } from '@/desktop/DownloadsPage/libraries'
 import { type MusicQueue, musicQueueOf } from '@/desktop/DownloadsPage/musicQueue'
-import { useDownloadsUnlocked } from '@/desktop/DownloadsPage/useDownloadsUnlocked'
+import { useVisibleDownloads } from '@/desktop/DownloadsPage/useVisibleDownloads'
 import { useTotalSpeed } from '@/desktop/useDownloadSpeed'
 import type { DownloadsChange } from '@/downloads/host'
 import { Tabs } from '@/components/Tabs/Tabs'
@@ -329,7 +325,6 @@ type HeldDownloads = { held: DownloadView[]; list: DownloadView[] }
 /** Every title Raven has downloaded or is downloading, and the disk they are kept on. */
 export const DownloadsPage = () => {
   const host = useDownloadsHost()
-  const downloads = useDownloads()
   const space = useSpace()
   const change = useChangeDownloads()
   const title = useRef<HTMLHeadingElement>(null)
@@ -337,18 +332,16 @@ export const DownloadsPage = () => {
 
   const focusTitle = () => title.current?.focus()
 
-  const held = downloads.data?.downloads ?? null
-  const isUnlocked = useDownloadsUnlocked(held ?? [])
-  const show = useDownloadsShow((state) => state.show)
   // A private library's downloads are left out of everything below but the bytes on their way.
-  const list = held === null ? null : visibleDownloadsOf({ downloads: held, isUnlocked })
+  const { held, visible: list, error: listError } = useVisibleDownloads()
+  const show = useDownloadsShow((state) => state.show)
   const hasHidden = (held ?? []).length > (list ?? []).length
   const bulks = bulksOf(list ?? [])
   const [tab, setTab] = useState<PageTab>(PAGE_TABS.manage)
   const ListView = TAB_VIEWS[tab]
   const read = keptRead<HeldDownloads>({
     data: held === null || list === null ? undefined : { held, list },
-    error: downloads.error,
+    error: listError,
   })
 
   return (

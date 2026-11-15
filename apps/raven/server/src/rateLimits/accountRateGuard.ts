@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common'
+import { HTTP_STATUSES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { AuthSessions, accountOf } from '@/auth/authSessions'
 import { CLOCK, type Clock } from '@/clock'
@@ -14,7 +15,6 @@ import {
   RATE_VERDICTS,
   RequestCounts,
   TOO_MANY_MESSAGES,
-  TOO_MANY_REQUESTS,
   refusalOf,
 } from '@/rateLimits/limitRequests'
 import { ACCOUNT_STRICT_LIMIT, RATE_LIMITS, RATE_TIERS, rateTierOf } from '@/rateLimits/rateTiers'
@@ -22,7 +22,7 @@ import { ACCOUNT_STRICT_LIMIT, RATE_LIMITS, RATE_TIERS, rateTierOf } from '@/rat
 type RefuseProps = Parameters<typeof refusalOf>[0]
 
 const refuse = (props: RefuseProps): never => {
-  throw new HttpException(refusalOf(props), TOO_MANY_REQUESTS)
+  throw new HttpException(refusalOf(props), HTTP_STATUSES.tooManyRequests)
 }
 
 /**

@@ -28,7 +28,7 @@ async def report(ctx, kind: ReportKind):
 
 def test_tier_parse():
     assert Tier.parse("admin") == Tier.ADMIN
-    assert Tier.parse(None, Tier.FRIEND) == Tier.FRIEND
+    assert Tier.parse("TRUSTED") == Tier.TRUSTED
     with pytest.raises(ValueError):
         Tier.parse("king")
 

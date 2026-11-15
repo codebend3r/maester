@@ -1,6 +1,5 @@
 import {
   DESKTOP_PATHS,
-  DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
   fileUrlFor,
   isOpaqueId,
@@ -21,7 +20,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
-import { refusalText } from '@/desktop/client'
+import { readMain } from '@/desktop/client'
 import { type DownloadsPage, playOriginFor } from '@/desktop/paths'
 import { useIsOutputFixed } from '@/desktop/output'
 import { PLAY_PAGE_COPY } from '@/desktop/PlayPage/copy'
@@ -261,9 +260,12 @@ const PlayPage = ({ fileId, queue, downloadsPage }: PlayPageProps) => {
   const file = useQuery({
     queryKey: [...DESKTOP_QUERY_KEYS.file, fileId, queue],
     queryFn: async (): Promise<LocalFile> => {
-      const reply = await client.request({ type: DESKTOP_REQUESTS.describeFile, fileId, queue })
-      if (reply.type === DESKTOP_REPLIES.file) return reply.file
-      throw new Error(refusalText({ reply, fallback: PLAY_PAGE_COPY.notOpenable }))
+      const reply = await readMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.describeFile, fileId, queue },
+        fallback: PLAY_PAGE_COPY.notOpenable,
+      })
+      return reply.file
     },
     /*
      * Opening a file also records it as recent and reads its resume point: asking again while it

@@ -68,6 +68,7 @@ export const HTTP_STATUSES = {
   ok: 200,
   noContent: 204,
   partialContent: 206,
+  found: 302,
   seeOther: 303,
   badRequest: 400,
   unauthorized: 401,

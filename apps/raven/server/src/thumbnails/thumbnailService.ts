@@ -126,7 +126,10 @@ export class ThumbnailService implements OnApplicationBootstrap {
       // A slow share is not a broken file: leave it pending for the next scan.
       const retryLater = error instanceof FfmpegTimeoutError || signal.aborted
       this.logger.warn(`No thumbnail for ${file.fileName}: ${errorMessage(error)}`)
-      this.index.setThumbnail({ id, state: retryLater ? 'pending' : 'failed' })
+      this.index.setThumbnail({
+        id,
+        state: retryLater ? THUMBNAIL_STATES.pending : THUMBNAIL_STATES.failed,
+      })
     }
   }
 }

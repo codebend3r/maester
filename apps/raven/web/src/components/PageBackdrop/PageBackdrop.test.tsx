@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { act, fireEvent, render } from '@testing-library/react'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
-import { usePageBackdrop } from '@raven/ui/headless'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 
 describe('PageBackdrop', () => {
   it('fades a picture in once it has loaded, the one before it staying up till then', () => {

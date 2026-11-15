@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { AUTH_EVENTS } from '@/lib/authClient'
-import { createSelectionStore, queryKeys } from '@raven/ui/headless'
+import { queryKeys } from '@raven/ui/headless'
+import { createSelectionStore } from '@/stores/selection'
 import { queryClient } from '@/lib/queryClient'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { useSelectionScopes } from '@/stores/selectionScope'

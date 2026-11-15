@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { BUTTON_TONES, Button, ButtonLink, useCanGoBack } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink, useCanGoBack, classNames } from '@raven/ui'
 import { useNavigate } from 'react-router-dom'
 import { BACK_BUTTON_COPY } from '@/components/BackButton/copy'
 import styles from '@/components/BackButton/BackButton.module.scss'
@@ -73,7 +73,7 @@ type BackButtonProps = {
  */
 export const BackButton = ({ fallback, className }: BackButtonProps) => {
   const canGoBack = useCanGoBack()
-  const classes = [styles.back, className ?? ''].filter(Boolean).join(' ')
+  const classes = classNames([styles.back, className])
   const Way: ComponentType<BackWayProps> = BACK_VIEWS[backWayOf({ canGoBack, fallback })]
   return <Way fallback={fallback} classes={classes} />
 }

@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 
 /** How Downloads lays out what it holds: every download together, or under its library. */
 export const DOWNLOADS_SHOWS = { everything: 'everything', byLibrary: 'byLibrary' } as const
@@ -17,18 +16,13 @@ type DownloadsShowState = {
 
 /** The Show choice of Downloads, one for its Manage and Watch tabs, kept across visits. */
 export const useDownloadsShow = create<DownloadsShowState>()(
-  devtools(
-    persist(
-      (set): DownloadsShowState => ({
-        show: DOWNLOADS_SHOWS.everything,
-        setShow: (show) => set({ show }),
-      }),
-      {
-        name: STORE_KEYS.downloadsShow,
-        storage: createJSONStorage(() => window.localStorage),
-        partialize: ({ show }) => ({ show }),
-      },
-    ),
-    { name: 'raven/downloadsShow' },
-  ),
+  keptInStorage({
+    key: STORE_KEYS.downloadsShow,
+    name: 'raven/downloadsShow',
+    state: (set) => ({
+      show: DOWNLOADS_SHOWS.everything,
+      setShow: (show) => set({ show }),
+    }),
+    keep: ({ show }) => ({ show }),
+  }),
 )

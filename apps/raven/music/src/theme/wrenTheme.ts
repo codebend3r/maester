@@ -1,29 +1,16 @@
 import { DEFAULT_THEME } from '@raven/core'
-import { nativeTokens } from '@raven/native/headless'
-import { designTokens, themeTokens } from '@raven/ui/designTokens'
+import { tokenReaderOf } from '@raven/native/headless'
+import { designTokenValues, themeTokens } from '@raven/ui/designTokens'
 
 import { PALETTE_TOKENS, SHADE_TOKENS, SIZE_TOKENS } from '@/theme/tokenNames'
 
-type TokenOfProps<T> = { tokens: Readonly<Record<string, T>>; name: string }
+const READER = 'Wren'
 
-/**
- * The token `name` from `tokens`. One the stylesheets dropped or renamed fails Wren as it
- * loads, and every render test with it, rather than painting the screen with nothing.
- */
-const tokenOf = <T>({ tokens, name }: TokenOfProps<T>): T => {
-  const value = tokens[name]
-  if (value === undefined) throw new Error(`Wren has no design token ${name}`)
-  return value
-}
+const { colour } = tokenReaderOf({ tokens: themeTokens[DEFAULT_THEME] ?? {}, owner: READER })
 
-const { colours } = nativeTokens(themeTokens[DEFAULT_THEME] ?? {})
-const { colours: shared, numbers } = nativeTokens(
-  Object.fromEntries(designTokens.map(({ name, value }) => [name, value])),
-)
+const shared = tokenReaderOf({ tokens: designTokenValues, owner: READER })
 
-const colour = (name: string): string => tokenOf({ tokens: colours, name })
-
-const size = (name: string): number => tokenOf({ tokens: numbers, name })
+const { size } = shared
 
 /** Wren wears raven's default theme, read from themes.scss through the built tokens. */
 export const PALETTE = {
@@ -41,7 +28,7 @@ export const PALETTE = {
 
 /** What Wren lays over a screen to hold a sheet above it, the same in every theme. */
 export const SHADES = {
-  scrim: tokenOf({ tokens: shared, name: SHADE_TOKENS.scrim }),
+  scrim: shared.colour(SHADE_TOKENS.scrim),
 } as const satisfies Record<keyof typeof SHADE_TOKENS, string>
 
 /** raven's scale in points, from globals.scss. */

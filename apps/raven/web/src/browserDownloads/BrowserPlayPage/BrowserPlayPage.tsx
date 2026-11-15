@@ -20,10 +20,8 @@ import { useParams } from 'react-router-dom'
 import { BROWSER_PLAY_COPY } from '@/browserDownloads/BrowserPlayPage/copy'
 import { BROWSER_DOWNLOAD_COPY } from '@/browserDownloads/copy'
 import type { BrowserDownloads, PlayableDownload } from '@/browserDownloads/engine'
-import { useDownloads } from '@/desktop/downloadsApi'
 import { DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
-import { visibleDownloadsOf } from '@/desktop/DownloadsPage/libraries'
-import { useDownloadsUnlocked } from '@/desktop/DownloadsPage/useDownloadsUnlocked'
+import { useVisibleDownloads } from '@/desktop/DownloadsPage/useVisibleDownloads'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { api } from '@/lib/api'
 import { useBrowserDownloads } from '@/stores/browserDownloads'
@@ -191,12 +189,9 @@ type BrowserPlayPageProps = { engine: BrowserDownloads; downloadId: string }
  */
 const BrowserPlayPage = ({ engine, downloadId }: BrowserPlayPageProps) => {
   useLeaveFullscreen()
-  const listed = useDownloads().data?.downloads ?? null
-  const held = listed ?? []
-  const isUnlocked = useDownloadsUnlocked(held)
-  const visible = visibleDownloadsOf({ downloads: held, isUnlocked })
-  const view = visible.find((each) => each.downloadId === downloadId) ?? null
-  const isHidden = view === null && held.some((each) => each.downloadId === downloadId)
+  const { held: listed, visible } = useVisibleDownloads()
+  const view = (visible ?? []).find((each) => each.downloadId === downloadId) ?? null
+  const isHidden = view === null && (listed ?? []).some((each) => each.downloadId === downloadId)
   const isReady = (view?.status.kind ?? null) === DOWNLOAD_STATUS_KINDS.ready
   const { opened, refusal } = useOpened({ engine, downloadId, isReady })
   const View = PAGE_VIEWS[opened === null ? PAGE_KINDS.message : PAGE_KINDS.playing]

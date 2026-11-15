@@ -4,10 +4,9 @@ import {
   ITEM_TYPES,
   type LibraryKind,
   type PathLayout,
-  describeLayout,
-  groupFolderOf,
   matchTypeFor,
 } from '@raven/core'
+import { describeLayout, groupFolderOf } from '@/scanner/folderLayout'
 import { groupBy } from '@/groupBy'
 import { filePlace, showPlace } from '@/metadata/places'
 import { type FoundFile, isUnder } from '@/scanner/walk'

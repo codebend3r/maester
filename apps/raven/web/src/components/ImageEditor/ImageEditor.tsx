@@ -46,16 +46,17 @@ const choiceOf = (option: ImageOption): ImageChoice =>
     ? { source: IMAGE_SOURCES.local }
     : { source: IMAGE_SOURCES.tmdb, ref: option.ref }
 
-/** A movie and a show each choose a poster, a backdrop and a logo. */
-const KINDS_OF: Record<MatchItemType, readonly ChoosableImageKind[]> = {
-  movie: ['poster', 'backdrop', 'logo'],
-  show: ['poster', 'backdrop', 'logo'],
-}
+/** A movie and a show alike choose a poster, a backdrop and a logo. */
+const CHOOSABLE_KINDS = [
+  ITEM_IMAGE_KINDS.poster,
+  ITEM_IMAGE_KINDS.backdrop,
+  ITEM_IMAGE_KINDS.logo,
+] as const satisfies readonly ChoosableImageKind[]
 
 const GRIDS: Record<ChoosableImageKind, string | undefined> = {
-  poster: styles.posters,
-  backdrop: styles.backdrops,
-  logo: styles.logos,
+  [ITEM_IMAGE_KINDS.poster]: styles.posters,
+  [ITEM_IMAGE_KINDS.backdrop]: styles.backdrops,
+  [ITEM_IMAGE_KINDS.logo]: styles.logos,
 }
 
 /** A logo is drawn by its own component, so it can be recoloured; the rest are plain pictures. */
@@ -246,8 +247,7 @@ const LibraryImages = ({
   libraryName,
 }: LibraryImagesProps) => {
   const ids = { versions: useId(), library: useId() }
-  const [tab, setTab] = useState<ChoosableImageKind>('poster')
-  const kinds = KINDS_OF[itemKind]
+  const [tab, setTab] = useState<ChoosableImageKind>(ITEM_IMAGE_KINDS.poster)
   const queryClient = useQueryClient()
   const options = useQuery(itemImagesQuery({ id: details.id, libraryId }))
   type ChooseMutationFnProps = { kind: ChoosableImageKind; option: ImageOption }
@@ -336,7 +336,7 @@ const LibraryImages = ({
         <section className={styles.group}>
           <Tabs
             label={IMAGE_EDITOR_COPY.pictures}
-            tabs={kinds.map((kind) => ({
+            tabs={CHOOSABLE_KINDS.map((kind) => ({
               value: kind,
               label: KIND_LABELS[kind],
               count: options.data[kind].length,

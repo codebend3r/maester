@@ -5,7 +5,7 @@ ADMIN tier, enforced here whatever the page shows. Writes take JSON only.
 
 - `GET /api/me`: who is signed in and their tier
 - `POST /api/admin/users/{user_id}/tier`: set or clear a user's tier
-  override, through the admin console's `/tier` so it is audited the same
+  override, audited as `/tier` under the admin who set it
 """
 
 # No `from __future__ import annotations`: FastAPI reads each route's
@@ -16,9 +16,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from sparrow.agent.tools import AssignableTier
-from sparrow.chat.admin import AdminConsole
-from sparrow.web.auth import Auth, Refused, Viewer, require_json
+from sparrow.agent.tools import AssignableTier, Tier
+from sparrow.chat.identity import IdentityService
+from sparrow.store import Store
+from sparrow.web.auth import Auth, Reason, Refused, Viewer, require_json
+
+# The audit log's name for a tier change, as the admin's command it replaced was named.
+TIER_AUDIT = "/tier"
 
 
 class TierChange(BaseModel):
@@ -28,12 +32,12 @@ class TierChange(BaseModel):
 @dataclass(frozen=True)
 class Api:
     auth: Auth
-    console: AdminConsole
+    identity: IdentityService
+    store: Store
 
     def router(self) -> APIRouter:
         router = APIRouter(prefix="/api")
-        auth, console = self.auth, self.console
-        identity, store = console.identity, console.store
+        auth, identity, store = self.auth, self.identity, self.store
 
         @router.get("/me")
         async def me(viewer: Annotated[Viewer, Depends(auth.signed_in)]) -> dict[str, Any]:
@@ -51,8 +55,16 @@ class Api:
             user_id: str, change: TierChange, admin: Annotated[Viewer, Depends(auth.admin)]
         ) -> dict[str, Any]:
             if store.get_user(user_id) is None:
-                raise Refused(404, {"reason": "unknown_user"})
-            console.set_tier(admin.chat_user, user_id, change.tier.value if change.tier else None)
+                raise Refused(404, Reason.UNKNOWN_USER)
+            tier = Tier.parse(change.tier) if change.tier is not None else None
+            said = identity.set_tier_override(user_id, tier)
+            store.audit(
+                user_id=admin.user.user_id,
+                tool=TIER_AUDIT,
+                args={"target": user_id, "tier": change.tier},
+                result=said,
+                ok=True,
+            )
             user = store.get_user(user_id)
             return {
                 "user_id": user_id,

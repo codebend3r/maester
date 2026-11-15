@@ -1,4 +1,5 @@
-import { ITEM_TYPES, finishedNote, matchTypeFor } from '@raven/core'
+import { ITEM_TYPES, matchTypeFor } from '@raven/core'
+import { finishedNote } from '@/lib/history'
 import { ButtonLink } from '@raven/ui'
 import { HISTORY_SHOWS, isNone } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'

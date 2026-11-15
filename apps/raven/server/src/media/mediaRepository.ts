@@ -5,6 +5,7 @@ import {
   type ItemSummary,
   LIBRARY_BACKDROP_TYPES,
   type LibraryBackdrop,
+  MATCH_STATES,
   MEDIA_SORTS,
   type MediaItem,
   type MediaSort,
@@ -12,230 +13,29 @@ import {
   type Saga,
   type ShowEntry,
   THUMBNAIL_STATES,
-  isMatchState,
-  isThumbnailState,
-  readCut,
-  readRelease,
-  MATCH_STATES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import {
-  BEST_FIRST,
-  FIRST_ITEM,
-  cardWatched,
-  fileWatched,
-  likePattern,
-  score,
-} from '@/media/mediaSql'
+  EPISODE_FILES,
+  FAVOURITE,
+  FROM_MEDIA,
+  IN_PROGRESS,
+  type MediaRow,
+  ORDER_BY,
+  SELECT_COLUMNS,
+  SELECT_MEDIA,
+  SHOW_ORDER_BY,
+  type ShowRow,
+  sqlLimit,
+  toItem,
+} from '@/media/mediaRows'
+import { BEST_FIRST, FIRST_ITEM, fileWatched, likePattern, score } from '@/media/mediaSql'
 import { SagaBackdrops } from '@/media/sagaBackdrops'
 import { shuffle } from '@/media/shuffle'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MusicRepository } from '@/music/musicRepository'
-
-/** A media row as the listings read it; the path is selected with the rest but never leaves here. */
-type MediaRow = {
-  id: number
-  library_id: number
-  file_name: string
-  folder: string
-  title: string
-  container: string
-  size: number
-  mtime_ms: number
-  duration: number | null
-  width: number | null
-  height: number | null
-  video_codec: string | null
-  video_bit_depth: number | null
-  hdr: number
-  dolby_vision_only: number
-  dolby_vision_profile: number | null
-  audio_codec: string | null
-  audio_channels: number | null
-  bitrate: number | null
-  thumbnail: string
-  added_at: string
-  changed_at: string
-  year: number | null
-  edition: string | null
-  match: string
-  position: number | null
-  favourited_at: string | null
-  item_id: number | null
-  item_type: string | null
-  item_tmdb_title: string | null
-  item_tmdb_original_title: string | null
-  split: string | null
-  versions: number
-  watched: number
-}
-
-/**
- * A saved spot counts only while its library saves progress; turned off, it
- * is kept but not shown. A file holding two episodes takes the first as its
- * item. `versions` counts the files in the library on the same movie's card,
- * which its `split` names; `IS` holds two NULLs equal, so the files on the
- * movie's own card count each other. The CROSS JOIN makes that count start
- * from the movie's files: left to choose, SQLite walked every file in the
- * library for each card, seconds for a few thousand movies. TMDB's own
- * titles come along for telling a split file's cut. `watched` is the card's,
- * not the file's.
- */
-const SELECT_COLUMNS = `
-  SELECT m.*, CASE WHEN l.save_progress = 1 THEN p.position END AS position,
-         f.added_at AS favourited_at,
-         i.id AS item_id, i.type AS item_type, i.title AS item_title,
-         i.original_title AS item_original_title, i.sort_title AS item_sort_title,
-         COALESCE(i.year, a.year) AS item_year,
-         COALESCE(i.released, a.release_date) AS item_released, t.title AS item_tmdb_title,
-         t.original_title AS item_tmdb_original_title,
-         CASE WHEN i.type = '${ITEM_TYPES.movie}'
-              THEN (SELECT COUNT(*) FROM media_items x CROSS JOIN media y ON y.id = x.media_id
-                     WHERE x.item_id = i.id AND y.library_id = m.library_id
-                       AND y.split IS m.split)
-              ELSE 1 END AS versions,
-         ${cardWatched({ file: 'm', item: 'i' })} AS watched,
-         ${score({ item: 'i.id', source: 'l.ratings_source' })} AS score`
-
-const FROM_MEDIA = `
-    FROM media m
-    JOIN libraries l ON l.id = m.library_id
-    LEFT JOIN playback_progress p ON p.account_id = @account AND p.media_id = m.id
-    LEFT JOIN favourites f ON f.account_id = @account AND f.media_id = m.id
-    LEFT JOIN ${FIRST_ITEM}
-    LEFT JOIN shown_items i ON i.id = mi.item_id
-    LEFT JOIN items t ON t.id = mi.item_id
-    LEFT JOIN tracks audio ON audio.media_id = m.id
-    LEFT JOIN albums a ON a.id = audio.album_id`
-
-const SELECT_MEDIA = `${SELECT_COLUMNS}${FROM_MEDIA}`
-
-/** A video `account` has a saved spot in, in a library that saves progress: what is in progress. */
-const IN_PROGRESS = 'p.media_id IS NOT NULL AND l.save_progress = 1'
-
-/** A video `account` favoured, in a library that is not locked. */
-const FAVOURITE = 'f.media_id IS NOT NULL AND l.locked = 0'
-
-/**
- * What sets a split movie file's card apart: the cut Smart split apart
- * gave it, else the cut or release its name reads as. Null for a file on
- * its movie's own card, and for anything but a movie.
- */
-const variantOf = (row: MediaRow): string | null => {
-  if (row.item_type !== ITEM_TYPES.movie || row.split == null) return null
-  if (row.split.startsWith('cut:')) return row.split.slice('cut:'.length)
-  const titles = [row.item_tmdb_title, row.item_tmdb_original_title]
-  return readCut({ fileName: row.file_name, titles })?.label ?? readRelease(row.file_name)
-}
-
-/** The client's view of a row, before its item's summary is attached: no path, no bookkeeping. */
-const toItem = (row: MediaRow): MediaItem => ({
-  id: row.id,
-  libraryId: row.library_id,
-  title: row.title,
-  fileName: row.file_name,
-  folder: row.folder,
-  size: row.size,
-  container: row.container,
-  duration: row.duration,
-  width: row.width,
-  height: row.height,
-  videoCodec: row.video_codec,
-  videoBitDepth: row.video_bit_depth,
-  hdr: row.hdr === 1,
-  isDolbyVisionOnly: row.dolby_vision_only === 1,
-  dolbyVisionProfile: row.dolby_vision_profile,
-  audioCodec: row.audio_codec,
-  audioChannels: row.audio_channels,
-  bitrate: row.bitrate,
-  thumbnail: isThumbnailState(row.thumbnail) ? row.thumbnail : 'pending',
-  thumbnailVersion: row.mtime_ms,
-  position: row.position ?? 0,
-  favourite: row.favourited_at != null,
-  watched: row.watched === 1,
-  addedAt: row.added_at,
-  changedAt: row.changed_at,
-  match: isMatchState(row.match) ? row.match : 'pending',
-  year: row.year,
-  edition: row.edition,
-  item: null,
-  versions: row.versions,
-  variant: variantOf(row),
-  card: row.item_type === ITEM_TYPES.movie ? row.split : null,
-  album: null,
-})
-
-/** A show in a TV library's listing, before its next episode is looked up. */
-type ShowRow = {
-  id: number
-  ended: string | null
-  episodes: number
-  seasons: number
-  total_episodes: number
-  watched_episodes: number
-  added_at: string
-  bitrate: number | null
-}
-
-const SHOW_BY_TITLE = 'sh.sort_title COLLATE NOCASE, sh.id'
-
-/** The day a show first aired, else its year alone. */
-const SHOW_RELEASED = 'COALESCE(sh.released, CAST(sh.year AS TEXT))'
-
-/**
- * A show's listing order: by its files' mean bitrate for the bitrate sorts,
- * by the day it first aired for the release sorts, and by title for the
- * others that only mean something per file.
- */
-const SHOW_ORDER_BY: Record<MediaSort, string> = {
-  title: SHOW_BY_TITLE,
-  'title-desc': 'sh.sort_title COLLATE NOCASE DESC, sh.id DESC',
-  added: 'added_at DESC, sh.id DESC',
-  oldest: 'added_at, sh.id',
-  changed: 'changed_at DESC, sh.id DESC',
-  'changed-old': 'changed_at, sh.id',
-  largest: SHOW_BY_TITLE,
-  smallest: SHOW_BY_TITLE,
-  'bitrate-high': `bitrate IS NULL, bitrate DESC, ${SHOW_BY_TITLE}`,
-  'bitrate-low': `bitrate IS NULL, bitrate, ${SHOW_BY_TITLE}`,
-  'resolution-high': SHOW_BY_TITLE,
-  'resolution-low': SHOW_BY_TITLE,
-  'year-new': `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED} DESC, ${SHOW_BY_TITLE}`,
-  'year-old': `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED}, ${SHOW_BY_TITLE}`,
-  'rating-high': `score IS NULL, score DESC, ${SHOW_BY_TITLE}`,
-  'rating-low': `score IS NULL, score, ${SHOW_BY_TITLE}`,
-  random: SHOW_BY_TITLE,
-}
-
-/** The files of a library that are episodes, with their show and numbers. */
-const EPISODE_FILES = `
-  SELECT m.id AS media_id, m.library_id, m.added_at, m.changed_at, m.bitrate, e.id AS episode_id,
-         s.parent_id AS show_id, ${fileWatched('m')} AS watched
-    FROM media m
-    JOIN libraries l ON l.id = m.library_id
-    JOIN media_items mi ON mi.media_id = m.id
-    JOIN shown_items e ON e.id = mi.item_id AND e.type = '${ITEM_TYPES.episode}'
-    JOIN shown_items s ON s.id = e.parent_id
-   WHERE m.library_id = ?
-     AND (? IS NULL OR s.parent_id IN (SELECT value FROM json_each(?)))`
-
-const BY_TITLE = 'COALESCE(item_sort_title, title) COLLATE NOCASE, id'
-
-/** SQLite reads a negative LIMIT as none. */
-const NO_LIMIT = -1
-
-type SqlLimitProps = { sort: MediaSort; limit: number | undefined }
-
-/**
- * The LIMIT a listing reads with. A random sort deals from every row, so it
- * reads them all and is cut after the shuffle.
- */
-const sqlLimit = ({ sort, limit }: SqlLimitProps): number =>
-  sort === MEDIA_SORTS.random ? NO_LIMIT : (limit ?? NO_LIMIT)
-
-const YEAR = 'COALESCE(item_year, year)'
 
 /** A card's library and the item on it, if any. */
 type CardItem = { libraryId: number; itemId: number | null }
@@ -268,37 +68,6 @@ const inEachLibrary = ({ entries, lookup }: InEachLibraryProps): Array<ItemSumma
   return entries.map(({ libraryId, itemId }) =>
     itemId == null ? null : (byLibrary.get(libraryId)?.get(itemId) ?? null),
   )
-}
-
-/**
- * The day a title came out, as `YYYY-MM-DD`, else its year alone, which
- * sorts as the start of that year.
- */
-const RELEASED = `COALESCE(item_released, CAST(${YEAR} AS TEXT))`
-
-/**
- * ORDER BY for each sort, over the listing's columns. Ties fall back to
- * title. Bitrate, resolution and release are unknown for some files, and
- * those go last either way. Random lists by title here and is shuffled after.
- */
-const ORDER_BY: Record<MediaSort, string> = {
-  title: BY_TITLE,
-  'title-desc': 'COALESCE(item_sort_title, title) COLLATE NOCASE DESC, id DESC',
-  added: 'added_at DESC, id DESC',
-  oldest: 'added_at, id',
-  changed: 'changed_at DESC, id DESC',
-  'changed-old': 'changed_at, id',
-  largest: `size DESC, ${BY_TITLE}`,
-  smallest: `size, ${BY_TITLE}`,
-  'bitrate-high': `bitrate IS NULL, bitrate DESC, ${BY_TITLE}`,
-  'bitrate-low': `bitrate IS NULL, bitrate, ${BY_TITLE}`,
-  'resolution-high': `width * height IS NULL, width * height DESC, ${BY_TITLE}`,
-  'resolution-low': `width * height IS NULL, width * height, ${BY_TITLE}`,
-  'year-new': `${RELEASED} IS NULL, ${RELEASED} DESC, ${BY_TITLE}`,
-  'year-old': `${RELEASED} IS NULL, ${RELEASED}, ${BY_TITLE}`,
-  'rating-high': `score IS NULL, score DESC, ${BY_TITLE}`,
-  'rating-low': `score IS NULL, score, ${BY_TITLE}`,
-  random: BY_TITLE,
 }
 
 type MediaRepositoryGetManyProps = { ids: readonly number[]; account: AccountKey }
@@ -379,13 +148,15 @@ type MediaRepositoryNextUpProps = { libraryId: number | null; account: AccountKe
 
 type NextUpShowRow = { show_id: number; library_id: number; last_played_at: string }
 
-type ProgressTimeRow = { media_id: number; updated_at: string }
+/** A video in progress, with when its spot was last saved. */
+type InProgressRow = MediaRow & { progress_at: string }
 
 type DatedVideo = { media: MediaItem; at: string }
 
-type MediaRepositoryCountFavouritesProps = { libraryId: number; account: AccountKey }
+/** A next-up episode's file, before it is read. */
+type DatedId = { mediaId: number; at: string }
 
-type MediaRepositoryCountSagasProps = { libraryId: number; account: AccountKey }
+type MediaRepositoryCountFavouritesProps = { libraryId: number; account: AccountKey }
 
 type MediaRepositoryCountWhereProps = { where: string; libraryId: number; account: AccountKey }
 
@@ -468,7 +239,7 @@ export class MediaRepository {
   list({
     libraryId,
     search = '',
-    sort = 'title',
+    sort = MEDIA_SORTS.title,
     seed = 0,
     limit,
     account,
@@ -547,7 +318,7 @@ export class MediaRepository {
   listShows({
     libraryId,
     search = '',
-    sort = 'title',
+    sort = MEDIA_SORTS.title,
     seed = 0,
     limit,
     showIds = null,
@@ -714,27 +485,20 @@ export class MediaRepository {
    * progress itself.
    */
   listInProgress({ libraryId = null, account }: MediaRepositoryListInProgressProps): MediaItem[] {
-    const started = this.items(
-      this.db
-        .prepare<{ libraryId: number | null; account: AccountKey }, MediaRow>(
-          `${SELECT_MEDIA} WHERE ${IN_PROGRESS}
-              AND (@libraryId IS NULL OR m.library_id = @libraryId)
-            ORDER BY p.updated_at DESC, m.id DESC`,
-        )
-        .all({ libraryId, account }),
-    )
+    const rows = this.db
+      .prepare<{ libraryId: number | null; account: AccountKey }, InProgressRow>(
+        `${SELECT_COLUMNS}, p.updated_at AS progress_at${FROM_MEDIA} WHERE ${IN_PROGRESS}
+            AND (@libraryId IS NULL OR m.library_id = @libraryId)
+          ORDER BY p.updated_at DESC, m.id DESC`,
+      )
+      .all({ libraryId, account })
+    const started = this.items(rows)
     const upNext = this.nextUp({ libraryId, account })
     if (upNext.length === 0) return started
-    const times = new Map(
-      this.db
-        .prepare<[ByAccount, string], ProgressTimeRow>(
-          `SELECT media_id, updated_at FROM playback_progress
-            WHERE account_id = @account AND media_id IN (SELECT value FROM json_each(?))`,
-        )
-        .all({ account }, JSON.stringify(started.map((media) => media.id)))
-        .map((row) => [row.media_id, row.updated_at]),
-    )
-    const dated: DatedVideo[] = started.map((media) => ({ media, at: times.get(media.id) ?? '' }))
+    const dated = started.map((media, index): DatedVideo => ({
+      media,
+      at: rows[index]?.progress_at ?? '',
+    }))
     return [...dated, ...upNext]
       .toSorted((a, b) => b.at.localeCompare(a.at))
       .map(({ media }) => media)
@@ -752,7 +516,7 @@ export class MediaRepository {
    * every row; their chain is spelled out again rather than shared in a CTE,
    * which SQLite planned by the titles' type index without statistics.
    */
-  private nextUp({ libraryId, account }: MediaRepositoryNextUpProps): DatedVideo[] {
+  private nextUpIds({ libraryId, account }: MediaRepositoryNextUpProps): DatedId[] {
     const shows = this.db
       .prepare<{ libraryId: number | null; account: AccountKey }, NextUpShowRow>(
         `WITH played AS (
@@ -798,12 +562,20 @@ export class MediaRepository {
       libraryIds: [...new Set(shows.map((row) => row.library_id))],
       account,
     })
+    return [...next].map(([showId, mediaId]) => ({ mediaId, at: lastWatched.get(showId) ?? '' }))
+  }
+
+  /** `nextUpIds`' episodes, each to start from the beginning. */
+  private nextUp(props: MediaRepositoryNextUpProps): DatedVideo[] {
+    const dated = this.nextUpIds(props)
     const episodes = new Map(
-      this.getMany({ ids: [...next.values()], account }).map((item) => [item.id, item]),
+      this.getMany({ ids: dated.map(({ mediaId }) => mediaId), account: props.account }).map(
+        (item) => [item.id, item],
+      ),
     )
-    return [...next].flatMap(([showId, mediaId]): DatedVideo[] => {
+    return dated.flatMap(({ mediaId, at }): DatedVideo[] => {
       const media = episodes.get(mediaId)
-      return media ? [{ media: { ...media, position: 0 }, at: lastWatched.get(showId) ?? '' }] : []
+      return media ? [{ media: { ...media, position: 0 }, at }] : []
     })
   }
 
@@ -883,7 +655,7 @@ export class MediaRepository {
   countInProgress({ libraryId, account }: MediaRepositoryCountInProgressProps): number {
     return (
       this.countWhere({ where: IN_PROGRESS, libraryId, account }) +
-      this.nextUp({ libraryId, account }).length
+      this.nextUpIds({ libraryId, account }).length
     )
   }
 
@@ -907,7 +679,7 @@ export class MediaRepository {
                     ROW_NUMBER() OVER (PARTITION BY i.id ORDER BY ${BEST_FIRST}) AS version_rank
              ${FROM_MEDIA}
               WHERE m.library_id = ? AND i.type = '${ITEM_TYPES.movie}' AND t.saga_tmdb_id IS NOT NULL)
-           SELECT * FROM ranked WHERE version_rank = 1 ORDER BY ${ORDER_BY['year-old']}`,
+           SELECT * FROM ranked WHERE version_rank = 1 ORDER BY ${ORDER_BY[MEDIA_SORTS.yearOld]}`,
         )
         .all({ account }, libraryId),
     )
@@ -929,8 +701,26 @@ export class MediaRepository {
       .toSorted((a, b) => a.name.localeCompare(b.name))
   }
 
-  /** How many sagas `listSagas` lists for the library, without their backdrops. */
-  countSagas({ libraryId, account }: MediaRepositoryCountSagasProps): number {
-    return this.sagaGroups({ libraryId, account }).length
+  /**
+   * How many sagas `listSagas` lists for the library, without reading its
+   * movies: the collections two or more of its matched movies are in.
+   */
+  countSagas(libraryId: number): number {
+    return (
+      this.db
+        .prepare<[number], { count: number }>(
+          `SELECT COUNT(*) AS count FROM (
+             SELECT t.saga_tmdb_id
+               FROM media m
+               JOIN ${FIRST_ITEM}
+               JOIN shown_items i ON i.id = mi.item_id
+               JOIN items t ON t.id = mi.item_id
+              WHERE m.library_id = ? AND i.type = '${ITEM_TYPES.movie}'
+                AND t.saga_tmdb_id IS NOT NULL AND t.saga_name IS NOT NULL
+              GROUP BY t.saga_tmdb_id
+             HAVING COUNT(DISTINCT i.id) > 1)`,
+        )
+        .get(libraryId)?.count ?? 0
+    )
   }
 }

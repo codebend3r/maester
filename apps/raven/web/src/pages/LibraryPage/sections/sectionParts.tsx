@@ -36,6 +36,8 @@ type SectionQueryProps<T> = {
   query: QueryRead<T>
   /** The shape of what is on its way, in grey. */
   shape: ReactNode
+  /** What a screen reader hears while it is on its way. */
+  loading?: string
   isEmpty: (data: T) => boolean
   /** What the tab says when its list holds nothing. */
   empty: string
@@ -49,13 +51,14 @@ type SectionQueryProps<T> = {
 export const SectionQuery = <T,>({
   query,
   shape,
+  loading = COMMON_COPY.loading,
   isEmpty,
   empty,
   children,
 }: SectionQueryProps<T>) => (
   <QueryView
     query={query}
-    pending={<Loading label={COMMON_COPY.loading}>{shape}</Loading>}
+    pending={<Loading label={loading}>{shape}</Loading>}
     renderFailed={(error) => <SectionFailed error={error} />}
     empty={{ isEmpty, shown: <SectionMessage message={empty} /> }}
   >

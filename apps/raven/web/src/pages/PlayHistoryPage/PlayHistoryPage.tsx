@@ -11,13 +11,13 @@ import {
   isPlayHistoryShow,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type ComponentType, type ReactNode, useId } from 'react'
+import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
+import { ForManagers } from '@/components/ManagersOnly/ManagersOnly'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { type ManagementMode, useManagement } from '@/lib/management'
+import { useManagement } from '@/lib/management'
 import { everyonesHistoryQuery, playHistoryQuery } from '@/lib/queries'
 import { PLAY_HISTORY_SEARCH } from '@/lib/playHistory'
 import { type AccountName, accountNamesOf, useAccounts } from '@/lib/useAccounts'
@@ -193,8 +193,6 @@ const AccountPicker = ({ accounts, accountId, onAccount }: AccountPickerProps) =
   )
 }
 
-type EveryoneViewProps = { mode: ManagementMode }
-
 /** Everyone's history once the viewer may manage: whose to read, what to show, and the table with an account column. */
 const EveryoneHistory = () => {
   const titleId = useId()
@@ -221,31 +219,18 @@ const EveryoneHistory = () => {
   )
 }
 
-const NotManaging = ({ mode }: EveryoneViewProps) => (
-  <ManagersOnly
-    mode={mode}
-    name={PLAY_HISTORY_COPY.everyoneTitle}
-    forAdmin={PLAY_HISTORY_COPY.managersOnlyFor}
-    forOwner={PLAY_HISTORY_COPY.managersOnlyFor}
-  />
-)
-
-const MANAGE_STATES = { managing: 'managing', refused: 'refused' } as const
-type ManageState = (typeof MANAGE_STATES)[keyof typeof MANAGE_STATES]
-
-const EVERYONE_VIEWS = {
-  [MANAGE_STATES.managing]: EveryoneHistory,
-  [MANAGE_STATES.refused]: NotManaging,
-} as const satisfies Record<ManageState, ComponentType<EveryoneViewProps>>
-
 /**
  * `/history/everyone`: what every account played, for the owner (or the
  * admin, on a server without accounts), with each entry's account and a
  * picker for one account's. Anyone else is told it is the owner's, and
  * nothing is asked of the server, which refuses them anyway.
  */
-export const EveryonesHistoryPage = () => {
-  const { mode, canManage } = useManagement()
-  const View = EVERYONE_VIEWS[canManage ? MANAGE_STATES.managing : MANAGE_STATES.refused]
-  return <View mode={mode} />
-}
+export const EveryonesHistoryPage = () => (
+  <ForManagers
+    name={PLAY_HISTORY_COPY.everyoneTitle}
+    forAdmin={PLAY_HISTORY_COPY.managersOnlyFor}
+    forOwner={PLAY_HISTORY_COPY.managersOnlyFor}
+  >
+    <EveryoneHistory />
+  </ForManagers>
+)

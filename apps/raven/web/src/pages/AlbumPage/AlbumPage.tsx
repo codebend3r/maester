@@ -5,18 +5,10 @@ import {
   MATCH_STATES,
   QUEUE_SOURCE_KINDS,
   RADIO_SEED_KINDS,
-  ROUTE_STATES,
-  type RouteQuery,
   routeState,
 } from '@raven/core'
 import { BUTTON_TONES, Button } from '@raven/ui'
-import {
-  afterAlbumMatch,
-  useAudioQueue,
-  KeyedView,
-  type ViewOf,
-  type ViewsOf,
-} from '@raven/ui/headless'
+import { afterAlbumMatch, useAudioQueue } from '@raven/ui/headless'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlaylistDialog'
@@ -26,7 +18,7 @@ import { AlbumMatchDialog } from '@/components/AlbumMatchDialog/AlbumMatchDialog
 import { BackButton } from '@/components/BackButton/BackButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
@@ -198,34 +190,13 @@ const AlbumSkeleton = () => (
   </>
 )
 
-const ALBUM_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type AlbumPageViewProps = {
-  [ALBUM_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [ALBUM_VIEW_KEYS.ready]: AlbumViewProps
-}
-
-const ALBUM_VIEWS = {
-  [ALBUM_VIEW_KEYS.pending]: RouteState,
-  [ALBUM_VIEW_KEYS.ready]: AlbumView,
-} as const satisfies ViewsOf<AlbumPageViewProps>
-
-type AlbumPageViewOfProps = { page: RouteQuery<AlbumDetails> }
-
-/** Which view the page shows: the album on its way, missing or failing, or the album. */
-const albumPageViewOf = ({ page }: AlbumPageViewOfProps): ViewOf<AlbumPageViewProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: ALBUM_VIEW_KEYS.pending,
-      props: { state: page, noun: ALBUM_COPY.noun, shape: <AlbumSkeleton /> },
-    }
-  return { key: ALBUM_VIEW_KEYS.ready, props: { details: page.data } }
-}
-
 /** `/albums/:id`: an album's cover, artists, facts and tracks, which play into the queue. */
 export const AlbumPage = () => {
   const id = useRouteId()
-  const album = useQuery(albumQuery(id))
-  const page = routeState({ id, query: album })
-  return <KeyedView<AlbumPageViewProps> views={ALBUM_VIEWS} view={albumPageViewOf({ page })} />
+  const page = routeState({ id, query: useQuery(albumQuery(id)) })
+  return (
+    <RouteView page={page} noun={ALBUM_COPY.noun} shape={<AlbumSkeleton />}>
+      {(details) => <AlbumView details={details} />}
+    </RouteView>
+  )
 }

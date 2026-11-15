@@ -5,7 +5,7 @@ import pytest
 from sparrow.agent.tools import Refused, Result, Tier
 from sparrow.clients.seerr import IssueType
 from sparrow.clients.tautulli import StreamData
-from sparrow.media import Decision, ReportKind, ReportStatus
+from sparrow.media import Decision, ReportKind
 from sparrow.notify import AdminPost, DirectMessage
 from sparrow.playback.diagnosis import FileChecked, PlayerLimit, TheirWord
 from sparrow.playback.reports import Evidence
@@ -218,20 +218,15 @@ async def test_after_a_player_fix_a_second_report_checks_the_file(library):
     )
 
 
-async def test_resolved_and_declined_reports_no_longer_testify(library):
+async def test_resolved_reports_no_longer_testify(library):
     link_pal(library)
     first = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
     library.store.set_issue_resolved(first.report.seerr_issue_id, True)
     second = await report(library, DUNE_4K_ITEM, ReportKind.CAM, user="d2")
     assert second.report.decision is Decision.RECORDED  # the resolved report doesn't count
-    # The admin declined replacing it for the second report: that one is spent...
-    library.store.move_report(second.report.id, {ReportStatus.OPEN}, ReportStatus.DECLINED)
+    # Two reports that still stand prove the file.
     third = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
-    assert third.report.decision is Decision.RECORDED
-    assert third.evidence.describe() == "1 report and no failed file check"
-    # ...but it covers only that report: two new ones stand on their own evidence.
-    fourth = await report(library, DUNE_4K_ITEM, ReportKind.CAM, user="d2")
-    assert fourth.report.decision is Decision.REPLACEABLE
+    assert third.report.decision is Decision.REPLACEABLE
 
 
 async def test_one_friends_claims_never_make_a_healthy_file_replaceable(library):

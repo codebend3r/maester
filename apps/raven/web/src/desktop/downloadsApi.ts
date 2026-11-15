@@ -12,7 +12,7 @@ import {
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query'
-import { askMain, refusalText } from '@/desktop/client'
+import { askMain, readMain } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import type { DownloadsChange } from '@/downloads/host'
 import { useDownloadsHost } from '@/stores/downloadsHost'
@@ -29,12 +29,13 @@ export const useDownloads = (): UseQueryResult<DownloadsData> => {
   return useQuery({
     queryKey: DESKTOP_QUERY_KEYS.downloads,
     queryFn: async () => {
-      const reply = await host.request({ type: DESKTOP_REQUESTS.listDownloads })
-      if (reply.type === DESKTOP_REPLIES.downloads) {
-        useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
-        return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
-      }
-      throw new Error(refusalText({ reply, fallback: NO_DOWNLOADS }))
+      const reply = await readMain({
+        client: host,
+        request: { type: DESKTOP_REQUESTS.listDownloads },
+        fallback: NO_DOWNLOADS,
+      })
+      useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
+      return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
     },
     retry: false,
   })
@@ -95,9 +96,12 @@ export const useSpace = (): UseQueryResult<SpaceView> => {
   return useQuery({
     queryKey: DESKTOP_QUERY_KEYS.space,
     queryFn: async () => {
-      const reply = await host.request({ type: DESKTOP_REQUESTS.readSpace })
-      if (reply.type === DESKTOP_REPLIES.space) return reply.space
-      throw new Error(refusalText({ reply, fallback: NO_SPACE }))
+      const reply = await readMain({
+        client: host,
+        request: { type: DESKTOP_REQUESTS.readSpace },
+        fallback: NO_SPACE,
+      })
+      return reply.space
     },
     retry: false,
   })

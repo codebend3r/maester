@@ -44,7 +44,7 @@ import {
 } from '@/main/player/loadTarget'
 import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
 import { type ApplyOutputProps, isVolumeFixedFor, outputOptions } from '@/main/player/outputOptions'
-import { type Phase, PLAYER_PHASES } from '@/main/player/phases'
+import { PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import type { MusicResolveProps } from '@/main/player/musicSource'
 import { createQuietMpv } from '@/main/player/quietMpv'
@@ -109,6 +109,36 @@ type Held = { mediaId: number; target: LoadTarget }
  * level and the `af` it starts with.
  */
 type Queued = Held & { kbps: AudioBitrate | null; level: number; filter: string }
+
+/** What the engine knows of the track it plays, from its load until it ends. */
+type Track = {
+  playing: Held
+  queued: Queued | null
+  /** The `af` the playing track runs, so a `sound` that changes nothing sets nothing. */
+  filter: string
+  lastTime: number
+  duration: number | null
+}
+
+/** Where the music engine is, with what that phase alone holds. */
+type AudioState =
+  | { phase: typeof PLAYER_PHASES.idle }
+  | { phase: typeof PLAYER_PHASES.dead }
+  | ({
+      phase: typeof PLAYER_PHASES.loading
+      /** The `af` a `sound` asked for while the file loads, set once it has loaded. */
+      pendingFilter: string | null
+    } & Track)
+  | ({ phase: typeof PLAYER_PHASES.loaded } & Track)
+
+type TrackState = Extract<AudioState, Track>
+
+const IDLE = { phase: PLAYER_PHASES.idle } as const satisfies AudioState
+
+const DEAD = { phase: PLAYER_PHASES.dead } as const satisfies AudioState
+
+const hasTrack = (state: AudioState): state is TrackState =>
+  state.phase === PLAYER_PHASES.loading || state.phase === PLAYER_PHASES.loaded
 
 type QueueNextProps = Omit<Extract<AudioCommand, { type: typeof AUDIO_COMMANDS.queueNext }>, 'type'>
 
@@ -188,16 +218,17 @@ export const createAudioService = ({
   onPlaying: reportPlaying,
   warn: reportWarning,
 }: CreateAudioServiceProps): AudioService => {
-  let playing: Held | null = null
-  let queued: Queued | null = null
-  let phase: Phase = PLAYER_PHASES.idle
+  let state: AudioState = IDLE
+  const trackOf = (): Track | null => (hasTrack(state) ? state : null)
+  const updateTrack = (change: Partial<Track>): void => {
+    if (!hasTrack(state)) return
+    state = { ...state, ...change }
+  }
   /*
    * Bumped by every load, stop and engine stop, so a step started for one of them notices it
    * was overtaken.
    */
   let epoch = 0
-  let lastTime = 0
-  let duration: number | null = null
   let isPaused = false
   // mpv's speed outlives each file, so it is kept across loads and stops too.
   let rate = 1
@@ -205,28 +236,25 @@ export const createAudioService = ({
   let shown: Shown | null = null
   // The equalizer the page last asked for, which every track mpv opens starts with.
   let eq: EqGains = EQ_PRESETS.flat
-  // The `af` the playing track runs, so a `sound` that changes nothing sets nothing.
-  let soundFilter = ''
-  // The `af` a `sound` asked for while a file loaded, set once it has.
-  let pendingFilter: string | null = null
   // These run inside the wrapper's event drain, so nothing they throw may escape.
   const warn = quietly((message) =>
-    reportWarning(withoutTarget({ target: playing?.target ?? null, message })),
+    reportWarning(withoutTarget({ target: trackOf()?.playing.target ?? null, message })),
   )
   const onPlaying = reporting({ report: reportPlaying, warn, what: 'music activity' })
   const { emit, subscribe } = createListeners<AudioEvent>({ warn, what: 'music listener' })
 
   const mpv = guardedMpv(unguarded)
   const { setEach, harden } = createQuietMpv({ mpv, warn })
-  const isDead = () => phase === PLAYER_PHASES.dead
+  const isDead = () => state.phase === PLAYER_PHASES.dead
 
   const showNowPlaying = () => {
     if (shown === null || isDead()) return
     try {
+      const track = trackOf()
       unguarded.nowPlaying({
         ...shown,
-        duration: duration ?? 0,
-        position: lastTime,
+        duration: track?.duration ?? 0,
+        position: track?.lastTime ?? 0,
         isPlaying: !isPaused,
         rate,
       })
@@ -254,22 +282,18 @@ export const createAudioService = ({
   }
 
   /** Back to nothing playing: both relay loads retired, the page told it stopped. */
-  const settle = (next: typeof PLAYER_PHASES.idle | typeof PLAYER_PHASES.dead) => {
-    phase = next
+  const settle = (next: typeof IDLE | typeof DEAD) => {
+    const track = trackOf()
+    state = next
     epoch += 1
-    retire(playing)
-    retire(queued)
-    playing = null
-    queued = null
-    pendingFilter = null
-    lastTime = 0
-    duration = null
+    retire(track?.playing ?? null)
+    retire(track?.queued ?? null)
     onPlaying(false)
   }
 
   const onEngineStopped = () => {
     if (isDead()) return
-    settle(PLAYER_PHASES.dead)
+    settle(DEAD)
     hideNowPlaying()
     emit({
       type: AUDIO_EVENTS.error,
@@ -279,17 +303,17 @@ export const createAudioService = ({
   }
 
   const onProperty = (event: Extract<MpvEvent, { type: typeof MPV_EVENTS.property }>) => {
-    if (phase === PLAYER_PHASES.idle) return
+    if (!hasTrack(state)) return
     switch (event.name) {
       case MPV_PROPERTIES.timePos:
         if (event.data === null) return
-        lastTime = event.data
+        updateTrack({ lastTime: event.data })
         emit({ type: AUDIO_EVENTS.time, time: event.data })
         return
       // mpv clears the duration as a file closes, before its end-file, so null is not the track's.
       case MPV_PROPERTIES.duration:
         if (event.data === null) return
-        duration = event.data
+        updateTrack({ duration: event.data })
         emit({ type: AUDIO_EVENTS.duration, duration: event.data })
         showNowPlaying()
         return
@@ -308,12 +332,11 @@ export const createAudioService = ({
   }
 
   const onFileLoaded = () => {
-    if (phase !== PLAYER_PHASES.loading) return
-    phase = PLAYER_PHASES.loaded
-    const filter = pendingFilter
-    pendingFilter = null
-    if (filter === null || filter === soundFilter) return
-    soundFilter = filter
+    if (state.phase !== PLAYER_PHASES.loading) return
+    const { pendingFilter: filter, ...track } = state
+    const isNews = filter !== null && filter !== track.filter
+    state = { ...track, phase: PLAYER_PHASES.loaded, filter: isNews ? filter : track.filter }
+    if (!isNews) return
     mpv.set({ name: MPV_OPTIONS.af, value: filter }).catch((error: unknown) => {
       warn(`mpv af failed: ${messageOf(error)}`)
     })
@@ -339,7 +362,8 @@ export const createAudioService = ({
   type OnEndFileProps = { reason: MpvEndFileReason }
 
   const onEndFile = ({ reason }: OnEndFileProps) => {
-    if (phase === PLAYER_PHASES.idle) return
+    if (!hasTrack(state)) return
+    const { playing, queued } = state
     switch (reason) {
       case MPV_END_FILE_REASONS.eof: {
         if (queued !== null) {
@@ -348,26 +372,26 @@ export const createAudioService = ({
            * It started with the `af` it was queued with, so the page's `sound` for it is no news.
            */
           retire(playing)
-          playing = queued
-          soundFilter = queued.filter
-          pendingFilter = null
-          queued = null
-          lastTime = 0
-          duration = null
-          phase = PLAYER_PHASES.loading
+          state = {
+            phase: PLAYER_PHASES.loading,
+            playing: queued,
+            queued: null,
+            filter: queued.filter,
+            pendingFilter: null,
+            lastTime: 0,
+            duration: null,
+          }
           emit({ type: AUDIO_EVENTS.advanced })
           return
         }
-        settle(PLAYER_PHASES.idle)
+        settle(IDLE)
         emit({ type: AUDIO_EVENTS.ended })
         return
       }
       case MPV_END_FILE_REASONS.error: {
-        const ended = playing
-        settle(PLAYER_PHASES.idle)
+        settle(IDLE)
         hideNowPlaying()
-        if (ended === null) return
-        onEndedEarly(ended.target).catch((error: unknown) => {
+        onEndedEarly(playing.target).catch((error: unknown) => {
           warn(`music ending failed: ${messageOf(error)}`)
         })
         return
@@ -459,7 +483,8 @@ export const createAudioService = ({
    * append leaves the next end a plain `ended`.
    */
   const queueNext = async ({ next }: QueueNextProps): Promise<PlayerOutcome> => {
-    if (phase === PLAYER_PHASES.idle) return OK
+    if (!hasTrack(state)) return OK
+    const { queued } = state
     const filter = next === null ? '' : soundFilterOf({ level: next.level, eq })
     if (
       next !== null &&
@@ -475,9 +500,9 @@ export const createAudioService = ({
     await mpv.command({ args: [MPV_COMMANDS.playlistClear] })
     if (token !== epoch) return overtaken()
     // mpv moved on to `previous` while it cleared: the page's `advanced` brings a fresh queueNext.
-    if (queued !== previous) return OK
+    if ((trackOf()?.queued ?? null) !== previous) return OK
     retire(previous)
-    queued = null
+    updateTrack({ queued: null })
     if (next === null) return OK
     const resolved = await resolve({ mediaId: next.mediaId, kbps: next.kbps })
     if (token !== epoch) {
@@ -502,7 +527,7 @@ export const createAudioService = ({
       retire(held)
       return overtaken()
     }
-    queued = held
+    updateTrack({ queued: held })
     return OK
   }
 
@@ -517,23 +542,23 @@ export const createAudioService = ({
     const isHardened = await hardening
     if (!isHardened) return refuse(PLAYER_MESSAGES.failed)
     if (token !== epoch) return overtaken()
-    retire(playing)
-    retire(queued)
-    playing = { mediaId: command.mediaId, target: resolved.target }
-    queued = null
-    phase = PLAYER_PHASES.loading
-    lastTime = Math.max(0, command.start)
-    duration = null
-    soundFilter = soundFilterOf({ level: command.level, eq })
-    pendingFilter = null
+    const replaced = trackOf()
+    retire(replaced?.playing ?? null)
+    retire(replaced?.queued ?? null)
+    const start = Math.max(0, command.start)
+    const filter = soundFilterOf({ level: command.level, eq })
+    state = {
+      phase: PLAYER_PHASES.loading,
+      playing: { mediaId: command.mediaId, target: resolved.target },
+      queued: null,
+      filter,
+      pendingFilter: null,
+      lastTime: start,
+      duration: null,
+    }
     await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
     if (token !== epoch) return overtaken()
-    await loadfile({
-      target: resolved.target,
-      mode: MPV_LOADFILE_MODES.replace,
-      start: lastTime,
-      filter: soundFilter,
-    })
+    await loadfile({ target: resolved.target, mode: MPV_LOADFILE_MODES.replace, start, filter })
     if (token !== epoch) return overtaken()
     return queueNext({ next: command.next })
   }
@@ -545,15 +570,16 @@ export const createAudioService = ({
    */
   const setSound = async (command: SetSoundProps): Promise<PlayerOutcome> => {
     eq = command.eq
-    if (phase === PLAYER_PHASES.idle) return OK
+    if (!hasTrack(state)) return OK
     const filter = soundFilterOf({ level: command.level, eq })
     // A file still loading takes it once loaded, or its own `af` would undo it.
-    if (phase === PLAYER_PHASES.loading) {
-      pendingFilter = filter
-    } else if (filter !== soundFilter) {
+    if (state.phase === PLAYER_PHASES.loading) {
+      state = { ...state, pendingFilter: filter }
+    } else if (filter !== state.filter) {
       await mpv.set({ name: MPV_OPTIONS.af, value: filter })
-      soundFilter = filter
+      updateTrack({ filter })
     }
+    const queued = trackOf()?.queued ?? null
     if (queued === null || command.nextLevel === null) return OK
     return queueNext({
       next: { mediaId: queued.mediaId, level: command.nextLevel, kbps: queued.kbps },
@@ -561,7 +587,7 @@ export const createAudioService = ({
   }
 
   const stop = async (): Promise<PlayerOutcome> => {
-    settle(PLAYER_PHASES.idle)
+    settle(IDLE)
     hideNowPlaying()
     await mpv.command({ args: [MPV_COMMANDS.stop] })
     return OK
@@ -580,13 +606,13 @@ export const createAudioService = ({
         await mpv.set({ name: MPV_PROPERTIES.pause, value: true })
         return OK
       case AUDIO_COMMANDS.seek: {
-        if (phase === PLAYER_PHASES.idle) return OK
+        if (!hasTrack(state)) return OK
         const target = clamp({
           value: command.time,
           min: 0,
-          max: duration ?? Number.POSITIVE_INFINITY,
+          max: state.duration ?? Number.POSITIVE_INFINITY,
         })
-        lastTime = target
+        updateTrack({ lastTime: target })
         await mpv.command({ args: [MPV_COMMANDS.seek, String(target), MPV_SEEK_MODES.absolute] })
         showNowPlaying()
         return OK
@@ -637,13 +663,13 @@ export const createAudioService = ({
     isDead,
     subscribe,
     reset: async () => {
-      if (phase === PLAYER_PHASES.idle || isDead()) return
+      if (!hasTrack(state)) return
       await handle({ type: AUDIO_COMMANDS.stop })
     },
     // Latches as dead: the mpv behind it is destroyed.
     dispose: () => {
       if (isDead()) return
-      settle(PLAYER_PHASES.dead)
+      settle(DEAD)
       shown = null
     },
     applyOutput: async ({ output, devices }) => {
@@ -653,7 +679,7 @@ export const createAudioService = ({
         mpv,
         setEach,
         options: outputOptions({ output, devices, canChooseAo, platform }),
-        isLoaded: () => phase === PLAYER_PHASES.loaded,
+        isLoaded: () => state.phase === PLAYER_PHASES.loaded,
         warn,
       })
     },

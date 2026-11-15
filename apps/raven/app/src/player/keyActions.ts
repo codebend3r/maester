@@ -1,10 +1,13 @@
 import {
+  type HostAction,
   KEYS,
   type KeyPress,
   PLAYER_ACTIONS,
+  PLAYER_ANSWERS,
   type PlayerAction,
-  SEEK_EDGES,
+  type PlayerAnswer,
   type SkipStep,
+  resolvePlayerAction,
   shortcutFor,
 } from '@raven/core'
 
@@ -28,20 +31,18 @@ export const PLAYER_KEYS: readonly string[] = KEY_CANDIDATES.filter(
 )
 
 export const KEY_ANSWERS = {
-  seek: 'seek',
+  seek: PLAYER_ANSWERS.seek,
   skip: 'skip',
-  togglePlay: 'togglePlay',
-  volume: 'volume',
+  togglePlay: PLAYER_ANSWERS.togglePlay,
+  volume: PLAYER_ANSWERS.volume,
   subtitle: 'subtitle',
   leave: 'leave',
 } as const
 
 /** What the touch chrome does for a key: the same as the button for it would. */
 export type KeyAnswer =
-  | { type: typeof KEY_ANSWERS.seek; to: number }
+  | Exclude<PlayerAnswer, { type: typeof PLAYER_ANSWERS.host }>
   | { type: typeof KEY_ANSWERS.skip; direction: SkipStep['direction'] }
-  | { type: typeof KEY_ANSWERS.togglePlay }
-  | { type: typeof KEY_ANSWERS.volume; volume: number; isMuted: boolean }
   | { type: typeof KEY_ANSWERS.subtitle; key: string }
   | { type: typeof KEY_ANSWERS.leave }
 
@@ -71,8 +72,6 @@ type ActionAnswerOfProps = Pick<
   action: Exclude<PlayerAction, { type: typeof PLAYER_ACTIONS.skip }>
 }
 
-const clampVolume = (value: number): number => Math.min(1, Math.max(0, value))
-
 /** Subtitles go off when any are on, and otherwise the first the picker offers goes on. */
 const subtitleToggleOf = (subtitles: SubtitleChoice | null): KeyAnswer | null => {
   if (subtitles === null) return null
@@ -82,31 +81,14 @@ const subtitleToggleOf = (subtitles: SubtitleChoice | null): KeyAnswer | null =>
   return first === null ? null : { type: KEY_ANSWERS.subtitle, key: first.key }
 }
 
-/** The chrome's answer to every action but a skip. */
-const actionAnswerOf = ({
-  action,
-  position,
-  duration,
-  volume,
-  isMuted,
-  subtitles,
-}: ActionAnswerOfProps): KeyAnswer | null => {
+type HostAnswerOfProps = {
+  action: HostAction
+  subtitles: SubtitleChoice | null
+}
+
+/** The chrome's answer to an action core hands back to its host: subtitles and Escape only. */
+const hostAnswerOf = ({ action, subtitles }: HostAnswerOfProps): KeyAnswer | null => {
   switch (action.type) {
-    case PLAYER_ACTIONS.togglePlay:
-      return { type: KEY_ANSWERS.togglePlay }
-    case PLAYER_ACTIONS.seekToFraction:
-      return duration === null ? null : { type: KEY_ANSWERS.seek, to: duration * action.fraction }
-    case PLAYER_ACTIONS.seekToEdge:
-      return {
-        type: KEY_ANSWERS.seek,
-        to: action.edge === SEEK_EDGES.start ? 0 : (duration ?? position),
-      }
-    case PLAYER_ACTIONS.volumeBy: {
-      const next = clampVolume((isMuted ? 0 : volume) + action.delta)
-      return { type: KEY_ANSWERS.volume, volume: next, isMuted: next === 0 }
-    }
-    case PLAYER_ACTIONS.toggleMute:
-      return { type: KEY_ANSWERS.volume, volume, isMuted: !isMuted }
     case PLAYER_ACTIONS.toggleSubtitles:
       return subtitleToggleOf(subtitles)
     case PLAYER_ACTIONS.escape:
@@ -123,6 +105,15 @@ const actionAnswerOf = ({
       return unknown
     }
   }
+}
+
+/** The chrome's answer to every action but a skip: core's shared answers, then the host's. */
+const actionAnswerOf = ({ action, subtitles, ...state }: ActionAnswerOfProps): KeyAnswer | null => {
+  // A skip never reaches here, so the skip ladder core keeps is never read.
+  const { answer } = resolvePlayerAction({ action, state: { ...state, lastSkip: null, now: 0 } })
+  if (answer === null) return null
+  if (answer.type !== PLAYER_ANSWERS.host) return answer
+  return hostAnswerOf({ action: answer.action, subtitles })
 }
 
 /**

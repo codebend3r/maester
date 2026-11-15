@@ -26,12 +26,12 @@ What a request is refused with, as JSON:
 
 from __future__ import annotations
 
+import enum
 import hashlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from fastapi import Request
 
@@ -47,13 +47,26 @@ COOKIE = "maester_session"
 CACHE_TTL = timedelta(seconds=30)
 
 
-class Refused(Exception):
-    """A request turned away, with the status and JSON body to answer with."""
+class Reason(enum.StrEnum):
+    """Why a request was turned away: the `reason` of its JSON body."""
 
-    def __init__(self, status: int, body: dict[str, Any]):
-        super().__init__(body.get("reason", ""))
+    SIGNED_OUT = "signed_out"
+    SIGN_IN_UNAVAILABLE = "sign_in_unavailable"
+    UNLINKED = "unlinked"
+    NOT_ADMIN = "not_admin"
+    JSON_ONLY = "json_only"
+    UNKNOWN_USER = "unknown_user"
+    UNKNOWN_CASE = "unknown_case"
+
+
+class Refused(Exception):
+    """A request turned away, with the status to answer with and a body of its `reason`
+    and whatever else the page needs to act on it."""
+
+    def __init__(self, status: int, reason: Reason, **extra: object):
+        super().__init__(reason)
         self.status = status
-        self.body = body
+        self.body: dict[str, object] = {"reason": reason, **extra}
 
 
 class SignInUnavailable(RuntimeError):
@@ -123,7 +136,7 @@ def require_json(request: Request) -> None:
     """A dependency for every write route: the body must be JSON."""
     content_type = request.headers.get("content-type", "")
     if content_type.split(";")[0].strip().lower() != "application/json":
-        raise Refused(415, {"reason": "json_only"})
+        raise Refused(415, Reason.JSON_ONLY)
 
 
 class Auth:
@@ -141,7 +154,7 @@ class Auth:
             account = await self.verifier.account(token)
         except SignInUnavailable:
             log.warning("rookery couldn't be asked who a session belongs to", exc_info=True)
-            raise Refused(503, {"reason": "sign_in_unavailable"}) from None
+            raise Refused(503, Reason.SIGN_IN_UNAVAILABLE) from None
         if account is None:
             raise self._signed_out()
         await self.identity.load_owner()
@@ -155,14 +168,14 @@ class Auth:
         if viewer.tier == Tier.UNLINKED:
             owner = self.identity.owner
             admin = owner.username if owner else None
-            raise Refused(403, {"reason": "unlinked", "admin": admin})
+            raise Refused(403, Reason.UNLINKED, admin=admin)
         return viewer
 
     async def admin(self, request: Request) -> Viewer:
         viewer = await self.signed_in(request)
         if viewer.tier != Tier.ADMIN:
-            raise Refused(403, {"reason": "not_admin"})
+            raise Refused(403, Reason.NOT_ADMIN)
         return viewer
 
     def _signed_out(self) -> Refused:
-        return Refused(401, {"reason": "signed_out", "sign_in": self.sign_in})
+        return Refused(401, Reason.SIGNED_OUT, sign_in=self.sign_in)

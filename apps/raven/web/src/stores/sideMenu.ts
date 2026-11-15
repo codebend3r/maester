@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 
 /** The key that collapses or expands the side menu. */
 export const SIDE_MENU_KEY = 'b'
@@ -21,26 +21,17 @@ type SideMenu = {
  * counts as having seen the tip about it.
  */
 export const useSideMenu = create<SideMenu>()(
-  devtools(
-    persist(
-      (set) => ({
-        collapsed: false,
-        tipSeen: false,
-        isManageFolded: false,
-        toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
-        dismissTip: () => set({ tipSeen: true }),
-        toggleManage: () => set((current) => ({ isManageFolded: !current.isManageFolded })),
-      }),
-      {
-        name: 'raven-side-menu',
-        storage: createJSONStorage(() => window.localStorage),
-        partialize: ({ collapsed, tipSeen, isManageFolded }) => ({
-          collapsed,
-          tipSeen,
-          isManageFolded,
-        }),
-      },
-    ),
-    { name: 'raven/sideMenu' },
-  ),
+  keptInStorage({
+    key: STORE_KEYS.sideMenu,
+    name: 'raven/sideMenu',
+    state: (set) => ({
+      collapsed: false,
+      tipSeen: false,
+      isManageFolded: false,
+      toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
+      dismissTip: () => set({ tipSeen: true }),
+      toggleManage: () => set((current) => ({ isManageFolded: !current.isManageFolded })),
+    }),
+    keep: ({ collapsed, tipSeen, isManageFolded }) => ({ collapsed, tipSeen, isManageFolded }),
+  }),
 )

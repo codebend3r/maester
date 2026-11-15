@@ -18,7 +18,7 @@ import {
   showPath,
   withLibraries,
 } from '@raven/core'
-import { Icon, PictureChips } from '@raven/ui'
+import { Icon, PictureChips, classNames } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { type KeyboardEvent, type ReactNode, useId, useState } from 'react'
@@ -380,7 +380,7 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
 
   return (
     <search
-      className={[styles.search, className].filter(Boolean).join(' ')}
+      className={classNames([styles.search, className])}
       onFocus={() => setFocused(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)
@@ -423,9 +423,10 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
               // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role, jsx-a11y/prefer-tag-over-role -- an option element could not hold a poster and its facts
               role="option"
               aria-selected={picked === index}
-              className={[styles.option, row.kind === ROW_KINDS.all ? styles.optionAll : '']
-                .filter(Boolean)
-                .join(' ')}
+              className={classNames([
+                styles.option,
+                row.kind === ROW_KINDS.all && styles.optionAll,
+              ])}
               // The box keeps the focus, so the list stays up through the click.
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => open(row)}

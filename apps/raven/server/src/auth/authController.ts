@@ -25,7 +25,7 @@ import {
   isMemberStatusChange,
   isString,
 } from '@raven/core'
-import { CACHE_POLICIES, HEADERS, wholeNumber } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, wholeNumber, HTTP_STATUSES } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { ACCOUNT_REQUIREMENTS, OpenToAnyone, RequireAccount } from '@/auth/accountGuard'
@@ -94,7 +94,7 @@ export class AuthController {
 
   @ForViewers()
   @RequireAccount(ACCOUNT_REQUIREMENTS.owner)
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   @Post(AUTH_PATHS.memberStatus)
   async setStatus(
     @Req() request: FastifyRequest,
@@ -138,7 +138,7 @@ export class AuthController {
   @ForViewers()
   @PrivateBy(PRIVACIES.media)
   @RequireAccount(ACCOUNT_REQUIREMENTS.approved)
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   @StrictlyLimited()
   @Post(AUTH_PATHS.ticket)
   ticket(

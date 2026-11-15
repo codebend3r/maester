@@ -4,23 +4,16 @@ import {
   type DesktopPlatform,
   isAudioRequest,
 } from '@raven/core'
-import { type Mpv, type NativeTarget, openMpv } from '@raven/mpv'
-import { app, type BrowserWindow, powerSaveBlocker } from 'electron'
+import type { Mpv, NativeTarget } from '@raven/mpv'
+import { type BrowserWindow, powerSaveBlocker } from 'electron'
 import type { ConfigStore } from '@/main/desktopConfig'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import { type AudioService, createAudioService } from '@/main/player/audioService'
-import {
-  addonPathFor,
-  audioSurfaceFor,
-  ENGINE_MODES,
-  ENGINE_WORDS,
-  engineOptionsFor,
-  openEngine,
-} from '@/main/player/engine'
+import { audioSurfaceFor, ENGINE_MODES, ENGINE_WORDS, openEngine } from '@/main/player/engine'
 import { createMusicResolve } from '@/main/player/musicSource'
 import { readDevices } from '@/main/player/outputOptions'
 import { createSleepGuard } from '@/main/player/sleepGuard'
-import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
+import { attachWindowEngine, engineMode, openAppMpv } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { ServerSources } from '@/main/servers/serverSources'
 import type { Timers } from '@/main/timers'
@@ -68,40 +61,31 @@ export const attachMusicPlayer = ({
     stop: (id) => powerSaveBlocker.stop(id),
   })
 
-  const openNative = async (surface: ReturnType<typeof audioSurfaceFor>): Promise<MusicEngine> => {
-    const mpv = await openMpv({
+  const openNative = (surface: ReturnType<typeof audioSurfaceFor>): Promise<MusicEngine> =>
+    openAppMpv({
       surface,
-      addonPath: addonPathFor({
-        target: nativeTarget,
-        isPackaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        resourcesPath: process.resourcesPath,
-      }),
+      nativeTarget,
+      options: [],
       onEvent: (event) => {
         if (sink.service !== null) sink.service.receive(event)
       },
+      setUp: async (mpv) => {
+        const service = createAudioService({
+          mpv,
+          resolve: createMusicResolve({ sources, downloads }),
+          explain: sources.explain,
+          closeLoad: (target) => relay.close(target.relay.loadId),
+          canChooseAo: mode === ENGINE_MODES.window,
+          platform,
+          onPlaying: (isPlaying) => sleepGuard.set(isPlaying),
+          warn,
+        })
+        sink.service = service
+        await service.applyOutput({ output: config.read().output, devices: await readDevices(mpv) })
+        info(`music engine ready: ${mpv.version}`)
+        return { mpv, service }
+      },
     })
-    try {
-      await Promise.all(engineOptionsFor({ surface }).map((option) => mpv.set(option)))
-      const service = createAudioService({
-        mpv,
-        resolve: createMusicResolve({ sources, downloads }),
-        explain: sources.explain,
-        closeLoad: (target) => relay.close(target.relay.loadId),
-        canChooseAo: mode === ENGINE_MODES.window,
-        platform,
-        onPlaying: (isPlaying) => sleepGuard.set(isPlaying),
-        warn,
-      })
-      sink.service = service
-      await service.applyOutput({ output: config.read().output, devices: await readDevices(mpv) })
-      info(`music engine ready: ${mpv.version}`)
-      return { mpv, service }
-    } catch (error) {
-      await mpv.destroy()
-      throw error
-    }
-  }
 
   const attached = attachWindowEngine<AudioCommand, AudioEvent, MusicEngine>({
     window,

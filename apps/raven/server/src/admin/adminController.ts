@@ -1,4 +1,4 @@
-import { HEADERS } from '@shared/server'
+import { HEADERS, HTTP_STATUSES } from '@shared/server'
 import {
   Body,
   ConflictException,
@@ -93,7 +93,7 @@ export class AdminController {
   @ForViewers()
   @StrictlyLimited()
   @Post('unlock')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   unlock(@Body() body: unknown, @Res({ passthrough: true }) reply: FastifyReply): AdminLock {
     this.requireLegacy()
     const { password } = parseBody({
@@ -110,7 +110,7 @@ export class AdminController {
   /** Turns the admin lock back on for this browser, after a wait in which it can be taken back. */
   @ForViewers()
   @Post('lock')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   lock(
     @Headers(HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,
@@ -123,7 +123,7 @@ export class AdminController {
   /** Takes back a lock still on its way; once it holds, only the password turns it off. */
   @ForViewers()
   @Post('keep-unlocked')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   keepUnlocked(
     @Headers(HEADERS.cookie) cookie: string | undefined,
     @Res({ passthrough: true }) reply: FastifyReply,

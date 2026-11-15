@@ -6,7 +6,7 @@ import {
   TABLE_SORT_DIRECTIONS,
   nextSort,
   sortRows,
-} from '@raven/core'
+} from '@/lib/tableSort'
 import { useState } from 'react'
 
 type UseTableSortProps<T, K extends string> = {

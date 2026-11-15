@@ -1,6 +1,6 @@
 export const TABLE_SORT_DIRECTIONS = { asc: 'asc', desc: 'desc' } as const
 
-export type ColumnDirection = (typeof TABLE_SORT_DIRECTIONS)[keyof typeof TABLE_SORT_DIRECTIONS]
+type ColumnDirection = (typeof TABLE_SORT_DIRECTIONS)[keyof typeof TABLE_SORT_DIRECTIONS]
 
 /** What a column header's `aria-sort` says: which way the table is sorted on it, if at all. */
 export const ARIA_SORTS = {

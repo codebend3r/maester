@@ -19,7 +19,7 @@ import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
 import { PlaybackNote } from '@/components/PlaybackNote/PlaybackNote'
 import { PosterFrame } from '@/components/PosterCard/PosterCard'
-import { FactParts, FactText } from '@raven/ui'
+import { FactParts, FactText, classNames } from '@raven/ui'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { Bone } from '@/components/Skeleton/Skeleton'
@@ -139,9 +139,7 @@ const MediaTile = ({
 
   return (
     <li
-      className={[styles.tile, isPoster ? styles.posterTile : '', menu.hostClass]
-        .filter(Boolean)
-        .join(' ')}
+      className={classNames([styles.tile, isPoster && styles.posterTile, menu.hostClass])}
       data-entry={mediaEntryKey(media)}
       {...select.rootProps}
     >

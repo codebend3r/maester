@@ -1,6 +1,6 @@
 import type { ItemSummary, ItemType } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import type { LocalCredit } from '@/metadata/metadataRepository'
+import type { LocalCredit } from '@/people/peopleRepository'
 import { departmentOf, isSelfAppearance, toEntries } from '@/people/filmography'
 import type { FilmographyRow } from '@/people/peopleRepository'
 

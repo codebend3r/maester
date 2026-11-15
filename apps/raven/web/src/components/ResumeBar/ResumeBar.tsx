@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import { type MediaItem, progressOf } from '@raven/core'
 import { RESUME_BAR_COPY } from '@/components/ResumeBar/copy'
 import styles from '@/components/ResumeBar/ResumeBar.module.scss'
@@ -17,10 +18,7 @@ export const ResumeBar = ({ media, tone = 'overlay', className }: ResumeBarProps
   const progress = progressOf(media)
   return (
     progress > 0 && (
-      <span
-        className={[styles.bar, styles[tone], className ?? ''].filter(Boolean).join(' ')}
-        aria-hidden="true"
-      >
+      <span className={classNames([styles.bar, styles[tone], className])} aria-hidden="true">
         <span className={styles.fill} style={{ width: `${progress * 100}%` }} />
       </span>
     )

@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import type { Selectable } from '@/lib/useSelectable'
 import styles from '@/components/SelectCheckbox/SelectCheckbox.module.scss'
 
@@ -15,7 +16,7 @@ export const SelectCheckbox = ({ select, className }: SelectCheckboxProps) =>
   select.isAvailable && (
     <input
       type="checkbox"
-      className={[styles.box, className ?? ''].filter(Boolean).join(' ')}
+      className={classNames([styles.box, className])}
       {...select.checkboxProps}
     />
   )

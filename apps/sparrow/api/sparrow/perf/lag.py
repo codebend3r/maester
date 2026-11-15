@@ -44,6 +44,7 @@ from typing import Any
 from sparrow.clients import ClientError, Services
 from sparrow.clients.tautulli import Session
 from sparrow.formatting import mbps
+from sparrow.media import MediaType
 from sparrow.perf.load import HostLoad, behind
 from sparrow.perf.uplink import Uplink
 from sparrow.perf.versions import Connection, Limit, best_fitting, needs_kbps, quality_for
@@ -415,7 +416,7 @@ async def _versions(
 ) -> tuple[TitleVersion, ...]:
     """A movie's versions, when the play came from the Plex server sparrow reads."""
     play = Play.from_session(host, session)
-    if host not in library or play.kind != "movie":
+    if host not in library or play.kind != MediaType.MOVIE:
         return ()
     try:
         return tuple(await title_versions(services.plex, await identify(services, play)))

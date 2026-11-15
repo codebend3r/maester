@@ -69,8 +69,6 @@ describe('the headless entry', () => {
     expect(entry.useProgressReport).toBeFunction()
     expect(entry.useTrackCues).toBeFunction()
     expect(entry.useCaptionStyle).toBeFunction()
-    expect(entry.createSelectionStore().getState().selecting).toBeFalse()
-    expect(entry.usePageBackdrop.getState().current).toBeNull()
   })
 
   test('reaches for no DOM package or stylesheet', () => {

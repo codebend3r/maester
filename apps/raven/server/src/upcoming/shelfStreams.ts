@@ -1,6 +1,9 @@
 import { ITEM_TYPES, type MatchItemType, UPCOMING_SHELVES, type UpcomingShelf } from '@raven/core'
 import { UPCOMING_LISTS, type UpcomingList } from '@/metadata/tmdbClient'
 
+/** How long one of Coming soon's reads of TMDB is served before TMDB is asked again. */
+export const UPCOMING_FRESH_MS = 6 * 60 * 60 * 1000
+
 /** One of TMDB's discover lists a shelf reads: a kind of title, of one of the lists of titles still to come. */
 export type ShelfStream = { type: MatchItemType; list: UpcomingList }
 

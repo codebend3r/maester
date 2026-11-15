@@ -138,8 +138,7 @@ export const useMediaSource = ({
   const plan = planOf({ source: htmlSource, rendition, audio })
   const { id, knownDuration } = plan
   // A library file's media plane: the origin and ticket it plays from; a local file has none.
-  const plane =
-    htmlSource.kind === PLAYER_SOURCE_KINDS.server ? (htmlSource.mediaPlane ?? null) : null
+  const plane = htmlSource.kind === PLAYER_SOURCE_KINDS.server ? htmlSource.mediaPlane : null
   const access = plane?.access ?? null
   // With an origin named, the video waits for its ticket rather than start through the web host.
   const isAwaitingTicket = !!plane?.isAwaitingTicket

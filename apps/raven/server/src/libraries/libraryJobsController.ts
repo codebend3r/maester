@@ -35,6 +35,7 @@ import { ROUTE_PARAMS } from '@/requestParts'
 import { QUEUE_KEYS, queueKeyOf } from '@/scanner/concurrency'
 import { ScannerService } from '@/scanner/scannerService'
 import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
+import { HTTP_STATUSES } from '@shared/server'
 
 type LibraryJobsControllerCommandedProps = { library: LibraryRecord; act: (id: number) => void }
 
@@ -61,7 +62,7 @@ export class LibraryJobsController {
 
   @AdminOnly()
   @Post(':id/markers')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   scanMarkers(@Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord): Library {
     return this.commanded({
       library,
@@ -78,14 +79,14 @@ export class LibraryJobsController {
   /** Cancels a full scan, or any scan running: it stops at its next step. */
   @AdminOnly()
   @Post(':id/scan/cancel')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   cancelScan(@Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord): Library {
     return this.commanded({ library, act: (libraryId) => this.scanner.cancel(libraryId) })
   }
 
   @AdminOnly()
   @Post(':id/scan')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   scan(@Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord): Library {
     return this.commanded({ library, act: (libraryId) => this.scanner.scan(libraryId) })
   }
@@ -97,7 +98,7 @@ export class LibraryJobsController {
    */
   @AdminOnly()
   @Post(':id/quick-scan')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   quickScan(@Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord): Library {
     return this.commanded({ library, act: (libraryId) => this.ratings.quickScan(libraryId) })
   }
@@ -105,7 +106,7 @@ export class LibraryJobsController {
   /** Cancels a quick scan, and the scores that would follow it. */
   @AdminOnly()
   @Post(':id/quick-scan/cancel')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   cancelQuickScan(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
   ): Library {
@@ -119,7 +120,7 @@ export class LibraryJobsController {
    */
   @AdminOnly()
   @Post(':id/ratings')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   updateRatings(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
   ): Library {
@@ -129,7 +130,7 @@ export class LibraryJobsController {
   /** Cancels Update ratings: the titles still waiting are not asked for. */
   @AdminOnly()
   @Post(':id/ratings/cancel')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   cancelRatings(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
   ): Library {
@@ -143,7 +144,7 @@ export class LibraryJobsController {
    */
   @AdminOnly()
   @Post(':id/albums/merge')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   mergeAlbums(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
   ): AlbumMerge {
@@ -163,7 +164,7 @@ export class LibraryJobsController {
    */
   @AdminOnly()
   @Post(':id/albums/smart-match')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   smartMatchAlbums(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
     @ViewingAccount() account: AccountKey,
@@ -187,7 +188,7 @@ export class LibraryJobsController {
    */
   @AdminOnly()
   @Post(':id/match')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   rematch(@Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord): Library {
     const matcher = matcherFor(library.settings.kind)
     if (matcher === null) {

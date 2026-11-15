@@ -1,4 +1,15 @@
-import type { HistoryEntry } from '@/contract'
+import type { HistoryEntry } from '@raven/core'
+import { COMMON_COPY } from '@/lib/copy'
+
+/** The words a history line or day heading says. */
+const HISTORY_COPY = {
+  today: 'Today',
+  yesterday: 'Yesterday',
+  markedWatched: 'Marked watched',
+  played: 'Played',
+  percentWatched: (percent: number) => `${percent}% watched`,
+  plays: (plays: number) => `${plays} plays`,
+} as const
 
 /** One day of a library's history, its entries in the order they came. */
 export type HistoryDay = {
@@ -23,8 +34,8 @@ type DayLabelProps = { date: Date; now: Date }
 
 const dayLabel = ({ date, now }: DayLabelProps): string => {
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
-  if (dayKey(date) === dayKey(now)) return 'Today'
-  if (dayKey(date) === dayKey(yesterday)) return 'Yesterday'
+  if (dayKey(date) === dayKey(now)) return HISTORY_COPY.today
+  if (dayKey(date) === dayKey(yesterday)) return HISTORY_COPY.yesterday
   return (date.getFullYear() === now.getFullYear() ? DAY : DAY_WITH_YEAR).format(date)
 }
 
@@ -55,11 +66,11 @@ export const historyDays = ({ entries, now = new Date() }: HistoryDaysProps): Hi
 }
 
 const howFar = (entry: HistoryEntry): string => {
-  if (entry.marked) return 'Marked watched'
-  if (entry.watched) return 'Watched'
+  if (entry.marked) return HISTORY_COPY.markedWatched
+  if (entry.watched) return COMMON_COPY.watched
   const duration = entry.media.duration
-  if (!duration) return 'Played'
-  return `${Math.min(100, Math.floor((entry.furthest / duration) * 100))}% watched`
+  if (!duration) return HISTORY_COPY.played
+  return HISTORY_COPY.percentWatched(Math.min(100, Math.floor((entry.furthest / duration) * 100)))
 }
 
 type FinishedNoteProps = {
@@ -71,8 +82,8 @@ type FinishedNoteProps = {
 export const finishedNote = ({ entry, now = new Date() }: FinishedNoteProps): string =>
   [
     dayLabel({ date: new Date(entry.lastPlayedAt), now }),
-    ...(entry.plays > 1 ? [`${entry.plays} plays`] : []),
-  ].join(' · ')
+    ...(entry.plays > 1 ? [HISTORY_COPY.plays(entry.plays)] : []),
+  ].join(COMMON_COPY.separator)
 
 /**
  * The line under a video in its history: how far it got, or that it was
@@ -82,5 +93,5 @@ export const historyNote = (entry: HistoryEntry): string =>
   [
     howFar(entry),
     TIME.format(new Date(entry.lastPlayedAt)),
-    ...(entry.plays > 1 ? [`${entry.plays} plays`] : []),
-  ].join(' · ')
+    ...(entry.plays > 1 ? [HISTORY_COPY.plays(entry.plays)] : []),
+  ].join(COMMON_COPY.separator)

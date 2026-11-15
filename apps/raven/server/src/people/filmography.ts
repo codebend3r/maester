@@ -7,7 +7,7 @@ import {
   isMatchItemType,
 } from '@raven/core'
 import { groupBy } from '@/groupBy'
-import type { LocalCredit } from '@/metadata/metadataRepository'
+import type { LocalCredit } from '@/people/peopleRepository'
 import { TMDB_DEPARTMENTS, yearOf } from '@/metadata/tmdbShapes'
 import type { FilmographyRow } from '@/people/peopleRepository'
 

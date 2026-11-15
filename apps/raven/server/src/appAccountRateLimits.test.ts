@@ -1,9 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { HEADERS } from '@shared/server'
+import { HEADERS, HTTP_STATUSES } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { TOO_MANY_REQUESTS } from '@/rateLimits/limitRequests'
 import { ACCOUNT_STRICT_LIMIT, RATE_LIMITS, RATE_TIERS } from '@/rateLimits/rateTiers'
 import { authFixture } from '@/test/auth'
 import {
@@ -56,11 +55,13 @@ describe("each account's own budget on the strict routes", () => {
       async (sent) => [...(await sent), (await mint({ caller: CALLER_KINDS.owner })).statusCode],
       Promise.resolve([]),
     )
-    expect(statuses.every((status) => status !== TOO_MANY_REQUESTS)).toBe(true)
+    expect(statuses.every((status) => status !== HTTP_STATUSES.tooManyRequests)).toBe(true)
     const refused = await mint({ caller: CALLER_KINDS.owner })
-    expect(refused.statusCode).toBe(TOO_MANY_REQUESTS)
+    expect(refused.statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     expect(Number(refused.headers[HEADERS.retryAfter])).toBeGreaterThan(0)
-    expect((await mint({ caller: CALLER_KINDS.member })).statusCode).not.toBe(TOO_MANY_REQUESTS)
+    expect((await mint({ caller: CALLER_KINDS.member })).statusCode).not.toBe(
+      HTTP_STATUSES.tooManyRequests,
+    )
   })
 
   // Last, as it fills the tier. The owner spent their own budget above, so the member asks here.
@@ -77,9 +78,9 @@ describe("each account's own budget on the strict routes", () => {
       async (done, n) => [...(await done), (await echo(strangerAt(n))).statusCode],
       Promise.resolve([]),
     )
-    expect(statuses.every((status) => status !== TOO_MANY_REQUESTS)).toBe(true)
+    expect(statuses.every((status) => status !== HTTP_STATUSES.tooManyRequests)).toBe(true)
     const stranger = await echo(strangerAt(sent.length))
-    expect(stranger.statusCode).toBe(TOO_MANY_REQUESTS)
+    expect(stranger.statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     expect(Number(stranger.headers[HEADERS.retryAfter])).toBeGreaterThan(0)
     const member = await enforced.app.inject({
       method: ROUTES.accountTicket.method,
@@ -91,6 +92,6 @@ describe("each account's own budget on the strict routes", () => {
       }),
       remoteAddress: strangerAt(sent.length + 1),
     })
-    expect(member.statusCode).not.toBe(TOO_MANY_REQUESTS)
+    expect(member.statusCode).not.toBe(HTTP_STATUSES.tooManyRequests)
   }, 120_000)
 })

@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import {
   RATING_SOURCES,
   type Rating,
@@ -178,7 +179,7 @@ export const RatingPanel = ({ ratings, size = PANEL_SIZES.full }: RatingPanelPro
   return (
     scored.length > 0 && (
       <ul
-        className={[styles.panel, PANEL_SIZE_CLASSES[size]].filter(Boolean).join(' ')}
+        className={classNames([styles.panel, PANEL_SIZE_CLASSES[size]])}
         aria-label={RATING_PANEL_COPY.ratings}
       >
         {scored.map((rating) => (

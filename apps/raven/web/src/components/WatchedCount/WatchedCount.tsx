@@ -1,6 +1,6 @@
 import { WATCHED_STATES, type WatchedState, watchedStateOf } from '@raven/core'
 import type { ComponentType } from 'react'
-import { Icon } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import { WATCHED_COUNT_COPY } from '@/components/WatchedCount/copy'
 import styles from '@/components/WatchedCount/WatchedCount.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
@@ -57,7 +57,7 @@ const WatchedCountMark = ({ state, counted, decorative, className }: WatchedCoun
   const Mark: ComponentType<CountMarkProps> = COUNT_MARKS[state]
   return (
     <span
-      className={[styles.count, className ?? ''].filter(Boolean).join(' ')}
+      className={classNames([styles.count, className])}
       aria-hidden={decorative ? 'true' : undefined}
     >
       <Mark counted={counted} />

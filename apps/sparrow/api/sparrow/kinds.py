@@ -27,6 +27,6 @@ class Kind:
 
 
 KINDS: dict[MediaType, Kind] = {
-    "movie": Kind("movie", "Radarr", "radarr", lambda services: services.radarr),
-    "tv": Kind("tv", "Sonarr", "sonarr", lambda services: services.sonarr),
+    MediaType.MOVIE: Kind(MediaType.MOVIE, "Radarr", "radarr", lambda services: services.radarr),
+    MediaType.TV: Kind(MediaType.TV, "Sonarr", "sonarr", lambda services: services.sonarr),
 }

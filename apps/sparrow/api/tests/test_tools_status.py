@@ -130,7 +130,7 @@ async def test_pending_unowned_and_ambiguous_requests(ctx):
     (row,) = (await request_status(ctx))["requests"]
     assert row["request"] == "pending" and "host" not in row and "download" not in row
 
-    await seerr.approve_request(1)
+    seerr.requests[0] = replace(seerr.requests[0], status=RequestStatus.APPROVED)
     (row,) = (await request_status(ctx))["requests"]
     assert row["download"] == "not sent to Radarr or Sonarr yet"
 

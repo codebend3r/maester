@@ -14,6 +14,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from sparrow.clients.arr_library import ArrService
 from sparrow.clients.seerr import MediaStatus
+from sparrow.media import MediaType
 
 # A Plex rating key or show key, which YAML reads as a number when it looks like one.
 Key = Annotated[str, BeforeValidator(str)]
@@ -35,7 +36,7 @@ class TitleSeed(Block):
 
     tmdb_id: int
     title: str
-    media_type: str = "movie"
+    media_type: MediaType = MediaType.MOVIE
     status: MediaStatus = MediaStatus.UNKNOWN
     status_4k: MediaStatus = MediaStatus.UNKNOWN
     year: int | None = None
@@ -58,7 +59,7 @@ class TitleSeed(Block):
 class RequestSeed(Block):
     tmdb_id: int
     status: Literal["approved", "pending"] = "approved"
-    media_type: str = "movie"
+    media_type: MediaType = MediaType.MOVIE
     is_4k: bool = False
 
 

@@ -38,6 +38,7 @@ import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { pageLimit } from '@/queryValues'
 import { ViewingAccount } from '@/media/viewingAccountParam'
+import { HTTP_STATUSES } from '@shared/server'
 
 /** What a page's query asks, as the routes read it off the address. */
 type PageQuery = {
@@ -139,7 +140,7 @@ export class PlayHistoryController {
   @ForViewers()
   @PrivateBy(PRIVACIES.media)
   @Post(PLAY_HISTORY_PATHS.startListen)
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   startListen(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
@@ -163,7 +164,7 @@ export class PlayHistoryController {
   @ForViewers()
   @Public()
   @Put(PLAY_HISTORY_PATHS.listen)
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   reportListen(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,

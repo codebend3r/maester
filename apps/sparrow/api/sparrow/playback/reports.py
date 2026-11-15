@@ -11,14 +11,14 @@ evidence only (`Evidence`): a replaceable kind whose file failed a health
 check, or that two or more people reported, may be replaced (`replace.py`);
 a replaceable kind short of that is recorded; anything else goes to the
 admin. A report the player explains doesn't testify, nor does one whose
-Seerr issue was resolved or whose replacement the admin declined. How each
-decision reads, to the Seerr issue and to the model, is data (`WORDING`).
+Seerr issue was resolved. How each decision reads, to the Seerr issue and
+to the model, is data (`WORDING`).
 
-A report's replacement then moves through statuses (`ReportStatus`) by the
-one move defined here (`REPLACE`), a compare-and-set in the store, and the
-statuses a replacement may start from are `MAY_REPLACE`. A report the
-admin once declined stays declined: a later report of the same file stands
-on its own evidence.
+A report is `open` until its file is replaced (`ReportStatus`), when the
+store marks every open report of that file replaced at once
+(`Reports.mark_replaced`); nothing moves one back. Two presses can't both
+replace one file because the runner runs destructive tools one at a time
+and `replace_media` refuses a report already replaced.
 
 Every report opens a Seerr issue as the friend, with the diagnosis and the
 decision, so the admin's trail is in a tool they already use. Resolving the
@@ -33,7 +33,7 @@ from typing import Any
 
 from sparrow.clients import ClientError, Services
 from sparrow.clients.seerr import IssueType
-from sparrow.media import Decision, ReportKind, ReportStatus
+from sparrow.media import Decision, MediaType, ReportKind
 from sparrow.notify import AdminPost, Notice
 from sparrow.playback.diagnosis import (
     Case,
@@ -102,8 +102,8 @@ class Testimony:
 
     @classmethod
     def of(cls, report: ReportRow) -> Testimony:
-        """A stored report's testimony. A resolved issue or a declined replacement is spent."""
-        if report.resolved_at is not None or report.status is ReportStatus.DECLINED:
+        """A stored report's testimony. One whose Seerr issue was resolved is spent."""
+        if report.resolved_at is not None:
             return cls(None, None)
         counts = POLICIES[report.kind].replaceable and report.decision is not Decision.ADVISED
         check = Health.from_dict(report.diagnosis["file_check"]) if report.health else None
@@ -138,7 +138,7 @@ class Evidence:
         )
 
     @classmethod
-    def for_file(cls, store: Store, host: str, media_type: str, file_id: int) -> Evidence:
+    def for_file(cls, store: Store, host: str, media_type: MediaType, file_id: int) -> Evidence:
         return cls.of(map(Testimony.of, store.reports_for_file(host, media_type, file_id)))
 
     @property
@@ -200,31 +200,6 @@ WORDING: dict[Decision, Wording] = {
         "Tell them it's recorded and the admin has been asked to fix it.",
     ),
 }
-
-
-@dataclass(frozen=True)
-class Move:
-    """One step a report's status may take, from the statuses it may start in."""
-
-    from_: frozenset[ReportStatus]
-    to: ReportStatus
-
-
-S = ReportStatus
-# Every move a report makes. Nothing else changes a report's status.
-REPLACE = Move(frozenset({S.OPEN}), S.REPLACED)  # the file was deleted
-# The statuses a friend's confirmed replacement may start from, and why no other may.
-MAY_REPLACE: frozenset[ReportStatus] = frozenset({S.OPEN})
-NOT_NOW: dict[ReportStatus, str] = {
-    S.OPEN: "it is still open",
-    S.REPLACED: "it was already replaced",
-    S.DECLINED: "the admin decided not to replace it",
-}
-
-
-def move(store: Store, report: ReportRow, step: Move) -> ReportRow | None:
-    """Make one move; None when the report wasn't in a status it starts from."""
-    return store.move_report(report.id, step.from_, step.to)
 
 
 @dataclass(frozen=True)

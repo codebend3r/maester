@@ -4,17 +4,15 @@ import {
   RADIO_SEED_KINDS,
   type AlbumSummary,
   type ArtistDetails,
-  ROUTE_STATES,
-  type RouteQuery,
   routeState,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { useId } from 'react'
-import { KeyedView, type ViewOf, type ViewsOf, useAudioQueue } from '@raven/ui/headless'
+import { useAudioQueue } from '@raven/ui/headless'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { START_RADIO_LOOKS, StartRadio } from '@/components/StartRadio/StartRadio'
@@ -135,34 +133,13 @@ const ArtistSkeleton = () => (
   </>
 )
 
-const ARTIST_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type ArtistPageViewProps = {
-  [ARTIST_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [ARTIST_VIEW_KEYS.ready]: ArtistViewProps
-}
-
-const ARTIST_VIEWS = {
-  [ARTIST_VIEW_KEYS.pending]: RouteState,
-  [ARTIST_VIEW_KEYS.ready]: ArtistView,
-} as const satisfies ViewsOf<ArtistPageViewProps>
-
-type ArtistPageViewOfProps = { page: RouteQuery<ArtistDetails> }
-
-/** Which view the page shows: the artist on its way, missing or failing, or the artist. */
-const artistPageViewOf = ({ page }: ArtistPageViewOfProps): ViewOf<ArtistPageViewProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: ARTIST_VIEW_KEYS.pending,
-      props: { state: page, noun: ARTIST_COPY.noun, shape: <ArtistSkeleton /> },
-    }
-  return { key: ARTIST_VIEW_KEYS.ready, props: { details: page.data } }
-}
-
 /** `/artists/:id`: an artist's albums, and the albums of others they appear on. */
 export const ArtistPage = () => {
   const id = useRouteId()
-  const artist = useQuery(artistQuery(id))
-  const page = routeState({ id, query: artist })
-  return <KeyedView<ArtistPageViewProps> views={ARTIST_VIEWS} view={artistPageViewOf({ page })} />
+  const page = routeState({ id, query: useQuery(artistQuery(id)) })
+  return (
+    <RouteView page={page} noun={ARTIST_COPY.noun} shape={<ArtistSkeleton />}>
+      {(details) => <ArtistView details={details} />}
+    </RouteView>
+  )
 }

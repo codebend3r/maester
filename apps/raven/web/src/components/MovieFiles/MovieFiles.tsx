@@ -1,13 +1,11 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type MediaItem, cardLink, plural } from '@raven/core'
+import { type MediaItem, SPLIT_HOWS, cardLink, plural } from '@raven/core'
 import { useId } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { MOVIE_FILES_COPY } from '@/components/MovieFiles/copy'
-import { api } from '@/lib/api'
-import { afterSplit } from '@raven/ui/headless'
 import styles from '@/components/MovieFiles/MovieFiles.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useSplits } from '@/lib/useSplits'
 
 type OtherCardsProps = {
   files: readonly MediaItem[]
@@ -45,20 +43,8 @@ type MovieFilesProps = {
  */
 export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
   const ids = { heading: useId(), others: useId() }
-  const queryClient = useQueryClient()
   const [first] = files
-  const { libraryId } = first
-  const settle = () => afterSplit({ queryClient, libraryId })
-  const split = useMutation({
-    mutationFn: () => api.splitDuplicate({ libraryId, mediaId: first.id, how: 'apart' }),
-    onSuccess: settle,
-  })
-  const join = useMutation({
-    mutationFn: () => api.joinSplit({ libraryId, itemId }),
-    onSuccess: settle,
-  })
-  const busy = split.isPending || join.isPending
-  const failure = split.error ?? join.error
+  const { split, join, isBusy: busy, failure } = useSplits({ libraryId: first.libraryId })
   const isShared = files.length > 1
   const others = otherCards({ files, everyCard })
 
@@ -83,7 +69,11 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
 
       {isShared && (
         <div className={styles.split}>
-          <Button icon="split" disabled={busy} onClick={() => split.mutate()}>
+          <Button
+            icon="split"
+            disabled={busy}
+            onClick={() => split.mutate({ mediaId: first.id, how: SPLIT_HOWS.apart })}
+          >
             {MOVIE_FILES_COPY.splitApart}
           </Button>
           <p className={styles.hint}>{MOVIE_FILES_COPY.splitHint}</p>
@@ -110,7 +100,7 @@ export const MovieFiles = ({ files, everyCard, itemId }: MovieFilesProps) => {
             })}
           </ul>
           <div className={styles.split}>
-            <Button icon="merge" disabled={busy} onClick={() => join.mutate()}>
+            <Button icon="merge" disabled={busy} onClick={() => join.mutate(itemId)}>
               {MOVIE_FILES_COPY.putBack}
             </Button>
           </div>

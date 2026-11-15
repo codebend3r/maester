@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { FILMOGRAPHY_STATES, type PersonFilmography } from '@raven/core'
 import { errorMessage } from '@/errorMessage'
-import { type LocalCredit, MetadataRepository } from '@/metadata/metadataRepository'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { toEntries } from '@/people/filmography'
-import { PeopleRepository } from '@/people/peopleRepository'
+import { type LocalCredit, PeopleRepository } from '@/people/peopleRepository'
 import { createGate } from '@/scanner/concurrency'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -92,7 +92,12 @@ export class Filmographies {
   }: FilmographiesReadProps): PersonFilmography {
     const fetchedAt = this.people.profile(personId)?.fetchedAt ?? null
     if (fetchedAt == null) {
-      return { state: isTurnedAway || this.inFlight.has(personId) ? 'pending' : 'unavailable' }
+      return {
+        state:
+          isTurnedAway || this.inFlight.has(personId)
+            ? FILMOGRAPHY_STATES.pending
+            : FILMOGRAPHY_STATES.unavailable,
+      }
     }
     const rows = this.people.filmographyRows(personId)
     const itemIds = rows.flatMap((row) => row.itemId ?? [])

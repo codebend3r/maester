@@ -18,7 +18,7 @@ import { Player } from '@/components/Player/Player'
 import type { PlayerTitle } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport, setStreamSupport } from '@/test/canPlay'
-import { itemSummary, mediaItem } from '@/test/fixtures'
+import { itemSummary, mediaItem, mediaPlane } from '@/test/fixtures'
 import { DEFAULT_PLAYBACK_STATE, renderWithProviders } from '@/test/render'
 import { CONTROLS_LINGER_SECONDS, usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
@@ -59,7 +59,13 @@ const TestPlayer = ({
     escape: null,
     progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
   })
-  return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
+  return (
+    isHosting && (
+      <Player
+        engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane: mediaPlane() } }}
+      />
+    )
+  )
 }
 
 const subtitleTrack = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({

@@ -129,6 +129,13 @@ type MetadataServiceAiMatchForProps = {
   sees: (libraryId: number) => boolean
 }
 
+type MetadataServiceMatchByProps = {
+  library: LibraryRecord
+  matcher: NonNullable<ReturnType<typeof matcherFor>>
+}
+
+type MetadataServiceMatchOnTmdbProps = { library: LibraryRecord; type: MatchItemType }
+
 type MetadataServiceMatchGroupsProps = {
   files: readonly MatchFile[]
   type: MatchItemType
@@ -300,10 +307,7 @@ export class MetadataService implements OnApplicationBootstrap {
     // Names are read again first, so a parser that now reads the name right gets its say.
     this.files.retitle({ libraryId, kind })
     // A pass already running has tried these files, so another follows it.
-    this.queue.again({
-      key: queueKeyOf({ kind: QUEUE_KEYS.library, parts: [libraryId] }),
-      task: () => this.pass(libraryId),
-    })
+    this.enqueue(libraryId)
     return count
   }
 
@@ -554,27 +558,42 @@ export class MetadataService implements OnApplicationBootstrap {
 
   private async matchAndClearUp(libraryId: number): Promise<void> {
     const library = this.libraries.get(libraryId)
-    const kind = library?.settings.kind
-    const type = kind == null ? null : matchTypeFor(kind)
-    // A music library's albums go to MusicBrainz; `type` is null for one, so TMDB is left alone.
-    if (kind != null && matcherFor(kind)?.by === MATCH_SOURCES.musicBrainz) {
-      await this.albums.matchLibrary({ libraryId })
-    }
-    if (library != null && kind != null && type != null && this.tmdb.enabled) {
-      this.tmdb.newPass()
-      const pass = this.newPass(kind)
-      const isStopped = await this.matchPending({ libraryId, type, pass })
-      /*
-       * The items of files still waiting for TMDB stay, with their edits and
-       * pictures, until a pass that gets through matches the files to them
-       * again. A library removed meanwhile is cleared up all the same.
-       */
-      if (isStopped && this.libraries.get(libraryId) != null) return
-      await this.lookUpUnmatched({ library, type, pass })
-      // A lookup that found TMDB away stops the pass the same way.
-      if (pass.guard.isStopped && this.libraries.get(libraryId) != null) return
-    }
+    const matcher = library == null ? null : matcherFor(library.settings.kind)
+    const isStopped =
+      library != null && matcher != null && (await this.matchBy({ library, matcher }))
+    /*
+     * The items of files still waiting for TMDB stay, with their edits and
+     * pictures, until a pass that gets through matches the files to them
+     * again. A library removed meanwhile is cleared up all the same.
+     */
+    if (isStopped && this.libraries.get(libraryId) != null) return
     await this.pictures.clearUp()
+  }
+
+  /** Matches a library with its source: albums go to MusicBrainz, videos to TMDB. Whether TMDB stopped the pass. */
+  private async matchBy({ library, matcher }: MetadataServiceMatchByProps): Promise<boolean> {
+    switch (matcher.by) {
+      case MATCH_SOURCES.musicBrainz:
+        await this.albums.matchLibrary({ libraryId: library.id })
+        return false
+      case MATCH_SOURCES.tmdb:
+        return this.matchOnTmdb({ library, type: matcher.type })
+      default: {
+        const unknown: never = matcher
+        return unknown
+      }
+    }
+  }
+
+  /** A TMDB pass over the library's pending files, then the AI lookups; whether TMDB stopped it. */
+  private async matchOnTmdb({ library, type }: MetadataServiceMatchOnTmdbProps): Promise<boolean> {
+    if (!this.tmdb.enabled) return false
+    this.tmdb.newPass()
+    const pass = this.newPass(library.settings.kind)
+    if (await this.matchPending({ libraryId: library.id, type, pass })) return true
+    await this.lookUpUnmatched({ library, type, pass })
+    // A lookup that found TMDB away stops the pass the same way.
+    return pass.guard.isStopped
   }
 
   /** Matches `files` in the units the matcher keeps together, a few at once, until TMDB stops the pass. */

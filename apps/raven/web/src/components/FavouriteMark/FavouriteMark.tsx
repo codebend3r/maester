@@ -1,5 +1,5 @@
 import type { MediaItem } from '@raven/core'
-import { Icon } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import styles from '@/components/FavouriteMark/FavouriteMark.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -34,7 +34,7 @@ export const FavouriteMark = ({
 }: FavouriteMarkProps) =>
   media.favourite && (
     <span
-      className={[styles.mark, styles[tone], className ?? ''].filter(Boolean).join(' ')}
+      className={classNames([styles.mark, styles[tone], className])}
       aria-hidden={decorative ? 'true' : undefined}
     >
       <Icon name="heart" size={tone === FAVOURITE_TONES.scrim ? 18 : 14} />

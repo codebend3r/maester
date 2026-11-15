@@ -34,7 +34,7 @@ from sparrow.clients.arr import HistoryEvent
 from sparrow.formatting import gigabytes
 from sparrow.notify import AdminPost
 from sparrow.playback.items import LocatedFile
-from sparrow.playback.reports import POLICIES, REPLACE, Evidence, move
+from sparrow.playback.reports import POLICIES, Evidence
 from sparrow.store import ReportRow, Store
 
 log = logging.getLogger("sparrow.playback")
@@ -190,9 +190,8 @@ async def replace_copy(
 ) -> Replacement:
     """Run the steps, then record the outcome on the reports and the Seerr issue."""
     replacement = Replacement(located, await run_steps(located))
-    if replacement.deleted:  # every report of the file is settled by its new copy
-        for other in store.reports_for_file(report.host, report.copy.media_type, report.file_id):
-            move(store, other, REPLACE)
+    if replacement.deleted:
+        store.mark_replaced(report.host, report.copy.media_type, report.file_id)
     if report.seerr_issue_id:
         try:
             await services.seerr.comment_issue(report.seerr_issue_id, replacement.text)

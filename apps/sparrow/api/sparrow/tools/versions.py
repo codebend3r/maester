@@ -19,6 +19,7 @@ from pydantic import Field
 from sparrow.agent.tools import Refused, Result, Tier, ToolContext, tool
 from sparrow.clients.seerr import MediaDetails
 from sparrow.formatting import mbps
+from sparrow.media import MediaType
 from sparrow.perf.uplink import recent
 from sparrow.perf.versions import Connection, last_away, recommend
 from sparrow.plex_versions import TitleVersion, title_versions
@@ -75,5 +76,5 @@ async def pick_version(
 
 
 async def _title(ctx: ToolContext, tmdb_id: int) -> tuple[MediaDetails, list[TitleVersion]]:
-    details = await ctx.services.seerr.media_details("movie", tmdb_id)
+    details = await ctx.services.seerr.media_details(MediaType.MOVIE, tmdb_id)
     return details, await title_versions(ctx.services.plex, details)

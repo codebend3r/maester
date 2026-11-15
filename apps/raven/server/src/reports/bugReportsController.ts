@@ -4,7 +4,6 @@ import {
   Get,
   Header,
   HttpException,
-  HttpStatus,
   Inject,
   NotFoundException,
   Param,
@@ -23,7 +22,7 @@ import {
   isPlaybackDiagnostics,
   withoutTickets,
 } from '@raven/core'
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import type { FastifyRequest } from 'fastify'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AuthSessions, accountOf } from '@/auth/authSessions'
@@ -70,7 +69,7 @@ export class BugReportsController {
     if (sent >= MAX_REPORTS_PER_WINDOW) {
       throw new HttpException(
         'Too many reports from this account. Try again in an hour.',
-        HttpStatus.TOO_MANY_REQUESTS,
+        HTTP_STATUSES.tooManyRequests,
       )
     }
     return this.reports.add({

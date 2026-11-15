@@ -5,7 +5,7 @@ import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { usePageBackdrop } from '@raven/ui/headless'
+import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { reported } from '@/test/viewport'
 
 describe('ShowCard', () => {

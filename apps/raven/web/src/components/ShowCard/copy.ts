@@ -7,6 +7,4 @@ export const SHOW_CARD_COPY = {
   shows: 'Shows',
   years: 'Years',
   episodes: 'Episodes',
-  rottenTomatoes: 'RT',
-  metacritic: 'Metacritic',
 } as const

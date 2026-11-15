@@ -139,6 +139,7 @@ describe("a library's sagas", () => {
 
     expect(media().list({ libraryId: state.libraryId, account: TEST_ACCOUNTS.a })).toHaveLength(2)
     expect(sagas()).toEqual([])
+    expect(media().countSagas(state.libraryId)).toBe(0)
   })
 
   it('lists each movie of a saga once, by its best file, whatever cards it is split onto', () => {
@@ -153,6 +154,7 @@ describe("a library's sagas", () => {
     expect(sagas()).toEqual([
       { name: RINGS.name, files: ['Fellowship.mkv', 'Two Towers 2160p.mkv'] },
     ])
+    expect(media().countSagas(state.libraryId)).toBe(1)
   })
 
   it('shows the default slideshow until the library picks a backdrop, and only its own pick', () => {

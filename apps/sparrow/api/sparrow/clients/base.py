@@ -95,7 +95,8 @@ class HttpClient:
         try:
             return response.json()
         except ValueError as exc:
-            raise ClientError(self.service, "GET", path, response.status_code, "not JSON") from exc
+            method = response.request.method
+            raise ClientError(self.service, method, path, response.status_code, "not JSON") from exc
 
 
 class Downable:

@@ -88,12 +88,12 @@ class Download:
     @property
     def search_ids(self) -> tuple[int, ...]:
         """What its arr searches for again: the movie, or the episodes."""
-        return (self.first.media_id,) if self.kind == "movie" else self.episode_ids
+        return (self.first.media_id,) if self.kind == MediaType.MOVIE else self.episode_ids
 
     @property
     def item(self) -> str:
         """The title it's for, so the same movie or episodes stalling again is recognized."""
-        if self.kind == "movie":
+        if self.kind == MediaType.MOVIE:
             return f"movie:{self.first.media_id}"
         return f"tv:{self.first.media_id}:{','.join(map(str, self.episode_ids))}"
 
@@ -111,7 +111,7 @@ def downloads(host: str, kind: MediaType, queue: Sequence[QueueItem]) -> list[Do
     the client by hand) isn't the sweeper's to remove, nor a show's with no episode named."""
     by_id: dict[str, list[QueueItem]] = {}
     for record in queue:
-        known = record.media_id and (kind == "movie" or record.episode_id is not None)
+        known = record.media_id and (kind == MediaType.MOVIE or record.episode_id is not None)
         if record.download_id and known:
             by_id.setdefault(record.download_id, []).append(record)
     return [Download(host, kind, d, tuple(rs)) for d, rs in by_id.items()]

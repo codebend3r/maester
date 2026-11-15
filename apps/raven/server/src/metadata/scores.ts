@@ -15,6 +15,9 @@ import {
 
 const NAMES = { omdb: 'OMDb', mdblist: 'MDBList' } as const satisfies Record<ScoreProvider, string>
 
+/** A stored movie or show, and what its score sources know it by. */
+type ScoresFetchProps = ScoreTitle & { itemId: number }
+
 type ScoresAskProps = {
   source: ScoreSource
   itemId: number
@@ -52,7 +55,7 @@ export class Scores {
    * MDBList does not know the title. False when no source could be asked or
    * the primary failed.
    */
-  async fetch({ itemId, ...title }: ScoreTitle & { itemId: number }): Promise<boolean> {
+  async fetch({ itemId, ...title }: ScoresFetchProps): Promise<boolean> {
     const primary = this.primary()
     if (primary == null) return false
     const answer = await this.ask({ source: primary, itemId, title })
@@ -84,7 +87,7 @@ export class Scores {
   }
 
   /** Asks OMDb alone, for a title MDBList does not know. False when OMDb failed. */
-  async fetchFallback({ itemId, ...title }: ScoreTitle & { itemId: number }): Promise<boolean> {
+  async fetchFallback({ itemId, ...title }: ScoresFetchProps): Promise<boolean> {
     return (await this.ask({ source: this.omdb, itemId, title })) != null
   }
 

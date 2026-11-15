@@ -1,8 +1,8 @@
-import type { ComponentType } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { MANAGERS_ONLY_COPY } from '@/components/ManagersOnly/copy'
-import { MANAGEMENT_MODES, type ManagementMode } from '@/lib/management'
+import { MANAGEMENT_MODES, type ManagementMode, useManagement } from '@/lib/management'
 import styles from '@/components/ManagersOnly/ManagersOnly.module.scss'
 import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
 import { APP_PATHS } from '@/lib/appPaths'
@@ -51,7 +51,7 @@ const NOTES = {
  * What a managing page shows, in place of itself, to a viewer who may not
  * manage: whom it is for, and with the admin lock, how to turn it off.
  */
-export const ManagersOnly = ({ mode, ...note }: ManagersOnlyProps) => {
+const ManagersOnly = ({ mode, ...note }: ManagersOnlyProps) => {
   const Note = NOTES[mode]
   return (
     <section className={styles.page}>
@@ -60,5 +60,33 @@ export const ManagersOnly = ({ mode, ...note }: ManagersOnlyProps) => {
         <Note {...note} />
       </div>
     </section>
+  )
+}
+
+const MANAGE_STATES = { managing: 'managing', refused: 'refused' } as const
+type ManageState = (typeof MANAGE_STATES)[keyof typeof MANAGE_STATES]
+
+type ForManagersViewProps = ManagersOnlyProps & { children: ReactNode }
+
+const Managing = ({ children }: ForManagersViewProps) => children
+
+const FOR_MANAGERS_VIEWS = {
+  [MANAGE_STATES.managing]: Managing,
+  [MANAGE_STATES.refused]: ManagersOnly,
+} as const satisfies Record<ManageState, ComponentType<ForManagersViewProps>>
+
+type ForManagersProps = NoteProps & {
+  /** The page itself, rendered (and so asking the server) only while the viewer may manage. */
+  children: ReactNode
+}
+
+/** A managing page: itself while the viewer may manage, else whom it is for. */
+export const ForManagers = ({ children, ...note }: ForManagersProps) => {
+  const { mode, canManage } = useManagement()
+  const View = FOR_MANAGERS_VIEWS[canManage ? MANAGE_STATES.managing : MANAGE_STATES.refused]
+  return (
+    <View mode={mode} {...note}>
+      {children}
+    </View>
   )
 }

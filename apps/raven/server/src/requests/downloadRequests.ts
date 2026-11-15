@@ -26,7 +26,7 @@ import {
   type ArrHolding,
   type ArrTitle,
 } from '@/requests/arrClient'
-import { FreshReads } from '@/requests/freshReads'
+import { FreshReads } from '@/freshReads'
 import { letterFolderOf } from '@/requests/letterFolders'
 import { statusOf } from '@/requests/requestStatus'
 
@@ -38,6 +38,12 @@ export const STATUS_FRESH_MS = 30_000
 
 /** How long the titles an arr holds are kept before the arr is asked for them all again. */
 export const HOLDINGS_FRESH_MS = 5 * 60 * 1000
+
+/** How many titles' reads of an arr are kept before the oldest go. */
+const HELD_READS = 10_000
+
+/** How many lists of an arr's holdings are kept: one for each arr, of the day they were read on. */
+const HELD_LISTS = 2
 
 /** The only resolution a requested title may download at; a profile that allows any other is refused. */
 const REQUEST_RESOLUTION = 1080
@@ -163,9 +169,9 @@ export class DownloadRequests {
     @Inject(SERVER_CONFIG) private readonly config: ServerConfig,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
-    this.statusReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
-    this.holdingReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
-    this.holdingLists = new FreshReads({ clock, freshMs: HOLDINGS_FRESH_MS })
+    this.statusReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS, most: HELD_READS })
+    this.holdingReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS, most: HELD_READS })
+    this.holdingLists = new FreshReads({ clock, freshMs: HOLDINGS_FRESH_MS, most: HELD_LISTS })
   }
 
   private get db() {

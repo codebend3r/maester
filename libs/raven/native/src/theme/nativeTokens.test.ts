@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { nativeTokens } from '@/theme/nativeTokens'
+import { nativeTokens, tokenReaderOf } from '@/theme/nativeTokens'
 
 describe('nativeTokens', () => {
   it('turns rem into points at 16 to the rem', () => {
@@ -66,5 +66,24 @@ describe('nativeTokens', () => {
         '--color-accent': 'oklch(70% 0.1 200)',
       }),
     ).toEqual({ colours: {}, numbers: {} })
+  })
+})
+
+describe('tokenReaderOf', () => {
+  const reader = tokenReaderOf({
+    tokens: { '--color-ink': '#123456', '--space-1': '0.5rem' },
+    owner: 'The fixture',
+  })
+
+  it('reads a colour and a length by name', () => {
+    expect(reader.colour('--color-ink')).toBe('#123456')
+    expect(reader.size('--space-1')).toBe(8)
+  })
+
+  it('throws, naming its reader, for a token it does not hold', () => {
+    expect(() => reader.colour('--color-gone')).toThrow(
+      'The fixture has no design token --color-gone',
+    )
+    expect(() => reader.size('--color-ink')).toThrow('The fixture has no design token --color-ink')
   })
 })

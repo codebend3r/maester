@@ -32,7 +32,7 @@ async def tell_landed(services: Services, store: Store) -> list[Notice]:
     since = datetime.now(UTC) - FOLLOW_FOR
     notices: list[Notice] = []
     checked: set[int] = set()
-    for row in store.acted_since(("replace_media", "decide_replacement"), since):
+    for row in store.acted_since(("replace_media",), since):
         report = store.get_report(int(row.args.get("report_id", 0)))
         if report is None or report.status is not ReportStatus.REPLACED or report.id in checked:
             continue

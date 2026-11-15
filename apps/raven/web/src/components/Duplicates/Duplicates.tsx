@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type Duplicate,
   type DuplicateCard,
@@ -7,6 +6,7 @@ import {
   type Library,
   type PosterEntry,
   type SplitHow,
+  SPLIT_HOWS,
   canSplitByCut,
   cardLink,
   cardTitle,
@@ -21,12 +21,11 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { ConfirmDelete } from '@/components/ConfirmDelete/ConfirmDelete'
 import { Button, WordFact } from '@raven/ui'
 import { PosterImage } from '@/components/PosterImage/PosterImage'
-import { api } from '@/lib/api'
-import { afterSplit, queryKeys } from '@raven/ui/headless'
 import { POSTER_SIZES } from '@/lib/posters'
 import { DUPLICATES_COPY } from '@/components/Duplicates/copy'
 import styles from '@/components/Duplicates/Duplicates.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useSplits } from '@/lib/useSplits'
 
 type PosterProps = { entry: PosterEntry }
 
@@ -96,10 +95,14 @@ const Splits = ({ card, busy, onSplit }: SplitsProps) => {
   return (
     <>
       <div className={styles.actions}>
-        <Button icon="split" disabled={busy} onClick={() => onSplit('apart')}>
+        <Button icon="split" disabled={busy} onClick={() => onSplit(SPLIT_HOWS.apart)}>
           {DUPLICATES_COPY.splitApart}
         </Button>
-        <Button icon="wand" disabled={busy || !canTellApart} onClick={() => onSplit('smart')}>
+        <Button
+          icon="wand"
+          disabled={busy || !canTellApart}
+          onClick={() => onSplit(SPLIT_HOWS.smart)}
+        >
           {DUPLICATES_COPY.smartSplit}
         </Button>
       </div>
@@ -242,24 +245,7 @@ type DuplicatesProps = {
  * Put back together.
  */
 export const Duplicates = ({ library, listing }: DuplicatesProps) => {
-  const queryClient = useQueryClient()
-  const settle = (updated: DuplicatesListing) => {
-    queryClient.setQueryData(queryKeys.duplicates(library.id), updated)
-    return afterSplit({ queryClient, libraryId: library.id })
-  }
-  type SplitMutationFnProps = { mediaId: number; how: SplitHow }
-
-  const split = useMutation({
-    mutationFn: ({ mediaId, how }: SplitMutationFnProps) =>
-      api.splitDuplicate({ libraryId: library.id, mediaId, how }),
-    onSuccess: settle,
-  })
-  const join = useMutation({
-    mutationFn: (itemId: number) => api.joinSplit({ libraryId: library.id, itemId }),
-    onSuccess: settle,
-  })
-  const busy = split.isPending || join.isPending
-  const failure = split.error ?? join.error
+  const { split, join, isBusy: busy, failure } = useSplits({ libraryId: library.id })
 
   return (
     <div className={styles.duplicates}>

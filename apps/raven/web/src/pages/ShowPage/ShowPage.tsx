@@ -2,8 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import {
   DOWNLOAD_TARGET_KINDS,
   type ItemDetails,
-  ROUTE_STATES,
-  type RouteQuery,
   TITLE_DISPLAYS,
   createdBy,
   episodeCode,
@@ -27,7 +25,6 @@ import { useNavigate } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AiMatchNote } from '@/components/AiMatchNote/AiMatchNote'
 import { BUTTON_TONES, Button, ButtonLink } from '@raven/ui'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CastRow } from '@/components/CastRow/CastRow'
 import { PlayAllButton } from '@/components/PlayAllButton/PlayAllButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
@@ -42,7 +39,7 @@ import {
 } from '@/components/ItemHeader/ItemHeader'
 import { useItemEditors } from '@/components/ItemEditors/ItemEditors'
 import { ReviewCards } from '@/components/ReviewCards/ReviewCards'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectionBar } from '@/components/SelectionBar/SelectionBar'
 import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionScope'
@@ -207,34 +204,6 @@ const ShowView = ({ details }: ShowViewProps) => {
   )
 }
 
-const SHOW_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type ShowViewsProps = {
-  [SHOW_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [SHOW_VIEW_KEYS.ready]: ShowViewProps
-}
-
-const SHOW_VIEWS = {
-  [SHOW_VIEW_KEYS.pending]: RouteState,
-  [SHOW_VIEW_KEYS.ready]: ShowView,
-} as const satisfies ViewsOf<ShowViewsProps>
-
-type ShowPageViewProps = { page: RouteQuery<ItemDetails> }
-
-/** The show on its way or failing, else the show. */
-const showPageView = ({ page }: ShowPageViewProps): ViewOf<ShowViewsProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: SHOW_VIEW_KEYS.pending,
-      props: {
-        state: page,
-        noun: SHOW_COPY.noun,
-        shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />,
-      },
-    }
-  return { key: SHOW_VIEW_KEYS.ready, props: { details: page.data } }
-}
-
 /**
  * `/shows/:id`: a show's backdrop, poster, creator, years, network, scores,
  * Play for the next episode and Shuffle for a random one, then its summary,
@@ -242,5 +211,13 @@ const showPageView = ({ page }: ShowPageViewProps): ViewOf<ShowViewsProps> => {
  */
 export const ShowPage = () => {
   const page = useRouteItem(ITEM_TYPES.show)
-  return <KeyedView<ShowViewsProps> views={SHOW_VIEWS} view={showPageView({ page })} />
+  return (
+    <RouteView
+      page={page}
+      noun={SHOW_COPY.noun}
+      shape={<ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />}
+    >
+      {(details) => <ShowView details={details} />}
+    </RouteView>
+  )
 }

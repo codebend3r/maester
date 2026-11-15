@@ -13,7 +13,7 @@ from sparrow.clients import Services
 from sparrow.clients.arr import MediaFile
 from sparrow.clients.seerr import MediaDetails
 from sparrow.library import Owner, owner_of
-from sparrow.media import Copy
+from sparrow.media import Copy, MediaType
 
 
 @dataclass(frozen=True)
@@ -43,7 +43,7 @@ class LocatedFile:
         for a truncated one, so episodes have none.
         """
         minutes = self.details.runtime_minutes
-        return minutes * 60.0 if minutes and self.copy.media_type == "movie" else None
+        return minutes * 60.0 if minutes and self.copy.media_type == MediaType.MOVIE else None
 
 
 async def locate(services: Services, copy: Copy) -> LocatedFile:

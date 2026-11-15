@@ -13,8 +13,8 @@ import {
 import { CLOCK, type Clock, utcDayOf } from '@/clock'
 import { TmdbClient, UPCOMING_LISTS } from '@/metadata/tmdbClient'
 import type { DiscoveredPage, DiscoveredTitle } from '@/metadata/tmdbShapes'
-import { FreshReads } from '@/upcoming/freshReads'
-import { SHELF_STREAMS, type ShelfStream } from '@/upcoming/shelfStreams'
+import { FreshReads } from '@/freshReads'
+import { SHELF_STREAMS, type ShelfStream, UPCOMING_FRESH_MS } from '@/upcoming/shelfStreams'
 import { isAnime } from '@/upcoming/upcomingKind'
 
 /** How many results a page of TMDB's discover holds, its last page aside. */
@@ -167,7 +167,7 @@ export class UpcomingShelfPages {
     @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'upcoming'>,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
-    this.pages = new FreshReads({ clock, most: HELD_PAGES })
+    this.pages = new FreshReads({ clock, freshMs: UPCOMING_FRESH_MS, most: HELD_PAGES })
   }
 
   /** The three shelves as Coming soon's own page shows them: the first titles of each. Rejects with TMDB's error when a read fails. */

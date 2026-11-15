@@ -394,13 +394,10 @@
   font-size: var(--font-size-xl);
 }
 
-.dialog {
-  width: min(var(--measure-question), calc(100vw - 2 * var(--space-3)));
-}
-
 .dialogBody {
   display: grid;
   gap: var(--space-3);
+  padding: var(--space-4);
 }
 
 .dialogTitle {

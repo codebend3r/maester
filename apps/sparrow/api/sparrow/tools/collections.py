@@ -18,6 +18,7 @@ from pydantic import Field
 
 from sparrow.agent.tools import Choice, Ok, Refused, Result, Tier, ToolContext, offer, tool
 from sparrow.clients.seerr import Collection, RequestRefused, RequestStatus, SearchResult
+from sparrow.media import MediaType
 from sparrow.tools.requests import explain
 from sparrow.tools.search import as_choice, availability
 
@@ -39,7 +40,7 @@ async def find_collection(
     tmdb_id: Annotated[int, Field(description="TMDB id of any movie in it.")],
 ) -> dict[str, Any] | Ok:
     seerr = ctx.services.seerr
-    movie = await seerr.media_details("movie", tmdb_id)
+    movie = await seerr.media_details(MediaType.MOVIE, tmdb_id)
     if movie.collection_id is None:
         return {"collection": None, "note": f"{movie.display} isn't part of a collection."}
     collection = await seerr.collection(movie.collection_id)
@@ -106,10 +107,12 @@ async def request_collection(
     # One at a time: each request counts against the quota the next one sees.
     for part in gaps:
         try:
-            req = await seerr.create_request("movie", part.tmdb_id, as_user=user.seerr_user_id)
+            req = await seerr.create_request(
+                MediaType.MOVIE, part.tmdb_id, as_user=user.seerr_user_id
+            )
         except RequestRefused as exc:
             refused.append(
-                {"title": part.title, "reason": await explain(seerr, user, exc, "movie")}
+                {"title": part.title, "reason": await explain(seerr, user, exc, MediaType.MOVIE)}
             )
             continue
         requested.append(

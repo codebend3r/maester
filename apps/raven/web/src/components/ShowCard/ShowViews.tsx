@@ -1,10 +1,7 @@
 import {
   type MediaSort,
-  RATING_SOURCES,
   type RatingSource,
   type ShowEntry,
-  type SortColumn,
-  TABLE_SORT_DIRECTIONS,
   WATCHED_STATES,
   episodeCode,
   showEntryKey,
@@ -15,9 +12,10 @@ import {
   watchPageOf,
   showPath,
 } from '@raven/core'
+import { type SortColumn, TABLE_SORT_DIRECTIONS } from '@/lib/tableSort'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { Icon } from '@raven/ui'
-import { RatingBadge, RatingChip } from '@/components/RatingPanel/RatingPanel'
+import { RatingChip } from '@/components/RatingPanel/RatingPanel'
 import { ItemPoster } from '@/components/PosterImage/PosterImage'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
 import { SortHeader } from '@/components/SortHeader/SortHeader'
@@ -28,6 +26,7 @@ import { useSelectable } from '@/lib/useSelectable'
 import { SHOW_CARD_COPY } from '@/components/ShowCard/copy'
 import styles from '@/components/ShowCard/ShowViews.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { RATING_COLUMNS, RatingCells, ratingSortColumns } from '@/lib/ratingColumns'
 
 type NextPlayProps = { title: string; next: NonNullable<ShowEntry['next']> }
 
@@ -65,13 +64,6 @@ const SmallPoster = ({ entry, inRow = false }: SmallPosterProps) => (
   </CardLink>
 )
 
-const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
-  { source: RATING_SOURCES.rottenTomatoes, label: SHOW_CARD_COPY.rottenTomatoes },
-  { source: RATING_SOURCES.imdb, label: COMMON_COPY.imdb },
-  { source: RATING_SOURCES.metacritic, label: SHOW_CARD_COPY.metacritic },
-  { source: RATING_SOURCES.tmdb, label: COMMON_COPY.tmdb },
-]
-
 /** The columns besides the scores that the show table sorts by. */
 const FACT_COLUMNS = {
   title: 'title',
@@ -81,11 +73,6 @@ const FACT_COLUMNS = {
 
 type Column = (typeof FACT_COLUMNS)[keyof typeof FACT_COLUMNS] | RatingSource
 
-type ScoreProps = { entry: ShowEntry; source: RatingSource }
-
-const score = ({ entry, source }: ScoreProps): number | null =>
-  entry.show.ratings.find((rating) => rating.source === source)?.value ?? null
-
 const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   [FACT_COLUMNS.title]: {
     value: (entry) => sortTitle(entry.show.title),
@@ -93,22 +80,7 @@ const COLUMNS: Record<Column, SortColumn<ShowEntry>> = {
   },
   [FACT_COLUMNS.years]: { value: (entry) => entry.show.year, first: TABLE_SORT_DIRECTIONS.desc },
   [FACT_COLUMNS.episodes]: { value: (entry) => entry.episodes, first: TABLE_SORT_DIRECTIONS.desc },
-  [RATING_SOURCES.rottenTomatoes]: {
-    value: (entry) => score({ entry, source: RATING_SOURCES.rottenTomatoes }),
-    first: TABLE_SORT_DIRECTIONS.desc,
-  },
-  [RATING_SOURCES.imdb]: {
-    value: (entry) => score({ entry, source: RATING_SOURCES.imdb }),
-    first: TABLE_SORT_DIRECTIONS.desc,
-  },
-  [RATING_SOURCES.metacritic]: {
-    value: (entry) => score({ entry, source: RATING_SOURCES.metacritic }),
-    first: TABLE_SORT_DIRECTIONS.desc,
-  },
-  [RATING_SOURCES.tmdb]: {
-    value: (entry) => score({ entry, source: RATING_SOURCES.tmdb }),
-    first: TABLE_SORT_DIRECTIONS.desc,
-  },
+  ...ratingSortColumns<ShowEntry>({ ratingsOf: (entry) => entry.show.ratings }),
 }
 
 type ShowRowProps = { entry: ShowEntry }
@@ -136,14 +108,7 @@ const ShowRow = ({ entry }: ShowRowProps) => {
         {showYears({ year: entry.show.year, endedYear: entry.endedYear }) ?? ''}
       </td>
       <td className={`${styles.number} ${styles.spare}`}>{entry.episodes}</td>
-      {RATING_COLUMNS.map((column) => {
-        const rating = entry.show.ratings.find((it) => it.source === column.source)
-        return (
-          <td key={column.source} className={`${styles.number} ${styles.roomy}`}>
-            {rating && <RatingBadge rating={rating} isBare />}
-          </td>
-        )
-      })}
+      <RatingCells ratings={entry.show.ratings} className={`${styles.number} ${styles.roomy}`} />
       <td className={styles.playCell}>
         {!select.selecting && !!entry.next && (
           <NextPlay title={entry.show.title} next={entry.next} />

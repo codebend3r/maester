@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from sparrow.media import MediaType
+
 # TMDB's "anime" keyword, the id Seerr itself uses to route anime to Sonarr's
 # anime settings, and TMDB's Animation genre.
 ANIME_KEYWORD, ANIMATION_GENRE = 210024, 16
@@ -86,7 +88,7 @@ def _user_name(raw: dict[str, Any]) -> str:
 @dataclass(frozen=True)
 class SearchResult:
     tmdb_id: int
-    media_type: str  # "movie" | "tv"
+    media_type: MediaType
     title: str
     year: int | None
     overview: str
@@ -103,7 +105,7 @@ class SearchResult:
         info = raw.get("mediaInfo") or {}
         return cls(
             tmdb_id=int(raw["id"]),
-            media_type=raw.get("mediaType", ""),
+            media_type=MediaType(raw["mediaType"]),
             title=raw.get("title") or raw.get("name") or "",
             year=_year(raw),
             overview=raw.get("overview") or "",
@@ -148,7 +150,7 @@ class MediaDetails:
     """A movie or show as Seerr describes it: TMDB facts plus the server's copies."""
 
     tmdb_id: int
-    media_type: str
+    media_type: MediaType
     title: str
     year: int | None
     overview: str
@@ -176,7 +178,7 @@ class MediaDetails:
     @property
     def seerr_anime(self) -> bool:
         """Seerr's own rule for sending a show to its anime Sonarr settings: TMDB's keyword."""
-        return self.media_type == "tv" and ANIME_KEYWORD in self.keyword_ids
+        return self.media_type == MediaType.TV and ANIME_KEYWORD in self.keyword_ids
 
     @property
     def anime_by_tmdb(self) -> bool:
@@ -195,7 +197,7 @@ class MediaDetails:
         return self.arr_4k if is_4k else self.arr
 
     @classmethod
-    def from_api(cls, media_type: str, raw: dict[str, Any]) -> MediaDetails:
+    def from_api(cls, media_type: MediaType, raw: dict[str, Any]) -> MediaDetails:
         info = raw.get("mediaInfo") or {}
         on_server = {int(s["seasonNumber"]): s for s in info.get("seasons") or []}
         seasons = []
@@ -245,7 +247,10 @@ class Collection:
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> Collection:
-        parts = (SearchResult.from_api({"mediaType": "movie", **p}) for p in raw.get("parts") or [])
+        parts = (
+            SearchResult.from_api({"mediaType": MediaType.MOVIE, **p})
+            for p in raw.get("parts") or []
+        )
         return cls(
             id=int(raw["id"]),
             name=raw.get("name") or "",
@@ -257,7 +262,7 @@ class Collection:
 class MediaRequest:
     id: int
     status: RequestStatus
-    media_type: str
+    media_type: MediaType
     tmdb_id: int
     is_4k: bool
     requested_by_id: int
@@ -280,7 +285,7 @@ class MediaRequest:
         return cls(
             id=int(raw["id"]),
             status=RequestStatus(int(raw.get("status", RequestStatus.PENDING))),
-            media_type=raw.get("type") or media.get("mediaType") or "",
+            media_type=MediaType(raw.get("type") or media.get("mediaType")),
             tmdb_id=int(media.get("tmdbId", 0)),
             is_4k=is_4k,
             requested_by_id=int((raw.get("requestedBy") or {}).get("id", 0)),
@@ -359,8 +364,8 @@ class Quotas:
     movie: Quota
     tv: Quota
 
-    def of(self, media_type: str) -> Quota:
-        return self.movie if media_type == "movie" else self.tv
+    def of(self, media_type: MediaType) -> Quota:
+        return self.movie if media_type == MediaType.MOVIE else self.tv
 
 
 UNLIMITED = Quota(limit=None, days=None, used=0, remaining=None, restricted=False)
@@ -482,7 +487,7 @@ class Issue:
 
     id: int
     kind: str  # video | audio | subtitles | other
-    media_type: str
+    media_type: MediaType
     tmdb_id: int
     reporter: str
     created_at: str = ""
@@ -495,7 +500,7 @@ class Issue:
         return cls(
             id=int(raw["id"]),
             kind=IssueType.of(raw.get("issueType")).label,
-            media_type=media.get("mediaType") or "",
+            media_type=MediaType(media.get("mediaType")),
             tmdb_id=int(media.get("tmdbId") or 0),
             reporter=_user_name(raw.get("createdBy") or {}),
             created_at=raw.get("createdAt") or "",

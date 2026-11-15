@@ -4,9 +4,9 @@
 Cancel in front of the friend; nothing happens until they press Confirm.
 Then, whatever the model said, it runs only on stored evidence about that
 very file (`Evidence`): a failed health check, or two people reporting it.
-It acts only on the friend's own report, from a status a friend may start
-from (`MAY_REPLACE`), only on the host that owns the copy, and only while
-the file is still the one reported.
+It acts only on the friend's own report, while it is still open, only on
+the host that owns the copy, and only while the file is still the one
+reported.
 
 A day holds at most `REPLACE_DAILY_CAP` replacements that friends confirm,
 counted from the audit log; past it, the call refuses until the day is
@@ -25,9 +25,10 @@ from pydantic import Field
 
 from sparrow.agent.tools import Failed, Ok, Refused, Result, Tier, ToolContext, tool
 from sparrow.library import NotLocated
+from sparrow.media import ReportStatus
 from sparrow.playback.items import LocatedFile, locate
 from sparrow.playback.replace import admin_notice, replace_copy
-from sparrow.playback.reports import MAY_REPLACE, NOT_NOW, Evidence
+from sparrow.playback.reports import Evidence
 from sparrow.store import ReportRow
 
 CAP_WINDOW = timedelta(days=1)
@@ -44,8 +45,8 @@ class Ready:
 
 async def ready(ctx: ToolContext, report: ReportRow, host: str) -> Ready | Refused:
     """The report's file, still there on `host` and proven broken by stored evidence."""
-    if report.status not in MAY_REPLACE:
-        return Refused(f"Report {report.id} can't be acted on: {NOT_NOW[report.status]}.")
+    if report.status is ReportStatus.REPLACED:
+        return Refused(f"Report {report.id} can't be acted on: it was already replaced.")
     if host.lower() != report.host:
         return Refused(f"{report.title} in {report.copy.version} is on {report.host}, not {host}.")
     try:

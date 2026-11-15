@@ -1,5 +1,5 @@
 import type { Type } from '@nestjs/common'
-import { HEADERS, HTTP_METHODS } from '@shared/server'
+import { HEADERS, HTTP_METHODS, HTTP_STATUSES } from '@shared/server'
 import type { FastifyInstance } from 'fastify'
 import { routeMarks } from '@/routeMarks'
 
@@ -131,7 +131,10 @@ export const registerMediaPlaneHook = ({
     if (request.method === MEDIA_PLANE_METHODS.options) {
       const wantsPrivateNetwork =
         request.headers[CORS_HEADERS.requestPrivateNetwork] === CORS_FLAGS.true
-      return reply.headers(preflightHeaders({ origin, wantsPrivateNetwork })).code(204).send()
+      return reply
+        .headers(preflightHeaders({ origin, wantsPrivateNetwork }))
+        .code(HTTP_STATUSES.noContent)
+        .send()
     }
     if (request.method !== MEDIA_PLANE_METHODS.get && request.method !== MEDIA_PLANE_METHODS.head) {
       return

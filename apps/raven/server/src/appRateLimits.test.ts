@@ -3,10 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import { HLS_PARAMS } from '@raven/core'
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
-import { TOO_MANY_REQUESTS } from '@/rateLimits/limitRequests'
 import { RATE_LIMITS, RATE_TIERS } from '@/rateLimits/rateTiers'
 import {
   type InjectOptions,
@@ -94,14 +93,14 @@ describe('rate limits', () => {
   it('answers a client from the internet 429 past the strict limit, with Retry-After and a JSON error', async () => {
     const options = { url: ECHO, remoteAddress: away(1) }
     const answered = await statuses({ options, times: STRICT })
-    expect(answered.every((status) => status !== TOO_MANY_REQUESTS)).toBe(true)
+    expect(answered.every((status) => status !== HTTP_STATUSES.tooManyRequests)).toBe(true)
     timing.advance(15_000)
     const refused = await app().inject(options)
-    expect(refused.statusCode).toBe(TOO_MANY_REQUESTS)
+    expect(refused.statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     expect(refused.headers[HEADERS.retryAfter]).toBe('45')
     expect(refused.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(refused.json()).toEqual({
-      statusCode: TOO_MANY_REQUESTS,
+      statusCode: HTTP_STATUSES.tooManyRequests,
       message: 'Too many requests. Try again in 45 seconds.',
     })
   })
@@ -122,7 +121,7 @@ describe('rate limits', () => {
     expect(refusals).toEqual(
       COUNTED_STRICT.map(({ path }) => ({
         path,
-        status: TOO_MANY_REQUESTS,
+        status: HTTP_STATUSES.tooManyRequests,
         wait: String(WINDOW_MS / 1000),
       })),
     )
@@ -134,9 +133,9 @@ describe('rate limits', () => {
       options: requestOf({ route: GATED, remoteAddress }),
       times: STRICT + 1,
     })
-    expect(gated.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    expect(gated.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([])
     const echoed = await statuses({ options: { url: ECHO, remoteAddress }, times: STRICT })
-    expect(echoed.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    expect(echoed.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([])
   })
 
   it('lets an ordinary route take the standard limit, and counts a path no route declares with it', async () => {
@@ -144,12 +143,12 @@ describe('rate limits', () => {
     const lockState = { url: pathOf({ route: ROUTES.lockState }), remoteAddress }
     const answered = await allStatuses({ options: lockState, times: STANDARD })
     expect(answered.filter((status) => status !== 200)).toEqual([])
-    expect((await app().inject(lockState)).statusCode).toBe(TOO_MANY_REQUESTS)
+    expect((await app().inject(lockState)).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     expect((await app().inject({ url: '/api/nothing-here', remoteAddress })).statusCode).toBe(
-      TOO_MANY_REQUESTS,
+      HTTP_STATUSES.tooManyRequests,
     )
     expect((await app().inject({ url: ECHO, remoteAddress })).statusCode).not.toBe(
-      TOO_MANY_REQUESTS,
+      HTTP_STATUSES.tooManyRequests,
     )
   })
 
@@ -170,7 +169,7 @@ describe('rate limits', () => {
       ...(await allStatuses({ options: range, times: runs })),
     ]
     expect(answered.length).toBeGreaterThan(STANDARD * 2)
-    expect(answered.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    expect(answered.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([])
     expect(
       (await app().inject({ url: pathOf({ route: ROUTES.lockState }), remoteAddress })).statusCode,
     ).toBe(200)
@@ -190,13 +189,15 @@ describe('rate limits', () => {
       },
       times: STANDARD + 10,
     })
-    expect([...direct, ...proxied].filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
+    expect(
+      [...direct, ...proxied].filter((status) => status === HTTP_STATUSES.tooManyRequests),
+    ).toEqual([])
   })
 
   it('limits the home network on the strict routes, so nothing passing for home can guess a secret', async () => {
     const options = { url: ECHO, remoteAddress: HOME_GUESSER }
     await statuses({ options, times: STRICT })
-    expect((await app().inject(options)).statusCode).toBe(TOO_MANY_REQUESTS)
+    expect((await app().inject(options)).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
   })
 
   it('takes a private socket it does not trust that forwards a header for the internet, counted by that socket', async () => {
@@ -206,8 +207,8 @@ describe('rate limits', () => {
       headers: { [HEADERS.forwardedFor]: claimed },
     })
     const answered = await allStatuses({ options: forged(HOME), times: STANDARD })
-    expect(answered.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([])
-    expect((await app().inject(forged(away(70)))).statusCode).toBe(TOO_MANY_REQUESTS)
+    expect(answered.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([])
+    expect((await app().inject(forged(away(70)))).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
   })
 
   it('counts a client behind the proxy by the address the proxy appended', async () => {
@@ -217,8 +218,10 @@ describe('rate limits', () => {
       headers: { [HEADERS.forwardedFor]: `${HOME}, ${client}` },
     })
     await statuses({ options: through(away(40)), times: STRICT })
-    expect((await app().inject(through(away(40)))).statusCode).toBe(TOO_MANY_REQUESTS)
-    expect((await app().inject(through(away(41)))).statusCode).not.toBe(TOO_MANY_REQUESTS)
+    expect((await app().inject(through(away(40)))).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
+    expect((await app().inject(through(away(41)))).statusCode).not.toBe(
+      HTTP_STATUSES.tooManyRequests,
+    )
   })
 
   it('pays no heed to an X-Forwarded-For a client on a public socket writes itself', async () => {
@@ -232,18 +235,22 @@ describe('rate limits', () => {
         return response.statusCode
       }),
     )
-    expect(forged.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([TOO_MANY_REQUESTS])
+    expect(forged.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([
+      HTTP_STATUSES.tooManyRequests,
+    ])
   })
 
   it('lets a limited client in again once its window ends', async () => {
     const options = { url: ECHO, remoteAddress: away(60) }
     await statuses({ options, times: STRICT })
-    expect((await app().inject(options)).statusCode).toBe(TOO_MANY_REQUESTS)
+    expect((await app().inject(options)).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     timing.advance(WINDOW_MS - 1)
-    expect((await app().inject(options)).statusCode).toBe(TOO_MANY_REQUESTS)
+    expect((await app().inject(options)).statusCode).toBe(HTTP_STATUSES.tooManyRequests)
     timing.advance(1)
     const reopened = await statuses({ options, times: STRICT + 1 })
-    expect(reopened.filter((status) => status === TOO_MANY_REQUESTS)).toEqual([TOO_MANY_REQUESTS])
-    expect(reopened.at(-1)).toBe(TOO_MANY_REQUESTS)
+    expect(reopened.filter((status) => status === HTTP_STATUSES.tooManyRequests)).toEqual([
+      HTTP_STATUSES.tooManyRequests,
+    ])
+    expect(reopened.at(-1)).toBe(HTTP_STATUSES.tooManyRequests)
   })
 })

@@ -224,7 +224,7 @@ def setting(default: Any, env: str, read: Reader = _text, *, required: bool = Fa
 
 @dataclass(frozen=True)
 class Jobs:
-    """When the admin console's scheduled jobs run, in the server's time zone."""
+    """When the scheduled jobs run, in the server's time zone."""
 
     timezone: str = setting("UTC", "TZ", _zone)
     # The daily digest, and the weekly NAS health report on `nas_report_day` at the same time.

@@ -35,6 +35,7 @@ import { ViewingAccount } from '@/media/viewingAccountParam'
 import { parseBody } from '@/parseBody'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
+import { HTTP_STATUSES } from '@shared/server'
 
 /** The route parameter naming a saga by its TMDB id. */
 const SAGA_PARAM = 'sagaId'
@@ -107,7 +108,7 @@ export class LibraryCurationController {
   /** Splits a card, named by any file on it: every file apart, or by cut. */
   @AdminOnly()
   @Post(':id/duplicates/split')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   split(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
     @Body() body: unknown,
@@ -125,7 +126,7 @@ export class LibraryCurationController {
   /** Puts a split movie's files back on one card. */
   @AdminOnly()
   @Post(':id/duplicates/join')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   join(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
     @Body() body: unknown,

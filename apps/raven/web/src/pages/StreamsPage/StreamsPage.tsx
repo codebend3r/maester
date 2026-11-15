@@ -29,12 +29,11 @@ import {
   wordPart,
 } from '@raven/core'
 import { BUTTON_TONES, Button, FactParts } from '@raven/ui'
-import { type ComponentType, type ReactNode, useId, useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
+import { ForManagers } from '@/components/ManagersOnly/ManagersOnly'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { useManagement } from '@/lib/management'
 import { STREAMS_COPY, STREAMS_MODE_COPY } from '@/pages/StreamsPage/copy'
 import { api } from '@/lib/api'
 import { liveStreamsQuery, mediaStreamsQuery, tracksQuery } from '@/lib/queries'
@@ -505,22 +504,6 @@ const RowsSkeleton = () => (
   </Loading>
 )
 
-const ACCESS_STATES = { managersOnly: 'managersOnly', managing: 'managing' } as const
-type AccessState = (typeof ACCESS_STATES)[keyof typeof ACCESS_STATES]
-
-type StreamsViewProps = { mode: ReturnType<typeof useManagement>['mode'] }
-
-type StreamsManagersOnlyProps = StreamsViewProps
-
-const StreamsManagersOnly = ({ mode }: StreamsManagersOnlyProps) => (
-  <ManagersOnly
-    mode={mode}
-    name={STREAMS_COPY.managersOnlyName}
-    forAdmin={STREAMS_COPY.forAdmin}
-    forOwner={STREAMS_COPY.forOwner}
-  />
-)
-
 /** The streams themselves, asked for only while the viewer may manage. */
 const StreamsList = () => {
   const streams = useQuery(liveStreamsQuery)
@@ -537,11 +520,6 @@ const StreamsList = () => {
   )
 }
 
-const STREAMS_VIEWS = {
-  [ACCESS_STATES.managersOnly]: StreamsManagersOnly,
-  [ACCESS_STATES.managing]: StreamsList,
-} as const satisfies Record<AccessState, ComponentType<StreamsViewProps>>
-
 /**
  * `/streams`: what the server is sending right now, in two sections: the
  * streams being watched, one card per viewer and video, newest last, with
@@ -551,8 +529,12 @@ const STREAMS_VIEWS = {
  * accounts are on, so it asks only while the viewer may manage, and says so
  * otherwise. The list is read every couple of seconds.
  */
-export const StreamsPage = () => {
-  const { mode, canManage } = useManagement()
-  const View = STREAMS_VIEWS[canManage ? ACCESS_STATES.managing : ACCESS_STATES.managersOnly]
-  return <View mode={mode} />
-}
+export const StreamsPage = () => (
+  <ForManagers
+    name={STREAMS_COPY.managersOnlyName}
+    forAdmin={STREAMS_COPY.forAdmin}
+    forOwner={STREAMS_COPY.forOwner}
+  >
+    <StreamsList />
+  </ForManagers>
+)

@@ -5,7 +5,7 @@ import {
   type SelectionStore,
   createSelectionStore,
   releaseSelectionStore,
-} from '@raven/ui/headless'
+} from '@/stores/selection'
 import {
   type SelectionScopeValue,
   type SelectionSource,

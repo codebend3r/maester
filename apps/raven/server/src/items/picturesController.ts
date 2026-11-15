@@ -17,11 +17,11 @@ import { IMAGE_AUDIENCES, sendImage } from '@/items/sendImage'
 import { Public } from '@/lock/lockGuard'
 import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
-import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { AlbumCovers } from '@/music/albumCovers'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
 import { MusicCoverStore } from '@/music/musicCoverStore'
+import { PeopleRepository } from '@/people/peopleRepository'
 import { QUERY_PARAMS } from '@/queryValues'
 
 type IsCurrentProps = { given: string; current: string | null | undefined }
@@ -51,7 +51,7 @@ export class PicturesController {
   constructor(
     @Inject(ItemImagesRepository) private readonly stored: ItemImagesRepository,
     @Inject(ItemPictureFiles) private readonly pictureFiles: ItemPictureFiles,
-    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
+    @Inject(PeopleRepository) private readonly people: PeopleRepository,
     @Inject(ImageCache) private readonly images: ImageCache,
     @Inject(PictureVersions) private readonly versions: PictureVersions,
     @Inject(AlbumCovers) private readonly covers: AlbumCovers,
@@ -120,7 +120,7 @@ export class PicturesController {
     @Param(PICTURE_PARAMS.version) version: string,
     @Res() reply: FastifyReply,
   ): Promise<void> {
-    const photo = this.metadata.photo(id)
+    const photo = this.people.photo(id)
     if (
       !isCurrent({ given: version, current: this.versions.photo({ id, photo }) }) ||
       photo == null

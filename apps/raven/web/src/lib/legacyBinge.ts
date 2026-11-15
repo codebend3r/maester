@@ -1,27 +1,22 @@
+import { type Infer, isBoolean, isNumber, isString, listOf, object } from '@raven/core'
 import { api } from '@/lib/api'
 import { STORE_KEYS } from '@/stores/storage'
 
-type LegacyProfile = { account: string; ids: number[]; hasSeenTip: boolean }
+const isLegacyProfile = object({ account: isString, ids: listOf(isNumber), hasSeenTip: isBoolean })
 
-const isLegacyProfile = (value: unknown): value is LegacyProfile =>
-  typeof value === 'object' &&
-  value !== null &&
-  'account' in value &&
-  typeof value.account === 'string' &&
-  'hasSeenTip' in value &&
-  typeof value.hasSeenTip === 'boolean' &&
-  'ids' in value &&
-  Array.isArray(value.ids) &&
-  value.ids.every((id: unknown) => typeof id === 'number')
+type LegacyProfile = Infer<typeof isLegacyProfile>
+
+/** Anything at all: each profile is checked on its own, so a bad one is dropped alone. */
+const isAny = (value: unknown): value is unknown => value !== undefined
+
+/** What zustand's persist middleware wrote under the key. */
+const isLegacyStore = object({ state: object({ profiles: listOf(isAny) }) })
 
 /** The profiles zustand's persist middleware saved before binge moved to the server. */
 const legacyProfiles = (): LegacyProfile[] => {
   try {
     const parsed: unknown = JSON.parse(window.localStorage.getItem(STORE_KEYS.binge) ?? 'null')
-    if (typeof parsed !== 'object' || parsed === null || !('state' in parsed)) return []
-    const { state } = parsed
-    if (typeof state !== 'object' || state === null || !('profiles' in state)) return []
-    return Array.isArray(state.profiles) ? state.profiles.filter(isLegacyProfile) : []
+    return isLegacyStore(parsed) ? parsed.state.profiles.filter(isLegacyProfile) : []
   } catch {
     return []
   }

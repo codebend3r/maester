@@ -44,6 +44,8 @@ export const COMMON_COPY = {
   hdr: 'HDR',
   tmdb: 'TMDB',
   imdb: 'IMDb',
+  rottenTomatoes: 'RT',
+  metacritic: 'Metacritic',
   envFile: '.env',
   /** Between the facts on one line: "1997 · Album · 12 tracks". */
   separator: ' · ',

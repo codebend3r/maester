@@ -29,8 +29,6 @@ export const SUBTITLE_SOURCES = { embedded: 'embedded', external: 'external' } a
 
 export const isSubtitleSource = oneOf(Object.values(SUBTITLE_SOURCES))
 
-export type SubtitleSource = Infer<typeof isSubtitleSource>
-
 export const isSubtitleTrack = object({
   /** Stable for the file: `embedded-N` for the Nth subtitle stream, `external-N` for the Nth sidecar. */
   id: isString,

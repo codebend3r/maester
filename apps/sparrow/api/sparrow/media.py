@@ -15,8 +15,13 @@ import enum
 from dataclasses import dataclass
 from typing import Literal
 
-# A title is a movie or a show, as Seerr and every tool name it.
-MediaType = Literal["movie", "tv"]
+
+class MediaType(enum.StrEnum):
+    # No docstring: pydantic would put it in every tool schema that takes one.
+    MOVIE = "movie"
+    TV = "tv"
+
+
 # How people name a copy.
 Version = Literal["1080p", "4K"]
 
@@ -33,7 +38,7 @@ def episode_code(season: int | None, episode: int | None) -> str:
     return f"S{season:02d}E{episode:02d}"
 
 
-def copy_ref(media_type: str, tmdb_id: int, version: str, code: str = "") -> str:
+def copy_ref(media_type: MediaType, tmdb_id: int, version: str, code: str = "") -> str:
     """How a copy reads in a pick; `version` is "?" when it isn't known."""
     return ":".join(part for part in (media_type, str(tmdb_id), version, code) if part)
 
@@ -45,7 +50,7 @@ def titled(display: str, code: str = "") -> str:
 
 @dataclass(frozen=True)
 class Copy:
-    media_type: str  # "movie" | "tv"
+    media_type: MediaType
     tmdb_id: int
     is_4k: bool
     # A show's copy may name one episode; a movie's never does.
@@ -53,7 +58,9 @@ class Copy:
     episode: int | None = None
 
     def __post_init__(self) -> None:
-        if self.media_type == "movie" and (self.season is not None or self.episode is not None):
+        if self.media_type == MediaType.MOVIE and (
+            self.season is not None or self.episode is not None
+        ):
             raise ValueError("a movie has no season or episode")
         if (self.season is None) != (self.episode is None):
             raise ValueError("name both the season and the episode")
@@ -61,7 +68,7 @@ class Copy:
     @classmethod
     def of(
         cls,
-        media_type: str,
+        media_type: MediaType,
         tmdb_id: int,
         version: str,
         season: int | None = None,
@@ -116,8 +123,7 @@ class Decision(enum.StrEnum):
 
 
 class ReportStatus(enum.StrEnum):
-    """Where a report's replacement stands; it moves (`playback/reports.py`), never jumps."""
+    """Whether a report's file was replaced yet; `open` until it is, never back."""
 
     OPEN = "open"
     REPLACED = "replaced"
-    DECLINED = "declined"  # the admin said no to this report's replacement

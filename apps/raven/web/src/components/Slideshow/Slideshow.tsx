@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import type { SlideshowMotion } from '@raven/core'
 import { useEffect, useState } from 'react'
 import styles from '@/components/Slideshow/Slideshow.module.scss'
@@ -90,14 +91,14 @@ export const Slideshow = ({ slides, motion, sizes, className }: SlideshowProps) 
   const step = useStep(slides.length)
   return (
     <div
-      className={[styles.slideshow, MOTIONS[motion], className].filter(Boolean).join(' ')}
+      className={classNames([styles.slideshow, MOTIONS[motion], className])}
       aria-hidden="true"
       ref={(node) => node?.style.setProperty('--slide-ms', `${SLIDE_MS}ms`)}
     >
       {slideRoles({ slides, step }).map(({ slide, role }) => (
         <img
           key={slide.src}
-          className={[styles.picture, ROLES[role]].filter(Boolean).join(' ')}
+          className={classNames([styles.picture, ROLES[role]])}
           src={slide.src}
           srcSet={slide.srcSet ?? undefined}
           sizes={slide.srcSet == null ? undefined : sizes}
