@@ -8,10 +8,13 @@ import {
   episodePlace,
   episodeTag,
   formatScore,
+  inSourceOrder,
   itemLabel,
   mediaLabel,
   pickScore,
   primaryVersion,
+  scoreBarPercent,
+  scoreFigure,
   tileWords,
 } from '@/items'
 import { ITEM_TYPES } from '@/contract'
@@ -82,6 +85,35 @@ describe('pickScore and formatScore', () => {
     expect(formatScore({ source: 'metacritic', kind: 'critic', value: 7.4, votes: null })).toBe(
       '74',
     )
+  })
+})
+
+describe('inSourceOrder, scoreFigure and scoreBarPercent', () => {
+  const tmdb = { source: 'tmdb' as const, kind: 'audience' as const, value: 7, votes: 900 }
+  const rotten = {
+    source: 'rottenTomatoes' as const,
+    kind: 'critic' as const,
+    value: 7.2,
+    votes: null,
+  }
+  const imdb = { source: 'imdb' as const, kind: 'audience' as const, value: 6.4, votes: 1200 }
+
+  it("lists a title's scores in the panel's order and leaves out the missing ones", () => {
+    expect(inSourceOrder([tmdb, imdb, rotten])).toEqual([rotten, imdb, tmdb])
+    expect(inSourceOrder([])).toEqual([])
+  })
+
+  it('shows each score on its own scale', () => {
+    expect(scoreFigure(rotten)).toBe('72')
+    expect(scoreFigure(imdb)).toBe('6.4')
+    expect(scoreFigure({ source: 'metacritic', kind: 'critic', value: 6, votes: null })).toBe('60')
+    expect(scoreFigure(tmdb)).toBe('7.0')
+  })
+
+  it('fills the bar out of 100, never past either end', () => {
+    expect(scoreBarPercent(tmdb)).toBe(70)
+    expect(scoreBarPercent({ ...tmdb, value: 12 })).toBe(100)
+    expect(scoreBarPercent({ ...tmdb, value: -1 })).toBe(0)
   })
 })
 

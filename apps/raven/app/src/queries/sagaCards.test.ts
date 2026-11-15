@@ -1,14 +1,45 @@
 import { describe, expect, it } from 'bun:test'
 
-import { LIBRARY_KINDS, SESSION_KINDS } from '@raven/core'
+import {
+  DEFAULT_SAGA_BACKDROP,
+  LIBRARY_KINDS,
+  RATING_KINDS,
+  RATING_SOURCES,
+  SESSION_KINDS,
+} from '@raven/core'
 
-import { hasSagas, sagaPlayTarget } from '@/queries/sagaCards'
+import { hasSagas, sagaFilmsSectionsOf, sagaPlayTarget } from '@/queries/sagaCards'
 import { ROUTE_TARGETS } from '@/routes'
+import { homeApi } from '@/test/homeServer'
+import { mediaItemFor, summaryFor } from '@/test/mediaItem'
 
 describe('hasSagas', () => {
   it('is for the libraries whose files are matched to movies alone', () => {
     expect(hasSagas(LIBRARY_KINDS.movies)).toBe(true)
     expect(hasSagas(LIBRARY_KINDS.shows)).toBe(false)
+  })
+})
+
+describe('sagaFilmsSectionsOf', () => {
+  it("gives each movie's card its scores, and a file with no match none", () => {
+    const ratings = [
+      { source: RATING_SOURCES.imdb, kind: RATING_KINDS.audience, value: 7.9, votes: 100 },
+    ]
+    const dune = summaryFor({ id: 70, title: 'Dune', year: 2021, ratings })
+    const sections = sagaFilmsSectionsOf({
+      saga: {
+        tmdbId: '77',
+        name: 'Dune Collection',
+        backdrop: DEFAULT_SAGA_BACKDROP,
+        media: [mediaItemFor({ id: 1, item: dune }), mediaItemFor({ id: 2, item: null })],
+      },
+      api: homeApi(),
+      headersFor: () => ({}),
+    })
+    expect(sections.flatMap(({ cards }) => cards.map((card) => card.ratings))).toEqual([
+      ratings,
+      [],
+    ])
   })
 })
 

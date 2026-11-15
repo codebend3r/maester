@@ -60,6 +60,7 @@ describe('playablePage', () => {
       title: 'Busboys',
       byline: 'Directed by Mark Kimball',
       rating: 'R',
+      ratings: BUSBOYS.ratings,
       facts: movieFacts({ details: BUSBOYS, primary: BUSBOYS_FILE }),
       progress: { fraction: 0.5, label: '50 min left' },
       poster: { shape: CARD_SHAPES.poster, picture: at('/api/pictures/items/40/poster/p40') },

@@ -23,7 +23,10 @@ import { RouteError, RouteLoading, RouteMissing, type RouteViewProps } from '@/s
 
 type SagaGridProps = { session: AppQueries; saga: SagaRecord }
 
-/** The saga's movies as posters, oldest first, with Play all, which plays them in the saga's session. */
+/**
+ * The saga's movies as rows, oldest first, each with its poster and its scores in the small ratings
+ * panel, as the web's saga page lists them; Play all plays them in the saga's session.
+ */
 const SagaGrid = ({ session, saga }: SagaGridProps) => {
   const { server, api } = session
   const router = useRouter()
@@ -52,7 +55,7 @@ const SagaGrid = ({ session, saga }: SagaGridProps) => {
           />
         )
       }
-      view={LIBRARY_VIEWS.grid}
+      view={LIBRARY_VIEWS.tiles}
     />
   )
 }

@@ -72,7 +72,7 @@ export const sagaSectionsOf = ({
 
 type SagaFilmsSectionsOfProps = Pictures & { saga: Saga }
 
-/** A saga's movies as one run of posters, oldest first as the server sends them. */
+/** A saga's movies as one run of rows, oldest first as the server sends them, each with its scores. */
 export const sagaFilmsSectionsOf = ({
   saga,
   api,
@@ -83,7 +83,10 @@ export const sagaFilmsSectionsOf = ({
     title: null,
     count: null,
     shape: CARD_SHAPES.poster,
-    cards: saga.media.map((media) => movieCard({ media, api, headersFor })),
+    cards: saga.media.map((media) => ({
+      ...movieCard({ media, api, headersFor }),
+      ratings: media.item?.ratings ?? [],
+    })),
   },
 ]
 

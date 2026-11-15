@@ -7,8 +7,9 @@ import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { Icon } from '@raven/native'
 import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { CARD_SHAPES, type CardShape, type ShelfCard } from '@/queries/cards'
+import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
+import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard, isCaptionless, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
@@ -83,7 +84,7 @@ const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
   const { onLongPress, menu } = useTouchCard({ card })
   return (
     <Pressable
-      accessibilityLabel={card.title}
+      accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       onLongPress={onLongPress}
       onPress={onPress}
@@ -103,6 +104,7 @@ const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
             {card.line}
           </Text>
         )}
+        <RowRatings card={card} sizes={SIZES} />
       </View>
       {menu}
     </Pressable>
@@ -290,10 +292,9 @@ const Grid = ({
     if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
-      const words = linesHeightOf({
-        sizes: [SIZES.text, SIZES.textXs],
-        fontScale: screen.fontScale,
-      })
+      const words =
+        linesHeightOf({ sizes: [SIZES.text, SIZES.textXs], fontScale: screen.fontScale }) +
+        rowRatingsHeightOf({ cards: row.cards, sizes: SIZES, fontScale: screen.fontScale })
       return Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, words) + SIZES.space2 * 2
     }
     return (

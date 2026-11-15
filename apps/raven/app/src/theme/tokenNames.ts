@@ -53,3 +53,11 @@ export const CHIP_TOKENS = {
   dolbyVisionOnly: '--color-range-dv5',
   dolbyVisionDualLayer: '--color-range-dv7',
 } as const
+
+/** Each rating source's colour, from globals.scss and the same in every theme, as the web's ratings panel wears them. */
+export const RATING_TOKENS = {
+  rottenTomatoes: '--color-brand-rotten-tomatoes',
+  imdb: '--color-brand-imdb',
+  metacritic: '--color-brand-metacritic',
+  tmdb: '--color-brand-tmdb-line',
+} as const

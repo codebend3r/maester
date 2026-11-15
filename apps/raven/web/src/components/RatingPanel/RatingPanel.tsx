@@ -1,19 +1,16 @@
-import { RATING_SOURCES, type Rating, type RatingSource, pickScore } from '@raven/core'
+import {
+  RATING_SOURCES,
+  type Rating,
+  type RatingSource,
+  inSourceOrder,
+  pickScore,
+  scoreBarPercent,
+  scoreFigure,
+} from '@raven/core'
 import { RATING_SOURCE_LABELS } from '@/lib/ratingSources'
 import { RATING_PANEL_COPY } from '@/components/RatingPanel/copy'
 import styles from '@/components/RatingPanel/RatingPanel.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-
-/** Every source, in the order the panel lists them. */
-const SOURCE_ORDER = [
-  RATING_SOURCES.rottenTomatoes,
-  RATING_SOURCES.imdb,
-  RATING_SOURCES.metacritic,
-  RATING_SOURCES.tmdb,
-] as const satisfies readonly RatingSource[]
-
-const percent = (rating: Rating): string => String(Math.round(rating.value * 10))
-const outOfTen = (rating: Rating): string => rating.value.toFixed(1)
 
 /**
  * How each source reads: its name in full, the short label under its score,
@@ -27,28 +24,24 @@ const SOURCES = {
   [RATING_SOURCES.rottenTomatoes]: {
     site: RATING_SOURCE_LABELS.rottenTomatoes,
     ...RATING_PANEL_COPY.sources[RATING_SOURCES.rottenTomatoes],
-    score: percent,
     className: styles.rottenTomatoes,
     isNamedOnCards: true,
   },
   [RATING_SOURCES.imdb]: {
     site: RATING_SOURCE_LABELS.imdb,
     ...RATING_PANEL_COPY.sources[RATING_SOURCES.imdb],
-    score: outOfTen,
     className: styles.imdb,
     isNamedOnCards: true,
   },
   [RATING_SOURCES.metacritic]: {
     site: RATING_SOURCE_LABELS.metacritic,
     ...RATING_PANEL_COPY.sources[RATING_SOURCES.metacritic],
-    score: percent,
     className: styles.metacritic,
     isNamedOnCards: false,
   },
   [RATING_SOURCES.tmdb]: {
     site: RATING_SOURCE_LABELS.tmdb,
     ...RATING_PANEL_COPY.sources[RATING_SOURCES.tmdb],
-    score: outOfTen,
     className: styles.tmdb,
     isNamedOnCards: true,
   },
@@ -58,7 +51,6 @@ const SOURCES = {
     site: string
     label: string
     meaning: string
-    score: (rating: Rating) => string
     shown: string
     spoken: string
     className: string | undefined
@@ -66,13 +58,13 @@ const SOURCES = {
   }
 >
 
-const barWidth = (rating: Rating): string => `${Math.min(100, Math.max(0, rating.value * 10))}%`
+const barWidth = (rating: Rating): string => `${scoreBarPercent(rating)}%`
 
 type RatingItemProps = { rating: Rating }
 
 const RatingItem = ({ rating }: RatingItemProps) => {
   const source = SOURCES[rating.source]
-  const score = source.score(rating)
+  const score = scoreFigure(rating)
   return (
     <li
       className={`${styles.item} ${source.className}`}
@@ -121,7 +113,7 @@ type RatingBadgeProps = { rating: Rating; isBare?: boolean }
  */
 export const RatingBadge = ({ rating, isBare = false }: RatingBadgeProps) => {
   const source = SOURCES[rating.source]
-  const score = source.score(rating)
+  const score = scoreFigure(rating)
   const shape = badgeShape({ isBare, isNamed: source.isNamedOnCards })
   return (
     <span className={`${styles.badge} ${shape} ${source.className}`}>
@@ -182,9 +174,7 @@ type RatingPanelProps = { ratings: readonly Rating[]; size?: PanelSize }
  * keeps the same cells at a row's size, as a saga's films show theirs.
  */
 export const RatingPanel = ({ ratings, size = PANEL_SIZES.full }: RatingPanelProps) => {
-  const scored = SOURCE_ORDER.flatMap(
-    (source) => ratings.find((each) => each.source === source) ?? [],
-  )
+  const scored = inSourceOrder(ratings)
   return (
     scored.length > 0 && (
       <ul
@@ -198,9 +188,6 @@ export const RatingPanel = ({ ratings, size = PANEL_SIZES.full }: RatingPanelPro
     )
   )
 }
-
-const inSourceOrder = (ratings: readonly Rating[]): Rating[] =>
-  SOURCE_ORDER.flatMap((source) => ratings.find((each) => each.source === source) ?? [])
 
 type RatingChipProps = {
   ratings: readonly Rating[]
@@ -228,7 +215,7 @@ const RatingChipFace = ({ scored, first }: RatingChipFaceProps) => {
     .map((rating) =>
       RATING_PANEL_COPY.chipEntry({
         site: SOURCES[rating.source].site,
-        score: SOURCES[rating.source].score(rating),
+        score: scoreFigure(rating),
         spoken: SOURCES[rating.source].spoken,
       }),
     )
@@ -254,7 +241,7 @@ const RatingChipFace = ({ scored, first }: RatingChipFaceProps) => {
               <li key={rating.source} className={`${styles.popoverRow} ${source.className}`}>
                 <span className={styles.popoverSite}>{source.site}</span>
                 <span className={styles.popoverScore}>
-                  <span className={styles.badgeValue}>{source.score(rating)}</span>
+                  <span className={styles.badgeValue}>{scoreFigure(rating)}</span>
                   <span className={styles.badgeScale}>{source.shown}</span>
                 </span>
                 <span className={styles.popoverTrack}>
