@@ -202,17 +202,9 @@ jobs:
 
       # release.yml makes the release from the same tag push, and may not be done yet.
       - name: ⏳ Wait for the release
-        run: |
-          tries=1
-          until gh release view "$TAG" > /dev/null 2>&1; do
-            if [ "$tries" -ge 30 ]; then
-              echo "::error::$TAG still has no release after 30 tries; release.yml makes it."
-              exit 1
-            fi
-            echo "$TAG has no release yet (try $tries of 30); waiting 20 s."
-            tries=$((tries + 1))
-            sleep 20
-          done
+        uses: ./.github/actions/wait-for-release
+        with:
+          tag: ${{ env.TAG }}
 
       - name: 📤 Upload the assets
         run: gh release upload "$TAG" release/* --clobber

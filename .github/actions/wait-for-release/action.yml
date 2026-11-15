@@ -1,0 +1,29 @@
+name: ⏳ Wait for the release
+description: >-
+  Waits up to ten minutes for a tag's GitHub release, which release.yml makes from the same
+  tag push, so a workflow that attaches assets to it never runs ahead of it.
+
+# Shared by desktop-release.yml and device-release.yml. A composite action reads no secrets:
+# the calling job sets GH_TOKEN in its env, which every step here inherits.
+inputs:
+  tag:
+    description: The release's tag, vX.Y.Z
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: ⏳ Wait for the release
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: |
+        tries=1
+        until gh release view "$TAG" > /dev/null 2>&1; do
+          if [ "$tries" -ge 30 ]; then
+            echo "::error::$TAG still has no release after 30 tries; release.yml makes it."
+            exit 1
+          fi
+          echo "$TAG has no release yet (try $tries of 30); waiting 20 s."
+          tries=$((tries + 1))
+          sleep 20
+        done

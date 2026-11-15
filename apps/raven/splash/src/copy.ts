@@ -8,6 +8,8 @@ export const SPLASH_COPY = {
   whatsNew: "What's new on GitHub",
   versionsFailed:
     'GitHub did not answer with the list. Try again in a minute, or open the releases on GitHub.',
+  devBuildsFailed:
+    'No builds to list yet, or GitHub did not answer. Try again in a minute, or open the releases on GitHub.',
   downloadFor: (platform: string) => `Download for ${platform}`,
   platformsJoiner: ' and ',
 } as const

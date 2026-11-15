@@ -1,0 +1,46 @@
+/*
+ * The dev builds page: the versions page's list, then a card per kind of device
+ * saying how its builds get onto it.
+ */
+.install-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-8);
+}
+
+.install-note {
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+  padding: var(--space-10);
+  border-radius: var(--radius-card);
+  background: var(--color-canopy);
+  color: var(--color-birch);
+  line-height: var(--line-relaxed);
+
+  h2 {
+    display: grid;
+    grid-auto-flow: column;
+    justify-content: start;
+    align-items: center;
+    gap: var(--space-4);
+    color: var(--color-bark);
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 400;
+    line-height: var(--line-heading);
+  }
+
+  ol {
+    display: grid;
+    margin: 0;
+    gap: var(--space-3);
+    padding-left: var(--space-8);
+  }
+
+  strong {
+    color: var(--color-bark);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+}

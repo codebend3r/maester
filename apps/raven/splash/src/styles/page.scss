@@ -19,10 +19,20 @@
   grid-template-areas: 'wordmark links';
   align-items: center;
   gap: var(--space-6);
+
+  // Three links beside the wordmark overflow a phone, so they take a row of their own.
+  @media (max-width: 30rem) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'wordmark'
+      'links';
+    gap: 0;
+  }
 }
 
 .wordmark {
   grid-area: wordmark;
+  justify-self: start;
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;
@@ -59,6 +69,7 @@
   }
 
   @media (max-width: 30rem) {
+    justify-content: start;
     gap: var(--space-6);
 
     .icon {
@@ -215,6 +226,12 @@
   display: grid;
   grid-auto-flow: column;
   gap: var(--space-8);
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    justify-items: end;
+    gap: var(--space-3);
+  }
 
   a {
     text-decoration: none;

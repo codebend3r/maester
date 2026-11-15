@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#15201e" />
+    <meta
+      name="description"
+      content="Builds of raven's device app for testing: the Android TV APK of every release, and TestFlight for Apple TV, iPhone and iPad."
+    />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>raven dev builds</title>
+  </head>
+  <body class="document">
+    <header class="masthead">
+      <a class="wordmark" href="/">
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="34" height="37" />
+        <span>Raven</span>
+      </a>
+      <nav class="masthead-links" aria-label="Project">
+        <a href="https://github.com/codebend3r/maester">
+          <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#github" /></svg>
+          <span>Source</span>
+        </a>
+        <a href="/releases/">
+          <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tag" /></svg>
+          <span>Releases</span>
+        </a>
+        <a href="/dev-builds/" aria-current="page">
+          <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#flask-conical" /></svg>
+          <span>Dev builds</span>
+        </a>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section class="versions">
+        <div class="pitch">
+          <h1>Dev builds</h1>
+          <p>
+            The device app as each release built it, newest first, for testing on a TV of your own.
+            Every build signs in at raven, so you need an approved account.
+          </p>
+        </div>
+        <p class="fine versions-status" id="versions-status">Asking GitHub for the list.</p>
+        <ul class="version-list" id="versions"></ul>
+      </section>
+
+      <ul class="install-notes" aria-label="How to install">
+        <li class="install-note">
+          <h2>
+            <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv-minimal" /></svg>
+            <span>Android TV</span>
+          </h2>
+          <ol>
+            <li>Install Downloader from the Play Store on the TV.</li>
+            <li>In the TV's settings, allow Downloader to install unknown apps.</li>
+            <li>
+              In Downloader, open <strong>maester.netlify.app/tv</strong> and pick the newest APK.
+            </li>
+          </ol>
+          <p>A newer APK installs over the one you have and keeps your sign-in.</p>
+        </li>
+        <li class="install-note">
+          <h2>
+            <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv" /></svg>
+            <span>Apple TV, iPhone and iPad</span>
+          </h2>
+          <p>
+            Apple devices take test builds through TestFlight, not as a file. The invitation will be
+            posted here once raven's TestFlight is open.
+          </p>
+        </li>
+      </ul>
+    </main>
+
+    <footer class="colophon">
+      <span class="colophon-mark">
+        <img src="/brand/raven-mark-on-dark.svg" alt="" width="20" height="22" />
+        <span>raven</span>
+      </span>
+      <nav class="colophon-links" aria-label="Footer">
+        <a href="https://github.com/codebend3r/maester">Source</a>
+        <a href="/releases/">Releases</a>
+        <a href="https://github.com/codebend3r/maester/releases">Releases on GitHub</a>
+      </nav>
+    </footer>
+
+    <script type="module" src="/src/devBuilds.ts"></script>
+  </body>
+</html>

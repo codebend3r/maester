@@ -41,9 +41,13 @@ tags:
       focused: true
     timeout: 30000
 - pressKey: Remote Dpad Center
+# Down only moves focus once the page holds it, so wait for Play as on the first open.
 - extendedWaitUntil:
-    visible: Episodes
+    visible:
+      text: Play S01E01
+      focused: true
     timeout: 30000
+- assertVisible: Episodes
 - repeat:
     while:
       notVisible:

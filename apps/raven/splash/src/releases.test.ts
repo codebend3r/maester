@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  CATALOGS,
   PLATFORMS,
   downloadMenu,
   formatBytes,
@@ -47,7 +48,7 @@ const url = (name: string) => `https://example.test/${name}`
 
 describe('parseReleases', () => {
   test('keeps the Raven downloads of each release, in GitHub order', () => {
-    expect(parseReleases({ releases: [latest, older] })).toEqual([
+    expect(parseReleases({ releases: [latest, older], catalog: CATALOGS.desktop })).toEqual([
       {
         version: '0.8.0',
         date: '2026-10-29T18:00:00Z',
@@ -107,12 +108,14 @@ describe('parseReleases', () => {
       { tag_name: 'v0.7.2', assets: [] },
       null,
     ]
-    expect(parseReleases({ releases })).toEqual([])
+    expect(parseReleases({ releases, catalog: CATALOGS.desktop })).toEqual([])
   })
 
   test('answers an empty list for anything that is not a list', () => {
-    expect(parseReleases({ releases: null })).toEqual([])
-    expect(parseReleases({ releases: { message: 'rate limited' } })).toEqual([])
+    expect(parseReleases({ releases: null, catalog: CATALOGS.desktop })).toEqual([])
+    expect(
+      parseReleases({ releases: { message: 'rate limited' }, catalog: CATALOGS.desktop }),
+    ).toEqual([])
   })
 
   test('skips a file the release workflow does not make', () => {
@@ -123,12 +126,44 @@ describe('parseReleases', () => {
         asset({ name: 'raven-player-0.8.0-arm64.pkg' }),
       ],
     }
-    expect(parseReleases({ releases: [release] })).toEqual([])
+    expect(parseReleases({ releases: [release], catalog: CATALOGS.desktop })).toEqual([])
+  })
+})
+
+describe('parseReleases with the device catalog', () => {
+  test('keeps the device app builds and leaves the desktop files out', () => {
+    const release = {
+      ...latest,
+      assets: [
+        ...latest.assets,
+        asset({ name: 'raven-app-0.8.0-android-tv.apk', size: 87_000_000 }),
+      ],
+    }
+    expect(parseReleases({ releases: [release, older], catalog: CATALOGS.devices })).toEqual([
+      {
+        version: '0.8.0',
+        date: '2026-10-29T18:00:00Z',
+        notesUrl: 'https://github.com/codebend3r/maester/releases/tag/v0.8.0',
+        files: [
+          {
+            platform: PLATFORMS.androidTv,
+            label: 'Android TV, APK',
+            url: url('raven-app-0.8.0-android-tv.apk'),
+            bytes: 87_000_000,
+          },
+        ],
+      },
+    ])
+  })
+
+  test('keeps the device app out of the desktop downloads', () => {
+    const release = { ...older, assets: [asset({ name: 'raven-app-0.7.5-android-tv.apk' })] }
+    expect(parseReleases({ releases: [release], catalog: CATALOGS.desktop })).toEqual([])
   })
 })
 
 const parsed = (release: unknown): Release => {
-  const [first] = parseReleases({ releases: [release] })
+  const [first] = parseReleases({ releases: [release], catalog: CATALOGS.desktop })
   if (first === undefined) throw new Error('the release carries no download')
   return first
 }
