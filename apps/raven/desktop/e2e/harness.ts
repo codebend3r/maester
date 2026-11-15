@@ -1,16 +1,11 @@
+import { DESKTOP_ENV } from '@/shared/platform'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, expect, type Page } from '@playwright/test'
-import {
-  DESKTOP_ENV,
-  DESKTOP_REPLIES,
-  DESKTOP_REQUESTS,
-  type DesktopReply,
-  isDesktopReply,
-} from '@raven/core'
+import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply, isDesktopReply } from '@raven/core'
 import { FIXTURE_ACCOUNT } from '@/e2e/fixtureAuth'
 import { withoutTestHooks } from '@/build/smokeVerdict'
 import { LOG_FILE } from '@/main/log/log'

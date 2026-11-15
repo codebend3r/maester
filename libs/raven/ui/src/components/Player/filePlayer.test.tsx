@@ -14,6 +14,7 @@ import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
 import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
 const URL = 'blob:raven/clip'
 
@@ -22,10 +23,18 @@ type FilePlayerProps = { subtitles?: FileSubtitles }
 /** A host of a local file, as the browser's player of a download is. */
 const FilePlayer = ({ subtitles }: FilePlayerProps) => {
   const isHosting = useHostPlayer({
-    title: { label: 'Clip 01', duration: null, resumeAt: 0, backTo: '/downloads', next: null },
+    title: {
+      ...NO_TITLE_EXTRAS,
+      label: 'Clip 01',
+      duration: null,
+      resumeAt: 0,
+      backTo: '/downloads',
+      next: null,
+    },
     posterUrl: null,
+    ...NO_HOST_EXTRAS,
     escape: null,
-    progress: { started: () => {}, save: () => {}, left: () => {} },
+    progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
   })
   return (
     isHosting && (

@@ -11,6 +11,7 @@ import {
   oneOf,
   optional,
   union,
+  literal,
 } from '@/schema'
 
 /**
@@ -203,10 +204,10 @@ const LIVE_STREAM_FIELDS = {
  * had when it resumed.
  */
 export const isLiveStream = union(
-  object({ ...LIVE_STREAM_FIELDS, purpose: oneOf([STREAM_PURPOSES.play]) }),
+  object({ ...LIVE_STREAM_FIELDS, purpose: literal(STREAM_PURPOSES.play) }),
   object({
     ...LIVE_STREAM_FIELDS,
-    purpose: oneOf([STREAM_PURPOSES.download]),
+    purpose: literal(STREAM_PURPOSES.download),
     received: isNumber,
   }),
 )
@@ -223,3 +224,6 @@ export const MEDIA_TICKET_REFRESH_SECONDS = 600
 
 /** How many bytes of a file an origin probe reads. */
 export const MEDIA_PROBE_BYTES = 262_144
+
+/** The speed probe's query parameter: how many bytes of noise to send. */
+export const PING_BYTES_PARAM = 'bytes'

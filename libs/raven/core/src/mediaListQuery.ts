@@ -17,13 +17,21 @@ export type MediaListParams = Required<MediaListOptions>
  * The `?q=&sort=&seed=` a library's videos and shows are listed by: written
  * by the client and read back by the server, so the two agree on it.
  */
+const mediaListParams = ({
+  search = '',
+  sort = MEDIA_SORTS.title,
+  seed,
+}: MediaListOptions): Record<string, string> => ({
+  sort,
+  ...(sort === MEDIA_SORTS.random && seed !== undefined ? { seed: String(seed) } : {}),
+  ...(search.trim() ? { q: search.trim() } : {}),
+})
+
 export const mediaListQuery = {
-  encode: ({ search = '', sort = MEDIA_SORTS.title, seed }: MediaListOptions): string =>
-    toQueryString({
-      sort,
-      ...(sort === MEDIA_SORTS.random && seed !== undefined ? { seed: String(seed) } : {}),
-      ...(search.trim() ? { q: search.trim() } : {}),
-    }),
+  /** The query's parameters, before they are written out. */
+  params: mediaListParams,
+
+  encode: (options: MediaListOptions): string => toQueryString(mediaListParams(options)),
 
   /** Takes a query string, or the record a server framework parsed it into. */
   decode: (query: string | Record<string, unknown>): MediaListParams => {

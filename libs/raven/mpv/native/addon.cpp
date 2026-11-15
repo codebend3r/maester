@@ -344,14 +344,14 @@ public:
                 option("vo", "null");
                 option("ao", "null");
             } else if (kind == "audio") {
-                // Sound alone: no window, no video decoding, the tracks run together and sit at
-                // the album's loudness. The host picks the audio output, as for a window.
+                // Sound alone: no window, no video decoding, and the tracks run together. Replaygain
+                // is off: the host levels each track with its own af, and picks the audio output.
                 option("vo", "null");
                 option("vid", "no");
                 option("force-window", "no");
                 option("audio-display", "no");
                 option("gapless-audio", "yes");
-                option("replaygain", "album");
+                option("replaygain", "no");
                 // Raven owns the media keys through Now Playing; the option exists on macOS alone,
                 // so a build without it is left as it is.
                 mpv_set_option_string(player->handle, "input-media-keys", "no");

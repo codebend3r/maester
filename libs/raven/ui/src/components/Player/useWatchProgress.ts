@@ -19,13 +19,14 @@ export const useWatchProgress = ({
   duration,
   audio,
 }: UseWatchProgressProps): void => {
-  const { progress, title } = useHostServices()
+  const progress = useHostServices((services) => services.progress)
+  const resumeAt = useHostServices((services) => services.title.resumeAt)
   useProgressReport({
     state,
     position,
     duration,
     audio,
-    resumeAt: title.resumeAt,
+    resumeAt,
     progress,
     watchHide: watchPageHide,
   })

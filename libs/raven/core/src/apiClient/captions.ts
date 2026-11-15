@@ -1,16 +1,13 @@
 import type { Transport } from '@/apiClient/transport'
-import { CAPTION_PATHS, type CaptionStyle, isCaptionStyle } from '@/contract'
+import { ROUTES } from '@/routes'
+import { type CaptionStyle } from '@/contract'
 
 /** How an account's subtitles look, kept on the server so every device draws them the same. */
-export const captionCalls = ({ send, expect }: Transport) => ({
+export const captionCalls = ({ ask }: Transport) => ({
   /** The account's subtitle size and colour; the defaults until it picks. */
-  getCaptionStyle: (): Promise<CaptionStyle> =>
-    expect({ request: send({ path: CAPTION_PATHS.style }), guard: isCaptionStyle }),
+  getCaptionStyle: (): Promise<CaptionStyle> => ask({ route: ROUTES.getCaptionStyle }),
 
   /** Changes the account's subtitle size and colour, and answers with them as kept. */
   setCaptionStyle: (style: CaptionStyle): Promise<CaptionStyle> =>
-    expect({
-      request: send({ path: CAPTION_PATHS.style, method: 'PUT', body: style }),
-      guard: isCaptionStyle,
-    }),
+    ask({ route: ROUTES.setCaptionStyle, body: style }),
 })

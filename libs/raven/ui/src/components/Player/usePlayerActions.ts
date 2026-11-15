@@ -1,30 +1,28 @@
 import { useRef } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
 import { CAPTION_SIZE_NAMES, PLAYER_ACTIONS_COPY } from '@/components/Player/copy'
-import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import type { EngineHandle } from '@/components/Player/engine'
 import type { MenuSection } from '@/components/Player/menus'
-import { preferredSubtitle } from '@/components/Player/selection'
-import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import {
+  preferredSubtitle,
+  type HostAction,
   PLAYER_ACTIONS,
+  PLAYER_ANSWERS,
   type PlayerAction,
-  SEEK_EDGES,
+  type PlayerAnswer,
   type SkipStep,
   languageName,
+  playerVolumeOf,
+  resolvePlayerAction,
   stepCaptionSize,
-  stepSkip,
   stepSpeed,
 } from '@raven/core'
+import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import { useHostServices } from '@/stores/playerServices'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
 /** Frames per second to step by when the file does not say. */
 const FALLBACK_FRAME_RATE = 24
-
-type ClampProps = { value: number; min: number; max: number }
-
-const clamp = ({ value, min, max }: ClampProps): number => Math.min(max, Math.max(min, value))
 
 export const OVERLAYS = { none: 'none', shortcuts: 'shortcuts' } as const
 
@@ -33,7 +31,6 @@ export type Overlay = (typeof OVERLAYS)[keyof typeof OVERLAYS] | MenuSection
 
 type UsePlayerActionsProps = {
   engine: EngineHandle
-  selection: TrackSelection
   flash: (next: Omit<BezelState, 'id'>) => void
   toggleFullscreen: () => void
   overlay: Overlay
@@ -51,8 +48,7 @@ type UsePlayerActionsProps = {
  * call the rest directly, the play button without the flash.
  */
 export const usePlayerActions = ({
-  engine: { actions, state, position, duration, captionStyle },
-  selection,
+  engine: { actions, state, position, duration, captionStyle, selection },
   flash,
   toggleFullscreen,
   overlay,
@@ -64,7 +60,7 @@ export const usePlayerActions = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const subtitles = usePlayerPrefs((prefs) => prefs.subtitles)
-  const { isVolumeFixed = false } = useHostServices()
+  const isVolumeFixed = useHostServices((services) => services.isVolumeFixed)
   const seek = actions.seek
   const lastSkip = useRef<SkipStep | null>(null)
 
@@ -80,7 +76,7 @@ export const usePlayerActions = ({
       flashFixedVolume()
       return
     }
-    const nextVolume = clamp({ value: next, min: 0, max: 1 })
+    const nextVolume = playerVolumeOf(next)
     const nextMuted = nextVolume === 0
     actions.setVolume({ volume: nextVolume, muted: nextMuted })
     flash({
@@ -120,9 +116,9 @@ export const usePlayerActions = ({
         ? null
         : (preferredSubtitle({
             tracks: selection.tracks,
-            subtitles: { on: true, language: subtitles.language },
-          }) ??
-          preferredSubtitle({ tracks: selection.tracks, subtitles: { on: true, language: null } }))
+            isOn: true,
+            language: subtitles.language,
+          }) ?? preferredSubtitle({ tracks: selection.tracks, isOn: true, language: null }))
     actions.setSubtitle(id)
     const landed = selection.tracks?.subtitles.find((track) => track.id === id) ?? null
     flash({
@@ -135,47 +131,49 @@ export const usePlayerActions = ({
     })
   }
 
-  const act = (action: PlayerAction) => {
-    const now = position.current
+  type FlashSeekProps = { action: PlayerAction; step: SkipStep | null }
+
+  /** What a seek says in the middle of the picture: a skip's seconds, a fraction's percent. */
+  const flashSeek = ({ action, step }: FlashSeekProps) => {
+    if (action.type === PLAYER_ACTIONS.skip && step !== null) {
+      flash({
+        icon: step.direction < 0 ? 'rewind' : 'forward',
+        text: PLAYER_ACTIONS_COPY.skip({ isBack: step.direction < 0, seconds: step.seconds }),
+      })
+      return
+    }
+    if (action.type === PLAYER_ACTIONS.seekToFraction) {
+      flash({
+        icon: 'forward',
+        text: PLAYER_ACTIONS_COPY.percent(Math.round(action.fraction * 100)),
+      })
+    }
+  }
+
+  /** Escape closes what is open, innermost first, then full screen, then leaves. */
+  const escape = () => {
+    if (overlay === OVERLAYS.shortcuts) {
+      setOverlay(() => OVERLAYS.none)
+      return
+    }
+    if (overlay !== OVERLAYS.none) {
+      closeMenu()
+      return
+    }
+    if (closeInfo) {
+      closeInfo()
+      return
+    }
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => undefined)
+      return
+    }
+    leave()
+  }
+
+  /** What only this player does: its full screen, frames, speeds, menus and the way out. */
+  const actOnHost = (action: HostAction) => {
     switch (action.type) {
-      case PLAYER_ACTIONS.togglePlay:
-        flash({
-          icon: state.paused ? 'play' : 'pause',
-          text: state.paused ? PLAYER_ACTIONS_COPY.play : PLAYER_ACTIONS_COPY.pause,
-        })
-        togglePlay()
-        return
-      case PLAYER_ACTIONS.skip: {
-        const step = stepSkip({
-          last: lastSkip.current,
-          direction: action.direction,
-          at: performance.now(),
-        })
-        lastSkip.current = step
-        seek(now + step.seconds * step.direction)
-        flash({
-          icon: step.direction < 0 ? 'rewind' : 'forward',
-          text: PLAYER_ACTIONS_COPY.skip({ isBack: step.direction < 0, seconds: step.seconds }),
-        })
-        return
-      }
-      case PLAYER_ACTIONS.seekToFraction:
-        if (duration == null) return
-        seek(duration * action.fraction)
-        flash({
-          icon: 'forward',
-          text: PLAYER_ACTIONS_COPY.percent(Math.round(action.fraction * 100)),
-        })
-        return
-      case PLAYER_ACTIONS.seekToEdge:
-        seek(action.edge === SEEK_EDGES.start ? 0 : (duration ?? now))
-        return
-      case PLAYER_ACTIONS.volumeBy:
-        changeVolume((muted ? 0 : volume) + action.delta)
-        return
-      case PLAYER_ACTIONS.toggleMute:
-        toggleMute()
-        return
       case PLAYER_ACTIONS.toggleFullscreen:
         toggleFullscreen()
         return
@@ -184,7 +182,10 @@ export const usePlayerActions = ({
         return
       case PLAYER_ACTIONS.stepFrame:
         if (!state.paused) actions.pause()
-        seek(now + action.direction / (selection.tracks?.frameRate ?? FALLBACK_FRAME_RATE))
+        seek(
+          position.current +
+            action.direction / (selection.tracks?.frameRate ?? FALLBACK_FRAME_RATE),
+        )
         return
       case PLAYER_ACTIONS.stepSpeed:
         changeRate(stepSpeed({ current: state.rate, direction: action.direction }))
@@ -199,8 +200,7 @@ export const usePlayerActions = ({
         return
       }
       case PLAYER_ACTIONS.toggleStats:
-        if (actions.toggleStats === undefined) return
-        actions.toggleStats()
+        actions.toggleStats?.()
         return
       case PLAYER_ACTIONS.showShortcuts:
         setOverlay((current) =>
@@ -208,17 +208,60 @@ export const usePlayerActions = ({
         )
         return
       case PLAYER_ACTIONS.escape:
-        if (overlay === OVERLAYS.shortcuts) setOverlay(() => OVERLAYS.none)
-        else if (overlay !== OVERLAYS.none) closeMenu()
-        else if (closeInfo) closeInfo()
-        else if (document.fullscreenElement) void document.exitFullscreen()
-        else leave()
+        escape()
         return
       default: {
         const unknown: never = action
         return unknown
       }
     }
+  }
+
+  type AnswerProps = { action: PlayerAction; answer: PlayerAnswer; step: SkipStep | null }
+
+  const carryOut = ({ action, answer, step }: AnswerProps) => {
+    switch (answer.type) {
+      case PLAYER_ANSWERS.togglePlay:
+        flash({
+          icon: state.paused ? 'play' : 'pause',
+          text: state.paused ? PLAYER_ACTIONS_COPY.play : PLAYER_ACTIONS_COPY.pause,
+        })
+        togglePlay()
+        return
+      case PLAYER_ANSWERS.seek:
+        seek(answer.to)
+        flashSeek({ action, step })
+        return
+      case PLAYER_ANSWERS.volume:
+        if (action.type === PLAYER_ACTIONS.toggleMute) toggleMute()
+        else changeVolume(answer.volume)
+        return
+      case PLAYER_ANSWERS.host:
+        actOnHost(answer.action)
+        return
+      default: {
+        const unknown: never = answer
+        return unknown
+      }
+    }
+  }
+
+  const act = (action: PlayerAction) => {
+    const resolved = resolvePlayerAction({
+      action,
+      state: {
+        position: position.current,
+        duration,
+        volume,
+        isMuted: muted,
+        lastSkip: lastSkip.current,
+        now: performance.now(),
+      },
+    })
+    const step = resolved.lastSkip === lastSkip.current ? null : resolved.lastSkip
+    lastSkip.current = resolved.lastSkip
+    if (resolved.answer === null) return
+    carryOut({ action, answer: resolved.answer, step })
   }
 
   return { act, togglePlay, changeVolume, toggleMute, changeRate, toggleSubtitles }

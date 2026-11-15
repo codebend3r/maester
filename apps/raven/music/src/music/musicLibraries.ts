@@ -1,5 +1,5 @@
+import { musicLibrariesOf } from '@raven/core'
 import type { Library } from '@raven/core'
-import { musicLibrariesOf } from '@raven/native/headless'
 import { useQuery } from '@tanstack/react-query'
 
 import type { WrenSession } from '@/useWren'

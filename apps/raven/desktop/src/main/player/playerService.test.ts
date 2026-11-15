@@ -2392,6 +2392,7 @@ describe('createPlayerService', () => {
       ])
       await Promise.all(
         names.map((name) =>
+          // @ts-expect-error A per-file option is no settable name; the guard still refuses one at run time.
           expect(guarded.set({ name, value: 'Cookie: raven_unlock=a.b' })).rejects.toThrow(
             'is set per file, never globally',
           ),

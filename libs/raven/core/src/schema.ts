@@ -4,6 +4,8 @@
  * cannot be missing from the other.
  */
 
+import { isRecord } from '@shared/http'
+
 /** Says whether an `unknown` is a `T`; what every network boundary narrows with. */
 export type Guard<T> = (value: unknown) => value is T
 
@@ -13,12 +15,29 @@ export type Infer<G> = G extends Guard<infer T> ? T : never
 /** An object's fields, each with the guard its value must pass. */
 export type Shape = Record<string, Guard<unknown>>
 
+/** A guard `optional` made: its field may be left out of the object altogether. */
+export type OptionalGuard<T> = Guard<T | undefined> & { readonly isOptional: true }
+
+/** The fields of `S` an `optional` guard checks. */
+type OptionalKeys<S extends Shape> = {
+  [K in keyof S]: S[K] extends { readonly isOptional: true } ? K : never
+}[keyof S]
+
+/** An intersection as one object type, so an editor shows its fields instead of an alias. */
+type Flatten<T> = { [K in keyof T]: T[K] } & {}
+
+/** The object a shape describes: a field of an `optional` guard may be missing, every other is there. */
+export type ObjectOf<S extends Shape> = Flatten<
+  { [K in Exclude<keyof S, OptionalKeys<S>>]: Infer<S[K]> } & {
+    [K in OptionalKeys<S>]?: Infer<S[K]>
+  }
+>
+
 /**
  * A guard for an object, with its shape kept so another can extend it:
- * `{ ...isA.shape, b }`. The object type is spelled out rather than named, so
- * an editor shows its fields instead of an alias.
+ * `{ ...isA.shape, b }`.
  */
-export type ObjectGuard<S extends Shape> = Guard<{ [K in keyof S]: Infer<S[K]> }> & {
+export type ObjectGuard<S extends Shape> = Guard<ObjectOf<S>> & {
   readonly shape: S
 }
 
@@ -29,8 +48,7 @@ export type OneOfGuard<T extends readonly Literal[]> = Guard<T[number]> & {
 
 type Literal = string | number | boolean
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
+export { isRecord }
 
 export const isString = (value: unknown): value is string => typeof value === 'string'
 
@@ -50,11 +68,27 @@ export const nullable =
   (value): value is T | null =>
     value === null || guard(value)
 
+/** Exactly `value`: the tag of one variant of a union. */
+export const literal = <const T extends Literal>(value: T): OneOfGuard<readonly [T]> =>
+  oneOf([value])
+
 /** A value `guard` accepts, or none at all: a field an older server does not send yet. */
-export const optional =
-  <T>(guard: Guard<T>): Guard<T | undefined> =>
-  (value): value is T | undefined =>
-    value === undefined || guard(value)
+export const optional = <T>(guard: Guard<T>): OptionalGuard<T> =>
+  Object.assign((value: unknown): value is T | undefined => value === undefined || guard(value), {
+    isOptional: true as const,
+  })
+
+type WholeNumberInProps = {
+  min: number
+  /** Left out, any whole number a double holds exactly. */
+  max?: number
+}
+
+/** A whole number from `min` to `max`, both included, that a double holds exactly. */
+export const wholeNumberIn =
+  ({ min, max = Number.MAX_SAFE_INTEGER }: WholeNumberInProps): Guard<number> =>
+  (value): value is number =>
+    isNumber(value) && Number.isSafeInteger(value) && value >= min && value <= max
 
 /** A list whose every entry passes `guard`. */
 export const listOf =
@@ -79,10 +113,37 @@ export const union =
 /** An object with every field of `shape`; fields it does not know are let through. */
 export const object = <S extends Shape>(shape: S): ObjectGuard<S> =>
   Object.assign(
-    (value: unknown): value is { [K in keyof S]: Infer<S[K]> } =>
+    (value: unknown): value is ObjectOf<S> =>
       isRecord(value) && Object.entries(shape).every(([key, guard]) => guard(value[key])),
     { shape },
   )
+
+/** Each variant's own fields, by the value its tag takes. */
+type Variants = Record<string, Shape>
+
+/** The union `tagged` checks: each variant's fields, with `D` set to its key. */
+type TaggedOf<D extends string, V extends Variants> = {
+  [K in keyof V & string]: Flatten<{ [P in D]: K } & ObjectOf<V[K]>>
+}[keyof V & string]
+
+/**
+ * A discriminated union written as a map from each tag to its variant's fields:
+ * `tagged({ tag: 'type', variants: { [KINDS.a]: { id: isNumber }, [KINDS.b]: {} } })`. A value
+ * passes when its `tag` names a variant and it has that variant's fields.
+ */
+type TaggedProps<D extends string, V extends Variants> = { tag: D; variants: V }
+
+export const tagged =
+  <const D extends string, const V extends Variants>({
+    tag,
+    variants,
+  }: TaggedProps<D, V>): Guard<TaggedOf<D, V>> =>
+  (value: unknown): value is TaggedOf<D, V> => {
+    if (!isRecord(value)) return false
+    const kind = value[tag]
+    if (!isString(kind) || !Object.hasOwn(variants, kind)) return false
+    return Object.entries(variants[kind] ?? {}).every(([key, guard]) => guard(value[key]))
+  }
 
 /** One of the field names of `shape`. */
 export const keyOf =

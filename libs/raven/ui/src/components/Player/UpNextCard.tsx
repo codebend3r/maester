@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { Button } from '@/components/Button/Button'
+import { BUTTON_TONES, Button } from '@/components/Button/Button'
 import { UP_NEXT_CARD_COPY } from '@/components/Player/copy'
 import { CountdownRing } from '@/components/Player/CountdownRing'
 import type { UpNext } from '@/components/Player/PlayerServices'
@@ -35,7 +35,7 @@ export const UpNextCard = ({
   onDismiss,
 }: UpNextCardProps) => {
   const heading = useId()
-  const isNextSeason = next.isNextSeason === true
+  const isNextSeason = !!next.isNextSeason
   return (
     <section className={styles.card} aria-labelledby={heading}>
       {!!next.posterUrl && <img className={styles.poster} src={next.posterUrl} alt="" />}
@@ -56,10 +56,10 @@ export const UpNextCard = ({
       )}
       {hasSceneAfter && <p className={styles.scene}>{UP_NEXT_CARD_COPY.sceneAfter}</p>}
       <p className={styles.actions}>
-        <Button tone="primary" icon="play" onClick={onPlay}>
+        <Button tone={BUTTON_TONES.primary} icon="play" onClick={onPlay}>
           {isNextSeason ? UP_NEXT_CARD_COPY.playNextSeason : UP_NEXT_CARD_COPY.playNow}
         </Button>
-        <Button tone="ghost" className={styles.dismiss} onClick={onDismiss}>
+        <Button tone={BUTTON_TONES.ghost} className={styles.dismiss} onClick={onDismiss}>
           {UP_NEXT_CARD_COPY.watchCredits}
         </Button>
       </p>

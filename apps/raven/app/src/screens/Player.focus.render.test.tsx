@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS, appClientCallOf } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, appClientCallOf } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -91,7 +91,7 @@ const AUDIO_PLAYED = 0
 
 const savedSpots = (): unknown[] =>
   mockServer.heard
-    .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
+    .filter(({ method, path }) => method === HTTP_METHODS.put && path === progressPath)
     .map(({ body }) => body)
 
 /** Every request for a track's WebVTT, which raven reads only to draw the cues itself. */

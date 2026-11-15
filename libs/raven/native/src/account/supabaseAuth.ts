@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
   AUTH_PATHS,
@@ -9,16 +9,13 @@ import {
   isString,
   object,
 } from '@raven/core'
+import { CONTENT_TYPES, HEADERS } from '@shared/http'
 
 const GRANT_TYPES = { password: 'password', refresh: 'refresh_token' } as const
 
 const TOKEN_PATH = '/auth/v1/token'
 
 const GRANT_PARAM = 'grant_type'
-
-const JSON_TYPE = 'application/json'
-
-const HEADERS = { accept: 'accept', contentType: 'content-type' } as const
 
 const MS_PER_SECOND = 1000
 
@@ -64,7 +61,7 @@ const readSupabaseConfig = async ({
   origin,
 }: ReadSupabaseConfigProps): Promise<SupabaseConfig | null> => {
   const response = await fetch(`${origin}${AUTH_PATHS.config}`, {
-    headers: { [HEADERS.accept]: JSON_TYPE },
+    headers: { [HEADERS.accept]: CONTENT_TYPES.json },
   })
   const body: unknown = await response.json()
   if (!isAuthConfig(body) || body.state !== AUTH_CONFIG_STATES.ready) return null
@@ -88,10 +85,10 @@ const requestToken = async ({
     const config = await readSupabaseConfig({ origin })
     if (config === null) return { kind: AUTH_OUTCOMES.unreachable }
     const response = await fetch(`${config.supabaseUrl}${TOKEN_PATH}?${GRANT_PARAM}=${grant}`, {
-      method: APP_CALL_METHODS.post,
+      method: HTTP_METHODS.post,
       headers: {
-        [HEADERS.accept]: JSON_TYPE,
-        [HEADERS.contentType]: JSON_TYPE,
+        [HEADERS.accept]: CONTENT_TYPES.json,
+        [HEADERS.contentType]: CONTENT_TYPES.json,
         [AUTH_HEADERS.apiKey]: config.publishableKey,
       },
       body: JSON.stringify(body),

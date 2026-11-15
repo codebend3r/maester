@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   SESSION_KINDS,
   SESSION_PARAMS,
@@ -92,7 +92,7 @@ const renderItem = async (params: Record<string, string>) => {
 
 /** The writes the server heard, without its reads. */
 const writes = (): HeardRequest[] =>
-  mockServer.heard.filter(({ method }) => method !== APP_CALL_METHODS.get)
+  mockServer.heard.filter(({ method }) => method !== HTTP_METHODS.get)
 
 describe('Item on a phone or tablet', () => {
   beforeEach(() => {
@@ -179,7 +179,7 @@ describe('Item on a phone or tablet', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
     expect(writes()).toEqual([
       {
-        method: APP_CALL_METHODS.put,
+        method: HTTP_METHODS.put,
         path: setWatched.path,
         body: { watched: true, targets: [{ kind: WATCH_TARGET_KINDS.media, id: BUSBOYS_FILE.id }] },
       },
@@ -226,7 +226,7 @@ describe('Item on a phone or tablet', () => {
     expect(await screen.findByRole('checkbox', { name: 'Favourite', checked: true })).toBeTruthy()
     expect(writes()).toEqual([
       {
-        method: APP_CALL_METHODS.put,
+        method: HTTP_METHODS.put,
         path: pathFor({ path: setItemFavourite.path, id: SEVERANCE.id }),
         body: { favourite: true },
       },
@@ -247,8 +247,8 @@ describe('Item on a phone or tablet', () => {
     ).toBeTruthy()
     const bingePath = pathFor({ path: setBinge.path, id: SEVERANCE.id })
     expect(writes()).toEqual([
-      { method: APP_CALL_METHODS.put, path: bingePath, body: { binge: true } },
-      { method: APP_CALL_METHODS.put, path: bingePath, body: { binge: false } },
+      { method: HTTP_METHODS.put, path: bingePath, body: { binge: true } },
+      { method: HTTP_METHODS.put, path: bingePath, body: { binge: false } },
     ])
   })
 

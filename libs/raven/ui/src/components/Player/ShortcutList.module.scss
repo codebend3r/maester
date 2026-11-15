@@ -19,7 +19,7 @@
 
 .key {
   min-width: 1.75rem;
-  padding: 0.1rem var(--space-1);
+  padding: var(--space-text-y) var(--space-1);
   border: 1px solid color-mix(in srgb, var(--color-on-picture) 16%, transparent);
   border-bottom-width: 2px;
   border-radius: var(--radius-sm);

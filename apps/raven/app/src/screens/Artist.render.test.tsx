@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 
@@ -67,9 +67,9 @@ describe('Artist', () => {
         screen.getByRole('button', { name: 'Favourite' }).props.accessibilityState,
       ).toMatchObject({ selected: true }),
     )
-    expect(mockHeard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
+    expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
-        method: APP_CALL_METHODS.put,
+        method: HTTP_METHODS.put,
         path: pathFor({ path: APP_CLIENT_CALLS.setArtistFavourite.path, id: RADIOHEAD.id }),
         body: { favourite: true },
       },

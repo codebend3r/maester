@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import fastifyStatic from '@fastify/static'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { CACHE_POLICIES, HEADERS } from '@/http'
+import { CACHE_POLICIES, HEADERS } from '@shared/http'
 import { SpaFallbackFilter } from '@/spaFallbackFilter'
 
 type ServeWebAppProps = {

@@ -1,3 +1,4 @@
+import { IGNORED } from '@raven/native/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -29,7 +30,6 @@ import {
 import { type DownloadDevice, fetchOne } from '@/downloads/downloadRun'
 import { prepareAhead } from '@/downloads/prepareAhead'
 import { reconcileDisk } from '@/downloads/reconcileDisk'
-import { IGNORED } from '@/lib/ignore'
 import { useDownloadProgress } from '@/stores/downloadProgress'
 
 /** The key the downloads are stored under in AsyncStorage. */

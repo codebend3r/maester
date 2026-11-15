@@ -27,6 +27,7 @@ import {
   type Mpv,
   type MpvEvent,
   type MpvProperty,
+  MPV_OPTIONS,
 } from '@raven/mpv'
 import { SPEED_RANGE, clamp } from '@/main/player/commandNumbers'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
@@ -42,12 +43,7 @@ import {
   withoutTarget,
 } from '@/main/player/loadTarget'
 import { ENGINE_GONE, OK, type PlayerOutcome, refuse } from '@/main/player/outcomes'
-import {
-  type ApplyOutputProps,
-  isVolumeFixedFor,
-  MPV_OPTIONS,
-  outputOptions,
-} from '@/main/player/outputOptions'
+import { type ApplyOutputProps, isVolumeFixedFor, outputOptions } from '@/main/player/outputOptions'
 import { type Phase, PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import type { MusicResolveProps } from '@/main/player/musicSource'

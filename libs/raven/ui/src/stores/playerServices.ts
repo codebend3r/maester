@@ -1,8 +1,7 @@
 import { useId, useLayoutEffect } from 'react'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
+import { devtools } from 'zustand/middleware'
 import { useAudioQueue } from '@/stores/audioQueue'
-import { STORE_KEYS, UNCONFIGURED_STORAGE } from '@/stores/storage'
 import type { PlayerServices } from '@/components/Player/PlayerServices'
 
 type PlayerServicesState = {
@@ -15,22 +14,23 @@ const EMPTY: PlayerServicesState = { host: null, services: null }
 
 /** What the host on screen gives its player: the title, progress, escape and the rest. */
 export const usePlayerServices = create<PlayerServicesState>()(
-  devtools(
-    persist(() => EMPTY, {
-      name: STORE_KEYS.playerServices,
-      storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
-      partialize: () => ({}),
-    }),
-    { name: 'raven/playerServices' },
-  ),
+  devtools(() => EMPTY, { name: 'raven/playerServices' }),
 )
 
-/** The player's own parts read the host's services here; the host sets them before the player renders. */
-export const useHostServices = (): PlayerServices => {
-  const services = usePlayerServices((state) => state.services)
-  if (services === null) throw new Error('The host sets the player services before the player')
-  return services
-}
+/** Reads one part of the host's services. */
+type ServiceSelector<T> = (services: PlayerServices) => T
+
+const UNSET = new Error('The host sets the player services before the player')
+
+/**
+ * The player's own parts read one of the host's services here, by selector, so each
+ * re-renders only when its part changes; the host sets them before the player renders.
+ */
+export const useHostServices = <T>(select: ServiceSelector<T>): T =>
+  usePlayerServices((state) => {
+    if (state.services === null) throw UNSET
+    return select(state.services)
+  })
 
 /**
  * For the component that renders the player: puts its services in the store

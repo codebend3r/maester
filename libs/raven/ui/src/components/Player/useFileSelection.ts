@@ -1,7 +1,7 @@
 import type { MediaTracks } from '@raven/core'
 import { useMemo, useState } from 'react'
 import type { FileSubtitles } from '@/components/Player/engine'
-import { preferredSubtitle } from '@/components/Player/selection'
+import { preferredSubtitle } from '@raven/core'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -25,7 +25,9 @@ export const useFileSelection = (subtitles: FileSubtitles | undefined): TrackSel
         : { audio: [], subtitles: [...subtitles.tracks], defaultAudio: null, frameRate: null },
     [subtitles],
   )
-  const subtitleId = pick ? pick.id : preferredSubtitle({ tracks, subtitles: subtitlePrefs })
+  const subtitleId = pick
+    ? pick.id
+    : preferredSubtitle({ tracks, isOn: subtitlePrefs.on, language: subtitlePrefs.language })
   return {
     tracks,
     tracksFailed: false,
@@ -34,6 +36,7 @@ export const useFileSelection = (subtitles: FileSubtitles | undefined): TrackSel
     isDefaultAudio: true,
     subtitle: tracks?.subtitles.find((track) => track.id === subtitleId) ?? null,
     isWaitingForTracks: false,
+    shouldPlayPickedAudio: false,
     pickAudio: () => {},
     pickSubtitle: (id) => {
       setPick({ id })

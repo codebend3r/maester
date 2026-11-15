@@ -4,7 +4,6 @@ export { fromPlayerEvent, rangesFrom } from '@/components/Player/fromPlayerEvent
 export { SAVE_EVERY_S } from '@/components/Player/watchProgress'
 export { useProgressReport } from '@/components/Player/useProgressReport'
 export type { WatchHide } from '@/components/Player/useProgressReport'
-export { preferredAudio, preferredSubtitle } from '@/components/Player/selection'
 export { ENGINE_KINDS, sendQuietly, sourceKey } from '@/components/Player/engine'
 export type {
   Engine,
@@ -16,7 +15,9 @@ export type {
   NativePlayer,
   PlaybackFile,
 } from '@/components/Player/engine'
+export { NO_HOST_EXTRAS, NO_TITLE_EXTRAS } from '@/components/Player/PlayerServices'
 export type {
+  EngineError,
   ErrorReporter,
   Handoff,
   HostActions,
@@ -25,6 +26,10 @@ export type {
   TitleLogo,
   ProgressSink,
   TrackChoice,
+  TrackPicks,
+  HostChrome,
+  PlayerEscape,
+  UpNext,
 } from '@/components/Player/PlayerServices'
 export {
   AUDIOBOOK_SPEEDS,
@@ -109,20 +114,8 @@ export {
   useTrackBitrate,
   useTrackRate,
 } from '@/query/useAudiobook'
-export { activeLineAt } from '@/lib/lyrics'
-export { chapterAt, nextChapterStart, previousChapterStart } from '@/lib/chapters'
 export type { UpNextMoment } from '@/lib/upNextCountdown'
 export { useUpNextCountdown } from '@/lib/useUpNextCountdown'
-export { movedUp, withoutPlace } from '@/music/playlistOrder'
-export {
-  albumDiscsOf,
-  albumFactsOf,
-  playTimeOf,
-  playlistFactsOf,
-  playlistTracksOf,
-  queueRowsOf,
-} from '@/music/musicRows'
-export type { AlbumDisc, AlbumTrack, PlaylistTrack, QueueRow } from '@/music/musicRows'
 export { usePlaybackPolicy } from '@/query/usePlaybackPolicy'
 export { useCaptionStyle } from '@/query/useCaptionStyle'
 export {
@@ -158,3 +151,6 @@ export type {
 } from '@/components/AudioHost/useWindowedAudioHost'
 export { KeyedView } from '@/components/KeyedView/KeyedView'
 export type { ViewOf, ViewsOf } from '@/components/KeyedView/KeyedView'
+export { QueryView, isNone, keptRead } from '@/components/QueryView/QueryView'
+export { UNCONFIGURED_STORAGE } from '@/stores/storage'
+export type { QueryEmpty, QueryRead } from '@/components/QueryView/QueryView'

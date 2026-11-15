@@ -11,6 +11,7 @@
 !libs/*/*/package.json
 !scripts/package.json
 !patches
+!libs/shared/http
 !libs/shared/server
 !libs/raven/core
 !libs/raven/ui

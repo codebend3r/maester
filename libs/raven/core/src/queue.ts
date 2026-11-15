@@ -1,5 +1,5 @@
 import { isMixKind, isRadioSeedKind } from '@/contract/mixes'
-import { type Infer, isNumber, listOf, nullable, object, oneOf, union } from '@/schema'
+import { type Infer, isNumber, listOf, nullable, object, oneOf, union, literal } from '@/schema'
 
 /** What happens at the end of the queue: it stops, starts over, or the track plays again. */
 export const REPEAT_MODES = { off: 'off', all: 'all', one: 'one' } as const
@@ -32,8 +32,8 @@ export const isQueueSource = union(
     ]),
     id: isNumber,
   }),
-  object({ kind: oneOf([QUEUE_SOURCE_KINDS.mix]), id: isMixKind }),
-  object({ kind: oneOf([QUEUE_SOURCE_KINDS.radio]), id: isNumber, seed: isRadioSeedKind }),
+  object({ kind: literal(QUEUE_SOURCE_KINDS.mix), id: isMixKind }),
+  object({ kind: literal(QUEUE_SOURCE_KINDS.radio), id: isNumber, seed: isRadioSeedKind }),
 )
 
 export type QueueSource = Infer<typeof isQueueSource>
@@ -75,8 +75,10 @@ export const currentOf = (queue: Queue): number | null => {
   return index === undefined ? null : (queue.items[index] ?? null)
 }
 
+type OrderedEntry = { id: number; isCurrent: boolean }
+
 /** The whole queue in play order, for the queue page: each media id and whether it is the one playing. */
-export const orderedOf = (queue: Queue): { id: number; isCurrent: boolean }[] =>
+export const orderedOf = (queue: Queue): OrderedEntry[] =>
   queue.order.flatMap((index, place) => {
     const id = queue.items[index]
     return id === undefined ? [] : [{ id, isCurrent: place === queue.at }]

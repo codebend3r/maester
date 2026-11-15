@@ -1,16 +1,17 @@
 import { type FetchResponse, LOCKED_STATUS, isString } from '@raven/core'
+import { HTTP_STATUSES } from '@shared/http'
 
 /** The statuses the test servers answer with. */
 export const STATUSES = {
-  ok: 200,
-  noContent: 204,
-  unauthorized: 401,
-  forbidden: 403,
-  notFound: 404,
-  conflict: 409,
+  ok: HTTP_STATUSES.ok,
+  noContent: HTTP_STATUSES.noContent,
+  unauthorized: HTTP_STATUSES.unauthorized,
+  forbidden: HTTP_STATUSES.forbidden,
+  notFound: HTTP_STATUSES.notFound,
+  conflict: HTTP_STATUSES.conflict,
   locked: LOCKED_STATUS,
-  failed: 500,
-  unavailable: 503,
+  failed: HTTP_STATUSES.internalServerError,
+  unavailable: HTTP_STATUSES.unavailable,
 } as const
 
 /** How a test server answers: a status, and the body it sends with it. */
@@ -22,12 +23,16 @@ export const NOT_FOUND: Answer = { status: STATUSES.notFound, body: { message: '
 /** The `:id` placeholder in the allowlist's paths. */
 const ID_PARAM = ':id'
 
-type PathForProps = { path: string; id: number }
+type PathWithIdProps = { path: string; id: number }
 
 /** A route's path for one id: `/api/items/40`. */
-export const pathFor = ({ path, id }: PathForProps): string => path.replace(ID_PARAM, String(id))
+export const pathWithId = ({ path, id }: PathWithIdProps): string =>
+  path.replace(ID_PARAM, String(id))
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300
+
+/** A request a test server heard: its method, its path and query, and what it was sent. */
+export type HeardRequest = { method: string; path: string; body: unknown }
 
 type ResponseOfProps = Answer
 

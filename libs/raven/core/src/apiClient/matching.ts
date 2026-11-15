@@ -1,8 +1,6 @@
 import type { Transport } from '@/apiClient/transport'
+import { ROUTES } from '@/routes'
 import {
-  isMatchCandidateList,
-  isMediaItem,
-  isServerHealth,
   MATCH_SUBJECT_KINDS,
   type MatchCandidate,
   type MatchChoice,
@@ -11,7 +9,6 @@ import {
   type MediaItem,
   type MetadataHealth,
 } from '@/contract'
-import { toQueryString } from '@/query'
 
 /** The query a search's subject adds: the file, or the show, it is scored against. */
 const subjectQuery = (subject: MatchSubject | null): Record<string, string> => {
@@ -43,7 +40,7 @@ type SetMatchProps = {
 }
 
 /** Fix match: TMDB's candidates for a file, the choice among them, and how matching is doing. */
-export const matchingCalls = ({ send, expect }: Transport) => ({
+export const matchingCalls = ({ ask }: Transport) => ({
   /**
    * TMDB's results for Fix match, best first by confidence, scored against
    * what `subject` has on disk; `libraryId`'s type comes first among equals.
@@ -55,17 +52,15 @@ export const matchingCalls = ({ send, expect }: Transport) => ({
     libraryId,
     subject = null,
   }: SearchMatchesProps): Promise<MatchCandidate[]> =>
-    expect({
-      request: send({
-        path: `/api/match/search?${toQueryString({
-          type,
-          query: query.trim(),
-          ...(year == null ? {} : { year: String(year) }),
-          ...(libraryId == null ? {} : { libraryId: String(libraryId) }),
-          ...subjectQuery(subject),
-        })}`,
-      }),
-      guard: isMatchCandidateList,
+    ask({
+      route: ROUTES.searchMatches,
+      query: {
+        type,
+        query: query.trim(),
+        ...(year == null ? {} : { year: String(year) }),
+        ...(libraryId == null ? {} : { libraryId: String(libraryId) }),
+        ...subjectQuery(subject),
+      },
     }),
 
   /**
@@ -73,16 +68,13 @@ export const matchingCalls = ({ send, expect }: Transport) => ({
    * that through renames; `null` says it is not a movie at all.
    */
   setMatch: ({ mediaId, tmdbId }: SetMatchProps): Promise<MediaItem> =>
-    expect({
-      request: send({
-        path: `/api/media/${mediaId}/match`,
-        method: 'PUT',
-        body: { tmdbId } satisfies MatchChoice,
-      }),
-      guard: isMediaItem,
+    ask({
+      route: ROUTES.setMatch,
+      params: { id: mediaId },
+      body: { tmdbId } satisfies MatchChoice,
     }),
 
   /** How matching is doing, and whether TMDB is configured at all. */
   getMetadataHealth: async (): Promise<MetadataHealth> =>
-    (await expect({ request: send({ path: '/api/health' }), guard: isServerHealth })).metadata,
+    (await ask({ route: ROUTES.getServerHealth })).metadata,
 })

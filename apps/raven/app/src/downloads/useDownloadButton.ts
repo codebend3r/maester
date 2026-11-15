@@ -1,3 +1,4 @@
+import { IGNORED } from '@raven/native/headless'
 import { confirmDelete } from '@/downloads/confirmDelete'
 import {
   DOWNLOAD_ACTIONS,
@@ -13,7 +14,6 @@ import {
   keyOfEntry,
 } from '@/downloads/downloadEntries'
 import type { DownloadTarget } from '@/downloads/downloadTargets'
-import { IGNORED } from '@/lib/ignore'
 import { useDownloadProgress } from '@/stores/downloadProgress'
 import { useDownloads } from '@/stores/downloads'
 

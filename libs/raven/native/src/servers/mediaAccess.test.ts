@@ -27,7 +27,7 @@ import {
   type SourceOutcome,
   type SourceRequest,
 } from '@/servers/mediaAccess'
-import { STATUSES, pathFor } from '@/test/fixtureFetch'
+import { STATUSES, pathWithId } from '@/test/fixtureFetch'
 import {
   LAN,
   NAS,
@@ -92,11 +92,11 @@ type TicketedProps = { origin: string; path: string; ticket: string }
 const ticketed = ({ origin, path, ticket }: TicketedProps) =>
   `${origin}${path}?${toQueryString({ [MEDIA_TICKET_PARAM]: ticket })}`
 
-const filePath = pathFor({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
-const transcodePath = pathFor({ path: APP_CLIENT_CALLS.transcode.path, id: BUSBOYS.id })
-const copyPath = pathFor({ path: APP_CLIENT_CALLS.deviceDownloadFile.path, id: BUSBOYS.id })
-const masterPath = pathFor({ path: HLS_PATHS.master, id: BUSBOYS.id })
-const ticketPath = pathFor({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
+const filePath = pathWithId({ path: APP_CLIENT_CALLS.file.path, id: BUSBOYS.id })
+const transcodePath = pathWithId({ path: APP_CLIENT_CALLS.transcode.path, id: BUSBOYS.id })
+const copyPath = pathWithId({ path: APP_CLIENT_CALLS.deviceDownloadFile.path, id: BUSBOYS.id })
+const masterPath = pathWithId({ path: HLS_PATHS.master, id: BUSBOYS.id })
+const ticketPath = pathWithId({ path: APP_CLIENT_CALLS.getMediaTicket.path, id: BUSBOYS.id })
 
 const direct: SourceRequest = {
   media: BUSBOYS,

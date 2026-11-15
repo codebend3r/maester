@@ -1,5 +1,5 @@
+import { desktopPlatformFor } from '@/shared/platform'
 import {
-  desktopPlatformFor,
   ENVELOPE_KINDS,
   type InvokeEnvelope,
   PAGE_ORIGIN,

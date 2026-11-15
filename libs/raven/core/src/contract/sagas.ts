@@ -1,5 +1,5 @@
 import { isMediaList } from '@/contract/items'
-import { type Infer, isNumber, isString, listOf, object, oneOf, union } from '@/schema'
+import { type Infer, isNumber, isString, listOf, object, oneOf, union, literal } from '@/schema'
 
 /** How a saga's slideshow moves from one movie's backdrop to the next. */
 export const SLIDESHOW_MOTIONS = { fade: 'fade', kenBurns: 'kenBurns', slide: 'slide' } as const
@@ -16,8 +16,8 @@ export const SAGA_BACKDROP_TYPES = { slideshow: 'slideshow', still: 'still' } as
  * `PUT /api/libraries/:id/sagas/:sagaId/backdrop` takes it and answers with it.
  */
 export const isSagaBackdrop = union(
-  object({ type: oneOf([SAGA_BACKDROP_TYPES.slideshow]), motion: isSlideshowMotion }),
-  object({ type: oneOf([SAGA_BACKDROP_TYPES.still]), itemId: isNumber }),
+  object({ type: literal(SAGA_BACKDROP_TYPES.slideshow), motion: isSlideshowMotion }),
+  object({ type: literal(SAGA_BACKDROP_TYPES.still), itemId: isNumber }),
 )
 
 export type SagaBackdrop = Infer<typeof isSagaBackdrop>

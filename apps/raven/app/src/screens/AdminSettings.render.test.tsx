@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import {
-  APP_CALL_METHODS,
-  APP_CLIENT_CALLS,
-  MEMBER_STATUSES,
-  TRANSCODINGS,
-  themeOf,
-} from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, MEMBER_STATUSES, TRANSCODINGS, themeOf } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -53,7 +47,7 @@ const answerSheet = (answer: string) =>
     done(options.options.indexOf(answer))
   })
 
-const writes = () => mockServer.heard.filter(({ method }) => method !== APP_CALL_METHODS.get)
+const writes = () => mockServer.heard.filter(({ method }) => method !== HTTP_METHODS.get)
 
 describe("the owner's settings on a phone or tablet", () => {
   let client = createScreenClient()
@@ -110,7 +104,7 @@ describe("the owner's settings on a phone or tablet", () => {
     await waitFor(() =>
       expect(writes()).toEqual([
         {
-          method: APP_CALL_METHODS.put,
+          method: HTTP_METHODS.put,
           path: APP_CLIENT_CALLS.setPlaybackSettings.path,
           body: { transcoding: TRANSCODINGS.remuxOnly },
         },
@@ -127,7 +121,7 @@ describe("the owner's settings on a phone or tablet", () => {
     await waitFor(() =>
       expect(writes()).toEqual([
         {
-          method: APP_CALL_METHODS.post,
+          method: HTTP_METHODS.post,
           path: pathFor({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id }),
           body: undefined,
         },
@@ -141,7 +135,7 @@ describe("the owner's settings on a phone or tablet", () => {
     await waitFor(() =>
       expect(writes()).toEqual([
         {
-          method: APP_CALL_METHODS.post,
+          method: HTTP_METHODS.post,
           path: APP_CLIENT_CALLS.setMemberStatus.path.replace(':id', WAITING.id),
           body: { status: MEMBER_STATUSES.approved },
         },

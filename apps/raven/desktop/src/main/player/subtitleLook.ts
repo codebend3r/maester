@@ -1,7 +1,7 @@
+import { type MpvOption, MPV_OPTIONS } from '@raven/mpv'
 import { basename, join } from 'node:path'
 import { CAPTION_COLOUR_VALUES, CAPTION_SIZE_SCALES, type CaptionStyle } from '@raven/core'
 import { FONTS } from '@/build/forgeOptions'
-import { MPV_OPTIONS, type MpvOption } from '@/main/player/outputOptions'
 
 /** The family name inside `resources/fonts/YoungSerif.ttf`, which is what libass matches on. */
 const SUBTITLE_FONT = 'Young Serif'

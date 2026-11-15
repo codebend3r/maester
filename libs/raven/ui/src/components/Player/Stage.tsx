@@ -1,202 +1,107 @@
-import {
-  KEYS,
-  PLAYER_ACTIONS,
-  PLAYER_SOURCE_KINDS,
-  type PlayerAction,
-  SEEK_EDGES,
-  formatDuration,
-  shortcutFor,
-} from '@raven/core'
-import {
-  type ReactNode,
-  type SyntheticEvent,
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-} from 'react'
-import { KeyedView, type ViewOf, type ViewsOf } from '@/components/KeyedView/KeyedView'
-import type { Engine, EngineHandle, PlaybackFile } from '@/components/Player/engine'
-import type { Handoff, UpNext } from '@/components/Player/PlayerServices'
-import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
-import type { PlayChoices } from '@/components/Player/playChoices'
-import type { Rendition } from '@/components/Player/rendition'
-import type { PlaybackFailure, StepDown } from '@/components/Player/usePlaybackLadder'
-import type { Delivery } from '@/lib/streamSource'
-import type { SubtitleStatus } from '@/lib/useTrackCues'
-import { Button, ButtonLink } from '@/components/Button/Button'
+import { PLAYER_ACTIONS, PLAYER_SOURCE_KINDS, SEEK_EDGES, playingAudio } from '@raven/core'
+import { type ReactNode, type SyntheticEvent, useRef, useState } from 'react'
+import { BarCardView, barCardOf, skipActionOf } from '@/components/Player/BarCard'
 import { Bezel, HOLD_LOOKS, HoldMark } from '@/components/Player/Bezel'
 import { Controls } from '@/components/Player/Controls'
-import { STAGE_COPY } from '@/components/Player/copy'
+import {
+  ENGINE_KINDS,
+  type EngineHandle,
+  type EngineOf,
+  type PlaybackFile,
+} from '@/components/Player/engine'
 import { Icon } from '@/components/Icon/Icon'
 import { type MenuSection, isMenuSection } from '@/components/Player/menus'
 import {
-  aboutLine,
   audioPillLabel,
   endsAtLabel,
-  headerTitleOf,
   qualityLabel,
   subtitlePillLabel,
 } from '@/components/Player/playbackFacts'
 import styles from '@/components/Player/Player.module.scss'
 import { PlaybackInfo } from '@/components/Player/PlaybackInfo'
+import { PlayerHeader } from '@/components/Player/PlayerHeader'
+import type { Handoff } from '@/components/Player/PlayerServices'
+import type { PlayChoices } from '@/components/Player/playChoices'
 import { Preloader } from '@/components/Player/Preloader'
-import { playingAudio } from '@/components/Player/selection'
+import type { Rendition } from '@/components/Player/rendition'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { ShortcutsDialog } from '@/components/Player/ShortcutsDialog'
 import { ShortcutsTip } from '@/components/Player/ShortcutsTip'
+import { useHostChromeSync } from '@/components/Player/useHostChromeSync'
+import { useHtmlEngine } from '@/components/Player/useHtmlEngine'
+import type { PlaybackFailure, StepDown } from '@/components/Player/usePlaybackLadder'
 import { OVERLAYS, type Overlay, usePlayerActions } from '@/components/Player/usePlayerActions'
-import { useBezel, useFullscreen, useIdle, useNow } from '@/components/Player/useStageChrome'
-import { SkipButton } from '@/components/Player/SkipButton'
-import { TitleHeading } from '@/components/Player/TitleHeading'
-import { UpNextCard } from '@/components/Player/UpNextCard'
-import { PlayerStatus } from '@/components/Player/PlayerStatus'
+import { useResumeNotice } from '@/components/Player/useResumeNotice'
 import { useShortcutsTip } from '@/components/Player/useShortcutsTip'
 import { useSkipIntro } from '@/components/Player/useSkipIntro'
+import {
+  type Fullscreen,
+  useBezel,
+  useFullscreen,
+  useIdle,
+  useNow,
+} from '@/components/Player/useStageChrome'
+import { useStageKeys } from '@/components/Player/useStageKeys'
 import { useTouchGestures } from '@/components/Player/useTouchGestures'
-import { useUpNext } from '@/components/Player/useUpNext'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
+import { useUpNext } from '@/components/Player/useUpNext'
 import { useWatchProgress } from '@/components/Player/useWatchProgress'
-import { isInForeignDialog, isTypingTarget } from '@/lib/keyboard'
+import type { Delivery } from '@/lib/streamSource'
+import { classNames } from '@/lib/classNames'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostServices } from '@/stores/playerServices'
 
-type SkipAction = { label: string; run: () => void }
+/** "Ends at" names a minute, so a step of 15 seconds keeps it true. */
+const ENDS_AT_STEP_MS = 15_000
 
-type SkipActionOfProps = {
-  undo: (() => void) | null
-  skipIntro: (() => void) | null
-  skipCredits: (() => void) | null
-}
-
-/** What the one skip button offers now, if anything: Undo first, then the intro, then the credits. */
-const skipActionOf = ({ undo, skipIntro, skipCredits }: SkipActionOfProps): SkipAction | null => {
-  if (undo) return { label: STAGE_COPY.undoSkip, run: undo }
-  if (skipIntro) return { label: STAGE_COPY.skipIntro, run: skipIntro }
-  if (skipCredits) return { label: STAGE_COPY.skipCredits, run: skipCredits }
-  return null
-}
-
-/** What sits above the timeline at the right: the up next card, else the skip button. */
-const BAR_CARDS = { upNext: 'upNext', skip: 'skip' } as const
-
-type BarCard =
-  | { kind: typeof BAR_CARDS.upNext; next: UpNext }
-  | { kind: typeof BAR_CARDS.skip; action: SkipAction }
-
-type BarCardKind = BarCard['kind']
-
-type BarCardOfProps = {
-  isCardShown: boolean
-  next: UpNext | null
-  skipAction: SkipAction | null
-}
-
-/** The up next card while it shows, otherwise the skip on offer, if any. */
-const barCardOf = ({ isCardShown, next, skipAction }: BarCardOfProps): BarCard | null => {
-  if (isCardShown && next) return { kind: BAR_CARDS.upNext, next }
-  if (skipAction) return { kind: BAR_CARDS.skip, action: skipAction }
-  return null
-}
-
-type BarCardScreenProps<K extends BarCardKind> = {
-  card: Extract<BarCard, { kind: K }>
-  upNext: ReturnType<typeof useUpNext>
-  focusSurface: () => void
-}
-
-type UpNextViewProps = BarCardScreenProps<typeof BAR_CARDS.upNext>
-
-const UpNextView = ({ card, upNext, focusSurface }: UpNextViewProps) => (
-  <UpNextCard
-    next={card.next}
-    countdown={upNext.countdown}
-    secondsLeft={upNext.secondsLeft}
-    hasSceneAfter={upNext.hasSceneAfter}
-    onPlay={upNext.playNext}
-    onDismiss={() => {
-      upNext.dismiss()
-      focusSurface()
-    }}
-  />
-)
-
-type SkipViewProps = BarCardScreenProps<typeof BAR_CARDS.skip>
-
-const SkipView = ({ card, focusSurface }: SkipViewProps) => (
-  <SkipButton
-    label={card.action.label}
-    onClick={() => {
-      card.action.run()
-      focusSurface()
-    }}
-  />
-)
-
-/** Each card kind's view props, or only `Keys`' for a builder generic over the kind. */
-type BarCardViewsProps<Keys extends BarCardKind = BarCardKind> = {
-  [K in Keys]: BarCardScreenProps<K>
-}
-
-const BAR_CARD_VIEWS = {
-  [BAR_CARDS.upNext]: UpNextView,
-  [BAR_CARDS.skip]: SkipView,
-} as const satisfies ViewsOf<BarCardViewsProps>
-
-type BarCardViewOfProps<K extends BarCardKind> = BarCardScreenProps<K> & { kind: K }
-
-/** The view for the card's kind, so each view is handed its own kind of card. */
-const barCardViewOf = <K extends BarCardKind>({
-  kind,
-  ...props
-}: BarCardViewOfProps<K>): ViewOf<BarCardViewsProps<K>, K> => ({ key: kind, props })
-
-const isControlTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && !!target.closest('button, a')
-
-const isInDialog = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement && !!target.closest('dialog')
-
-/**
- * Whether a focused button or link answers the key itself: Enter anywhere,
- * Space only in a menu or dialog. On the bar Space plays or pauses, as
- * YouTube's does, rather than pressing the button clicked last, Full screen
- * among them.
- */
-const isPressedByControl = (event: KeyboardEvent): boolean => {
-  if (!isControlTarget(event.target)) return false
-  if (event.key === KEYS.enter) return true
-  return event.key === KEYS.space && isInDialog(event.target)
-}
+/** The play mark over a paused picture. */
+const PAUSED_ICON_SIZE = 40
 
 export type StageProps = {
-  engine: Extract<Engine, { kind: 'html' }>
+  engine: EngineOf<typeof ENGINE_KINDS.html>
   onBack: () => void
   rendition: Rendition
   selection: TrackSelection
   onFailure: (failure: PlaybackFailure) => void
-  /** The connection cannot carry the converted stream as fast as it plays. */
-  onSlow?: (delivery: Delivery) => void
-  steppedDown?: StepDown | null
-  choices?: PlayChoices | null
+  /** The connection cannot carry the converted stream as fast as it plays; null where nothing converts. */
+  onSlow: ((delivery: Delivery) => void) | null
+  steppedDown: StepDown | null
+  choices: PlayChoices | null
   /** What the picture needs said over it as it plays. */
-  notice?: ReactNode
+  notice: ReactNode
 }
 
-export const Stage = ({ engine, ...props }: StageProps) => {
+export const Stage = ({
+  engine,
+  onBack,
+  rendition,
+  selection,
+  onFailure,
+  onSlow,
+  steppedDown,
+  choices,
+  notice,
+}: StageProps) => {
   const fullscreen = useFullscreen()
   const html = useHtmlEngine({
     source: engine.source,
-    ...props,
+    rendition,
+    selection,
+    onFailure,
+    onSlow,
     toggleFullscreen: fullscreen.toggle,
   })
   const source = engine.source
   return (
     <PlayerChrome
-      {...props}
-      {...html}
-      file={source.kind === PLAYER_SOURCE_KINDS.server ? source : null}
+      engine={html}
+      onBack={onBack}
+      rendition={rendition}
       fullscreen={fullscreen}
+      file={source.kind === PLAYER_SOURCE_KINDS.server ? source : null}
+      steppedDown={steppedDown}
+      choices={choices}
+      notice={notice}
     />
   )
 }
@@ -205,18 +110,15 @@ type PlayerChromeProps = {
   engine: EngineHandle
   onBack: () => void
   rendition: Rendition
-  selection: TrackSelection
-  subtitleStatus: SubtitleStatus
-  renderSubtitles?: (lifted: boolean) => ReactNode
-  fullscreen: ReturnType<typeof useFullscreen>
+  fullscreen: Fullscreen
   /** The library file playing, for the line under the title and Playback info; null for a local file. */
-  file?: PlaybackFile | null
+  file: PlaybackFile | null
   /** Why the picture dropped to a transcode, when the connection is the reason. */
-  steppedDown?: StepDown | null
+  steppedDown: StepDown | null
   /** The ways to play this file and the viewer's pick among them; null where there is one. */
-  choices?: PlayChoices | null
+  choices: PlayChoices | null
   /** What the engine's host needs said over the picture as it plays, beside the keyboard tip. */
-  notice?: ReactNode
+  notice: ReactNode
 }
 
 /**
@@ -228,23 +130,21 @@ export const PlayerChrome = ({
   engine,
   onBack,
   rendition,
-  selection,
-  subtitleStatus,
-  renderSubtitles,
   fullscreen,
-  file = null,
-  steppedDown = null,
-  choices = null,
-  notice = null,
+  file,
+  steppedDown,
+  choices,
+  notice,
 }: PlayerChromeProps) => {
   const { mode, quality } = rendition
-  const { title, hostActions, chrome, isVolumeFixed, handoff } = useHostServices()
+  const resumeAt = useHostServices((services) => services.title.resumeAt)
+  const markers = useHostServices((services) => services.title.markers)
+  const hostActions = useHostServices((services) => services.hostActions)
+  const chrome = useHostServices((services) => services.chrome)
+  const isVolumeFixed = useHostServices((services) => services.isVolumeFixed)
+  const handoff = useHostServices((services) => services.handoff)
   const media = file?.media ?? null
-  const label = title.label
-  // A logo that fails to load gives way to the label for the rest of the title.
-  const [failedLogo, setFailedLogo] = useState<string | null>(null)
-  const logo = title.logo && title.logo.url !== failedLogo ? title.logo : null
-  const { state, duration, actions } = engine
+  const { state, duration, actions, selection } = engine
   const seek = actions.seek
   const root = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDialogElement>(null)
@@ -257,7 +157,6 @@ export const PlayerChrome = ({
     duration,
     audio: selection.audio ?? selection.tracks?.defaultAudio ?? null,
   })
-  const markers = title.markers ?? null
   const upNext = useUpNext({
     ended: state.ended,
     time: state.time,
@@ -271,11 +170,9 @@ export const PlayerChrome = ({
     skipIntro: intro.isInside ? intro.skip : null,
     skipCredits: upNext.skipCredits,
   })
-  const nextLink = upNext.next
-  const barCard = barCardOf({ isCardShown: upNext.isCardShown, next: nextLink, skipAction })
+  const barCard = barCardOf({ isCardShown: upNext.isCardShown, next: upNext.next, skipAction })
   const setAutoplay = usePlayerPrefs((prefs) => prefs.setAutoplay)
-  // "Ends at" names a minute, so a step of 15 seconds keeps it true.
-  const now = useNow(15_000)
+  const now = useNow(ENDS_AT_STEP_MS)
   // Nothing holds the controls past this: not a pause, an open menu or a focused button.
   const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
   const idle = useIdle(lingerSeconds * 1_000)
@@ -283,34 +180,16 @@ export const PlayerChrome = ({
   const [overlay, setOverlay] = useState<Overlay>(OVERLAYS.none)
   // Apart from the overlay: it stays open over the video, menus and all.
   const [infoOpen, setInfoOpen] = useState(false)
-  const [resumedAt, setResumedAt] = useState<number | null>(
-    title.resumeAt > 0 ? title.resumeAt : null,
-  )
-
-  // The host title stays in the tab only while this player is open.
-  useEffect(() => {
-    const previousTitle = document.title
-    document.title = label
-    return () => {
-      document.title = previousTitle
-    }
-  }, [label])
+  const resume = useResumeNotice(resumeAt)
 
   const shortcutsTip = useShortcutsTip({
     isPlaying: !state.paused,
     isListOpen: overlay === OVERLAYS.shortcuts,
   })
 
-  const isResumeShown = resumedAt !== null
-  useEffect(() => {
-    if (!isResumeShown) return
-    const resumedTimer = window.setTimeout(() => setResumedAt(null), 6000)
-    return () => window.clearTimeout(resumedTimer)
-  }, [isResumeShown])
-
   const closeMenu = () => {
     setOverlay(OVERLAYS.none)
-    if (menuButton.current !== null) menuButton.current.focus()
+    menuButton.current?.focus()
   }
 
   const toggleMenu = (section: MenuSection) =>
@@ -319,7 +198,7 @@ export const PlayerChrome = ({
   const showInfo = () => {
     closeMenu()
     // The panel opens where the resume notice sits, over its Start over.
-    setResumedAt(null)
+    resume.dismiss()
     setInfoOpen(true)
   }
 
@@ -330,7 +209,6 @@ export const PlayerChrome = ({
 
   const controls = usePlayerActions({
     engine,
-    selection,
     flash,
     toggleFullscreen: fullscreen.toggle,
     overlay,
@@ -347,52 +225,14 @@ export const PlayerChrome = ({
     onTap: controls.togglePlay,
   })
 
-  const onKey = useEffectEvent((event: KeyboardEvent) => {
-    // A host's dialog over the player keeps its keys, Escape included: they close it, not the player.
-    if (isInForeignDialog({ target: event.target, root: root.current })) return
-    idle.wake()
-    const action = shortcutFor(event)
-    /*
-     * Form controls keep their own keys (the radios' arrows, the volume
-     * slider's); only Escape reaches past them, to close what they sit in.
-     */
-    const isEscape = action !== null && action.type === PLAYER_ACTIONS.escape
-    if (isTypingTarget(event.target) && !isEscape) return
-    if (isPressedByControl(event)) return
-    if (!action) return
-    // An engine without the video info overlay leaves `i` to the page.
-    if (action.type === PLAYER_ACTIONS.toggleStats && actions.toggleStats === undefined) return
-    // With the shortcut list open, the keys only close it.
-    if (
-      overlay === OVERLAYS.shortcuts &&
-      action.type !== PLAYER_ACTIONS.escape &&
-      action.type !== PLAYER_ACTIONS.showShortcuts
-    ) {
-      return
-    }
-    event.preventDefault()
-    controls.act(action)
+  useStageKeys({
+    root,
+    overlay,
+    canShowStats: actions.toggleStats !== null,
+    hostActions,
+    wake: idle.wake,
+    act: controls.act,
   })
-  // A button presses itself on Space's keyup, so the bar's are stopped there too.
-  const onKeyUp = useEffectEvent((event: KeyboardEvent) => {
-    if (event.key !== KEYS.space || !isControlTarget(event.target) || isInDialog(event.target))
-      return
-    event.preventDefault()
-  })
-  useEffect(() => {
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('keyup', onKeyUp)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keyup', onKeyUp)
-    }
-  }, [])
-
-  const onHostAction = useEffectEvent((action: PlayerAction) => {
-    idle.wake()
-    controls.act(action)
-  })
-  useEffect(() => hostActions?.subscribe(onHostAction) ?? undefined, [hostActions])
 
   // A press outside the open menu closes it, as a popover should.
   const onStagePointerDown = (event: SyntheticEvent) => {
@@ -413,7 +253,7 @@ export const PlayerChrome = ({
   const startOver = () => {
     seek(0)
     actions.play()
-    setResumedAt(null)
+    resume.dismiss()
     engine.focusSurface()
   }
 
@@ -423,14 +263,12 @@ export const PlayerChrome = ({
    */
   const chromeShown = idle.active || upNext.isCardShown || intro.isPrompting
   const chapterStarts = markers?.chapters.map(({ start }) => start) ?? []
-  const heading = headerTitleOf({ media, label })
-  // The art spells out only the name, so the line under it gives the year the label would.
-  const about = aboutLine({
-    media,
-    label: logo?.name ?? label,
-    context: title.context ?? null,
-    duration,
-  })
+  const audioPlaying = {
+    mode,
+    tracks: selection.tracks,
+    audio: selection.audio,
+    shouldPlayPickedAudio: selection.shouldPlayPickedAudio,
+  }
 
   /*
    * The scrubber and the clock keep what they showed while the controls are
@@ -442,20 +280,12 @@ export const PlayerChrome = ({
     setHeld({ time: state.time, buffered: state.buffered })
   }
 
-  const tellHost = useEffectEvent((isShown: boolean) => {
-    if (chrome === undefined) return
-    chrome.shown(isShown)
-  })
-  useEffect(() => {
-    tellHost(chromeShown)
-  }, [chromeShown])
-  // The player going away leaves the host's own chrome as it should be.
-  useEffect(() => () => tellHost(true), [])
+  useHostChromeSync({ chrome, isShown: chromeShown })
 
   return (
     <div
       ref={root}
-      className={[styles.stage, chromeShown ? '' : styles.idle].filter(Boolean).join(' ')}
+      className={classNames([styles.stage, !chromeShown && styles.idle])}
       {...gestures.handlers}
       onPointerMove={(event) => {
         idle.wake()
@@ -467,13 +297,13 @@ export const PlayerChrome = ({
       }}
     >
       {engine.surface}
-      {!engine.drawsSubtitles && (renderSubtitles?.(chromeShown) ?? null)}
+      {engine.subtitles.overlay?.(chromeShown) ?? null}
       {/* A skip waits for data while its flash shows: one thing at a time in the middle. */}
       {state.waiting && !isFlashing && <Preloader />}
       {state.paused && !state.waiting && chromeShown && gestures.hold === null && (
         // The picture under it takes the click; this only says a click will play.
         <span className={styles.paused} aria-hidden="true">
-          <Icon name="play" size={40} />
+          <Icon name="play" size={PAUSED_ICON_SIZE} />
         </span>
       )}
       {!!bezel && <Bezel key={bezel.id} bezel={bezel} />}
@@ -481,54 +311,15 @@ export const PlayerChrome = ({
       <p className="visually-hidden" aria-live="polite">
         {gestures.hold === null ? (bezel?.text ?? null) : HOLD_LOOKS[gestures.hold].label}
       </p>
-      <header
-        className={[styles.chrome, chromeShown ? '' : styles.chromeHidden]
-          .filter(Boolean)
-          .join(' ')}
-      >
-        <Button
-          tone="ghost"
-          icon="back"
-          aria-label={STAGE_COPY.back}
-          className={styles.back}
-          onClick={onBack}
-        />
-        <div className={styles.heading}>
-          <TitleHeading
-            name={heading.name}
-            logo={logo}
-            homeTo={title.homeTo ?? null}
-            onFail={setFailedLogo}
-          />
-          {heading.episode != null && <p className={styles.episode}>{heading.episode}</p>}
-          {!!about && <p className={styles.about}>{about}</p>}
-        </div>
-        <PlayerStatus media={media} mode={mode} quality={quality}>
-          {nextLink && (
-            <ButtonLink
-              to={nextLink.to}
-              state={nextLink.state}
-              replace
-              tone="ghost"
-              icon={nextLink.isShuffled ? 'shuffle' : 'next'}
-              className={styles.next}
-              aria-label={STAGE_COPY.upNextLabel(nextLink.label)}
-              title={nextLink.label}
-            >
-              <span className={styles.nextLead}>{STAGE_COPY.upNext}</span>
-              <span className={styles.nextLabel}>{nextLink.label}</span>
-            </ButtonLink>
-          )}
-        </PlayerStatus>
-        {resumedAt != null && (
-          <p className={styles.resumed} aria-live="polite">
-            <span>{STAGE_COPY.resumedAt(formatDuration(resumedAt))}</span>
-            <Button tone="ghost" className={styles.startOver} onClick={startOver}>
-              {STAGE_COPY.startOver}
-            </Button>
-          </p>
-        )}
-      </header>
+      <PlayerHeader
+        isShown={chromeShown}
+        media={media}
+        rendition={rendition}
+        duration={duration}
+        resumedAt={resume.resumedAt}
+        onBack={onBack}
+        onStartOver={startOver}
+      />
       <Controls
         shown={chromeShown}
         paused={state.paused}
@@ -543,29 +334,16 @@ export const PlayerChrome = ({
         subtitlesOn={selection.subtitle != null}
         menuValues={{
           subtitles: subtitlePillLabel(selection.subtitle),
-          audio: audioPillLabel({
-            mode,
-            tracks: selection.tracks,
-            audio: selection.audio,
-            playsPickedAudio: selection.playsPickedAudio,
-          }),
+          audio: audioPillLabel(audioPlaying),
           playback: qualityLabel({ media, mode, quality }),
         }}
         menuOpen={isMenuSection(overlay) ? overlay : false}
         settingsButton={menuButton}
-        upNext={nextLink?.label ?? null}
+        upNext={upNext.next?.label ?? null}
         countdown={upNext.countdown}
         card={
           barCard && (
-            <KeyedView<BarCardViewsProps>
-              views={BAR_CARD_VIEWS}
-              view={barCardViewOf({
-                kind: barCard.kind,
-                card: barCard,
-                upNext,
-                focusSurface: engine.focusSurface,
-              })}
-            />
+            <BarCardView card={barCard} upNext={upNext} focusSurface={engine.focusSurface} />
           )
         }
         endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}
@@ -586,12 +364,7 @@ export const PlayerChrome = ({
           steppedDown={steppedDown}
           file={file}
           tracks={selection.tracks}
-          audio={playingAudio({
-            mode,
-            tracks: selection.tracks,
-            audio: selection.audio,
-            playsPickedAudio: selection.playsPickedAudio,
-          })}
+          audio={playingAudio(audioPlaying)}
           onClose={closeInfo}
         />
       )}
@@ -606,7 +379,7 @@ export const PlayerChrome = ({
             pickAudio: actions.setAudio,
             pickSubtitle: actions.setSubtitle,
           }}
-          subtitleStatus={subtitleStatus}
+          subtitleStatus={engine.subtitles.status}
           rate={state.rate}
           mode={mode}
           steppedDown={steppedDown}
@@ -625,7 +398,7 @@ export const PlayerChrome = ({
       {shortcutsTip.isShown && <ShortcutsTip onDismiss={shortcutsTip.dismiss} />}
       {overlay === OVERLAYS.shortcuts && (
         <ShortcutsDialog
-          canShowStats={!!actions.toggleStats}
+          canShowStats={actions.toggleStats !== null}
           onClose={() => setOverlay(OVERLAYS.none)}
         />
       )}

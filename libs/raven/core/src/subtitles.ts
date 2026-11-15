@@ -34,8 +34,10 @@ const SUBTITLE_WINDOW_LEAD = 10
 /** The next window is fetched this long before playback reaches it. */
 const PREFETCH_SECONDS = 60
 
+type SubtitleWindowRange = { start: number; duration: number }
+
 /** The stretch of the file window `window` covers, as the server reads it. */
-export const subtitleWindowRange = (window: number): { start: number; duration: number } => {
+export const subtitleWindowRange = (window: number): SubtitleWindowRange => {
   const from = window * SUBTITLE_WINDOW_SECONDS
   const start = Math.max(0, from - SUBTITLE_WINDOW_LEAD)
   return { start, duration: from + SUBTITLE_WINDOW_SECONDS - start }

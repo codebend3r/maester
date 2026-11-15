@@ -12,6 +12,8 @@ import {
   object,
   oneOf,
   union,
+  wholeNumberIn,
+  literal,
 } from '@/schema'
 
 /** The routes Remote Access answers on: the owner's settings and status, and the echo the outside check reaches. */
@@ -51,8 +53,7 @@ export const PORT_RANGE = { min: 1, max: 65_535 } as const
 /** The port an https origin leaves unsaid. */
 export const HTTPS_PORT = 443
 
-export const isPort = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= PORT_RANGE.min && value <= PORT_RANGE.max
+export const isPort = wholeNumberIn(PORT_RANGE)
 
 /** The most an upload speed can be, in megabits a second: a 100 gigabit line. */
 export const MAX_UPLOAD_MBPS = 100_000
@@ -145,9 +146,9 @@ const SEEN_FIELDS = { publicAddress: nullable(isString), resolved: listOf(isStri
 
 /** What the reachability function answers the server. */
 export const isReachabilityReport = union(
-  object({ state: oneOf([REMOTE_ACCESS_STATES.reachable]), ...SEEN_FIELDS }),
+  object({ state: literal(REMOTE_ACCESS_STATES.reachable), ...SEEN_FIELDS }),
   object({
-    state: oneOf([REMOTE_ACCESS_STATES.unreachable]),
+    state: literal(REMOTE_ACCESS_STATES.unreachable),
     problem: isReachabilityProblem,
     ...SEEN_FIELDS,
   }),
@@ -159,17 +160,17 @@ const CHECKED_FIELDS = { ...SEEN_FIELDS, checkedAt: isString }
 
 /** Whether raven is reachable from outside its network, as the Admin page shows it. */
 export const isRemoteAccessStatus = union(
-  object({ state: oneOf([REMOTE_ACCESS_STATES.disabled]) }),
-  object({ state: oneOf([REMOTE_ACCESS_STATES.unconfigured]) }),
-  object({ state: oneOf([REMOTE_ACCESS_STATES.unchecked]) }),
+  object({ state: literal(REMOTE_ACCESS_STATES.disabled) }),
+  object({ state: literal(REMOTE_ACCESS_STATES.unconfigured) }),
+  object({ state: literal(REMOTE_ACCESS_STATES.unchecked) }),
   object({
-    state: oneOf([REMOTE_ACCESS_STATES.reachable]),
+    state: literal(REMOTE_ACCESS_STATES.reachable),
     /** Whether the check's request reached raven with its own address forwarded, not the reverse proxy's. */
     isClientAddressForwarded: isBoolean,
     ...CHECKED_FIELDS,
   }),
   object({
-    state: oneOf([REMOTE_ACCESS_STATES.unreachable]),
+    state: literal(REMOTE_ACCESS_STATES.unreachable),
     problem: isReachabilityProblem,
     ...CHECKED_FIELDS,
   }),

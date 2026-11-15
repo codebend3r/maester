@@ -50,5 +50,6 @@ describe('initialsOf', () => {
     expect(initialsOf('Ana Ortiz')).toBe('AO')
     expect(initialsOf('  Mary  Jo Kate ')).toBe('MJ')
     expect(initialsOf('Cher')).toBe('C')
+    expect(initialsOf('guillermo  del Toro')).toBe('GD')
   })
 })

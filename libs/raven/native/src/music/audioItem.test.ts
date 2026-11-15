@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   AUDIO_BITRATES,
   AUDIO_BITRATE_PARAM,
@@ -57,7 +57,7 @@ const ravenServer = () => {
     baseUrl: ORIGIN,
     fetch: async (input) => {
       const url = String(input)
-      const call = appClientCallOf({ method: APP_CALL_METHODS.get, url })
+      const call = appClientCallOf({ method: HTTP_METHODS.get, url })
       heard.push(call ?? url)
       if (call === null) return new Response(null, { status: 404 })
       if (APP_CLIENT_CALLS[call] === APP_CLIENT_CALLS.getMediaTicket) {

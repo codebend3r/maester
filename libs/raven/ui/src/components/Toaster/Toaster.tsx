@@ -1,11 +1,12 @@
 import { NOTIFICATION_TONES, type NotificationTone } from '@raven/core'
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { BUTTON_TONES, Button } from '@/components/Button/Button'
 import { Icon } from '@/components/Icon/Icon'
 import type { IconName } from '@/components/Icon/drawings'
 import { TOASTER_COPY } from '@/components/Toaster/copy'
 import styles from '@/components/Toaster/Toaster.module.scss'
 import { TOAST_FADE_MS, TOAST_MS, type Toast, useToasts } from '@/stores/toasts'
+import { classNames } from '@/lib/classNames'
 
 type ToastNoteProps = { toast: Toast }
 
@@ -37,16 +38,14 @@ const ToastNote = ({ toast }: ToastNoteProps) => {
   return (
     // An output holds phrasing content only, so each toast is a span.
     <span
-      className={[styles.toast, TONE_CLASSES[toast.tone], isLeaving ? styles.leaving : '']
-        .filter(Boolean)
-        .join(' ')}
+      className={classNames([styles.toast, TONE_CLASSES[toast.tone], isLeaving && styles.leaving])}
     >
       <span className={styles.mark}>
         <Icon name={NOTIFICATION_ICONS[toast.tone]} />
       </span>
       <span className={styles.message}>{toast.message}</span>
       <Button
-        tone="ghost"
+        tone={BUTTON_TONES.ghost}
         icon="close"
         className={styles.dismiss}
         aria-label={TOASTER_COPY.dismiss}

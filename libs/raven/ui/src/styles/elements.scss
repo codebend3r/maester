@@ -88,14 +88,14 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 }
 
 :where(code, samp) {
-  padding: 0.1em var(--space-0);
+  padding: var(--space-text-y) var(--space-0);
   border: 1px solid var(--color-line-faint);
   border-radius: var(--radius-sm);
   background: var(--color-canopy);
 }
 
 :where(kbd) {
-  padding: 0.1em var(--space-1);
+  padding: var(--space-text-y) var(--space-1);
   border-radius: var(--radius-sm);
   background: var(--color-moss);
   box-shadow: var(--shadow-key);
@@ -241,7 +241,7 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 // Fields.
 :where(#{$field}) {
   min-height: var(--field-size);
-  padding: var(--space-1) 0.875rem;
+  padding: var(--space-1) var(--space-field-x);
   border: 1px solid color-mix(in srgb, var(--color-bark) 12%, transparent);
   border-radius: var(--radius-md);
   background-color: var(--color-canopy);
@@ -476,8 +476,8 @@ $field: "input:not([type='checkbox'], [type='radio'], [type='range'], [type='col
 }
 
 :where(input[type='file'])::file-selector-button {
-  // The file name beside the button is no element, so no grid gap can reach it.
-  margin-inline-end: var(--space-2);
+  // stylelint-disable-next-line declaration-property-value-allowed-list
+  margin-inline-end: var(--space-2); // The file name beside it is no element, so no gap reaches it.
 }
 
 :where(fieldset) {

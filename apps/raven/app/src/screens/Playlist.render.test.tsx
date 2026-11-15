@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
@@ -43,7 +43,7 @@ const MIXTAPE_TRACKS = pathFor({
 
 /** The writes the screen sent, as method, path and body. */
 const writes = (): HeardRequest[] =>
-  mockHeard.filter((request) => request.method !== APP_CALL_METHODS.get)
+  mockHeard.filter((request) => request.method !== HTTP_METHODS.get)
 
 /** The client this test's screen reads through. */
 const shown = { client: createScreenClient() }
@@ -87,7 +87,7 @@ describe('Playlist', () => {
     await waitFor(() =>
       expect(writes()).toEqual([
         {
-          method: APP_CALL_METHODS.put,
+          method: HTTP_METHODS.put,
           path: MIXTAPE_TRACKS,
           body: { mediaIds: [AIRBAG.id, LUCKY.id, PARANOID.id] },
         },
@@ -99,7 +99,7 @@ describe('Playlist', () => {
     )
     await waitFor(() =>
       expect(writes()[1]).toEqual({
-        method: APP_CALL_METHODS.put,
+        method: HTTP_METHODS.put,
         path: MIXTAPE_TRACKS,
         body: { mediaIds: [PARANOID.id, LUCKY.id] },
       }),
@@ -115,7 +115,7 @@ describe('Playlist', () => {
     await waitFor(() =>
       expect(writes()).toEqual([
         {
-          method: APP_CALL_METHODS.put,
+          method: HTTP_METHODS.put,
           path: pathFor({ path: APP_CLIENT_CALLS.renamePlaylist.path, id: MIXTAPE.id }),
           body: { name: 'Road trip' },
         },
@@ -140,7 +140,7 @@ describe('Playlist', () => {
     await waitFor(() => expect(mockBack).toHaveBeenCalled())
     expect(writes()).toEqual([
       {
-        method: APP_CALL_METHODS.delete,
+        method: HTTP_METHODS.delete,
         path: pathFor({ path: APP_CLIENT_CALLS.deletePlaylist.path, id: MIXTAPE.id }),
         body: null,
       },

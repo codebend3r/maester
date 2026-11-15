@@ -8,8 +8,8 @@ import {
   listOf,
   nullable,
   object,
-  oneOf,
   union,
+  literal,
 } from '@/schema'
 
 export const HOME_SHELF_TYPES = { shows: 'shows', media: 'media' } as const
@@ -22,10 +22,10 @@ export const HOME_SHELF_TYPES = { shows: 'shows', media: 'media' } as const
 export const isHomeShelf = union(
   object({
     libraryId: isNumber,
-    type: oneOf([HOME_SHELF_TYPES.shows]),
+    type: literal(HOME_SHELF_TYPES.shows),
     shows: listOf(isShowEntry),
   }),
-  object({ libraryId: isNumber, type: oneOf([HOME_SHELF_TYPES.media]), media: isMediaList }),
+  object({ libraryId: isNumber, type: literal(HOME_SHELF_TYPES.media), media: isMediaList }),
 )
 
 export type HomeShelf = Infer<typeof isHomeShelf>
@@ -89,13 +89,13 @@ export type HomeSearch = Infer<typeof isHomeSearch>
 export const isHeroEntry = union(
   object({
     libraryId: isNumber,
-    type: oneOf([HOME_SHELF_TYPES.shows]),
+    type: literal(HOME_SHELF_TYPES.shows),
     entry: isShowEntry,
     line: nullable(isString),
   }),
   object({
     libraryId: isNumber,
-    type: oneOf([HOME_SHELF_TYPES.media]),
+    type: literal(HOME_SHELF_TYPES.media),
     media: isMediaItem,
     line: nullable(isString),
   }),

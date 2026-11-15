@@ -8,6 +8,27 @@ export const wholeNumber = (value: string | undefined): number | null => {
     : null
 }
 
+type TextProps<F extends string | null> = {
+  value: string | undefined
+  fallback: F
+}
+
+/** The value trimmed, or `fallback` when it is missing or blank. */
+export const text = <F extends string | null>({ value, fallback }: TextProps<F>): string | F => {
+  const trimmed = value?.trim() ?? ''
+  return trimmed === '' ? fallback : trimmed
+}
+
+type AtLeastProps = {
+  value: string | undefined
+  min: number
+  fallback: number
+}
+
+/** A whole number read as `wholeNumber` reads it, `fallback` when it is not one, and never below `min`. */
+export const atLeast = ({ value, min, fallback }: AtLeastProps): number =>
+  Math.max(min, wholeNumber(value) ?? fallback)
+
 type FlagProps = {
   value: string | undefined
   fallback: boolean
@@ -43,13 +64,17 @@ type ReadListenConfigProps = {
   defaultPort: number
 }
 
+const LISTEN_DEFAULTS = { host: '0.0.0.0', dataDir: './data' } as const
+
 /** `PORT`, `HOST`, `DATA_DIR` and `WEB_DIR`, with `defaultPort` when `PORT` is not a whole number. */
 export const readListenConfig = ({ env, defaultPort }: ReadListenConfigProps): ListenConfig => {
-  const webDir = env[LISTEN_ENV_VARS.webDir]?.trim()
+  const webDir = text({ value: env[LISTEN_ENV_VARS.webDir], fallback: null })
   return {
     port: wholeNumber(env[LISTEN_ENV_VARS.port]) ?? defaultPort,
-    host: env[LISTEN_ENV_VARS.host]?.trim() || '0.0.0.0',
-    dataDir: resolve(env[LISTEN_ENV_VARS.dataDir]?.trim() || './data'),
-    webDir: webDir ? resolve(webDir) : null,
+    host: text({ value: env[LISTEN_ENV_VARS.host], fallback: LISTEN_DEFAULTS.host }),
+    dataDir: resolve(
+      text({ value: env[LISTEN_ENV_VARS.dataDir], fallback: LISTEN_DEFAULTS.dataDir }),
+    ),
+    webDir: webDir === null ? null : resolve(webDir),
   }
 }

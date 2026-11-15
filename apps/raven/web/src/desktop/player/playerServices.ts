@@ -1,3 +1,4 @@
+import { NO_HOST_EXTRAS, NO_TITLE_EXTRAS } from '@raven/ui/headless'
 import {
   DESKTOP_PATHS,
   DESKTOP_REQUESTS,
@@ -143,7 +144,9 @@ export const fileServicesFor = ({
   engine,
   downloadsPage,
 }: FileServicesForProps): PlayerServices => ({
+  ...NO_HOST_EXTRAS,
   title: {
+    ...NO_TITLE_EXTRAS,
     label: file.label,
     // Only a download's folder says where it came from; any other file's is just its folder.
     context: file.isDownload ? file.folder : null,

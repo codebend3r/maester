@@ -10,7 +10,7 @@ import type { FastifyReply } from 'fastify'
 import { type Observable, Subject, map } from 'rxjs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { ENCODINGS, compressResponses } from '@/compressResponses'
-import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@/http'
+import { CACHE_POLICIES, CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/http'
 import { serveWebApp } from '@/serveWebApp'
 
 const LIST = Array.from({ length: 200 }, (_, id) => ({ id, title: `Video ${id}`, year: 2026 }))

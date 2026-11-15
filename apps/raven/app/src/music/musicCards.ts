@@ -8,8 +8,8 @@ import {
   albumEntryKey,
   artistNames,
   plural,
+  playlistFactsOf,
 } from '@raven/core'
-import { playlistFactsOf } from '@raven/ui/headless'
 
 import { MUSIC_COPY } from '@/layouts/copy'
 import {

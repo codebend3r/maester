@@ -121,8 +121,10 @@ type ArtItem = Pick<ItemSummary, 'id' | 'show'>
  */
 export const artItemIdOf = (item: ArtItem): number => item.show?.id ?? item.id
 
+type TileWords = { title: string; line: string | null }
+
 /** What a wide tile names: the show, with the episode under it, else the movie and its release day. */
-export const tileWords = (media: MediaItem): { title: string; line: string | null } => {
+export const tileWords = (media: MediaItem): TileWords => {
   const { item } = media
   if (item && item.type === ITEM_TYPES.episode && item.show) {
     return { title: item.show.title, line: episodeLine(item) }

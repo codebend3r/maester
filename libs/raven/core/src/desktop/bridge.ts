@@ -1,3 +1,5 @@
+import { oneOf } from '@/schema'
+
 /**
  * What the preload exposes to the page as `window.ravenDesktop`. The player's port is not
  * on it: the preload hands it over with `window.postMessage`, since a port cannot cross
@@ -16,26 +18,10 @@ export const DESKTOP_PLATFORMS = { mac: 'mac', windows: 'windows' } as const
 
 export type DesktopPlatform = (typeof DESKTOP_PLATFORMS)[keyof typeof DESKTOP_PLATFORMS]
 
-const isDesktopPlatform = (value: unknown): value is DesktopPlatform =>
-  Object.values(DESKTOP_PLATFORMS).some((platform) => platform === value)
+const isDesktopPlatform = oneOf(Object.values(DESKTOP_PLATFORMS))
 
-// Node's name for Windows; core has no Node types, so it is spelled here.
-const WINDOWS_PLATFORM = 'win32'
-
-type DesktopPlatformForProps = {
-  /** Node's `process.platform`. */
-  platform: string
-}
-
-/** The system a Raven process runs on, from Node's name for it. */
-export const desktopPlatformFor = ({ platform }: DesktopPlatformForProps): DesktopPlatform =>
-  platform === WINDOWS_PLATFORM ? DESKTOP_PLATFORMS.windows : DESKTOP_PLATFORMS.mac
-
-/** What logs and diagnostics call the system, before its version. */
-export const SYSTEM_NAMES = {
-  [DESKTOP_PLATFORMS.mac]: 'macOS',
-  [DESKTOP_PLATFORMS.windows]: 'Windows',
-} as const satisfies Record<DesktopPlatform, string>
+/** The name the preload exposes the bridge under, `window.ravenDesktop`. */
+export const RAVEN_DESKTOP_BRIDGE_KEY = 'ravenDesktop'
 
 /** What the page calls the computer, in "On this Mac" and "free on this PC". */
 export const COMPUTER_NAMES = {

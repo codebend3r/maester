@@ -1,12 +1,12 @@
-import { type AlbumDetails, QUEUE_SOURCE_KINDS, routeIdOf } from '@raven/core'
 import {
+  type AlbumDetails,
+  QUEUE_SOURCE_KINDS,
+  routeIdOf,
   type AlbumTrack,
   albumDiscsOf,
   albumFactsOf,
-  playingTrackOf,
-  useAudioQueue,
-  useServerAlbumFavourite,
-} from '@raven/ui/headless'
+} from '@raven/core'
+import { playingTrackOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useState } from 'react'

@@ -13,12 +13,15 @@ import {
   type MediaItem,
   PICTURE_PARAMS,
   PICTURE_PATHS,
+  IMAGE_CACHE_PATH,
+  PICTURE_VERSION_PARAM,
   POSTER_OWN_WIDTH,
   POSTER_WIDTHS,
   type PosterWidth,
   THUMBNAIL_STATES,
 } from '@/contract'
 import { fillPath, toQueryString } from '@/query'
+import { ROUTES, pathFor } from '@/routes'
 import type { SagaPicture } from '@/sagas'
 
 type ItemPicturePathProps = {
@@ -91,6 +94,9 @@ type ImageOptionUrlProps = {
   option: ImageOption
 }
 
+/** An `img`'s `src` and `srcset`. */
+type PictureSources = { src: string; srcSet: string }
+
 type PictureCallsProps = {
   transport: Transport
   /** The path of an image CDN on the page's own site, or null to fetch pictures from the server. */
@@ -132,7 +138,9 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
 
   /** A video's thumbnail at `version`, which it changes with, so it can be cached for good. */
   const thumbnailAt = ({ id, version }: ThumbnailAtProps): string =>
-    url(`/api/media/${id}/thumbnail?v=${version}`)
+    url(
+      `${pathFor({ path: ROUTES.thumbnail.path, params: { id } })}?${toQueryString({ [PICTURE_VERSION_PARAM]: String(version) })}`,
+    )
 
   const itemImageAt = (picture: ItemPicturePathProps): string =>
     pictureAt({ path: itemPicturePath(picture) })
@@ -207,7 +215,9 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
     reviewAvatarUrl: ({ reviewId, avatarVersion }: ReviewAvatarUrlProps): string | null =>
       avatarVersion == null
         ? null
-        : url(`/api/reviews/${reviewId}/avatar?${toQueryString({ v: avatarVersion })}`),
+        : url(
+            `${pathFor({ path: ROUTES.reviewAvatar.path, params: { id: reviewId } })}?${toQueryString({ [PICTURE_VERSION_PARAM]: avatarVersion })}`,
+          ),
 
     /** A person's photo; null when TMDB has none. */
     photoUrl: ({ personId, photoVersion }: PhotoUrlProps): string | null =>
@@ -247,7 +257,7 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
 
     /** A Fix match result's poster, through the server's image cache. */
     candidatePosterUrl: (poster: string | null): string | null =>
-      poster == null ? null : url(`/api/images/poster${poster}`),
+      poster == null ? null : url(`${IMAGE_CACHE_PATH}/${ITEM_IMAGE_KINDS.poster}${poster}`),
 
     /**
      * A TMDB poster path at each width the server keeps, for an `img`'s `src`
@@ -255,8 +265,8 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
      * The widest is the URL with no width, as in `posterSrcSet`, so it is the
      * one `candidatePosterUrl` asks for and the browser keeps one copy.
      */
-    tmdbPosterSources: (poster: string): { src: string; srcSet: string } => {
-      const own = url(`/api/images/poster${poster}`)
+    tmdbPosterSources: (poster: string): PictureSources => {
+      const own = url(`${IMAGE_CACHE_PATH}/${ITEM_IMAGE_KINDS.poster}${poster}`)
       const at = (width: PosterWidth): string =>
         width === POSTER_OWN_WIDTH ? own : `${own}?${toQueryString({ w: String(width) })}`
       return {
@@ -266,12 +276,13 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
     },
 
     /** A TMDB backdrop path through the server's image cache, so the browser never talks to TMDB. */
-    tmdbBackdropUrl: (backdrop: string): string => url(`/api/images/backdrop${backdrop}`),
+    tmdbBackdropUrl: (backdrop: string): string =>
+      url(`${IMAGE_CACHE_PATH}/${ITEM_IMAGE_KINDS.backdrop}${backdrop}`),
 
     /** A picture Edit images offers, through the server's cache (TMDB's) or scaled (a local one). */
     imageOptionUrl: ({ id, kind, option }: ImageOptionUrlProps): string =>
       option.source === IMAGE_SOURCES.local
-        ? url(`/api/items/${id}/images/${kind}/local`)
-        : url(`/api/images/${kind}${option.ref}`),
+        ? url(pathFor({ path: ROUTES.localItemImage.path, params: { id, kind } }))
+        : url(`${IMAGE_CACHE_PATH}/${kind}${option.ref}`),
   }
 }

@@ -55,8 +55,10 @@ const BARE_EDITION = new RegExp(
   'i',
 )
 
+type TitledEdition = { title: string; edition: string | null }
+
 /** The edition a title names at its end, and the title without it. */
-const readBareEdition = (title: string): { title: string; edition: string | null } => {
+const readBareEdition = (title: string): TitledEdition => {
   const found = BARE_EDITION.exec(title)
   const rest = found?.[1]?.trim() ?? ''
   const edition = found?.[2]?.trim() ?? null
@@ -123,8 +125,10 @@ const tidy = (text: string): string =>
     .replace(/(?<![\s\-_.([])[\s\-_.([]+$/, '')
     .trim()
 
+type FoundYear = { year: number; at: number }
+
 /** Where the year sits: the last `(YYYY)`, else the last bare year that release tags follow. */
-const findYear = (name: string): { year: number; at: number } | null => {
+const findYear = (name: string): FoundYear | null => {
   const bracketed = [...name.matchAll(/\((\d{4})\)/g)].findLast((match) =>
     plausibleYear(Number(match[1])),
   )
@@ -272,13 +276,15 @@ const wordsOf = (text: string): string[] => text.match(WORD) ?? []
 const foldWord = (word: string): string =>
   word.normalize('NFKD').replace(/\p{M}/gu, '').replace(/['’]/g, '').toLowerCase()
 
+type Regions = { named: string; release: string }
+
 /**
  * A name without its tags, in two: what names the movie, its title and any
  * cut with the year taken out, and the release details after.
  * `Kingdom of Heaven (2005) Directors Cut WEBDL-2160p` names `Kingdom of
  * Heaven Directors Cut` and is released as `WEBDL-2160p`.
  */
-const regionsOf = (bare: string): { named: string; release: string } => {
+const regionsOf = (bare: string): Regions => {
   const found = findYear(bare)
   const before = found ? bare.slice(0, found.at) : ''
   const rest = found ? bare.slice(found.at).replace(/^\(?\d{4}\)?/, '') : bare
@@ -454,12 +460,14 @@ const COUNTRY_SUFFIX =
 /** Sonarr's country codes that TMDB, keeping to ISO 3166-1, writes another way. */
 const TMDB_COUNTRIES: Readonly<Record<string, string>> = { UK: 'GB' }
 
+type TitledCountry = { title: string; country: string | null }
+
 /**
  * A name without Sonarr's country suffix, and the country it gives as TMDB
  * writes it: `The Office (UK)` is `The Office` from GB. A name without one
  * gives no country.
  */
-export const splitCountry = (name: string): { title: string; country: string | null } => {
+export const splitCountry = (name: string): TitledCountry => {
   const code = COUNTRY_SUFFIX.exec(name)?.[1]?.toUpperCase() ?? null
   return {
     title: code === null ? name : name.replace(COUNTRY_SUFFIX, '').trimEnd(),

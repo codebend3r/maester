@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Button } from '@/components/Button/Button'
+import { useEffect, useId, useRef, useState } from 'react'
+import { BUTTON_TONES, Button } from '@/components/Button/Button'
 import { UNPLAYABLE_COPY } from '@/components/Player/copy'
 import {
   NO_CONTEXT,
@@ -13,9 +13,6 @@ import type { ErrorReporter } from '@/components/Player/PlayerServices'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { useHostServices } from '@/stores/playerServices'
 import { useToasts } from '@/stores/toasts'
-
-const PLAYER_HINT =
-  'The file is served untouched, so a player that handles every format, like VLC or IINA, can open the same link.'
 
 const REPORT_STATES = { idle: 'idle', sending: 'sending', failed: 'failed' } as const
 
@@ -43,17 +40,14 @@ export const Unplayable = ({
   onTryAnyway,
   context = NO_CONTEXT,
 }: UnplayableProps) => {
-  const {
-    title,
-    posterUrl: thumbnail,
-    escape,
-    escapeFeedback,
-    escapeHint,
-    unplayableNote,
-    handoff,
-    report,
-  } = useHostServices()
-  const hint = escapeHint === undefined ? PLAYER_HINT : escapeHint
+  const title = useHostServices((services) => services.title)
+  const thumbnail = useHostServices((services) => services.posterUrl)
+  const escape = useHostServices((services) => services.escape)
+  const escapeFeedback = useHostServices((services) => services.escapeFeedback)
+  const unplayableNote = useHostServices((services) => services.unplayableNote)
+  const handoff = useHostServices((services) => services.handoff)
+  const report = useHostServices((services) => services.report)
+  const titleId = useId()
   const showToast = useToasts((state) => state.show)
   const [reportState, setReportState] = useState<ReportState>(REPORT_STATES.idle)
   // A report still sending when the viewer leaves by Back must not leave a second time.
@@ -83,13 +77,13 @@ export const Unplayable = ({
   }
 
   return (
-    <section className={styles.unplayable} aria-labelledby="unplayable-title">
+    <section className={styles.unplayable} aria-labelledby={titleId}>
       {!!thumbnail && <img className={styles.backdrop} src={thumbnail} alt="" aria-hidden="true" />}
       <div className={styles.panel}>
-        <Button tone="ghost" icon="back" className={styles.panelBack} onClick={onBack}>
+        <Button tone={BUTTON_TONES.ghost} icon="back" className={styles.panelBack} onClick={onBack}>
           {UNPLAYABLE_COPY.back}
         </Button>
-        <h1 id="unplayable-title" className={styles.panelTitle}>
+        <h1 id={titleId} className={styles.panelTitle}>
           {title.label}
         </h1>
         <p>{unplayableNote ?? UNPLAYABLE_COPY.cannotPlay}</p>
@@ -98,20 +92,27 @@ export const Unplayable = ({
             <li key={problem}>{problem}</li>
           ))}
         </ul>
-        {escape && !!hint && <p className={styles.hint}>{hint}</p>}
+        {escape && <p className={styles.hint}>{UNPLAYABLE_COPY.playerHint}</p>}
         <div className={styles.panelActions}>
           {handoff && (
-            <Button tone="primary" icon="play" onClick={() => handoff.run(title.resumeAt)}>
+            <Button
+              tone={BUTTON_TONES.primary}
+              icon="play"
+              onClick={() => handoff.run(title.resumeAt)}
+            >
               {handoff.label}
             </Button>
           )}
           {!!onTryAnyway && (
-            <Button tone={handoff ? 'quiet' : 'primary'} onClick={onTryAnyway}>
+            <Button
+              tone={handoff ? BUTTON_TONES.quiet : BUTTON_TONES.primary}
+              onClick={onTryAnyway}
+            >
               {UNPLAYABLE_COPY.tryAnyway}
             </Button>
           )}
           {escape && (
-            <Button icon={escape.icon ?? 'copy'} className={styles.escape} onClick={escape.run}>
+            <Button icon={escape.icon} className={styles.escape} onClick={escape.run}>
               {escape.label}
             </Button>
           )}

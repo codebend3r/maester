@@ -3,7 +3,7 @@ import { constants } from 'node:zlib'
 import fastifyCompress from '@fastify/compress'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import type { FastifyRequest } from 'fastify'
-import { CONTENT_TYPES, HEADERS } from '@/http'
+import { CONTENT_TYPES, HEADERS } from '@shared/http'
 
 /*
  * Past this list the plugin asks mime-db, which marks no video and neither JPEG
@@ -19,6 +19,9 @@ const isCompressible = (type: string): boolean =>
 /** The content codings offered, in order of preference. */
 export const ENCODINGS = { br: 'br', gzip: 'gzip' } as const
 
+/** The request header the plugin reads to skip one reply. */
+const NO_COMPRESSION_HEADER = 'x-no-compression'
+
 /** Why a reply skips the plugin, as its `x-no-compression` value. */
 const SKIP_REASONS = { range: 'range', bytes: 'bytes' } as const
 
@@ -29,7 +32,7 @@ type SkipCompressionProps = {
 
 // `x-no-compression` on the request is the plugin's way to skip one reply.
 const skipCompression = ({ request, reason }: SkipCompressionProps): void => {
-  request.headers = { ...request.headers, [HEADERS.xNoCompression]: reason }
+  request.headers = { ...request.headers, [NO_COMPRESSION_HEADER]: reason }
 }
 
 const isStream = (payload: unknown): payload is Stream | ReadableStream =>

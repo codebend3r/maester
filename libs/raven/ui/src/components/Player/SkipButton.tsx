@@ -1,4 +1,4 @@
-import { Button } from '@/components/Button/Button'
+import { BUTTON_TONES, Button } from '@/components/Button/Button'
 import styles from '@/components/Player/SkipButton.module.scss'
 
 type SkipButtonProps = {
@@ -9,7 +9,7 @@ type SkipButtonProps = {
 
 /** The one skip control, above the bar at the right: Skip intro, Undo after one skipped by itself, and Skip credits. */
 export const SkipButton = ({ label, onClick }: SkipButtonProps) => (
-  <Button tone="ghost" icon="skipNext" className={styles.skip} onClick={onClick}>
+  <Button tone={BUTTON_TONES.ghost} icon="skipNext" className={styles.skip} onClick={onClick}>
     {label}
   </Button>
 )

@@ -22,7 +22,7 @@ import {
   inFolder,
   keyOfEntry,
 } from '@/downloads/downloadEntries'
-import { IGNORED } from '@/lib/ignore'
+import { IGNORED } from '@raven/native/headless'
 import type { DownloadProgressActions, DownloadReading } from '@/stores/downloadProgress'
 
 /** How often a video the server is still copying is asked about again. */

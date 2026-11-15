@@ -1,4 +1,4 @@
-import { type Infer, isNumber, isString, object, oneOf, union } from '@/schema'
+import { type Infer, isNumber, isString, object, oneOf, union, literal } from '@/schema'
 
 /**
  * The routes a device downloads a video through when its player cannot open the original
@@ -44,9 +44,9 @@ export const DEVICE_DOWNLOAD_STATES = {
  * or running. `progress` is from 0 to 1; `bytes` is the finished copy's size.
  */
 export const isDeviceDownload = union(
-  object({ state: oneOf([DEVICE_DOWNLOAD_STATES.preparing]), progress: isNumber }),
-  object({ state: oneOf([DEVICE_DOWNLOAD_STATES.ready]), bytes: isNumber }),
-  object({ state: oneOf([DEVICE_DOWNLOAD_STATES.failed]), message: isString }),
+  object({ state: literal(DEVICE_DOWNLOAD_STATES.preparing), progress: isNumber }),
+  object({ state: literal(DEVICE_DOWNLOAD_STATES.ready), bytes: isNumber }),
+  object({ state: literal(DEVICE_DOWNLOAD_STATES.failed), message: isString }),
 )
 
 export type DeviceDownload = Infer<typeof isDeviceDownload>

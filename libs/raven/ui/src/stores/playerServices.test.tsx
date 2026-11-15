@@ -3,11 +3,13 @@ import { render, screen } from '@testing-library/react'
 import { useEffect, useState } from 'react'
 import type { PlayerServices } from '@/components/Player/PlayerServices'
 import { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
+import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
 const servicesFor = (label: string): PlayerServices => ({
-  title: { label, duration: null, resumeAt: 0, backTo: '/', next: null },
-  progress: { started: () => {}, save: () => {}, left: () => {} },
+  title: { ...NO_TITLE_EXTRAS, label, duration: null, resumeAt: 0, backTo: '/', next: null },
+  progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
   posterUrl: null,
+  ...NO_HOST_EXTRAS,
   escape: null,
 })
 
@@ -15,7 +17,7 @@ type ProbeProps = { firsts: string[] }
 
 /** Stands in for the player: notes the title its first render read. */
 const Probe = ({ firsts }: ProbeProps) => {
-  const { title } = useHostServices()
+  const title = useHostServices((services) => services.title)
   const [first] = useState(title.label)
   useEffect(() => {
     firsts.push(first)

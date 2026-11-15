@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type * as Native from '@raven/native'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Alert } from 'react-native'
 
@@ -37,7 +37,7 @@ const mockApi = jest.fn(() =>
 
 /** The writes the screen sent, as method, path and body. */
 const writes = (): HeardRequest[] =>
-  mockHeard.filter((request) => request.method !== APP_CALL_METHODS.get)
+  mockHeard.filter((request) => request.method !== HTTP_METHODS.get)
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
@@ -129,7 +129,7 @@ describe('Album', () => {
       ).toMatchObject({ selected: true }),
     )
     const path = pathFor({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id })
-    expect(writes()).toEqual([{ method: APP_CALL_METHODS.put, path, body: { favourite: true } }])
+    expect(writes()).toEqual([{ method: HTTP_METHODS.put, path, body: { favourite: true } }])
     release()
     await untilIdle(client)
   })
@@ -146,7 +146,7 @@ describe('Album', () => {
     expect(await screen.findByText(`Added to ${MIXTAPE.name}.`)).toBeTruthy()
     expect(writes()).toEqual([
       {
-        method: APP_CALL_METHODS.post,
+        method: HTTP_METHODS.post,
         path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
         body: { mediaIds: [AIRBAG.id, PARANOID.id, LUCKY.id] },
       },
@@ -168,12 +168,12 @@ describe('Album', () => {
     expect(await screen.findByText('Added to Road trip.')).toBeTruthy()
     expect(writes()).toEqual([
       {
-        method: APP_CALL_METHODS.post,
+        method: HTTP_METHODS.post,
         path: APP_CLIENT_CALLS.createPlaylist.path,
         body: { name: 'Road trip' },
       },
       {
-        method: APP_CALL_METHODS.post,
+        method: HTTP_METHODS.post,
         path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: NEW_PLAYLIST_ID }),
         body: { mediaIds: [PARANOID.id] },
       },

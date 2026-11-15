@@ -1,3 +1,4 @@
+import { isMediaId } from '@/contract/ids'
 import { isTrack } from '@/contract/music'
 import { type Infer, isBoolean, isNumber, isString, listOf, matching, object } from '@/schema'
 
@@ -43,10 +44,6 @@ export const isPlaylistName = matching(
 export const isPlaylistInput = object({ name: isPlaylistName })
 
 export type PlaylistInput = Infer<typeof isPlaylistInput>
-
-/** A media id: a whole number from 1. */
-const isMediaId = (value: unknown): value is number =>
-  isNumber(value) && Number.isInteger(value) && value >= 1
 
 const isMediaIds = (value: unknown): value is number[] =>
   listOf(isMediaId)(value) && value.length <= PLAYLIST_LIMITS.tracks

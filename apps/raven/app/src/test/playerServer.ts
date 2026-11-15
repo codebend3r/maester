@@ -1,6 +1,6 @@
 import {
   DEFAULT_CAPTION_STYLE,
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   CONTAINERS,
@@ -241,7 +241,7 @@ export const playerApi = ({
   type AnswerForProps = { method: string; path: string }
 
   const answerFor = ({ method, path }: AnswerForProps): Answer => {
-    if (method !== APP_CALL_METHODS.get) {
+    if (method !== HTTP_METHODS.get) {
       return WRITES.has(path) ? { status: STATUSES.noContent, body: null } : NOT_FOUND
     }
     if (path === getPlaybackSettings.path) {
@@ -266,7 +266,7 @@ export const playerApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
-        const method = init.method ?? APP_CALL_METHODS.get
+        const method = init.method ?? HTTP_METHODS.get
         hear({ method, path, body: bodyOf(init.body) })
         return responseOf(answerFor({ method, path: pathOnly(path) }))
       },

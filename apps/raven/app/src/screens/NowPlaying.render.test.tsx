@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CALL_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
 import type * as Native from '@raven/native'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
@@ -117,9 +117,9 @@ describe('Now Playing under the thumb', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Add to playlist' }))
     expect(offered).toEqual([[MIXTAPE.name, 'New playlist', 'Cancel']])
     expect(await screen.findByText(`Added to ${MIXTAPE.name}.`)).toBeTruthy()
-    expect(mockHeard.filter(({ method }) => method !== APP_CALL_METHODS.get)).toEqual([
+    expect(mockHeard.filter(({ method }) => method !== HTTP_METHODS.get)).toEqual([
       {
-        method: APP_CALL_METHODS.post,
+        method: HTTP_METHODS.post,
         path: pathFor({ path: APP_CLIENT_CALLS.appendPlaylistTracks.path, id: MIXTAPE.id }),
         body: { mediaIds: [AIRBAG.id] },
       },

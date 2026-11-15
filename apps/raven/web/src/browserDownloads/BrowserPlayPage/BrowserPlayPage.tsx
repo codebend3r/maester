@@ -1,3 +1,4 @@
+import { NO_HOST_EXTRAS, NO_TITLE_EXTRAS } from '@raven/ui/headless'
 import {
   DESKTOP_PATHS,
   DOWNLOAD_STATUS_KINDS,
@@ -48,7 +49,9 @@ const servicesFor = ({ engine, download }: ServicesForProps): PlayerServices => 
   const keep = (position: number): void =>
     engine.savePosition({ downloadId, position, duration: length.seconds })
   return {
+    ...NO_HOST_EXTRAS,
     title: {
+      ...NO_TITLE_EXTRAS,
       label: download.label,
       logo: download.logo,
       context: BROWSER_PLAY_COPY.downloaded,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   DEFAULT_THEME,
   HLS_PARAMS,
@@ -139,13 +139,12 @@ const AUDIO_PLAYED = 0
 
 const savedSpots = (): unknown[] =>
   mockServer.heard
-    .filter(({ method, path }) => method === APP_CALL_METHODS.put && path === progressPath)
+    .filter(({ method, path }) => method === HTTP_METHODS.put && path === progressPath)
     .map(({ body }) => body)
 
 const playsRecorded = (): number =>
-  mockServer.heard.filter(
-    ({ method, path }) => method === APP_CALL_METHODS.post && path === playsPath,
-  ).length
+  mockServer.heard.filter(({ method, path }) => method === HTTP_METHODS.post && path === playsPath)
+    .length
 
 /** A light theme, whose page colours would vanish over a bright picture. */
 const PATINA = THEMES.find((theme) => theme.name === 'Patina')?.id ?? DEFAULT_THEME

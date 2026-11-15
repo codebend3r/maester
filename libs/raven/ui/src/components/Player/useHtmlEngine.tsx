@@ -13,6 +13,7 @@ import {
 } from '@/components/Player/engine'
 import type { Rendition } from '@/components/Player/rendition'
 import type { PlaybackFailure } from '@/components/Player/usePlaybackLadder'
+import { HTML_ENGINE_COPY } from '@/components/Player/copy'
 import styles from '@/components/Player/Player.module.scss'
 import { useHostServices } from '@/stores/playerServices'
 import { SubtitleOverlay } from '@/components/Player/SubtitleOverlay'
@@ -26,14 +27,12 @@ import { useCaptionStyle } from '@/query/useCaptionStyle'
 import { useFileCues } from '@/lib/useFileCues'
 import { useTrackCues } from '@/lib/useTrackCues'
 
-const ENGINE_NAME = 'HTML video'
-
 type UseHtmlEngineProps = {
   source: HtmlSource
   rendition: Rendition
   selection: TrackSelection
   onFailure: (failure: PlaybackFailure) => void
-  onSlow?: (delivery: Delivery) => void
+  onSlow: ((delivery: Delivery) => void) | null
   toggleFullscreen: () => void
 }
 
@@ -44,8 +43,9 @@ export const useHtmlEngine = ({
   onFailure,
   onSlow,
   toggleFullscreen,
-}: UseHtmlEngineProps) => {
-  const { title, posterUrl } = useHostServices()
+}: UseHtmlEngineProps): EngineHandle => {
+  const title = useHostServices((services) => services.title)
+  const posterUrl = useHostServices((services) => services.posterUrl)
   const videoRef = useRef<HTMLVideoElement>(null)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
@@ -70,11 +70,12 @@ export const useHtmlEngine = ({
   }
   const readStats = (): EngineStats => {
     const element = videoRef.current
-    if (!element) return { engine: ENGINE_NAME, viewport: null, frame: null, frames: null }
+    if (!element)
+      return { engine: HTML_ENGINE_COPY.engineName, viewport: null, frame: null, frames: null }
     // Missing outside a real browser.
     const frameQuality = element.getVideoPlaybackQuality?.() ?? null
     return {
-      engine: ENGINE_NAME,
+      engine: HTML_ENGINE_COPY.engineName,
       viewport:
         element.clientWidth > 0
           ? {
@@ -158,15 +159,28 @@ export const useHtmlEngine = ({
     setAudio: selection.pickAudio,
     setSubtitle: selection.pickSubtitle,
     setCaptionStyle: captions.change,
+    toggleStats: null,
   }
-  const engine: EngineHandle = {
+  return {
     state: playback.state,
     duration: playback.duration,
     position,
     tracks: selection.tracks,
     captionStyle: captions.style,
     actions,
-    drawsSubtitles: false,
+    selection,
+    subtitles: {
+      status: subtitles.status,
+      overlay: (lifted) => (
+        <SubtitleOverlay
+          cues={subtitles.cues}
+          video={videoRef}
+          shift={shift}
+          lifted={lifted}
+          captionStyle={captions.style}
+        />
+      ),
+    },
     readStats,
     focusSurface: () => videoRef.current?.focus(),
     surface: (
@@ -184,19 +198,6 @@ export const useHtmlEngine = ({
         aria-label={title.label}
         onClick={() => (playback.state.paused ? actions.play() : actions.pause())}
         onDoubleClick={toggleFullscreen}
-      />
-    ),
-  }
-  return {
-    engine,
-    subtitleStatus: subtitles.status,
-    renderSubtitles: (lifted: boolean) => (
-      <SubtitleOverlay
-        cues={subtitles.cues}
-        video={videoRef}
-        shift={shift}
-        lifted={lifted}
-        captionStyle={captions.style}
       />
     ),
   }

@@ -1,7 +1,7 @@
+import { DESKTOP_ENV } from '@/shared/platform'
 import {
   DEFAULT_LINK_ORIGINS,
   DEFAULT_SERVER_ORIGIN,
-  DESKTOP_ENV,
   isServerOrigin,
   serverOriginOf,
 } from '@raven/core'

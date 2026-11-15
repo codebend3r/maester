@@ -20,6 +20,9 @@ export {
 /** The one event the native side emits, carrying every player event as its payload. */
 const NATIVE_EVENT = 'onAudioEvent'
 
+/** The name `RavenAudioModule` registers under, on iOS and Android alike. */
+const NATIVE_MODULE = 'RavenAudio'
+
 type NativeAudioModule = {
   /**
    * Replaces the player's window, `items` in play order, and plays the first from `start`
@@ -59,7 +62,8 @@ let cached: NativeAudioModule | null = null
  * through the video player and imports this package beside it, never wakes the native player.
  */
 const native = (): NativeAudioModule => {
-  cached ??= requireNativeModule<NativeAudioModule>('RavenAudio')
+  // The module's shape is this contract's, kept in step with the Swift and Kotlin by hand; its events are guarded as they arrive.
+  cached ??= requireNativeModule<NativeAudioModule>(NATIVE_MODULE)
   return cached
 }
 
@@ -79,7 +83,10 @@ type OnEventProps = {
   onUnknown: (event: unknown) => void
 }
 
-/** The music player on iPhones and iPads: `AVQueuePlayer`, with Now Playing and the lock screen. */
+/**
+ * The music player on phones and tablets: `AVQueuePlayer` on iOS and Media3 on Android, with
+ * Now Playing, the lock screen, CarPlay and Android Auto.
+ */
 export const audioPlayer = {
   setWindow: ({ playing, next, shouldPlay, start }: SetWindowProps): Promise<void> =>
     native().setWindow(next === null ? [playing] : [playing, next], shouldPlay, Math.max(0, start)),

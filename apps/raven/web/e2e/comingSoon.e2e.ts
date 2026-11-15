@@ -1,5 +1,6 @@
+import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { expect, type Locator, type Page, test } from '@playwright/test'
-import { FIXTURE_SERVER, ITEM_TYPES, REQUEST_STATUSES, UPCOMING_SHELVES } from '@raven/core'
+import { ITEM_TYPES, REQUEST_STATUSES, UPCOMING_SHELVES } from '@raven/core'
 import { COMMON_COPY } from '@/lib/copy'
 import { COMING_SOON_COPY, comingSoonTitlePath } from '@/pages/ComingSoonPage/copy'
 import { REQUEST_COPY, REQUEST_STATUS_COPY } from '@/pages/ComingSoonPage/requestCopy'

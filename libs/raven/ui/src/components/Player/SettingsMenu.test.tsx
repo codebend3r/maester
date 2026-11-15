@@ -29,6 +29,7 @@ const selection: TrackSelection = {
   isDefaultAudio: true,
   subtitle: null,
   isWaitingForTracks: false,
+  shouldPlayPickedAudio: false,
   pickAudio: () => {},
   pickSubtitle: () => {},
 }

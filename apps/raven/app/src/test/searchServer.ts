@@ -1,5 +1,5 @@
 import {
-  APP_CALL_METHODS,
+  HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
   HOME_SHELF_TYPES,
@@ -101,7 +101,7 @@ export const searchApi = ({
     fetch: allowlistedFetch({
       fetch: async (url, init = {}) => {
         const path = url.slice(NAS.origin.length)
-        hear({ method: init.method ?? APP_CALL_METHODS.get, path, body: null })
+        hear({ method: init.method ?? HTTP_METHODS.get, path, body: null })
         await reads(path)
         return responseOf(answerFor(path))
       },

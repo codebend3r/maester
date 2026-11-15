@@ -1,11 +1,14 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { BezelState } from '@/components/Player/Bezel'
 
+/** Whether the viewer has stirred lately, and the way to say they just did. */
+export type Idle = { active: boolean; wake: () => void }
+
 /**
  * Whether the viewer has stirred lately: true on arrival and after any
  * `wake`, false once `ms` pass without one.
  */
-export const useIdle = (ms: number): { active: boolean; wake: () => void } => {
+export const useIdle = (ms: number): Idle => {
   const [active, setActive] = useState(true)
   const timer = useRef<number | null>(null)
   const clear = () => {
@@ -30,18 +33,23 @@ export const useIdle = (ms: number): { active: boolean; wake: () => void } => {
   }
 }
 
+/** The flash showing, whether it still shows, and the way to show another. */
+export type BezelFlash = {
+  bezel: BezelState | null
+  isFlashing: boolean
+  flash: (next: Omit<BezelState, 'id'>) => void
+}
+
 /** How long a flash shows: the length of the bezel's animation in `Bezel.module.scss`. */
 const BEZEL_MS = 700
+
+const FULLSCREEN_CHANGE = 'fullscreenchange'
 
 /**
  * The flash in the middle of the picture; each `flash` restarts it, even with the same words.
  * `isFlashing` holds while it shows, so nothing else is drawn in the middle under it.
  */
-export const useBezel = (): {
-  bezel: BezelState | null
-  isFlashing: boolean
-  flash: (next: Omit<BezelState, 'id'>) => void
-} => {
+export const useBezel = (): BezelFlash => {
   const [bezel, setBezel] = useState<BezelState | null>(null)
   const [isFlashing, setIsFlashing] = useState(false)
   const id = bezel?.id ?? null
@@ -60,24 +68,30 @@ export const useBezel = (): {
   }
 }
 
+/** Whether the player fills the screen, and the way in and out. */
+export type Fullscreen = { fullscreen: boolean; toggle: () => void }
+
 /**
  * Whether the player fills the screen, and the way in and out. The whole
  * page fills it rather than the stage, so the next video in line, which
  * brings a stage of its own, carries on full screen. `useLeaveFullscreen`
  * takes it back when the player goes.
  */
-export const useFullscreen = (): { fullscreen: boolean; toggle: () => void } => {
+export const useFullscreen = (): Fullscreen => {
   const [fullscreen, setFullscreen] = useState(() => !!document.fullscreenElement)
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onChange)
-    return () => document.removeEventListener('fullscreenchange', onChange)
+    document.addEventListener(FULLSCREEN_CHANGE, onChange)
+    return () => document.removeEventListener(FULLSCREEN_CHANGE, onChange)
   }, [])
   return {
     fullscreen,
     toggle: () => {
-      if (document.fullscreenElement) void document.exitFullscreen()
-      else void document.documentElement.requestFullscreen?.()
+      // The browser refuses full screen without a user's gesture; nothing is lost by it.
+      const change = document.fullscreenElement
+        ? document.exitFullscreen()
+        : document.documentElement.requestFullscreen?.()
+      change?.catch(() => undefined)
     },
   }
 }
@@ -90,7 +104,7 @@ export const useFullscreen = (): { fullscreen: boolean; toggle: () => void } => 
 export const useLeaveFullscreen = (): void =>
   useEffect(
     () => () => {
-      if (document.fullscreenElement) void document.exitFullscreen()
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => undefined)
     },
     [],
   )

@@ -1,4 +1,4 @@
-import { APP_CALL_METHODS, AUTH_API_PREFIX, AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
+import { HTTP_METHODS, AUTH_API_PREFIX, AUTH_HEADERS, AUTH_SCHEME } from '@raven/core'
 
 import { checkAppCall } from '@/servers/allowlist'
 import { type ServerCookies, cookieHeaderOf } from '@/servers/cookieJar'
@@ -26,7 +26,7 @@ type CookieHeadersForProps = {
 export const cookieHeadersFor =
   ({ server, cookies, accessToken = null }: CookieHeadersForProps) =>
   (url: string): Record<string, string> => {
-    checkAppCall({ method: APP_CALL_METHODS.get, url })
+    checkAppCall({ method: HTTP_METHODS.get, url })
     if (!isServerApi({ server, address: url })) return {}
     const cookie = cookieHeaderOf(cookies)
     return {
