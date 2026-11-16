@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/routes'
 /** What the touch header's buttons and the side menu are called aloud, and the field's button. */
 export const TOUCH_NAV_COPY = {
   home: HOME_NAV_COPY.home,
+  top: 'Back to the top',
   menu: 'Open menu',
   closeMenu: 'Close menu',
   sideMenu: 'Menu',

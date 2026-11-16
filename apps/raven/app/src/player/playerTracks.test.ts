@@ -4,12 +4,12 @@ import {
   type MediaTracks,
   PICTURE_SUBTITLES,
   PLAYBACK_MODES,
-  type PictureSubtitles,
   SUBTITLE_SOURCES,
   type SubtitleTrack,
 } from '@raven/core'
 
 import {
+  type PictureWays,
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
@@ -34,6 +34,14 @@ const subtitle = (track: Partial<SubtitleTrack> & Pick<SubtitleTrack, 'id'>): Su
 
 const ENGLISH = subtitle({ id: 'embedded-0' })
 const PICTURES = subtitle({ id: 'embedded-1', codec: SUBTITLE_CODECS.pgs, supported: false })
+/** The same track from a server that reads it into pictures raven can lay over the video. */
+const OVERLAID = { ...PICTURES, hasPictureCues: true } satisfies SubtitleTrack
+
+/** Each way a picture track can be shown, alone. */
+const NO_WAY = { canDraw: false, canOverlay: false, canBurn: false } as const
+const DRAWS = { ...NO_WAY, canDraw: true } as const
+const OVERLAYS = { ...NO_WAY, canOverlay: true } as const
+const BURNS = { ...NO_WAY, canBurn: true } as const
 const FRENCH = subtitle({ id: 'embedded-2', language: 'fr' })
 const SIDECAR = subtitle({
   id: 'external-0',
@@ -73,26 +81,41 @@ describe('the track pickers', () => {
   })
 
   it('offers subtitles off, then every text track, and no picture track where pictures are hidden', () => {
-    expect(
-      subtitleOptionsOf({ tracks: TRACKS, pictures: PICTURE_SUBTITLES.hidden }).map(
-        ({ key }) => key,
-      ),
-    ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
+    expect(subtitleOptionsOf({ tracks: TRACKS, ways: NO_WAY }).map(({ key }) => key)).toEqual([
+      SUBTITLE_CHOICES.off,
+      ENGLISH.id,
+      FRENCH.id,
+      SIDECAR.id,
+      UNTAGGED.id,
+    ])
   })
 
   it("adds the file's picture tracks, in the file's order, where the player draws them", () => {
-    expect(
-      subtitleOptionsOf({ tracks: TRACKS, pictures: PICTURE_SUBTITLES.drawn }).map(
-        ({ key }) => key,
-      ),
-    ).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, PICTURES.id, FRENCH.id, SIDECAR.id, UNTAGGED.id])
+    expect(subtitleOptionsOf({ tracks: TRACKS, ways: DRAWS }).map(({ key }) => key)).toEqual([
+      SUBTITLE_CHOICES.off,
+      ENGLISH.id,
+      PICTURES.id,
+      FRENCH.id,
+      SIDECAR.id,
+      UNTAGGED.id,
+    ])
+  })
+
+  it('offers a picture track raven can lay over the video only when the server reads it into pictures', () => {
+    const keysOf = (pictures: SubtitleTrack) =>
+      subtitleOptionsOf({
+        tracks: { ...TRACKS, subtitles: [ENGLISH, pictures] },
+        ways: OVERLAYS,
+      }).map(({ key }) => key)
+    expect(keysOf(OVERLAID)).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id, OVERLAID.id])
+    expect(keysOf(PICTURES)).toEqual([SUBTITLE_CHOICES.off, ENGLISH.id])
   })
 
   it('names a picture track by its language alone, however it is shown', () => {
-    const labelOf = (pictures: PictureSubtitles) =>
-      subtitleOptionsOf({ tracks: TRACKS, pictures }).find(({ key }) => key === PICTURES.id)?.label
-    expect(labelOf(PICTURE_SUBTITLES.drawn)).toBe('English')
-    expect(labelOf(PICTURE_SUBTITLES.burned)).toBe('English')
+    const labelOf = (ways: PictureWays) =>
+      subtitleOptionsOf({ tracks: TRACKS, ways }).find(({ key }) => key === PICTURES.id)?.label
+    expect(labelOf(DRAWS)).toBe('English')
+    expect(labelOf(BURNS)).toBe('English')
   })
 
   it('labels each subtitle by its language, adding SDH and nothing else', () => {
@@ -105,17 +128,31 @@ describe('the track pickers', () => {
         UNTAGGED,
       ],
     }
-    expect(
-      subtitleOptionsOf({ tracks, pictures: PICTURE_SUBTITLES.hidden }).map(({ label }) => label),
-    ).toEqual(['Off', 'English', 'French · SDH', 'English', 'Unknown language'])
+    expect(subtitleOptionsOf({ tracks, ways: NO_WAY }).map(({ label }) => label)).toEqual([
+      'Off',
+      'English',
+      'French · SDH',
+      'English',
+      'Unknown language',
+    ])
   })
 })
 
 describe('picturesFor', () => {
   it('draws where the player can, burns where a transcode can, and hides otherwise', () => {
-    expect(picturesFor({ canDraw: true, canBurn: true })).toBe(PICTURE_SUBTITLES.drawn)
-    expect(picturesFor({ canDraw: false, canBurn: true })).toBe(PICTURE_SUBTITLES.burned)
-    expect(picturesFor({ canDraw: false, canBurn: false })).toBe(PICTURE_SUBTITLES.hidden)
+    const track = PICTURES
+    expect(picturesFor({ track, ...BURNS, canDraw: true })).toBe(PICTURE_SUBTITLES.drawn)
+    expect(picturesFor({ track, ...BURNS })).toBe(PICTURE_SUBTITLES.burned)
+    expect(picturesFor({ track, ...NO_WAY })).toBe(PICTURE_SUBTITLES.hidden)
+  })
+
+  it('lays a track the server reads into pictures over the video, in place of a burn', () => {
+    const ways = { ...BURNS, canOverlay: true }
+    expect(picturesFor({ track: OVERLAID, ...ways })).toBe(PICTURE_SUBTITLES.drawn)
+    expect(picturesFor({ track: OVERLAID, ...OVERLAYS })).toBe(PICTURE_SUBTITLES.drawn)
+    // A picture track the server cannot read (VobSub, or an older server) is still burned in.
+    expect(picturesFor({ track: PICTURES, ...ways })).toBe(PICTURE_SUBTITLES.burned)
+    expect(picturesFor({ track: OVERLAID, ...BURNS })).toBe(PICTURE_SUBTITLES.burned)
   })
 })
 

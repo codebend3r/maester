@@ -11,6 +11,13 @@ export const playerQueryKeys = {
     trackId,
     window,
   ],
+  pictureSubtitles: ({ id, trackId, window }: PlayerQueryKeysSubtitlesProps) => [
+    'media',
+    id,
+    'pictureSubtitles',
+    trackId,
+    window,
+  ],
   /** How the server plays video, for every viewer. */
   playbackSettings: ['settings', 'playback'],
 }

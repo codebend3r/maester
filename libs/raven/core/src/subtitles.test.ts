@@ -4,9 +4,11 @@ import {
   activeCues,
   cueRuns,
   formatWebVtt,
+  isOverlaySubtitle,
   isPictureSubtitle,
   isShowableSubtitle,
   mergeCues,
+  mergePictureCues,
   parseWebVtt,
   subtitleWindowRange,
   subtitleWindows,
@@ -172,6 +174,34 @@ describe('formatWebVtt', () => {
   })
 })
 
+describe('mergePictureCues', () => {
+  const canvas = { width: 1920, height: 1080 }
+  type Times = { start: number; end: number }
+  const cue = ({ start, end }: Times) => ({ start, end, canvas, pictures: [] })
+
+  it("keeps the later window's copy of a cue both hold, in time order", () => {
+    // The first window cut the cue at 298 short at its own end; the next holds it whole.
+    const merged = mergePictureCues({
+      existing: [cue({ start: 1, end: 3 }), cue({ start: 298, end: 300 })],
+      incoming: [cue({ start: 298, end: 302 }), cue({ start: 310, end: 312 })],
+    })
+    expect(merged.map(({ start, end }) => [start, end])).toEqual([
+      [1, 3],
+      [298, 302],
+      [310, 312],
+    ])
+  })
+
+  it('shows a picture cue while it is up, as a text cue', () => {
+    expect(
+      activeCues({ cues: [cue({ start: 1, end: 3 }), cue({ start: 7, end: 9 })], time: 8 }),
+    ).toEqual([cue({ start: 7, end: 9 })])
+    expect(
+      activeCues({ cues: [cue({ start: 1, end: 3 }), cue({ start: 7, end: 9 })], time: 5 }),
+    ).toEqual([])
+  })
+})
+
 describe('isPictureSubtitle', () => {
   const track = (overrides: Partial<SubtitleTrack>): SubtitleTrack => ({
     id: 'embedded-0',
@@ -191,6 +221,14 @@ describe('isPictureSubtitle', () => {
     expect(isPictureSubtitle(track({ supported: true }))).toBe(false)
     expect(isPictureSubtitle(track({ source: SUBTITLE_SOURCES.external }))).toBe(false)
     expect(isPictureSubtitle(null)).toBe(false)
+  })
+
+  it('is laid over the video only when the server reads the track into pictures', () => {
+    expect(isOverlaySubtitle(track({ hasPictureCues: true }))).toBe(true)
+    expect(isOverlaySubtitle(track({}))).toBe(false)
+    expect(isOverlaySubtitle(track({ hasPictureCues: false }))).toBe(false)
+    expect(isOverlaySubtitle(track({ supported: true, hasPictureCues: true }))).toBe(false)
+    expect(isOverlaySubtitle(null)).toBe(false)
   })
 
   it('is showable when it is text, or a picture unless pictures are hidden', () => {

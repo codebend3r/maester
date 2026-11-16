@@ -10,6 +10,7 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
+import { SCROLL_EVERY_MS, ScrollHomeButton, useScrollHome } from '@/layouts/ScrollHome.touch'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard, isCaptionless, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
@@ -33,6 +34,7 @@ import {
   gridColumnsOf,
 } from '@/layouts/gridRows'
 import { useGrid } from '@/layouts/useGrid'
+import { useReduceMotion } from '@/stores/reduceMotion'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 
@@ -316,6 +318,9 @@ const Grid = ({
     />
   )
 
+  const home = useScrollHome()
+  const isReduced = useReduceMotion((motion) => motion.isReduced)
+
   return (
     <View style={styles.ground}>
       <FlatList
@@ -334,6 +339,8 @@ const Grid = ({
          */
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
+        onScroll={home.onScroll}
+        scrollEventThrottle={SCROLL_EVERY_MS}
         ListHeaderComponent={
           <View
             onLayout={({ nativeEvent }) => setTop(nativeEvent.layout.height)}
@@ -353,6 +360,10 @@ const Grid = ({
         }
         renderItem={renderRow}
         style={styles.ground}
+      />
+      <ScrollHomeButton
+        isAway={home.isAway}
+        onPress={() => list.current?.scrollToOffset({ offset: 0, animated: !isReduced })}
       />
       {jump !== null && (
         <View

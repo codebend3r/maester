@@ -51,4 +51,24 @@ describe('playerQueriesFor', () => {
     expect(client.getSubtitles).toHaveBeenCalledWith({ ...input, access })
     cache.clear()
   })
+
+  it('reads a picture track under its own key, with the ticket where the client hands one', async () => {
+    const access = {
+      origin: { url: 'https://raven.home.example' },
+      ticket: 'abc.def',
+    } as const satisfies TicketedOrigin
+    const client = { ...api, getPictureSubtitles: mock(async () => []) }
+    const queries = playerQueriesFor(client)
+    const cache = new QueryClient()
+    const input = { id: 7, trackId: 'embedded-2', window: 0 }
+    expect(queryKeys.pictureSubtitles(input)).toEqual(queries.pictureSubtitles(input).queryKey)
+    expect(queryKeys.pictureSubtitles(input)).not.toEqual(queryKeys.subtitles(input))
+    await cache.fetchQuery(queries.pictureSubtitles(input))
+    expect(client.getPictureSubtitles).toHaveBeenCalledWith({ ...input, access: null })
+    await cache.fetchQuery(
+      queries.pictureSubtitles({ ...input, window: 1, readAccess: async () => access }),
+    )
+    expect(client.getPictureSubtitles).toHaveBeenCalledWith({ ...input, window: 1, access })
+    cache.clear()
+  })
 })

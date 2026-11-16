@@ -8,6 +8,7 @@ import {
   type SubtitleTrack,
   type TrackLabel,
   audioLabel,
+  isOverlaySubtitle,
   isShowableSubtitle,
   languageName,
 } from '@raven/core'
@@ -40,33 +41,46 @@ const subtitleLabelOf = (track: SubtitleTrack): string => {
 const showable = (tracks: MediaTracks): SubtitleTrack[] =>
   tracks.subtitles.filter((track) => track.supported)
 
-type PicturesForProps = {
+/** The ways a picture track can be shown on this device now. */
+export type PictureWays = {
   /** Whether the player draws the file's picture tracks now: it can, and it plays the file as it is. */
   canDraw: boolean
+  /** Whether raven lays the server's timed pictures over the video itself, as it draws text. */
+  canOverlay: boolean
   /** Whether the plan holds a transcode, which burns a picture track into the picture. */
   canBurn: boolean
 }
 
-/** How the player shows a picture track now: drawing it beats burning it, which beats neither. */
-export const picturesFor = ({ canDraw, canBurn }: PicturesForProps): PictureSubtitles => {
-  if (canDraw) return PICTURE_SUBTITLES.drawn
+type PicturesForProps = PictureWays & { track: SubtitleTrack }
+
+/**
+ * How the player shows a picture track now: drawing it (the player from its file, or raven over
+ * the video when the server reads the track into pictures) beats burning it, which beats neither.
+ */
+export const picturesFor = ({
+  track,
+  canDraw,
+  canOverlay,
+  canBurn,
+}: PicturesForProps): PictureSubtitles => {
+  if (canDraw || (canOverlay && isOverlaySubtitle(track))) return PICTURE_SUBTITLES.drawn
   return canBurn ? PICTURE_SUBTITLES.burned : PICTURE_SUBTITLES.hidden
 }
 
 type SubtitleOptionsOfProps = {
   tracks: MediaTracks
-  /** How the player shows a picture track now. */
-  pictures: PictureSubtitles
+  /** The ways a picture track can be shown now. */
+  ways: PictureWays
 }
 
 /**
  * Subtitles off, then each track the player can show now, keyed by its id: the text tracks,
- * and the picture tracks too unless pictures are hidden, each by its language and SDH alone.
+ * and each picture track there is a way to show, each by its language and SDH alone.
  */
-export const subtitleOptionsOf = ({ tracks, pictures }: SubtitleOptionsOfProps): TrackOption[] => [
+export const subtitleOptionsOf = ({ tracks, ways }: SubtitleOptionsOfProps): TrackOption[] => [
   { key: SUBTITLE_CHOICES.off, label: PLAYER_TRACKS_COPY.off },
   ...tracks.subtitles
-    .filter((track) => isShowableSubtitle({ track, pictures }))
+    .filter((track) => isShowableSubtitle({ track, pictures: picturesFor({ track, ...ways }) }))
     .map((track) => ({ key: track.id, label: subtitleLabelOf(track) })),
 ]
 

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Icon } from '@raven/native'
 import { BUTTON_TONES } from '@raven/native/headless'
 
+import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { TouchFactChips } from '@/layouts/FactChips'
 import { RATING_PANEL_SIZES, RatingPanel } from '@/layouts/RatingPanel'
 import { Text } from '@/layouts/Text'
@@ -449,7 +450,7 @@ const ItemLayout = ({ page, actions, links, onOpen, onBack }: ItemLayoutProps) =
   return (
     <View style={styles.ground}>
       {page.hero.backdrop !== null && <Backdrop backdrop={page.hero.backdrop} />}
-      <ScrollView
+      <HomeScrollView
         contentContainerStyle={[styles.page, { paddingBottom: insets.bottom + SIZES.space5 }]}
         style={styles.scroll}
       >
@@ -474,7 +475,7 @@ const ItemLayout = ({ page, actions, links, onOpen, onBack }: ItemLayoutProps) =
           </View>
         )}
         {page.cast.length > 0 && <Cast cast={page.cast} title={page.castTitle} />}
-      </ScrollView>
+      </HomeScrollView>
     </View>
   )
 }

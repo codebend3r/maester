@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, extname } from 'node:path'
 import { promisify } from 'node:util'
+import { PGS_CLOCK, PGS_SEGMENTS } from '@/playback/pgs'
 
 const run = promisify(execFile)
 
@@ -107,18 +108,6 @@ export const addChapters = async ({ path, chapters }: AddChaptersProps): Promise
   await rm(metadata)
 }
 
-/** A PGS segment's type, as a Blu-ray's subtitle stream names it. */
-const PGS_SEGMENTS = {
-  palette: 0x14,
-  object: 0x15,
-  presentation: 0x16,
-  window: 0x17,
-  end: 0x80,
-} as const
-
-/** The 90 kHz clock PGS stamps its segments with. */
-const PGS_CLOCK = 90_000
-
 type PgsSegmentProps = { pts: number; type: number; data: readonly number[] }
 
 /** One segment: the "PG" magic, its time (and a decode time of 0), its type, size and data. */
@@ -146,15 +135,18 @@ const be16 = (value: number): number[] => [(value >> 8) & 0xff, value & 0xff]
 
 type PgsCue = { start: number; end: number }
 
-type WritePgsProps = { path: string; width: number; height: number; cues: readonly PgsCue[] }
+type PgsBytesProps = { width: number; height: number; cues: readonly PgsCue[] }
+
+/** The white box `pgsBytes` draws for each cue. */
+export const PGS_BOX = { width: 96, height: 16 } as const
 
 /**
  * A Blu-ray PGS subtitle stream (`.sup`) holding, for each cue, a white box at the foot of the
  * frame from its start, and a clear screen at its end: a real picture track, which ffmpeg can not
  * make from text, for the tests that need one.
  */
-const writePgs = async ({ path, width, height, cues }: WritePgsProps): Promise<void> => {
-  const box = { width: 96, height: 16 }
+export const pgsBytes = ({ width, height, cues }: PgsBytesProps): Uint8Array => {
+  const box = PGS_BOX
   const at = { x: (width - box.width) >> 1, y: height - box.height - 8 }
   // Each line: one run of the palette's white across the box, then the end of the line.
   const line = [0x00, 0xc0 | (box.width >> 8), box.width & 0xff, 0x01, 0x00, 0x00]
@@ -222,8 +214,14 @@ const writePgs = async ({ path, width, height, cues }: WritePgsProps): Promise<v
     ...show({ start, number: index * 2 }),
     ...clear({ end, number: index * 2 + 1 }),
   ])
-  await writeFile(path, Uint8Array.from(bytes))
+  return Uint8Array.from(bytes)
 }
+
+type WritePgsProps = PgsBytesProps & { path: string }
+
+/** `pgsBytes` as a file, for ffmpeg to mux into a clip. */
+const writePgs = ({ path, ...stream }: WritePgsProps): Promise<void> =>
+  writeFile(path, pgsBytes(stream))
 
 type EncodeRichClipProps = {
   path: string

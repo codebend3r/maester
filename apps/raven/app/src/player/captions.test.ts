@@ -89,6 +89,7 @@ describe('captionsFor where the player draws the subtitles', () => {
   it("picks a text track inside the file by its place among the file's own, pictures counted", () => {
     expect(shown({ ...PLAYER_DRAWS, mode: PLAYBACK_MODES.direct, subtitle: TEXT.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: { type: TRACK_TYPES.INDEX, value: 1 },
     })
   })
@@ -96,6 +97,7 @@ describe('captionsFor where the player draws the subtitles', () => {
   it('picks a sidecar by the title it was handed to the player under', () => {
     expect(shown({ ...PLAYER_DRAWS, mode: PLAYBACK_MODES.direct, subtitle: SIDECAR.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: { type: TRACK_TYPES.TITLE, value: SIDECAR.id },
     })
   })
@@ -103,6 +105,7 @@ describe('captionsFor where the player draws the subtitles', () => {
   it("picks a stream's rendition by its place among the text tracks", () => {
     expect(shown({ ...PLAYER_DRAWS, mode: PLAYBACK_MODES.remux, subtitle: SIDECAR.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: { type: TRACK_TYPES.INDEX, value: 1 },
     })
   })
@@ -110,10 +113,12 @@ describe('captionsFor where the player draws the subtitles', () => {
   it('hands a picture track to the player only while the file plays as it is', () => {
     expect(shown({ ...PLAYER_DRAWS, mode: PLAYBACK_MODES.direct, subtitle: PICTURES.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: { type: TRACK_TYPES.INDEX, value: 0 },
     })
     expect(shown({ ...PLAYER_DRAWS, mode: PLAYBACK_MODES.remux, subtitle: PICTURES.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: OFF,
     })
   })
@@ -132,14 +137,39 @@ describe('captionsFor where raven draws the subtitles', () => {
     modes.forEach((mode) => {
       expect(shown({ ...RAVEN_DRAWS, mode, subtitle: SIDECAR.id })).toEqual({
         cueTrack: SIDECAR,
+        pictureTrack: null,
         textTrack: OFF,
       })
     })
   })
 
-  it('draws no picture track, which AVPlayer cannot and raven has no text for', () => {
+  it("lays the server's pictures of a picture track over the video, in any mode", () => {
+    const overlaid = { ...PICTURES, hasPictureCues: true } satisfies SubtitleTrack
+    const tracks = { ...TRACKS, subtitles: [overlaid, TEXT, SIDECAR] }
+    const modes = [PLAYBACK_MODES.direct, PLAYBACK_MODES.remux, PLAYBACK_MODES.transcode]
+    modes.forEach((mode) => {
+      expect(shown({ ...RAVEN_DRAWS, tracks, mode, subtitle: overlaid.id })).toEqual({
+        cueTrack: null,
+        pictureTrack: overlaid,
+        textTrack: OFF,
+      })
+    })
+    // While the server burns a track in, the picture already holds it.
+    expect(
+      shown({
+        ...RAVEN_DRAWS,
+        tracks,
+        mode: PLAYBACK_MODES.transcode,
+        subtitle: overlaid.id,
+        isBurning: true,
+      }),
+    ).toEqual({ cueTrack: null, pictureTrack: null, textTrack: OFF })
+  })
+
+  it('draws no picture track the server cannot read into pictures', () => {
     expect(shown({ ...RAVEN_DRAWS, mode: PLAYBACK_MODES.direct, subtitle: PICTURES.id })).toEqual({
       cueTrack: null,
+      pictureTrack: null,
       textTrack: OFF,
     })
   })

@@ -43,6 +43,12 @@ export const isSubtitleTrack = object({
   hearingImpaired: isBoolean,
   /** Text tracks convert to WebVTT; image tracks (PGS, VobSub, DVB) cannot be shown. */
   supported: isBoolean,
+  /**
+   * A picture track the server reads into timed pictures (`PictureCue`s), which a player that
+   * draws its own subtitles lays over the video: Blu-ray PGS. Left out of every other track, and
+   * by an older server.
+   */
+  hasPictureCues: optional(isBoolean),
 })
 
 export type SubtitleTrack = Infer<typeof isSubtitleTrack>
@@ -135,6 +141,33 @@ export const isMediaStreams = object({
 })
 
 export type MediaStreams = Infer<typeof isMediaStreams>
+
+/** One picture of a picture cue, placed on the cue's canvas by its top left corner. */
+export const isCuePicture = object({
+  x: isNumber,
+  y: isNumber,
+  width: isNumber,
+  height: isNumber,
+  /** The picture as a PNG, base64 encoded. */
+  png: isString,
+})
+
+export type CuePicture = Infer<typeof isCuePicture>
+
+/**
+ * One subtitle of a picture track (Blu-ray PGS), timed against the file: the pictures the disc
+ * shows, each where the disc puts it on a canvas the size of the video's frame.
+ */
+export const isPictureCue = object({
+  start: isNumber,
+  end: isNumber,
+  canvas: object({ width: isNumber, height: isNumber }),
+  pictures: listOf(isCuePicture),
+})
+
+export type PictureCue = Infer<typeof isPictureCue>
+
+export const isPictureCues = listOf(isPictureCue)
 
 /**
  * One subtitle, timed against the file. `text` may hold `<i>`, `<b>` and `<u>`.

@@ -5,6 +5,7 @@ import {
   type ItemDetails,
   type MediaItem,
   type MediaTracks,
+  type PictureCue,
   type PlayNetwork,
   ROUTE_STATES,
   type RouteQuery,
@@ -46,6 +47,8 @@ const PLAY_NETWORK_KEY = 'playNetwork'
 
 const NO_CHAPTERS: readonly Chapter[] = []
 
+const NO_PICTURES: readonly PictureCue[] = []
+
 type ReadyPlayerProps = Omit<PlayingProps, 'way' | 'summary'>
 
 type WaitingProps = {
@@ -60,6 +63,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     audio={null}
     caption={null}
     captionStyle={DEFAULT_CAPTION_STYLE}
+    pictures={NO_PICTURES}
     notice={notice}
     onBack={onBack}
     heading={NO_HEADING}

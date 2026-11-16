@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { Logo } from '@/layouts/Logo'
 import { Text } from '@/layouts/Text'
 import { TouchNav } from '@/layouts/TouchNav'
@@ -45,7 +46,7 @@ export const TouchShelfPage = ({
   const insets = useSafeAreaInsets()
   const styles = useStyles()
   return (
-    <ScrollView
+    <HomeScrollView
       contentContainerStyle={[
         styles.shelves,
         {
@@ -71,7 +72,7 @@ export const TouchShelfPage = ({
       </View>
       {notice !== null && <TouchNotice>{notice}</TouchNotice>}
       {children}
-    </ScrollView>
+    </HomeScrollView>
   )
 }
 

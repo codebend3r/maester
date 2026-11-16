@@ -3,8 +3,10 @@ import {
   DEFAULT_PLAYBACK_SETTINGS,
   ITEM_IMAGE_KINDS,
   ITEM_TYPES,
+  PICTURE_SUBTITLES,
   PLAYBACK_MODES,
   type MediaItem,
+  type SubtitleTrack,
   type ViewingSession,
   activeCues,
   asksServerForNext,
@@ -23,6 +25,7 @@ import {
   initialVideoState,
   useCaptionStyle,
   useProgressReport,
+  usePictureCues,
   useTrackCues,
   usePlayerPrefs,
   videoReducer,
@@ -58,6 +61,7 @@ import {
   isAudioDropped,
 } from '@/player/droppedAudio'
 import {
+  type PictureWays,
   SUBTITLE_CHOICES,
   audioOptionsOf,
   audioPlaceFor,
@@ -146,6 +150,16 @@ const StayAwake = () => {
   useKeepAwake()
   return null
 }
+
+type BurnForProps = { track: SubtitleTrack | null; ways: PictureWays }
+
+/** The track to burn in for `track` to show under `ways`, or null when it shows without a burn. */
+const burnFor = ({ track, ways }: BurnForProps): string | null =>
+  track !== null &&
+  isPictureSubtitle(track) &&
+  picturesFor({ track, ...ways }) === PICTURE_SUBTITLES.burned
+    ? track.id
+    : null
 
 export type PlayingProps = {
   media: MediaItem
@@ -290,6 +304,17 @@ export const Playing = ({
     duration,
   })
   const showing = activeCues({ cues, time: video.time })
+  const pictureCues = usePictureCues({
+    video: {
+      api: session.api,
+      mediaId: media.id,
+      readAccess: () => sources.subtitleAccess(media.id),
+    },
+    track: captions.pictureTrack,
+    time: video.time,
+    duration,
+  })
+  const pictures = activeCues({ cues: pictureCues, time: video.time })
   const startAt = ladder?.at ?? resumeAt
   const attempt = ladder?.attempt ?? null
   const isStarted = !IS_SEEKING_TO_RESUME || isStartedOf({ state: startState, attempt })
@@ -381,16 +406,21 @@ export const Playing = ({
   }
 
   /*
-   * The player draws a picture track itself only from the file it plays; anywhere else the
-   * server burns it into a transcode.
+   * The player draws a picture track itself only from the file it plays, and raven lays over
+   * the video only the tracks the server reads into pictures; any other the server burns into
+   * a transcode.
    */
-  const canDrawPictures = canDrawPictureSubtitles && mode === PLAYBACK_MODES.direct
+  const pictureWays: PictureWays = {
+    canDraw: canDrawPictureSubtitles && mode === PLAYBACK_MODES.direct,
+    canOverlay: shouldDrawCaptions,
+    canBurn: ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false,
+  }
   const pickSubtitle = (key: string) => {
     const id = key === SUBTITLE_CHOICES.off ? null : key
     const track = tracks?.subtitles.find((each) => each.id === id) ?? null
     setSubtitles({ on: id !== null, language: track?.language ?? subtitlePrefs.language })
     setSubtitle(id)
-    const burn = track !== null && isPictureSubtitle(track) && !canDrawPictures ? track.id : null
+    const burn = burnFor({ track, ways: pictureWays })
     if (burn !== burning) {
       dispatch({ type: SESSION_EVENTS.burnPicked, burn, at: position.current })
     }
@@ -398,7 +428,7 @@ export const Playing = ({
 
   /*
    * Direct play plays the file itself, whatever the plan started with. A size moves the play to
-   * the transcode, where only a burn shows a picture track ExoPlayer drew.
+   * the transcode, where only a burn shows a picture track ExoPlayer drew from the file.
    */
   const pickQuality = (key: string) => {
     const quality = pickedQualityOf(key)
@@ -407,22 +437,13 @@ export const Playing = ({
       return
     }
     const track = tracks?.subtitles.find((each) => each.id === subtitle) ?? null
-    const burn = burning ?? (track !== null && isPictureSubtitle(track) ? track.id : null)
+    const burn = burning ?? burnFor({ track, ways: { ...pictureWays, canDraw: false } })
     dispatch({ type: SESSION_EVENTS.qualityPicked, quality, burn, at: position.current })
   }
   const qualityOptions =
     ladder === null ? [] : qualityOptionsOf({ media, modes: ladder.modes, maxHeight })
 
-  const subtitleOptions =
-    tracks === null
-      ? []
-      : subtitleOptionsOf({
-          tracks,
-          pictures: picturesFor({
-            canDraw: canDrawPictures,
-            canBurn: ladder?.modes.includes(PLAYBACK_MODES.transcode) ?? false,
-          }),
-        })
+  const subtitleOptions = tracks === null ? [] : subtitleOptionsOf({ tracks, ways: pictureWays })
   const audioValue = audioPlaying === null ? '' : String(audioPlaying)
   const audioTrack: VideoSurface['selectedAudioTrack'] =
     audioPlace === null ? undefined : { type: SelectedTrackType.INDEX, value: audioPlace }
@@ -495,6 +516,7 @@ export const Playing = ({
         artwork={artwork}
         caption={showing.length === 0 ? null : showing.map((cue) => cue.text).join('\n')}
         captionStyle={captionStyle}
+        pictures={pictures}
         audio={
           tracks === null || tracks.audio.length < 2 || ladder === null
             ? null

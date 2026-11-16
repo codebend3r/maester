@@ -7,6 +7,7 @@ import Video from 'react-native-video'
 
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { CaptionText } from '@/layouts/PlayerCaption'
+import { PictureCaptions } from '@/layouts/PlayerPictureCaption'
 import { HoldMark, SkipMark, TapAreaFlash } from '@/layouts/PlayerMark.touch'
 import { PLAYER_COPY, type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
 import { Text } from '@/layouts/Text'
@@ -41,6 +42,7 @@ const PlayerChrome = ({
   isOpening,
   caption,
   captionStyle,
+  pictures,
   transport,
   audio,
   subtitles,
@@ -97,6 +99,7 @@ const PlayerChrome = ({
           volume={volume}
         />
       )}
+      <PictureCaptions cues={pictures} />
       <Pressable
         {...gestures.surfaceProps}
         accessibilityLabel={isVisible ? PLAYER_COPY.hideControls : PLAYER_COPY.showControls}
