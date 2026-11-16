@@ -8,4 +8,4 @@ import { SPLASH_COPY } from '@/copy'
 import { CATALOGS } from '@/releases'
 import { showVersions } from '@/versionList'
 
-await showVersions({ catalog: CATALOGS.desktop, emptyText: SPLASH_COPY.versionsFailed })
+await showVersions({ catalogs: [CATALOGS.desktop], emptyText: SPLASH_COPY.versionsFailed })

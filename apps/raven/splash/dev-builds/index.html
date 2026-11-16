@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#15201e" />
     <meta
       name="description"
-      content="Builds of raven's device app for testing: the Android TV APK of every release, and TestFlight for Apple TV, iPhone and iPad."
+      content="Every release of raven with the files that install it: Raven for Mac and Windows, and the device app for Android TV."
     />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -40,40 +40,40 @@
         <div class="pitch">
           <h1>Dev builds</h1>
           <p>
-            The device app as each release built it, newest first, for testing on a TV of your own.
-            Every build signs in at raven, so you need an approved account.
+            Every release of raven, newest first, with the files that install it: Raven for Mac and
+            Windows, and the device app for Android TV. Every build signs in at raven, so you need
+            an approved account.
           </p>
         </div>
+        <ul class="install-notes" aria-label="How to install">
+          <li class="install-note">
+            <h2>
+              <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv-minimal" /></svg>
+              <span>Android TV</span>
+            </h2>
+            <ol>
+              <li>Install Downloader from the Play Store on the TV.</li>
+              <li>In the TV's settings, allow Downloader to install unknown apps.</li>
+              <li>
+                In Downloader, open <strong>maester.netlify.app/tv</strong> and pick the newest APK.
+              </li>
+            </ol>
+            <p>A newer APK installs over the one you have and keeps your sign-in.</p>
+          </li>
+          <li class="install-note">
+            <h2>
+              <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv" /></svg>
+              <span>Apple TV, iPhone and iPad</span>
+            </h2>
+            <p>
+              Apple devices take test builds through TestFlight, not as a file. The invitation will
+              be posted here once raven's TestFlight is open.
+            </p>
+          </li>
+        </ul>
         <p class="fine versions-status" id="versions-status">Asking GitHub for the list.</p>
         <ul class="version-list" id="versions"></ul>
       </section>
-
-      <ul class="install-notes" aria-label="How to install">
-        <li class="install-note">
-          <h2>
-            <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv-minimal" /></svg>
-            <span>Android TV</span>
-          </h2>
-          <ol>
-            <li>Install Downloader from the Play Store on the TV.</li>
-            <li>In the TV's settings, allow Downloader to install unknown apps.</li>
-            <li>
-              In Downloader, open <strong>maester.netlify.app/tv</strong> and pick the newest APK.
-            </li>
-          </ol>
-          <p>A newer APK installs over the one you have and keeps your sign-in.</p>
-        </li>
-        <li class="install-note">
-          <h2>
-            <svg class="icon" aria-hidden="true"><use href="/brand/icons.svg#tv" /></svg>
-            <span>Apple TV, iPhone and iPad</span>
-          </h2>
-          <p>
-            Apple devices take test builds through TestFlight, not as a file. The invitation will be
-            posted here once raven's TestFlight is open.
-          </p>
-        </li>
-      </ul>
     </main>
 
     <footer class="colophon">

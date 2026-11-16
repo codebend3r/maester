@@ -36,7 +36,7 @@ const showLatestRelease = async (): Promise<void> => {
   const note = document.getElementById(IDS.note)
   const title = document.getElementById(IDS.title)
   if (menu === null || note === null || title === null) return
-  const [latest] = await fetchReleases({ catalog: CATALOGS.desktop })
+  const [latest] = await fetchReleases({ catalogs: [CATALOGS.desktop], limit: 1 })
   if (latest === undefined) return
   const offer = downloadMenu({
     release: latest,
