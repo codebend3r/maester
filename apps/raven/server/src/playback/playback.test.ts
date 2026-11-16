@@ -13,7 +13,7 @@ import { MediaIndex } from '@/media/mediaIndex'
 import { SubtitlesService } from '@/playback/subtitlesService'
 import { ScannerService } from '@/scanner/scannerService'
 import { BROWSER_ENCODINGS, adminCookie, testConfig } from '@/test/app'
-import { encodeRichClip } from '@/test/clips'
+import { PGS_BOX, encodeRichClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
 const run = promisify(execFile)
@@ -200,6 +200,39 @@ describe('playback', () => {
     expect(await api().getSubtitles({ id: movieId(), trackId: 'embedded-0', window: 1 })).toEqual(
       [],
     )
+  })
+
+  it("serves a picture track's window as timed pictures on the file clock", async () => {
+    const response = await app().inject({
+      method: 'GET',
+      url: `/api/media/${picturesId()}/subtitles/embedded-0?window=0`,
+    })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers[HEADERS.contentType]).toContain(CONTENT_TYPES.json)
+    const read = () =>
+      api().getPictureSubtitles({ id: picturesId(), trackId: 'embedded-0', window: 0 })
+    const cues = await read()
+    /*
+     * The two boxes `encodeRichClip` writes, on a canvas the size of the clip's frame. ffmpeg
+     * muxes the picture track from its first cue, so the clip holds each a second early.
+     */
+    expect(
+      cues.map(({ start, end, canvas, pictures }) => ({
+        start: ms(start - state.lead),
+        end: ms(end - state.lead),
+        canvas,
+        sizes: pictures.map(({ width, height }) => ({ width, height })),
+      })),
+    ).toEqual([
+      { start: 0, end: 2, canvas: { width: 320, height: 240 }, sizes: [PGS_BOX] },
+      { start: 6, end: 8, canvas: { width: 320, height: 240 }, sizes: [PGS_BOX] },
+    ])
+    // The second ask is answered from the cache, the same cues.
+    expect(await read()).toEqual(cues)
+    // Past the end of a 12 second clip: empty, not an error.
+    expect(
+      await api().getPictureSubtitles({ id: picturesId(), trackId: 'embedded-0', window: 1 }),
+    ).toEqual([])
   })
 
   it('converts a sidecar, falling back from UTF-8', async () => {

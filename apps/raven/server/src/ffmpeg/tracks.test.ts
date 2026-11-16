@@ -74,6 +74,7 @@ describe('parseTracks', () => {
         forced: false,
         hearingImpaired: true,
         supported: false,
+        hasPictureCues: true,
       },
     ])
   })

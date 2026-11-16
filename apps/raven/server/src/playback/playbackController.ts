@@ -43,7 +43,7 @@ import { MediaPlane } from '@/media/mediaPlaneMark'
 import { MEDIA_ROUTES } from '@/media/mediaRoutes'
 import { MediaTickets } from '@/media/mediaTickets'
 import { ConversionRequests } from '@/playback/conversionRequests'
-import { SubtitlesService } from '@/playback/subtitlesService'
+import { CUE_KINDS, SubtitlesService } from '@/playback/subtitlesService'
 import { TracksService } from '@/playback/tracksService'
 import { StreamSessions } from '@/streams/streamSessions'
 import { RESPONSE_EVENTS, trackStream } from '@/streams/trackStream'
@@ -133,7 +133,10 @@ export class PlaybackController {
     return parseStreams(await this.ffmpeg.probeJson(this.index.requireFile(id).path))
   }
 
-  /** WebVTT for one track; `window` picks the stretch of an embedded one. */
+  /**
+   * One track's cues: WebVTT for text, and for a picture track the server can read (Blu-ray PGS)
+   * its timed pictures as JSON. `window` picks the stretch of an embedded one.
+   */
   @MediaPlane()
   @Get(':id/subtitles/:trackId')
   async subtitle(
@@ -145,15 +148,16 @@ export class PlaybackController {
     const asked = queryText({ value: window, name: QUERY_PARAMS.window })
     const part = asked == null ? 0 : wholeNumber(asked)
     if (part == null) throw new BadRequestException('window must be a whole number')
-    const vtt = await this.subtitles.vtt({
+    const cues = await this.subtitles.cues({
       file: this.index.requireFile(id),
       trackId,
       window: part,
     })
+    const isText = cues.kind === CUE_KINDS.text
     await reply
-      .header(HEADERS.contentType, CONTENT_TYPES.vtt)
+      .header(HEADERS.contentType, isText ? CONTENT_TYPES.vtt : CONTENT_TYPES.json)
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateFiveMinutes)
-      .send(vtt)
+      .send(isText ? cues.vtt : JSON.stringify(cues.cues))
   }
 
   /**

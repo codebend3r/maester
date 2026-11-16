@@ -5,6 +5,7 @@ import {
   type FactPart,
   type Marker,
   PLAYBACK_MODES,
+  type PictureCue,
   type PlaybackMode,
   formatDuration,
 } from '@raven/core'
@@ -83,6 +84,8 @@ export type PlayerChromeProps = {
   caption: string | null
   /** How the account's subtitles look: the size and colour raven draws the cues in, where it draws them. */
   captionStyle: CaptionStyle
+  /** The picture subtitle cues showing now (Blu-ray PGS), laid over the video where the disc puts them. */
+  pictures: readonly PictureCue[]
   /** Null while there is nothing to drive: as the source is asked for, or once nothing plays. */
   transport: Transport | null
   audio: TrackPicker | null

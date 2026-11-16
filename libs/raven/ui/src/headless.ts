@@ -43,6 +43,7 @@ export { configureStorage } from '@/stores/configureStorage'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
+export { usePictureCues } from '@/lib/usePictureCues'
 export { useClock } from '@/lib/useClock'
 export {
   CAPTION_COLOUR_NAMES,

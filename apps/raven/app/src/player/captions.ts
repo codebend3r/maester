@@ -4,6 +4,7 @@ import {
   type PlaybackMode,
   SUBTITLE_SOURCES,
   type SubtitleTrack,
+  isOverlaySubtitle,
 } from '@raven/core'
 import type { SidecarSource } from '@raven/native/headless'
 import { SelectedTrackType, TextTrackType } from 'react-native-video'
@@ -17,9 +18,13 @@ type SidecarTracks = NonNullable<NonNullable<VideoSurface['source']>['textTracks
 
 const NO_TEXT_TRACK = { type: SelectedTrackType.DISABLED } as const satisfies TextTrackPick
 
-/** The subtitles as they are shown: the track raven draws the cues of, and the one the player draws itself. */
+/**
+ * The subtitles as they are shown: the text track raven draws the cues of, the picture track it
+ * lays the server's pictures of over the video, and the track the player draws itself.
+ */
 export type Captions = {
   cueTrack: SubtitleTrack | null
+  pictureTrack: SubtitleTrack | null
   textTrack: TextTrackPick
 }
 
@@ -54,7 +59,8 @@ type CaptionsForProps = {
  * `cueTrack`, and the player's own track is never picked, so it never draws a second. Elsewhere
  * the player draws them itself on its own clock, as Plex's does (`textTrack`): the file's track
  * or its sidecar while the file plays as it is, the stream's rendition otherwise. A picture
- * track is only ever the player's, from the file, since there is no text in it to draw.
+ * track has no text to draw: it is the player's from the file where the player draws pictures,
+ * and where raven draws, the server's timed pictures of it (`pictureTrack`), in every mode.
  */
 export const captionsFor = ({
   mode,
@@ -64,21 +70,24 @@ export const captionsFor = ({
   shouldDrawCaptions,
   canDrawPictureSubtitles,
 }: CaptionsForProps): Captions => {
-  const nothing: Captions = { cueTrack: null, textTrack: NO_TEXT_TRACK }
+  const nothing: Captions = { cueTrack: null, pictureTrack: null, textTrack: NO_TEXT_TRACK }
   const picked = tracks?.subtitles.find((track) => track.id === subtitle) ?? null
   if (isBurning || picked === null || tracks === null || mode === null) return nothing
   const isDirect = mode === PLAYBACK_MODES.direct
-  // A track with no text in it: a picture inside the file is the player's alone to draw.
+  // A track with no text in it: the player's to draw from its file, else raven's from the server's pictures.
   if (!picked.supported) {
     const canDraw =
       isDirect && canDrawPictureSubtitles && picked.source === SUBTITLE_SOURCES.embedded
-    return canDraw ? { cueTrack: null, textTrack: directTrackOf({ tracks, picked }) } : nothing
+    if (canDraw) return { ...nothing, textTrack: directTrackOf({ tracks, picked }) }
+    return shouldDrawCaptions && isOverlaySubtitle(picked)
+      ? { ...nothing, pictureTrack: picked }
+      : nothing
   }
-  if (shouldDrawCaptions) return { cueTrack: picked, textTrack: NO_TEXT_TRACK }
-  if (isDirect) return { cueTrack: null, textTrack: directTrackOf({ tracks, picked }) }
+  if (shouldDrawCaptions) return { ...nothing, cueTrack: picked }
+  if (isDirect) return { ...nothing, textTrack: directTrackOf({ tracks, picked }) }
   const place = subtitlePlaceFor({ mode, tracks, subtitle: picked.id })
   return {
-    cueTrack: null,
+    ...nothing,
     textTrack: place === null ? NO_TEXT_TRACK : { type: SelectedTrackType.INDEX, value: place },
   }
 }

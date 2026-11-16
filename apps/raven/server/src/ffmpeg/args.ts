@@ -550,13 +550,29 @@ type SubtitleWindowArgsProps = {
  * went on to the end of a 74 GB file, 160 seconds for one minute of cues,
  * where `-to` takes under two.
  */
-export const subtitleWindowArgs = ({
+export const subtitleWindowArgs = (props: SubtitleWindowArgsProps): string[] =>
+  windowArgs({ ...props, format: ['-f', 'webvtt'] })
+
+/**
+ * One window of an embedded picture track (Blu-ray PGS) as the disc's own segments, copied, read
+ * as `subtitleWindowArgs` reads text: the server draws the pictures from them itself.
+ */
+export const pictureWindowArgs = (props: SubtitleWindowArgsProps): string[] =>
+  windowArgs({ ...props, format: ['-c:s', 'copy', '-f', 'sup'] })
+
+type WindowArgsProps = SubtitleWindowArgsProps & {
+  /** How the track is written out: the codec, when it is not the format's own, and the format. */
+  format: readonly string[]
+}
+
+const windowArgs = ({
   input,
   stream,
   start,
   duration,
   output,
-}: SubtitleWindowArgsProps): string[] => [
+  format,
+}: WindowArgsProps): string[] => [
   ...QUIET,
   '-y',
   ...(start > 0 ? ['-ss', String(start)] : []),
@@ -568,8 +584,7 @@ export const subtitleWindowArgs = ({
   `0:s:${stream}`,
   '-to',
   String(start + duration),
-  '-f',
-  'webvtt',
+  ...format,
   output,
 ]
 

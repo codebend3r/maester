@@ -72,6 +72,18 @@ export const playerQueriesFor = (api: ApiClient) => ({
       gcTime: 30 * 60 * 1000,
       retry: 1,
     }),
+  /** A picture track's cues, kept a shorter while than text: each holds its pictures. */
+  pictureSubtitles: (input: PlayerQueriesForSubtitlesProps) =>
+    queryOptions({
+      queryKey: queryKeys.pictureSubtitles(input),
+      queryFn: async () => {
+        const { readAccess, ...asked } = input
+        return api.getPictureSubtitles({ ...asked, access: (await readAccess?.()) ?? null })
+      },
+      staleTime: Infinity,
+      gcTime: 5 * 60 * 1000,
+      retry: 1,
+    }),
   playbackSettings: queryOptions({
     queryKey: queryKeys.playbackSettings,
     queryFn: () => api.getPlaybackSettings(),

@@ -1,7 +1,8 @@
 import { type ComponentRef, useRef } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
+import { Pressable, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { TouchNav } from '@/layouts/TouchNav'
@@ -30,7 +31,7 @@ const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
   const insets = useSafeAreaInsets()
   const styles = useStyles()
   return (
-    <ScrollView
+    <HomeScrollView
       contentContainerStyle={[
         styles.page,
         {
@@ -47,7 +48,7 @@ const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
         {title}
       </Text>
       {children}
-    </ScrollView>
+    </HomeScrollView>
   )
 }
 

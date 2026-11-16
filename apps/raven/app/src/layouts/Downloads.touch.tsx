@@ -1,8 +1,9 @@
 import { Icon } from '@raven/native'
 import { type ComponentType, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import { FinishedGroupView, UnderwayEntry, underwayHeightOf } from '@/layouts/DownloadRows.touch'
 import type {
@@ -123,7 +124,7 @@ const DownloadsLayout = ({
   const FinishedView = FINISHED_VIEWS[grouping]
   const { Picker } = touchPicker
   return (
-    <ScrollView
+    <HomeScrollView
       scrollEnabled={!isDragging}
       contentContainerStyle={[
         styles.page,
@@ -203,7 +204,7 @@ const DownloadsLayout = ({
           <Text style={styles.deleteAllLabel}>{DOWNLOAD_COPY.deleteAll}</Text>
         </Pressable>
       )}
-    </ScrollView>
+    </HomeScrollView>
   )
 }
 

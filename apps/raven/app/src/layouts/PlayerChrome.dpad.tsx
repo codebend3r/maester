@@ -22,6 +22,7 @@ import {
 import { useFocusOnMount } from '@/layouts/focus'
 import { FocusBand } from '@/layouts/FocusBand'
 import { CaptionText } from '@/layouts/PlayerCaption'
+import { PictureCaptions } from '@/layouts/PlayerPictureCaption'
 import { OpeningMark, PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
 import { UpNextCard, useUpNextOffer } from '@/layouts/PlayerUpNext.dpad'
@@ -324,6 +325,7 @@ const DpadPlayer = ({
   isOpening,
   caption,
   captionStyle,
+  pictures,
   transport,
   audio,
   subtitles,
@@ -429,6 +431,7 @@ const DpadPlayer = ({
           })}
         />
       )}
+      <PictureCaptions cues={pictures} />
       {isOpening && (
         <View pointerEvents="none" style={StyleSheet.absoluteFill}>
           <OpeningMark />

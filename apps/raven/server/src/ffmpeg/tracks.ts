@@ -48,6 +48,9 @@ const TEXT_SUBTITLES: ReadonlySet<string> = new Set([
 
 const isTextSubtitle = (codec: string | null): boolean => codec != null && TEXT_SUBTITLES.has(codec)
 
+/** The picture subtitle format the server reads into timed pictures itself: a Blu-ray's PGS. */
+const PICTURE_CUE_CODEC = 'hdmv_pgs_subtitle'
+
 type FlagProps = { stream: Stream; name: string }
 
 const flag = ({ stream, name }: FlagProps): boolean =>
@@ -96,6 +99,7 @@ export const parseTracks = (output: unknown): FileTracks => {
     forced: flag({ stream, name: 'forced' }),
     hearingImpaired: flag({ stream, name: 'hearing_impaired' }),
     supported: isTextSubtitle(codecOf(stream)),
+    ...(codecOf(stream) === PICTURE_CUE_CODEC ? { hasPictureCues: true } : {}),
   }))
   const video = ofType(CODEC_TYPES.video).find((stream) => !flag({ stream, name: 'attached_pic' }))
   const defaultAudio = audio.find((track) => track.default)?.index ?? audio[0]?.index ?? null

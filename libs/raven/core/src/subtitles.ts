@@ -1,4 +1,4 @@
-import { SUBTITLE_SOURCES, type SubtitleCue, type SubtitleTrack } from '@/contract'
+import { type PictureCue, SUBTITLE_SOURCES, type SubtitleCue, type SubtitleTrack } from '@/contract'
 
 /**
  * A picture of text inside the file (Blu-ray PGS, VobSub, DVD): no text for a player to draw, so
@@ -6,6 +6,14 @@ import { SUBTITLE_SOURCES, type SubtitleCue, type SubtitleTrack } from '@/contra
  */
 export const isPictureSubtitle = (track: SubtitleTrack | null): track is SubtitleTrack =>
   track !== null && !track.supported && track.source === SUBTITLE_SOURCES.embedded
+
+/**
+ * A picture track the server reads into timed pictures (`PictureCue`s), which a player that draws
+ * its own subtitles lays over the video as it does text. Any other picture track is still only
+ * the file's own player's to draw, or a transcode's to burn in.
+ */
+export const isOverlaySubtitle = (track: SubtitleTrack | null): track is SubtitleTrack =>
+  isPictureSubtitle(track) && !!track.hasPictureCues
 
 /**
  * How a player shows a picture track now: not at all, drawn by the player from the file it plays,
@@ -133,6 +141,11 @@ export const formatWebVtt = ({ cues, timestampMap }: FormatWebVttProps): string 
   return `${[header.join('\n'), ...blocks].join('\n\n')}\n\n`
 }
 
+/** What every cue has, text or picture: when it shows and when it goes. */
+type TimedCue = Pick<SubtitleCue, 'start' | 'end'>
+
+const inTimeOrder = (a: TimedCue, b: TimedCue): number => a.start - b.start || a.end - b.end
+
 const cueKey = (cue: SubtitleCue): string => `${cue.start}|${cue.end}|${cue.text}`
 
 type MergeCuesProps = {
@@ -144,18 +157,31 @@ type MergeCuesProps = {
 export const mergeCues = ({ existing, incoming }: MergeCuesProps): SubtitleCue[] => {
   const seen = new Set(existing.map(cueKey))
   const fresh = incoming.filter((cue) => !seen.has(cueKey(cue)))
-  return fresh.length === 0
-    ? [...existing]
-    : [...existing, ...fresh].toSorted((a, b) => a.start - b.start || a.end - b.end)
+  return fresh.length === 0 ? [...existing] : [...existing, ...fresh].toSorted(inTimeOrder)
 }
 
-type ActiveCuesProps = {
-  cues: readonly SubtitleCue[]
+type MergePictureCuesProps = {
+  existing: readonly PictureCue[]
+  incoming: readonly PictureCue[]
+}
+
+/**
+ * `mergeCues` for a picture track's windows. A picture track shows one cue at a time, so its
+ * start alone names it, and the later window's copy wins: a cue still up at its window's end is
+ * cut short there, and comes whole in the next window, which starts early.
+ */
+export const mergePictureCues = ({ existing, incoming }: MergePictureCuesProps): PictureCue[] => {
+  const starts = new Set(incoming.map((cue) => cue.start))
+  return [...existing.filter((cue) => !starts.has(cue.start)), ...incoming].toSorted(inTimeOrder)
+}
+
+type ActiveCuesProps<Cue extends TimedCue> = {
+  cues: readonly Cue[]
   time: number
 }
 
 /** Every cue showing at `time`, oldest first, as a viewer reads them top to bottom. */
-export const activeCues = ({ cues, time }: ActiveCuesProps): SubtitleCue[] =>
+export const activeCues = <Cue extends TimedCue>({ cues, time }: ActiveCuesProps<Cue>): Cue[] =>
   cues.filter((cue) => cue.start <= time && time < cue.end)
 
 /** A stretch of cue text with one style. Line breaks stay in `text` as `\n`. */

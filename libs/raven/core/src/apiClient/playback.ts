@@ -11,10 +11,12 @@ import {
   type LiveStream,
   MEDIA_PROBE_BYTES,
   PING_BYTES_PARAM,
+  isPictureCues,
   type MediaOrigin,
   type MediaStreams,
   type MediaTicket,
   type MediaTracks,
+  type PictureCue,
   type StreamMode,
   type StreamQuality,
   type SubtitleCue,
@@ -87,7 +89,7 @@ type StreamUrlProps = {
 }
 
 /** What a player loads: the file, its tracks and streams, the origins and tickets that open them, and the admin's view of who is streaming. */
-export const playbackCalls = ({ url, mediaUrl, sendForText, ask, tell }: Transport) => ({
+export const playbackCalls = ({ url, mediaUrl, sendForText, askMedia, ask, tell }: Transport) => ({
   /** The original file, served with byte ranges: what a player loads for direct play. */
   fileUrl: ({ id, access = null }: FileUrlProps): string =>
     mediaUrl({ path: pathFor({ path: ROUTES.file.path, params: { id } }), query: {}, access }),
@@ -172,6 +174,25 @@ export const playbackCalls = ({ url, mediaUrl, sendForText, ask, tell }: Transpo
         }),
       ),
     ),
+
+  /**
+   * One window of a picture track's cues (see `isOverlaySubtitle`), from the route its text
+   * would come from: the server answers a picture track with its pictures.
+   */
+  getPictureSubtitles: ({
+    id,
+    trackId,
+    window = 0,
+    access = null,
+  }: GetSubtitlesProps): Promise<PictureCue[]> =>
+    askMedia({
+      href: mediaUrl({
+        path: subtitlesPathOf({ id, trackId }),
+        query: { window: String(window) },
+        access,
+      }),
+      guard: isPictureCues,
+    }),
 
   /**
    * Where a sidecar subtitle file is, whole, as WebVTT, for a player that reads it itself

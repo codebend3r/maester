@@ -2,9 +2,10 @@ import { formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
 import type { ComponentType, ReactNode } from 'react'
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native'
+import { Image, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { PICTURE_STATES, type PictureState, pictureStateOf } from '@/layouts/Card'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type FavouriteButtonProps } from '@/layouts/musicKit'
@@ -174,7 +175,7 @@ export const TouchPage = ({ onBack, children }: TouchPageProps) => {
   const insets = useSafeAreaInsets()
   const styles = useMusicStyles()
   return (
-    <ScrollView
+    <HomeScrollView
       contentContainerStyle={[
         styles.page,
         { paddingTop: insets.top + SIZES.space3, paddingBottom: insets.bottom + SIZES.space8 },
@@ -183,7 +184,7 @@ export const TouchPage = ({ onBack, children }: TouchPageProps) => {
     >
       <TouchNav onBack={onBack} />
       {children}
-    </ScrollView>
+    </HomeScrollView>
   )
 }
 

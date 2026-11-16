@@ -195,6 +195,12 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
   const sendForText = async (href: string): Promise<string> =>
     (await call({ kind: CALL_KINDS.media, href })).text()
 
+  type AskMediaProps<T> = { href: string; guard: Guard<T> }
+
+  /** A JSON body from a media address, once its guard says it is what was asked for. */
+  const askMedia = async <T>({ href, guard }: AskMediaProps<T>): Promise<T> =>
+    expect({ request: readJson(await call({ kind: CALL_KINDS.media, href })), guard })
+
   type ExpectProps<T> = {
     request: Promise<unknown>
     guard: Guard<T>
@@ -243,5 +249,5 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     await sendRoute(props)
   }
 
-  return { url, mediaUrl, sendForText, ask, tell }
+  return { url, mediaUrl, sendForText, askMedia, ask, tell }
 }
