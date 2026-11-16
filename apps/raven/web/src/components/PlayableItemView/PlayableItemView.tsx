@@ -292,6 +292,10 @@ export const PlayableItemView = ({
   const back = config.back({ details, primary, libraries: known })
   const tagline = config.tagline(details)
   const play = watchLink({ media: primary })
+  const playLabel =
+    primary.position > 0
+      ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
+      : COMMON_COPY.play
   const playPicture = { ...play, label: PLAYABLE_ITEM_VIEW_COPY.playTitle(details.title) }
   const still =
     api.itemImageUrl({
@@ -338,38 +342,17 @@ export const PlayableItemView = ({
           <AdminOnly>
             {config.editable && editors.buttons}
             {details.type === ITEM_TYPES.movie && <HeroToggle itemId={details.id} />}
-            {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
-            <MediaMenu
-              media={primary}
-              open={menuOpen}
-              onOpenChange={setMenuOpen}
-              inline
-              matchType={config.matchType}
-              aiMatch={details.aiMatch}
-              withFavourite={false}
-              withWatched={false}
-              onMatched={(updated) => {
-                const page = updated.item ? itemPath(updated.item) : null
-                navigate(
-                  page == null
-                    ? libraryPath(updated.libraryId)
-                    : inLibrary({ page, libraryId: updated.libraryId }),
-                  { replace: true },
-                )
-              }}
-              onDeleted={() => {
-                if (details.versions.length <= 1) navigate(back.to)
-                else
-                  handled(queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) }))
-              }}
-            />
           </AdminOnly>
         }
       >
-        <ButtonLink tone={BUTTON_TONES.primary} icon="play" to={play.to} state={play.state}>
-          {primary.position > 0
-            ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
-            : COMMON_COPY.play}
+        <ButtonLink
+          tone={BUTTON_TONES.primary}
+          icon="play"
+          to={play.to}
+          state={play.state}
+          title={playLabel}
+        >
+          {playLabel}
         </ButtonLink>
         <DownloadButton
           target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }}
@@ -382,6 +365,32 @@ export const PlayableItemView = ({
           state={primary.watched ? WATCHED_STATES.watched : WATCHED_STATES.unwatched}
           onToggle={() => watched.mutate(!primary.watched)}
         />
+        <AdminOnly>
+          {/* Without its favourite and watched, which the page has beside it, all the menu holds needs the admin lock off. */}
+          <MediaMenu
+            media={primary}
+            open={menuOpen}
+            onOpenChange={setMenuOpen}
+            inline
+            matchType={config.matchType}
+            aiMatch={details.aiMatch}
+            withFavourite={false}
+            withWatched={false}
+            onMatched={(updated) => {
+              const page = updated.item ? itemPath(updated.item) : null
+              navigate(
+                page == null
+                  ? libraryPath(updated.libraryId)
+                  : inLibrary({ page, libraryId: updated.libraryId }),
+                { replace: true },
+              )
+            }}
+            onDeleted={() => {
+              if (details.versions.length <= 1) navigate(back.to)
+              else handled(queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) }))
+            }}
+          />
+        </AdminOnly>
       </ItemHeader>
 
       <PlaybackNote media={primary} />

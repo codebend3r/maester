@@ -31,12 +31,15 @@ type Standing = { status: RequestStatus; whose: string }
 
 type StandingOfProps = { request: TitleRequest | null; holding: TitleHolding | undefined }
 
+/** Whose ask a listed request was: the caller's, nobody's (its arr held it already), or another account's. */
+const whoseOf = (request: TitleRequest): string => {
+  if (request.isMine) return REQUEST_COPY.requestedByYou
+  return request.isHeld ? REQUEST_COPY.requestedAlready : REQUEST_COPY.requestedBySomeone
+}
+
 /** raven's request for the title, else its arr's holding of it; null while it is free to request. */
 const standingOf = ({ request, holding }: StandingOfProps): Standing | null => {
-  if (request !== null) {
-    const whose = request.isMine ? REQUEST_COPY.requestedByYou : REQUEST_COPY.requestedBySomeone
-    return { status: request.status, whose }
-  }
+  if (request !== null) return { status: request.status, whose: whoseOf(request) }
   const held = holding?.status ?? null
   return held === null ? null : { status: held, whose: REQUEST_COPY.requestedAlready }
 }

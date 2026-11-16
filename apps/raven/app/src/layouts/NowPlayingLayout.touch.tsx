@@ -123,7 +123,13 @@ const Player = ({
   return (
     track !== null && (
       <View style={[own.player, { width: size }, isCentred && own.centred]}>
-        <PlayingCover cover={track.cover} size={size} title={track.title} />
+        <PlayingCover
+          cover={track.cover}
+          onSeek={onSeek}
+          position={position}
+          size={size}
+          title={track.title}
+        />
         <View style={[own.words, isCentred && own.centred]}>
           <Text
             variant={TEXT_VARIANTS.display}
@@ -227,7 +233,7 @@ const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
             key={row.key}
             isSelected={row.isCurrent}
             label={row.title}
-            line={row.line}
+            line={MUSIC_COPY.facts([row.line, row.length])}
             onPress={() => onJump(row.place)}
             title={row.title}
           >

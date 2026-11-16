@@ -122,3 +122,23 @@ export const ItemPoster = ({ item, sizes }: ItemPosterProps) => {
   const poster = posterSources({ item, sizes })
   return <Picture sources={poster ? [poster] : []} initial={item.title.slice(0, 1)} />
 }
+
+type TmdbPosterProps = {
+  /** TMDB's poster path. */
+  poster: string
+  /** How wide the container shows it, as a library's poster says. */
+  sizes: string
+  className?: string
+}
+
+/** The poster of a title no library holds, from TMDB through the server's image cache; its frame is the container's to give. */
+export const TmdbPoster = ({ poster, sizes, className }: TmdbPosterProps) => (
+  <img
+    {...api.tmdbPosterSources(poster)}
+    sizes={sizes}
+    alt=""
+    loading="lazy"
+    decoding="async"
+    className={className}
+  />
+)

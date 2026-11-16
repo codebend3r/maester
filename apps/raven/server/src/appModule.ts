@@ -128,8 +128,9 @@ import { ArrClient } from '@/requests/arrClient'
 import { DownloadRequests } from '@/requests/downloadRequests'
 import { RequestsController } from '@/requests/requestsController'
 import { UpcomingController } from '@/upcoming/upcomingController'
+import { LibraryTitles } from '@/upcoming/libraryTitles'
+import { UpcomingSearch } from '@/upcoming/upcomingSearch'
 import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
-import { UpcomingTitles } from '@/upcoming/upcomingTitles'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { PlaybackController } from '@/playback/playbackController'
 import { BugReportsController } from '@/reports/bugReportsController'
@@ -360,7 +361,8 @@ export class AppModule {
         MatchFactsCache,
         Filmographies,
         UpcomingShelfPages,
-        UpcomingTitles,
+        UpcomingSearch,
+        LibraryTitles,
         OmdbClient,
         MdblistClient,
         AiClient,

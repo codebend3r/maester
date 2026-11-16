@@ -1,0 +1,30 @@
+// How many requests are left today, over the posters.
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.budget,
+.message {
+  color: var(--color-lichen);
+}
+
+// As a library's posters, which `POSTER_SIZES.grid` measures.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(10.5rem, 100%), 1fr));
+  gap: calc(var(--space-4) + var(--space-0)) var(--space-3);
+}
+
+@media (max-width: 64rem) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(9.375rem, 100%), 1fr));
+  }
+}
+
+@media (max-width: 48rem) {
+  .grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(8rem, 100%), 1fr));
+  }
+}

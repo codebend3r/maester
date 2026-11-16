@@ -8,5 +8,6 @@ export const STORE_KEYS = {
   downloadNotes: 'raven-download-notes',
   downloadsShow: 'raven-downloads-show',
   seasonView: 'raven-season-view',
+  upcomingFilter: 'raven-upcoming-filter',
   serverReach: 'raven-server-reach',
 } as const

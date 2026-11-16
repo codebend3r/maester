@@ -1,7 +1,7 @@
 import { ITEM_TYPES, type MatchItemType } from '@raven/core'
 import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
-import { DOCUMENTARY_FILTERS, type MetadataFetch } from '@/metadata/tmdbClient'
+import type { MetadataFetch } from '@/metadata/tmdbClient'
 import type { RequestsConfig } from '@/requests/requestsConfig'
 import type { FakeMovie, FakeShow } from '@/test/fakeTmdb'
 
@@ -53,6 +53,7 @@ const ARR_ROUTES = {
   series: '/api/v3/series',
   command: '/api/v3/command',
   queue: '/api/v3/queue/details',
+  calendar: '/api/v3/calendar',
 } as const
 
 const LETTERS = [...'#ABCDEFGHIJKLMNOPQRSTUVWXYZ']
@@ -60,8 +61,8 @@ const LETTERS = [...'#ABCDEFGHIJKLMNOPQRSTUVWXYZ']
 /** TMDB's `/discover` routes, as the fixture's fetch sees them, under the API's `/3`. */
 const TMDB_DISCOVER_ROUTES = { any: '/3/discover/', shows: '/3/discover/tv' } as const
 
-/** The query parameters the fake reads: a discover page, and a title's TMDB id as each arr sends it. */
-const QUERY_KEYS = { page: 'page', tmdbId: 'tmdbId', term: 'term' } as const
+/** The query parameters the fake reads: a discover page, the genres a list is made of, and a title's TMDB id as each arr sends it. */
+const QUERY_KEYS = { page: 'page', genres: 'with_genres', tmdbId: 'tmdbId', term: 'term' } as const
 
 /** The prefix Sonarr's lookup term puts before a TMDB id. */
 const TMDB_TERM = 'tmdb:'
@@ -83,12 +84,12 @@ const discovered = ({ tmdbId, title }: UpcomingFixture) => ({
   popularity: 10,
 })
 
-/** A `/discover` shelf: no documentaries, and every movie or the show on its first page. */
+/** A `/discover` shelf: no documentaries or anime, the lists made of a genre, and every movie or the show on its first page. */
 const discover = (url: URL): Response => {
-  const isDocumentaries = url.searchParams.has(DOCUMENTARY_FILTERS.only)
+  const isOfGenre = url.searchParams.has(QUERY_KEYS.genres)
   const isFirstPage = url.searchParams.get(QUERY_KEYS.page) === FIRST_PAGE
   const titles = url.pathname === TMDB_DISCOVER_ROUTES.shows ? [show] : [held, open]
-  const results = isDocumentaries || !isFirstPage ? [] : titles.map(discovered)
+  const results = isOfGenre || !isFirstPage ? [] : titles.map(discovered)
   return json({ total_results: results.length, results })
 }
 
@@ -141,6 +142,9 @@ const arrAnswer = ({ url, init }: ArrAnswerProps): Response => {
   if (method === HTTP_METHODS.get && path === ARR_ROUTES.movies) {
     return json(holdings.has(tmdbId) ? [{ id: Number(tmdbId) }] : [])
   }
+  // Neither arr lists a title still to come: the fixture's requests are raven's own.
+  if (path === ARR_ROUTES.calendar) return json([])
+  if (method === HTTP_METHODS.get && path === ARR_ROUTES.series) return json([])
   if (method === HTTP_METHODS.post && (path === ARR_ROUTES.movies || path === ARR_ROUTES.series)) {
     const asked = tmdbIdIn(init.body)
     holdings.add(asked)

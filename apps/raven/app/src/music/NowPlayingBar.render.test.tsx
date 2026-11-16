@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { Track } from '@raven/core'
-import { useAudioQueue } from '@raven/ui/headless'
+import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, screen } from '@testing-library/react-native'
 
 import { NowPlayingBar } from '@/music/NowPlayingBar'
@@ -59,6 +59,16 @@ describe('NowPlayingBar', () => {
     expect(screen.getByText('Radiohead')).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Open Now Playing' }))
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.nowPlaying)
+  })
+
+  it('stops the music and goes when its X is pressed', async () => {
+    useAudioQueue.getState().playTracks({ tracks: [TRACK] })
+    await renderBar()
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'Stop the music and close the player' }),
+    )
+    expect(useAudioQueue.getState().state).toBe(AUDIO_STATES.empty)
+    expect(screen.queryByText('Airbag')).toBeNull()
   })
 
   it.each([APP_SCREENS.nowPlaying, APP_SCREENS.play])('stays off %s', async (screenName) => {

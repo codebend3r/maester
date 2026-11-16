@@ -1,0 +1,31 @@
+/*
+ * The table's room is its section's to give: columns drop when the room is
+ * narrow, and anything still too wide scrolls inside it, never the page.
+ */
+.room {
+  container-type: inline-size;
+  overflow-x: auto;
+}
+
+/*
+ * The element defaults draw the table; this sets its rhythm: eyebrow
+ * headers, faint rules between rows and a tint under the pointer.
+ */
+.table {
+  width: 100%;
+
+  thead th {
+    padding-block: var(--space-2);
+  }
+
+  tbody tr:hover {
+    background: var(--color-hover);
+  }
+
+  th,
+  td {
+    padding-inline: var(--space-1);
+    text-align: start;
+    vertical-align: middle;
+  }
+}

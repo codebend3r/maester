@@ -9,15 +9,33 @@
   align-items: center;
   border-radius: var(--radius-md);
 
-  @media (prefers-reduced-motion: no-preference) {
-    transition: background-color 200ms var(--ease-out);
+  /*
+   * Over a busy backdrop the words had nothing to stand on: focus fades the
+   * top of the page into the theme's ground, solid at the top and gone a
+   * quarter of the way down, darker on a dark theme and lighter on a light
+   * one. It spans the window, behind the field and the shell's corner.
+   */
+  &::before {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: -1;
+    height: 25dvh;
+    background: linear-gradient(var(--color-night), transparent);
+    opacity: 0;
+    content: '';
+    pointer-events: none;
   }
 
-  // Over a pale backdrop the words had nothing to stand on: focus brings up dark glass under them.
-  &:focus-within {
-    background: var(--color-night-glass);
-    box-shadow: var(--shadow-menu);
-    backdrop-filter: var(--filter-glass);
+  &:focus-within::before {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &::before {
+      transition: opacity 200ms var(--ease-out);
+    }
   }
 }
 
@@ -34,7 +52,7 @@
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   text-overflow: ellipsis;
-  text-shadow: var(--shadow-text);
+  text-shadow: var(--shadow-ground-text);
 
   &:hover:not(:focus-visible) {
     border-bottom-color: color-mix(in srgb, var(--color-bark) 40%, transparent);
@@ -76,8 +94,8 @@
 
 .option {
   display: grid;
-  grid-template-columns: 2.25rem minmax(0, 1fr);
-  grid-template-areas: 'poster words';
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+  grid-template-areas: 'poster words aside';
   align-items: center;
   column-gap: var(--space-2);
   padding: var(--space-1);
@@ -97,6 +115,13 @@
   overflow: hidden;
   border-radius: var(--radius-sm);
   background: var(--color-canopy);
+}
+
+// An upcoming title's TMDB poster, filling its frame as a library's poster does.
+.upcomingPoster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .words {
@@ -121,6 +146,22 @@
   font-size: var(--font-size-xs);
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+// A library title's quality chips, then its scores, at the row's end.
+.aside {
+  grid-area: aside;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+// A phone's row keeps its room for the title.
+@media (max-width: 40rem) {
+  .aside {
+    display: none;
+  }
 }
 
 // The last row has words alone, no poster, so it keeps one column.

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(45);
+select plan(53);
 
 -- Most cases run after the auto-approval window; the window has its own cases below.
 update private.enrolment set approve_until = '-infinity';
@@ -37,7 +37,7 @@ insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) value
   ('10000000-0000-4000-8000-000000000006', 'test-alerted@maester.test', now(), '{}');
 select is(
   (select convert_from(body, 'UTF8')::jsonb from net.http_request_queue where url = 'http://alerts.test/signup-alert'),
-  '{"email": "test-alerted@maester.test", "status": "pending"}'::jsonb,
+  '{"event": "signedUp", "email": "test-alerted@maester.test", "status": "pending"}'::jsonb,
   'A sign-up alerts the owner with its status'
 );
 select is(
@@ -47,6 +47,29 @@ select is(
 );
 update auth.users set email = 'test-alerted-again@maester.test' where id = '10000000-0000-4000-8000-000000000006';
 select is((select count(*)::integer from net.http_request_queue), 1, 'An email change sends no alert');
+update public.members set status = 'approved' where id = '10000000-0000-4000-8000-000000000006';
+select is(
+  (select convert_from(body, 'UTF8')::jsonb from net.http_request_queue
+    where convert_from(body, 'UTF8')::jsonb ->> 'event' = 'approved'),
+  '{"event": "approved", "email": "test-alerted-again@maester.test"}'::jsonb,
+  'Approving a member emails them'
+);
+update public.members set status = 'approved', updated_at = now() where id = '10000000-0000-4000-8000-000000000006';
+select is((select count(*)::integer from net.http_request_queue), 2, 'An approved member is never welcomed twice');
+update public.members set status = 'revoked' where id = '10000000-0000-4000-8000-000000000006';
+select is((select count(*)::integer from net.http_request_queue), 2, 'Revoking access sends nothing');
+update public.members set status = 'approved' where id = '10000000-0000-4000-8000-000000000006';
+select is((select count(*)::integer from net.http_request_queue), 3, 'Restoring access welcomes them again');
+update private.enrolment set approve_until = 'infinity';
+insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values
+  ('10000000-0000-4000-8000-000000000007', 'test-welcomed@maester.test', now(), '{}');
+update private.enrolment set approve_until = '-infinity';
+select is(
+  (select array_agg(convert_from(body, 'UTF8')::jsonb ->> 'event' order by id) from net.http_request_queue
+    where convert_from(body, 'UTF8')::jsonb ->> 'email' = 'test-welcomed@maester.test'),
+  array['signedUp', 'approved'],
+  'A sign-up the window approves alerts the owner and welcomes the member'
+);
 
 select ok(not has_table_privilege('anon', 'public.members', 'SELECT'), 'Anonymous cannot read members');
 select ok(not has_table_privilege('authenticated', 'public.members', 'INSERT'), 'Clients cannot insert members');
@@ -58,6 +81,8 @@ select ok(not has_function_privilege('anon', 'public.list_members(integer,intege
 select ok(not has_function_privilege('anon', 'public.set_member_status(uuid,text)', 'EXECUTE'), 'Anonymous cannot approve');
 select ok(not has_function_privilege('authenticated', 'private.enrol_confirmed_user()', 'EXECUTE'), 'Clients cannot run enrolment');
 select ok(not has_function_privilege('authenticated', 'private.alert_signup()', 'EXECUTE'), 'Clients cannot send alerts');
+select ok(not has_function_privilege('authenticated', 'private.mail_approval()', 'EXECUTE'), 'Clients cannot send welcomes');
+select ok(not has_function_privilege('authenticated', 'private.post_member_mail(jsonb)', 'EXECUTE'), 'Clients cannot post member emails');
 select ok(not has_table_privilege('authenticated', 'private.enrolment', 'UPDATE'), 'Clients cannot move the approval cutoff');
 
 -- Bootstrap uses database-operator privileges, never a public first-signup rule.
@@ -81,6 +106,12 @@ select ok((select count(*) > 1 from public.list_members()), 'Owner can list memb
 select is((select count(*)::integer from public.list_members(1, 0)), 1, 'Member listing is paginated');
 select throws_ok($$select * from public.list_members(101, 0)$$, '22023', 'Invalid pagination', 'Page size is bounded');
 select is((select status from public.set_member_status('10000000-0000-4000-8000-000000000002', 'approved')), 'approved', 'Owner can approve');
+select is(
+  (select count(*)::integer from net.http_request_queue
+    where convert_from(body, 'UTF8')::jsonb = '{"event": "approved", "email": "test-member@maester.test"}'::jsonb),
+  1,
+  'The owner approving a member emails them'
+);
 select throws_ok($$select * from public.set_member_status('10000000-0000-4000-8000-000000000001', 'revoked')$$, '42501', 'The owner cannot be changed here', 'Owner cannot revoke themselves');
 select throws_ok($$select * from public.set_member_status('10000000-0000-4000-8000-000000000002', 'pending')$$, '22023', 'Expected approved or revoked', 'No unsupported status transition');
 select throws_ok($$select * from public.set_member_status('90000000-0000-4000-8000-000000000001', 'approved')$$, 'P0002', 'Verified member not found', 'Nonexistent or unverified account cannot be approved');

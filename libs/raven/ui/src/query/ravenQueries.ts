@@ -269,6 +269,13 @@ export const ravenQueriesFor = (api: ApiClient) => {
       refetchInterval: REQUESTS_REFETCH_MS,
     }),
 
+    /** Every account's requests and whose each was, for the owner, asked again while a page shows them. */
+    everyonesRequestsQuery: queryOptions({
+      queryKey: queryKeys.everyonesRequests,
+      queryFn: () => api.listEveryonesRequests(),
+      refetchInterval: REQUESTS_REFETCH_MS,
+    }),
+
     /** Whether one title's Sonarr or Radarr holds it already, and where it stands there. */
     requestHoldingQuery: (title: TitleRequestAsk) =>
       queryOptions({
@@ -277,13 +284,22 @@ export const ravenQueriesFor = (api: ApiClient) => {
         refetchInterval: REQUESTS_REFETCH_MS,
       }),
 
-    /** One Coming soon shelf, a page at a time, the soonest out first; kept as long as the shelves. */
+    /** One Coming soon shelf, a page at a time, the most popular first; kept as long as the shelves. */
     upcomingShelfQuery: (shelf: UpcomingShelf) =>
       infiniteQueryOptions({
         queryKey: queryKeys.upcomingShelf(shelf),
         queryFn: ({ pageParam }) => api.getUpcomingShelf({ shelf, after: pageParam }),
         initialPageParam: FIRST_UPCOMING_PAGE,
         getNextPageParam: nextUpcomingPage,
+        staleTime: UPCOMING_STALE_MS,
+      }),
+
+    /** Upcoming movies and shows a search finds that no library holds; a blank one asks for nothing. */
+    upcomingSearchQuery: (query: string) =>
+      queryOptions({
+        queryKey: queryKeys.upcomingSearch(query),
+        queryFn: query === '' ? skipToken : () => api.searchUpcoming(query),
+        placeholderData: keepPreviousData,
         staleTime: UPCOMING_STALE_MS,
       }),
 

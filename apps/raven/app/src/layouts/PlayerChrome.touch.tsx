@@ -7,11 +7,11 @@ import Video from 'react-native-video'
 
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { CaptionText } from '@/layouts/PlayerCaption'
-import { HoldMark, SkipMark } from '@/layouts/PlayerMark.touch'
+import { HoldMark, SkipMark, TapAreaFlash } from '@/layouts/PlayerMark.touch'
 import { PLAYER_COPY, type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
 import { Text } from '@/layouts/Text'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
-import { useSkipLadder } from '@/layouts/useSkipLadder'
+import { useSkipMark } from '@/layouts/useSkipLadder'
 import { heldPlaybackOf, useSurfaceGestures } from '@/layouts/useSurfaceGestures'
 import { usePlayerKeys } from '@/player/usePlayerKeys'
 import { SIZES } from '@/theme/appTheme'
@@ -57,17 +57,16 @@ const PlayerChrome = ({
   const isPlaying = transport !== null && !transport.isPaused
   const { isVisible, opacity, stir, show, toggle } = useControlsLinger({ isPlaying })
   const { width } = useWindowDimensions()
-  const skip = useSkipLadder({ transport })
-  // The last skip's mark, counted so the same one twice starts afresh.
-  const [skipped, setSkipped] = useState<{ step: SkipStep; count: number } | null>(null)
-  const skipBy = (direction: SkipStep['direction']) => {
-    const step = skip(direction)
-    if (step !== null) setSkipped((was) => ({ step, count: (was?.count ?? 0) + 1 }))
-  }
+  const { skipped, skipBy } = useSkipMark({ transport })
+  // The last double tap's side, counted so the same side twice washes afresh.
+  const [tapped, setTapped] = useState<{ side: SkipStep['direction']; count: number } | null>(null)
   const gestures = useSurfaceGestures({
     transport,
     width,
-    onSkip: skipBy,
+    onSkip: (direction) => {
+      skipBy(direction)
+      setTapped((was) => ({ side: direction, count: (was?.count ?? 0) + 1 }))
+    },
     // Paused, opening or ended the controls stay up, so a tap has nothing to show or hide.
     onTap: () => {
       if (isPlaying) toggle()
@@ -159,6 +158,7 @@ const PlayerChrome = ({
           )}
         </View>
       </Animated.View>
+      {tapped !== null && <TapAreaFlash key={tapped.count} side={tapped.side} />}
       {skipped !== null && gestures.held === null && (
         <SkipMark key={skipped.count} sides={sides} step={skipped.step} />
       )}

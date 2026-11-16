@@ -29,10 +29,11 @@ export const UnsupportedDownloadButton = () => {
   }
 
   return (
-    <span className={styles.control} data-wide>
+    <span className={styles.control}>
       <Button
         icon="download"
         className={styles.greyed}
+        aria-label={COMMON_COPY.download}
         aria-disabled
         aria-expanded={isOpen}
         aria-controls={ids.note}
@@ -40,9 +41,7 @@ export const UnsupportedDownloadButton = () => {
         title={DOWNLOAD_BUTTON_COPY.dolbyVision.title}
         onClick={() => (isOpen ? close() : setIsOpen(true))}
         onKeyDown={onKeyDown}
-      >
-        {COMMON_COPY.download}
-      </Button>
+      />
       {isOpen && (
         <span id={ids.note} className={styles.note} role="note" aria-labelledby={ids.title}>
           <strong id={ids.title}>{DOWNLOAD_BUTTON_COPY.dolbyVision.title}</strong>

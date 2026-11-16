@@ -1,5 +1,6 @@
 import { isMatchItemType } from '@/contract/items'
 import { isTmdbId } from '@/contract/metadata'
+import { isUpcomingKind } from '@/contract/upcoming'
 import {
   type Infer,
   isBoolean,
@@ -9,10 +10,14 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
 } from '@/schema'
 
-/** Where members ask for a Coming soon title to be downloaded, and read how far each got. */
-export const REQUEST_PATHS = { requests: '/api/requests' } as const
+/** Where members ask for a Coming soon title to be downloaded and read how far each got, and where the owner reads who asked for each. */
+export const REQUEST_PATHS = {
+  requests: '/api/requests',
+  everyone: '/api/requests/everyone',
+} as const
 
 /** The parameters of an upcoming title's own page on the server. */
 export const UPCOMING_TITLE_PARAMS = { type: 'type', tmdbId: 'tmdbId' } as const
@@ -46,7 +51,11 @@ export const isTitleRequestAsk = object({
 
 export type TitleRequestAsk = Infer<typeof isTitleRequestAsk>
 
-/** One title someone asked for. One request covers everyone, so it says only whether it was the caller's. */
+/**
+ * One title someone asked for, or one its Sonarr or Radarr holds that is
+ * still to come. One request covers everyone, so it says only whether it was
+ * the caller's.
+ */
 export const isTitleRequest = object({
   type: isMatchItemType,
   tmdbId: isString,
@@ -55,9 +64,37 @@ export const isTitleRequest = object({
   /** When it was asked for, as an ISO time. */
   requestedAt: isString,
   isMine: isBoolean,
+  /**
+   * True for a title still to come that its arr holds though nobody asked
+   * raven for it: it downloads as a request does, so every account sees it
+   * among their own, and `requestedAt` is when the arr took it on. An older
+   * server leaves it out.
+   */
+  isHeld: optional(isBoolean),
+  /**
+   * The library's item for the title once a scan has added it, or null while
+   * no library holds it. An older server leaves it out, which reads as not
+   * added, so its whole list stays readable as pending.
+   */
+  libraryItemId: optional(nullable(isNumber)),
 })
 
 export type TitleRequest = Infer<typeof isTitleRequest>
+
+/**
+ * A request as the owner reads it: also whose it was, an account's id or the
+ * one account a server without accounts keeps, or null for a held title,
+ * which its Sonarr or Radarr took on with nobody asking.
+ */
+export const isMemberRequest = object({
+  ...isTitleRequest.shape,
+  requestedBy: nullable(isString),
+})
+
+export type MemberRequest = Infer<typeof isMemberRequest>
+
+/** `GET` on `REQUEST_PATHS.everyone`: every request and held title still to come, newest first, for the owner alone. */
+export const isMemberRequests = listOf(isMemberRequest)
 
 /** How many requests the caller has left in the last 24 hours, and when the next comes back while none do. */
 export const isRequestBudget = object({
@@ -65,6 +102,8 @@ export const isRequestBudget = object({
   left: isNumber,
   /** When the oldest request in the window drops out, as an ISO time; null while some are left. */
   nextAt: nullable(isString),
+  /** True for whoever manages raven, whose requests no budget holds; an older server leaves it out. */
+  isUnlimited: optional(isBoolean),
 })
 
 export type RequestBudget = Infer<typeof isRequestBudget>
@@ -75,7 +114,7 @@ export const isRequestKinds = object({
   show: isBoolean,
 })
 
-/** `GET` on `REQUEST_PATHS.requests`: every request, the caller's budget, and which kinds are on. */
+/** `GET` on `REQUEST_PATHS.requests`: every request and held title still to come, newest first, the caller's budget, and which kinds are on. */
 export const isTitleRequests = object({
   requests: listOf(isTitleRequest),
   budget: isRequestBudget,
@@ -112,6 +151,8 @@ export const isUpcomingDetails = object({
   genres: listOf(isString),
   /** Minutes: a movie's length, or an episode's. */
   runtime: nullable(isNumber),
+  /** Whether it is a movie, a show, a documentary or anime; an older server leaves it out. */
+  kind: optional(isUpcomingKind),
 })
 
 export type UpcomingDetails = Infer<typeof isUpcomingDetails>

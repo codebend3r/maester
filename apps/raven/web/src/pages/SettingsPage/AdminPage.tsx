@@ -1,31 +1,25 @@
-import {
-  DEFAULT_DISPLAY_SETTINGS,
-  DEFAULT_PLAYBACK_SETTINGS,
-  DISPLAY_CHOICES,
-  PLAYBACK_CHOICES,
-} from '@raven/core'
 import { type ComponentType, useId, useState } from 'react'
 import { BUTTON_TONES, Button } from '@raven/ui'
 import { useServerSettingsSaves } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
+import { PageTitle } from '@/components/PageTitle/PageTitle'
+import { Tabs } from '@/components/Tabs/Tabs'
 import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { api } from '@/lib/api'
+import { COMMON_COPY } from '@/lib/copy'
 import { MANAGEMENT_MODES, useManagement } from '@/lib/management'
 import { displaySettingsQuery, playbackSettingsQuery } from '@/lib/queries'
+import { useAddressValue } from '@/lib/useAddressValue'
+import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
 import { AdminLockSection } from '@/pages/SettingsPage/AdminLockSection'
-import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
-import { ServerSection } from '@/pages/SettingsPage/ServerSection'
-import { Setting, SettingsSection, SettingsSkeleton } from '@/pages/SettingsPage/Setting'
-import { Titled } from '@/pages/SettingsPage/Titled'
+import { type AdminPanelProps, AdminPlaybackPanel } from '@/pages/SettingsPage/AdminPlaybackPanel'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
+import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
+import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
+import { ServerSection } from '@/pages/SettingsPage/ServerSection'
+import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
 import { useIsDesktop } from '@/stores/desktop'
-import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
-import { PageTitle } from '@/components/PageTitle/PageTitle'
-import { COMMON_COPY } from '@/lib/copy'
-import { ADMIN_CHOICES_COPY, ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
-import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
-import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 
 type ResetControlProps = {
   isConfirming: boolean
@@ -82,23 +76,70 @@ const ResetControl = (props: ResetControlProps) => {
   return <View {...props} />
 }
 
-/**
- * Server-wide settings and management, mounted only for an authorized admin.
- * Changes save optimistically; Reset asks for confirmation before restoring defaults.
- */
-const ServerSettings = () => {
-  const titleId = useId()
+/** Admin's second tab: which server this is, where the app is not Raven's own, and the scans running across its libraries. */
+const ServerPanel = () => {
   const isDesktop = useIsDesktop()
-  const [isConfirming, setConfirming] = useState(false)
+  return (
+    <>
+      {!isDesktop && <ServerSection />}
+      <ScanSwitch />
+    </>
+  )
+}
+
+/** Admin's third tab: who reaches raven and how. Remote access, the accounts for their owner, and the admin lock where it is what guards managing. */
+const AccessPanel = () => {
   // Accounts show only to an approved viewer; the other states have a screen of their own.
   const access = useAccessState()
   const { mode } = useManagement()
-  const { playback, display, save, saveDisplay, reset, isBusy, isAllAtDefaults } =
-    useServerSettingsSaves({
-      api,
-      queries: { playbackSettingsQuery, displaySettingsQuery },
-      onReset: () => setConfirming(false),
-    })
+  return (
+    <>
+      <RemoteAccessSection />
+      {access.kind === ACCESS_KINDS.approved && access.account.isOwner && (
+        <UsersSection key={access.account.id} userId={access.account.id} />
+      )}
+      {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
+    </>
+  )
+}
+
+/** Admin's tabs, each a group of settings that belong together; the address names any but the first, so a reload keeps it. */
+const ADMIN_TABS = { playback: 'playback', server: 'server', access: 'access' } as const
+
+type AdminTab = (typeof ADMIN_TABS)[keyof typeof ADMIN_TABS]
+
+const ADMIN_TAB_VALUES = Object.values(ADMIN_TABS)
+
+const isAdminTab = (value: string | null): value is AdminTab =>
+  ADMIN_TAB_VALUES.some((tab) => tab === value)
+
+/** The address's search param that names the tab shown. */
+const ADMIN_SEARCH = { tab: 'tab' } as const
+
+const ADMIN_PANELS = {
+  [ADMIN_TABS.playback]: AdminPlaybackPanel,
+  [ADMIN_TABS.server]: ServerPanel,
+  [ADMIN_TABS.access]: AccessPanel,
+} as const satisfies Record<AdminTab, ComponentType<AdminPanelProps>>
+
+/**
+ * Server-wide settings and management, mounted only for an authorized admin,
+ * grouped into tabs: playback and display, the server and its scans, and who
+ * has access. Changes save optimistically; Reset asks for confirmation
+ * before restoring the playback and display defaults.
+ */
+const ServerSettings = () => {
+  const titleId = useId()
+  const [isConfirming, setConfirming] = useState(false)
+  const [asked, setAsked] = useAddressValue(ADMIN_SEARCH.tab)
+  const tab = isAdminTab(asked) ? asked : ADMIN_TABS.playback
+  const Panel = ADMIN_PANELS[tab]
+  const saves = useServerSettingsSaves({
+    api,
+    queries: { playbackSettingsQuery, displaySettingsQuery },
+    onReset: () => setConfirming(false),
+  })
+  const { playback, reset, isBusy, isAllAtDefaults } = saves
   const hasSettings = playback.data !== undefined
 
   return (
@@ -127,116 +168,16 @@ const ServerSettings = () => {
           {reset.error.message}
         </p>
       )}
-      {!isDesktop && <ServerSection />}
-      <SettingsSection
-        icon="playback"
-        title={SETTINGS_COPY.playback}
-        hint={SETTINGS_COPY.playbackHint}
-        isResetting={reset.isPending}
-        query={playback}
-        shape={<SettingsSkeleton count={Object.keys(DEFAULT_PLAYBACK_SETTINGS).length} />}
-        saveError={save.failure}
+      <Tabs
+        label={ADMIN_COPY.tabs.label}
+        tabs={ADMIN_TAB_VALUES.map((value) => ({ value, label: ADMIN_COPY.tabs[value] }))}
+        chosen={tab}
+        onChoose={(next) => setAsked(next === ADMIN_TABS.playback ? null : next)}
       >
-        {({ settings: current, effective }) => (
-          <>
-            <Setting
-              values={PLAYBACK_CHOICES.directPlay}
-              icon="file-play"
-              label={SETTINGS_COPY.directPlay}
-              choices={ADMIN_CHOICES_COPY.directPlay}
-              value={current.directPlay}
-              onChange={(directPlay) => save.mutate({ directPlay })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.transcoding}
-              icon="convert"
-              label={SETTINGS_COPY.transcoding}
-              choices={ADMIN_CHOICES_COPY.transcoding}
-              value={current.transcoding}
-              onChange={(transcoding) => save.mutate({ transcoding })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.maxHeight}
-              icon="resize"
-              label={SETTINGS_COPY.maxHeight}
-              choices={ADMIN_CHOICES_COPY.maxHeight}
-              value={current.maxHeight}
-              onChange={(maxHeight) => save.mutate({ maxHeight })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.quality}
-              icon="gauge"
-              label={SETTINGS_COPY.quality}
-              choices={ADMIN_CHOICES_COPY.quality}
-              value={current.quality}
-              onChange={(quality) => save.mutate({ quality })}
-            />
-            <Setting
-              values={PLAYBACK_CHOICES.hwAccel}
-              icon="chip"
-              label={SETTINGS_COPY.hwAccel}
-              choices={ADMIN_CHOICES_COPY.hwAccel}
-              value={current.hwAccel}
-              onChange={(hwAccel) => save.mutate({ hwAccel })}
-            />
-            <p className={styles.hint}>
-              {SETTINGS_COPY.encodesWith(ADMIN_CHOICES_COPY.encoders[effective.encoder])}
-            </p>
-            <fieldset className={styles.setting}>
-              <legend className={styles.legend}>
-                <Titled icon="sun">{COMMON_COPY.hdr}</Titled>
-              </legend>
-              <ToggleChoice
-                label={SETTINGS_COPY.tonemap}
-                hint={
-                  effective.tonemapAvailable
-                    ? SETTINGS_COPY.tonemapHint
-                    : SETTINGS_COPY.tonemapUnavailable
-                }
-                isChecked={current.tonemap}
-                onChange={(tonemap) => save.mutate({ tonemap })}
-              />
-            </fieldset>
-            <fieldset className={styles.setting}>
-              <legend className={styles.legend}>
-                <Titled icon="skipNext">{SETTINGS_COPY.markers}</Titled>
-              </legend>
-              <ToggleChoice
-                label={SETTINGS_COPY.detectMarkers}
-                hint={SETTINGS_COPY.detectMarkersHint}
-                isChecked={current.detectMarkers}
-                onChange={(detectMarkers) => save.mutate({ detectMarkers })}
-              />
-            </fieldset>
-          </>
-        )}
-      </SettingsSection>
-      <SettingsSection
-        icon="image"
-        title={SETTINGS_COPY.display}
-        hint={SETTINGS_COPY.displayHint}
-        isResetting={reset.isPending}
-        query={display}
-        shape={<SettingsSkeleton count={Object.keys(DEFAULT_DISPLAY_SETTINGS).length} />}
-        saveError={saveDisplay.failure}
-      >
-        {(shown) => (
-          <Setting
-            icon="film"
-            label={SETTINGS_COPY.movieTitles}
-            values={DISPLAY_CHOICES.titles}
-            choices={ADMIN_CHOICES_COPY.titles}
-            value={shown.titles}
-            onChange={(titles) => saveDisplay.mutate({ titles })}
-          />
-        )}
-      </SettingsSection>
-      <RemoteAccessSection />
-      <ScanSwitch />
-      {access.kind === ACCESS_KINDS.approved && access.account.isOwner && (
-        <UsersSection key={access.account.id} userId={access.account.id} />
-      )}
-      {mode === MANAGEMENT_MODES.adminLock && <AdminLockSection />}
+        <div className={styles.panel}>
+          <Panel saves={saves} />
+        </div>
+      </Tabs>
     </section>
   )
 }

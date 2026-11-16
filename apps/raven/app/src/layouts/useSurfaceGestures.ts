@@ -1,17 +1,16 @@
 import {
-  type SurfaceTap,
   TOUCH_HOLD_DELAY_MS,
   TOUCH_HOLD_RATE,
   TOUCH_REWIND_TICK_MS,
   type TouchSide,
   rewoundTo,
-  stepTap,
   touchSideOf,
 } from '@raven/core'
 import { useEffect, useRef, useState } from 'react'
 import type { GestureResponderEvent } from 'react-native'
 
 import type { Transport, VideoSurface } from '@/layouts/playerKit'
+import { useTapLadder } from '@/layouts/useTapLadder'
 
 /** A finger held on the picture: its side, where and when it started, and where it has got to. */
 type Hold = { side: TouchSide; from: number; startedAt: number; at: number }
@@ -45,10 +44,9 @@ type UseSurfaceGesturesProps = {
 }
 
 /**
- * A finger on the picture under the thumb, by the web player's rules (core's `stepTap`): a
- * double tap on the right half skips forward and on the left half back, each further quick tap
- * skipping again, and a lone tap is `onTap` at once; the double tap's second calls it again, so
- * the pair leaves the controls as it found them. `held` is the side a finger rests on, null
+ * A finger on the picture under the thumb: its taps are `useTapLadder`'s, a double tap on the
+ * right half skipping forward and on the left half back, a lone tap `onTap`, the pair leaving the
+ * controls as it found them. `held` is the side a finger rests on, null
  * while none does: the chrome plays the right at twice the speed, and holds the left paused
  * while this seeks it back at twice the speed every tick, since neither platform's player runs
  * in reverse. `transport` is the one to draw, its position the hold's while one runs back.
@@ -63,7 +61,7 @@ export const useSurfaceGestures = ({
   useEffect(() => {
     latest.current = transport
   })
-  const lastTap = useRef<SurfaceTap | null>(null)
+  const taps = useTapLadder({ onSkip, onTap })
   const [hold, setHold] = useState<Hold | null>(null)
   const isRewinding = hold !== null && hold.side < 0
   const rewoundAt = isRewinding ? hold.at : null
@@ -89,24 +87,12 @@ export const useSurfaceGestures = ({
   const sideOf = ({ nativeEvent }: GestureResponderEvent): TouchSide =>
     touchSideOf({ x: nativeEvent.pageX, width })
 
-  const onPress = (event: GestureResponderEvent) => {
-    const side = sideOf(event)
-    const hasSkipped = lastTap.current?.isSkip ?? false
-    const tap = stepTap({ last: lastTap.current, side, at: Date.now() })
-    lastTap.current = tap
-    if (!tap.isSkip) {
-      onTap()
-      return
-    }
-    // The pair's first tap showed or hid the controls; its second puts them back.
-    if (!hasSkipped) onTap()
-    onSkip(side)
-  }
+  const onPress = (event: GestureResponderEvent) => taps.tap(sideOf(event))
 
   const onLongPress = (event: GestureResponderEvent) => {
     const current = latest.current
     if (current === null) return
-    lastTap.current = null
+    taps.forget()
     setHold({
       side: sideOf(event),
       from: current.position,

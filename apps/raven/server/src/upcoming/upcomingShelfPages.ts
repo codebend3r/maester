@@ -1,17 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
   type MatchItemType,
+  type Upcoming,
   UPCOMING_PAGE_SIZE,
+  UPCOMING_SHELF_SIZES,
+  UPCOMING_SHELVES,
   type UpcomingPage,
   type UpcomingShelf,
   type UpcomingTitle,
   uniqueUpcomingTitles,
 } from '@raven/core'
 import { CLOCK, type Clock, utcDayOf } from '@/clock'
-import { TmdbClient } from '@/metadata/tmdbClient'
+import { TmdbClient, UPCOMING_LISTS } from '@/metadata/tmdbClient'
 import type { DiscoveredPage, DiscoveredTitle } from '@/metadata/tmdbShapes'
 import { FreshReads } from '@/upcoming/freshReads'
 import { SHELF_STREAMS, type ShelfStream } from '@/upcoming/shelfStreams'
+import { isAnime } from '@/upcoming/upcomingKind'
 
 /** How many results a page of TMDB's discover holds, its last page aside. */
 const TMDB_PAGE_SIZE = 20
@@ -46,21 +50,44 @@ export const cursorOf = ({ after, streams }: CursorOfProps): Cursor | null => {
 const cursorText = ({ from, offsets }: Cursor): string => `${from}_${offsets.join('.')}`
 
 /** A title read from one of a shelf's lists, at its place in that list. */
-type Entry = { stream: number; type: MatchItemType; raw: number; title: DiscoveredTitle }
+type Entry = {
+  stream: number
+  type: MatchItemType
+  raw: number
+  title: DiscoveredTitle
+  /** Whether the shelf shows it: it has a poster, and is no anime among the movies or shows, which have a shelf of their own. */
+  isShown: boolean
+}
 
 /** What one list holds from a cursor on: its titles, how far they reach, and whether the list ends there. */
 type Window = { offset: number; entries: Entry[]; reach: number; isLast: boolean }
 
-const byDay = (a: Entry, b: Entry): number => {
-  if (a.title.released === b.title.released) return 0
-  return a.title.released < b.title.released ? -1 : 1
+type MergeProps = { lists: readonly (readonly Entry[])[]; merged: readonly Entry[] }
+
+/*
+ * The lists' titles as one, the most popular first: the most popular of the
+ * lists' next titles, one at a time. Each list keeps TMDB's own order, so a
+ * page takes a run from the start of each and its cursor stays true even
+ * where TMDB's popularity figures and its order disagree.
+ */
+const mergedOf = ({ lists, merged }: MergeProps): Entry[] => {
+  const top = lists.reduce<Entry | null>((best, list) => {
+    const next = list[0]
+    if (next === undefined) return best
+    return best === null || next.title.popularity > best.title.popularity ? next : best
+  }, null)
+  if (top === null) return [...merged]
+  return mergedOf({
+    lists: lists.map((list, stream) => (stream === top.stream ? list.slice(1) : list)),
+    merged: [...merged, top],
+  })
 }
 
 type SafeEndProps = { windows: readonly Window[]; merged: readonly Entry[] }
 
 /*
  * How far into `merged` a page may go: past the last title read from a list
- * that goes on, that list's next title is unknown and could come sooner.
+ * that goes on, that list's next title is unknown and could be more popular.
  */
 const safeEndOf = ({ windows, merged }: SafeEndProps): number =>
   windows.reduce((end, window) => {
@@ -69,10 +96,10 @@ const safeEndOf = ({ windows, merged }: SafeEndProps): number =>
     return last === undefined ? 0 : Math.min(end, merged.indexOf(last) + 1)
   }, merged.length)
 
-/** The first entries of `safe` that hold `UPCOMING_PAGE_SIZE` posters, or all of them. */
+/** The first entries of `safe` that hold `UPCOMING_PAGE_SIZE` titles the shelf shows, or all of them. */
 const takenOf = (safe: readonly Entry[]): Entry[] => {
-  const withPoster = safe.flatMap((entry, index) => (entry.title.poster == null ? [] : index))
-  return safe.slice(0, (withPoster[UPCOMING_PAGE_SIZE - 1] ?? safe.length - 1) + 1)
+  const shown = safe.flatMap((entry, index) => (entry.isShown ? index : []))
+  return safe.slice(0, (shown[UPCOMING_PAGE_SIZE - 1] ?? safe.length - 1) + 1)
 }
 
 type OffsetsProps = { windows: readonly Window[]; taken: readonly Entry[] }
@@ -85,8 +112,8 @@ const offsetsAfter = ({ windows, taken }: OffsetsProps): number[] =>
     return (read.at(-1)?.raw ?? window.offset - 1) + 1
   })
 
-const upcomingTitleOf = ({ type, title }: Entry): UpcomingTitle[] =>
-  title.poster == null
+const upcomingTitleOf = ({ type, title, isShown }: Entry): UpcomingTitle[] =>
+  title.poster == null || !isShown
     ? []
     : [
         {
@@ -100,9 +127,9 @@ const upcomingTitleOf = ({ type, title }: Entry): UpcomingTitle[] =>
 
 type PageOfProps = { from: string; windows: readonly Window[] }
 
-/** The page the lists' windows make, merged by day, and the cursor of the page after it. */
+/** The page the lists' windows make, merged by popularity, and the cursor of the page after it. */
 const pageOf = ({ from, windows }: PageOfProps): UpcomingPage => {
-  const merged = windows.flatMap((window) => window.entries).toSorted(byDay)
+  const merged = mergedOf({ lists: windows.map((window) => window.entries), merged: [] })
   const taken = takenOf(merged.slice(0, safeEndOf({ windows, merged })))
   const offsets = offsetsAfter({ windows, taken })
   const isDone = windows.every(
@@ -122,33 +149,59 @@ type PageProps = ShelfStream & { from: string; page: number }
 
 type ReadProps = { shelf: UpcomingShelf; after: string | null }
 
+type PageFromProps = { shelf: UpcomingShelf; cursor: Cursor }
+
 /**
- * A Coming soon shelf a page at a time, the soonest out first: TMDB's lists
- * read from today on, documentaries of both kinds merged by day, and titles
- * with no poster yet left out. Each of TMDB's pages is kept six hours, so
- * scrolling on asks TMDB once for each.
+ * Coming soon's shelves, the most popular first: TMDB's lists read from
+ * today on, documentaries and anime of both kinds merged by popularity,
+ * titles with no poster yet left out, and anime kept to its own shelf. Coming soon's own page shows the start of
+ * each shelf's first page, so a shelf's page carries on from the very titles
+ * it showed. Each of TMDB's pages is kept six hours, so everyone shares one
+ * read of it and scrolling on asks TMDB once for each.
  */
 @Injectable()
 export class UpcomingShelfPages {
   private readonly pages: FreshReads<DiscoveredPage>
 
   constructor(
-    @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'soonest'>,
+    @Inject(TmdbClient) private readonly tmdb: Pick<TmdbClient, 'upcoming'>,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {
     this.pages = new FreshReads({ clock, most: HELD_PAGES })
   }
 
+  /** The three shelves as Coming soon's own page shows them: the first titles of each. Rejects with TMDB's error when a read fails. */
+  async shelves(): Promise<Upcoming> {
+    const startOf = async (shelf: UpcomingShelf): Promise<UpcomingTitle[]> =>
+      (await this.first(shelf)).titles.slice(0, UPCOMING_SHELF_SIZES[shelf])
+    const [movies, shows, documentaries, anime] = await Promise.all([
+      startOf(UPCOMING_SHELVES.movies),
+      startOf(UPCOMING_SHELVES.shows),
+      startOf(UPCOMING_SHELVES.documentaries),
+      startOf(UPCOMING_SHELVES.anime),
+    ])
+    return { movies, shows, documentaries, anime }
+  }
+
   /** The page after `after`, or the first; null when `after` is no cursor of this shelf's. */
   async read({ shelf, after }: ReadProps): Promise<UpcomingPage | null> {
-    const streams = SHELF_STREAMS[shelf]
-    const cursor =
-      after === null
-        ? { from: utcDayOf(this.clock.now()), offsets: streams.map(() => 0) }
-        : cursorOf({ after, streams: streams.length })
-    if (cursor === null) return null
+    if (after === null) return this.first(shelf)
+    const cursor = cursorOf({ after, streams: SHELF_STREAMS[shelf].length })
+    return cursor === null ? null : this.pageFrom({ shelf, cursor })
+  }
+
+  /** A shelf's first page, its lists read from today on. */
+  private first(shelf: UpcomingShelf): Promise<UpcomingPage> {
+    const cursor = {
+      from: utcDayOf(this.clock.now()),
+      offsets: SHELF_STREAMS[shelf].map(() => 0),
+    }
+    return this.pageFrom({ shelf, cursor })
+  }
+
+  private async pageFrom({ shelf, cursor }: PageFromProps): Promise<UpcomingPage> {
     const windows = await Promise.all(
-      streams.map((stream, index) =>
+      SHELF_STREAMS[shelf].map((stream, index) =>
         this.window({ stream, index, from: cursor.from, offset: cursor.offsets[index] ?? 0 }),
       ),
     )
@@ -183,6 +236,8 @@ export class UpcomingShelfPages {
             type: stream.type,
             raw: (number - 1) * TMDB_PAGE_SIZE + at,
             title,
+            isShown:
+              title.poster != null && !(stream.list === UPCOMING_LISTS.general && isAnime(title)),
           })),
         )
         .filter((entry) => entry.raw >= offset),
@@ -195,10 +250,10 @@ export class UpcomingShelfPages {
   }
 
   /** One of TMDB's pages, from the last six hours' reads while it holds it. */
-  private page({ type, documentaries, from, page }: PageProps): Promise<DiscoveredPage> {
+  private page({ type, list, from, page }: PageProps): Promise<DiscoveredPage> {
     return this.pages.read({
-      key: [type, documentaries, from, page].join('|'),
-      read: () => this.tmdb.soonest({ type, documentaries, from, page }),
+      key: [type, list, from, page].join('|'),
+      read: () => this.tmdb.upcoming({ type, list, from, page }),
     })
   }
 }

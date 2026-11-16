@@ -18,6 +18,13 @@
   color: var(--color-lichen);
 }
 
+// The Upcoming tab's shelves, one under the next.
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
 .section {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

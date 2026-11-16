@@ -1,3 +1,4 @@
+import { Icon } from '@raven/native'
 import { Image, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -6,7 +7,8 @@ import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { useMusicStyles } from '@/layouts/MusicParts.touch'
 import { Text } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
-import { themedStyles } from '@/theme/useTheme'
+import { APP_ICONS } from '@/theme/icons'
+import { themedStyles, useTheme } from '@/theme/useTheme'
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -37,6 +39,12 @@ const useStyles = themedStyles((colours) =>
       backgroundColor: colours.ground,
     },
     barButtonLabel: { color: colours.text, fontSize: SIZES.textSm },
+    close: {
+      minWidth: SIZES.fieldHeight,
+      minHeight: SIZES.fieldHeight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   }),
 )
 
@@ -60,8 +68,8 @@ const BarButton = ({ label, onPress }: BarButtonProps) => {
 }
 
 /**
- * The strip under the screens while a track plays: its cover, title and artists, play or pause
- * and next; pressed, it opens Now Playing.
+ * The strip under the screens while a track plays: its cover, title and artists, play or pause,
+ * next, and an X at the right that stops the music and closes it; pressed, it opens Now Playing.
  */
 export const NowPlayingStrip = ({
   title,
@@ -71,8 +79,10 @@ export const NowPlayingStrip = ({
   onOpen,
   onToggle,
   onNext,
+  onClose,
 }: NowPlayingStripProps) => {
   const insets = useSafeAreaInsets()
+  const muted = useTheme((theme) => theme.palette.muted)
   const music = useMusicStyles()
   const styles = useStyles()
   return (
@@ -97,6 +107,15 @@ export const NowPlayingStrip = ({
       </Pressable>
       <BarButton label={toggleLabelOf(isPlaying)} onPress={onToggle} />
       <BarButton label={MUSIC_COPY.next} onPress={onNext} />
+      <Pressable
+        accessibilityLabel={MUSIC_COPY.closePlayer}
+        accessibilityRole="button"
+        hitSlop={SIZES.space1}
+        onPress={onClose}
+        style={({ pressed }) => [styles.close, pressed && music.pressed]}
+      >
+        <Icon colour={muted} name={APP_ICONS.close} size={SIZES.textLg} />
+      </Pressable>
     </View>
   )
 }

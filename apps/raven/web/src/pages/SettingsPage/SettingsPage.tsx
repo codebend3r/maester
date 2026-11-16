@@ -1,3 +1,4 @@
+import { myRequestsOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId, useState } from 'react'
 import { AUTOPLAY_COUNTDOWN_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
@@ -8,7 +9,7 @@ import { requestsQuery } from '@/lib/queries'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
 import { CaptionSettings } from '@/pages/SettingsPage/CaptionSettings'
-import { mineOf, RequestsTab } from '@/pages/SettingsPage/RequestsTab'
+import { RequestsTab } from '@/pages/SettingsPage/RequestsTab'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
 import { SoundSettings } from '@/pages/SettingsPage/SoundSettings'
 import { Titled } from '@/pages/SettingsPage/Titled'
@@ -170,7 +171,7 @@ const ViewerSettings = () => {
           {
             value: SETTINGS_TABS.requests,
             label: SETTINGS_COPY.tabs.requests,
-            ...(requests === undefined ? {} : { count: mineOf(requests).length }),
+            ...(requests === undefined ? {} : { count: myRequestsOf(requests).length }),
           },
         ]}
         chosen={tab}

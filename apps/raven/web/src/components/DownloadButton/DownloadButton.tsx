@@ -52,9 +52,12 @@ const HostDownloadButton = ({ target }: HostDownloadButtonProps) => {
   }
   return (
     // aria-disabled, not disabled: disabling the focused button would drop focus to the page.
-    <Button icon="download" data-wide aria-disabled={isAsking} onClick={() => handled(ask())}>
-      {COMMON_COPY.download}
-    </Button>
+    <Button
+      icon="download"
+      aria-label={COMMON_COPY.download}
+      aria-disabled={isAsking}
+      onClick={() => handled(ask())}
+    />
   )
 }
 
@@ -64,11 +67,9 @@ type LinkDownloadButtonProps = DownloadWayProps
 const LinkDownloadButton = ({ target }: LinkDownloadButtonProps) => (
   <Button
     icon="download"
-    data-wide
+    aria-label={DOWNLOAD_BUTTON_COPY.downloadToRaven}
     onClick={() => ravenPlayer.open(downloadLinkFor({ origin: window.location.origin, target }))}
-  >
-    {DOWNLOAD_BUTTON_COPY.downloadToRaven}
-  </Button>
+  />
 )
 
 const NoDownload = () => null
@@ -115,9 +116,9 @@ type DownloadButtonProps = {
  * browser that can, it asks that host itself; a browser keeps videos only, so an album or a
  * playlist falls to the link, and a Dolby Vision only video in a browser that does not play it
  * is greyed out, with a note saying DV5 downloads are unsupported. Elsewhere it is shown only where this browser says Raven is
- * installed, as Settings' toggle does, and opens a `raven://download` link. Its label cannot
- * wrap or shrink, so it marks itself wide and the header's action row makes room for it (see
- * ItemHeader).
+ * installed, as Settings' toggle does, and opens a `raven://download` link. It is the
+ * download arrow alone, a round button like its neighbours, its name in its aria-label and
+ * hover title.
  */
 export const DownloadButton = ({ target, isDolbyVisionOnly = false }: DownloadButtonProps) => {
   const host = useDownloadsHostOrNone()

@@ -17,20 +17,30 @@ import {
   type UpcomingPage,
   UPCOMING_PARAMS,
   UPCOMING_PATH,
+  UPCOMING_SEARCH_PARAM,
+  UPCOMING_SEARCH_PATH,
   UPCOMING_SHELF_PATH,
+  type UpcomingSearch as UpcomingSearchResult,
 } from '@raven/core'
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { Public } from '@/lock/lockGuard'
+import { upcomingKindOf } from '@/upcoming/upcomingKind'
+import { UpcomingSearch } from '@/upcoming/upcomingSearch'
 import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
 import { titleAskOf } from '@/upcoming/titleAsk'
-import { UpcomingTitles } from '@/upcoming/upcomingTitles'
 
 /** What the 503 says Coming soon needs TMDB for. */
 const TMDB_TO_DO = 'see what is coming soon'
 
 /** What the 503 says a title's own page needs TMDB for. */
 const TMDB_TO_DESCRIBE = 'describe a title that is coming soon'
+
+/** What the 503 says a search of what is coming soon needs TMDB for. */
+const TMDB_TO_SEARCH = 'search what is coming soon'
+
+/** What a 400 says of a `q` that is no single string. */
+const BAD_QUERY = 'q must be the words to search for'
 
 /** What a 400 says of an `after` that is no cursor. */
 const BAD_CURSOR = 'after must be the cursor a page answered as next'
@@ -40,19 +50,31 @@ const BAD_CURSOR = 'after must be the cursor a page answered as next'
 export class UpcomingController {
   constructor(
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
-    @Inject(UpcomingTitles) private readonly upcoming: UpcomingTitles,
     @Inject(UpcomingShelfPages) private readonly shelves: UpcomingShelfPages,
+    @Inject(UpcomingSearch) private readonly searches: UpcomingSearch,
   ) {}
+
+  /**
+   * Upcoming movies and shows `?q=` finds on TMDB that no library holds, the
+   * most popular first. Held to the PIN lock as the shelves are, since what
+   * it leaves out says what the libraries hold.
+   */
+  @Get(UPCOMING_SEARCH_PATH)
+  async search(@Query(UPCOMING_SEARCH_PARAM) query: unknown): Promise<UpcomingSearchResult> {
+    if (query !== undefined && typeof query !== 'string') throw new BadRequestException(BAD_QUERY)
+    requireTmdb({ tmdb: this.tmdb, toDo: TMDB_TO_SEARCH })
+    return this.searches.search(query ?? '').catch(tmdbUnavailable)
+  }
 
   /** The three shelves, the same for every viewer: none of it is in a library, so no lock holds it. */
   @Get(UPCOMING_PATH)
   async list(): Promise<Upcoming> {
     requireTmdb({ tmdb: this.tmdb, toDo: TMDB_TO_DO })
-    return this.upcoming.read().catch(tmdbUnavailable)
+    return this.shelves.shelves().catch(tmdbUnavailable)
   }
 
   /**
-   * A page of one shelf, the soonest out first, after `?after=`, the cursor
+   * A page of one shelf, the most popular first, after `?after=`, the cursor
    * the page before answered. Public to the PIN lock: no library holds it.
    */
   @Get(UPCOMING_SHELF_PATH)
@@ -97,6 +119,7 @@ export class UpcomingController {
       tagline: item.tagline,
       genres: item.genres,
       runtime: item.runtime,
+      kind: upcomingKindOf({ ...item, type: ask.type }),
     }
   }
 }

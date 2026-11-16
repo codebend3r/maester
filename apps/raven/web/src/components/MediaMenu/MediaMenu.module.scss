@@ -9,7 +9,8 @@
 
 /*
  * In a list row or a tile the menu takes its own cell instead, on the
- * ground rather than over a picture.
+ * ground rather than over a picture. A row of buttons (a page's header) sets
+ * `--menu-trigger-size` and `--menu-trigger-fill` so it matches them.
  */
 .inline {
   position: relative;
@@ -17,13 +18,15 @@
   right: auto;
 
   .trigger {
-    background: transparent;
+    width: var(--menu-trigger-size, 2rem);
+    height: var(--menu-trigger-size, 2rem);
+    background: var(--menu-trigger-fill, transparent);
     box-shadow: none;
     backdrop-filter: none;
 
     &:hover,
     &[aria-expanded='true'] {
-      background: var(--color-moss);
+      background: var(--menu-trigger-hover, var(--color-moss));
     }
   }
 }

@@ -153,11 +153,7 @@ const EpisodeRow = ({ episode }: EpisodeRowProps) => {
       </div>
       {!select.selecting && (
         <span className={styles.actions}>
-          <WatchedToggle
-            {...toggle}
-            label={SEASON_COPY.watched(episode.title)}
-            isLabelShown={false}
-          />
+          <WatchedToggle {...toggle} label={SEASON_COPY.watched(episode.title)} />
           {file && (
             <Link
               {...watchLink({ media: file, session: SEASON_SESSION })}

@@ -95,6 +95,10 @@ export type FetchedItem = {
   runtime: number | null
   studio: string | null
   genres: string[]
+  /** TMDB's ids of those genres, which do not change with the language asked for. */
+  genreIds: number[]
+  /** The language it was made in, as TMDB writes it: `ja`. */
+  originalLanguage: string | null
   imdbId: string | null
   tvdbId: string | null
   /** The TMDB collection a movie belongs to; null for one in none, and for anything but a movie. */
@@ -130,6 +134,8 @@ export const BLANK_ITEM: Omit<FetchedItem, 'type' | 'tmdbId' | 'number' | 'title
   runtime: null,
   studio: null,
   genres: [],
+  genreIds: [],
+  originalLanguage: null,
   imdbId: null,
   tvdbId: null,
   saga: null,
@@ -501,6 +507,8 @@ export const toShow = ({ body, country, language }: ToShowProps): FetchedItem | 
     runtime: number(list(show.episode_run_time)[0]) || null,
     studio: text(records(show.networks)[0]?.name ?? null),
     genres: records(show.genres).flatMap((genre) => text(genre.name) ?? []),
+    genreIds: records(show.genres).flatMap((genre) => number(genre.id) ?? []),
+    originalLanguage: text(show.original_language),
     imdbId: text(external.imdb_id),
     tvdbId: idOf(external.tvdb_id),
     saga: null,
@@ -604,6 +612,8 @@ export const toMovie = ({ body, country, language }: ToMovieProps): FetchedItem 
     runtime: number(movie.runtime) || null,
     studio: text(records(movie.production_companies)[0]?.name ?? null),
     genres: records(movie.genres).flatMap((genre) => text(genre.name) ?? []),
+    genreIds: records(movie.genres).flatMap((genre) => number(genre.id) ?? []),
+    originalLanguage: text(movie.original_language),
     imdbId: text(record(movie.external_ids).imdb_id) ?? text(movie.imdb_id),
     tvdbId: null,
     saga: extras.saga,
@@ -739,6 +749,9 @@ export type DiscoveredTitle = {
   released: string
   poster: string | null
   popularity: number
+  /** TMDB's genre ids, `[16, 10759]`, and the language it was made in, `ja`: what tells anime apart. */
+  genreIds: number[]
+  originalLanguage: string | null
 }
 
 const toDiscoveredTitle = (entry: Record<string, unknown>): DiscoveredTitle | null => {
@@ -752,6 +765,8 @@ const toDiscoveredTitle = (entry: Record<string, unknown>): DiscoveredTitle | nu
     released,
     poster: imagePath(entry.poster_path),
     popularity: number(entry.popularity) ?? 0,
+    genreIds: list(entry.genre_ids).filter(isNumber),
+    originalLanguage: text(entry.original_language),
   }
 }
 

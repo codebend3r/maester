@@ -1,13 +1,15 @@
 import { Icon } from '@raven/native'
 import { type Search, useSearch } from '@raven/ui/headless'
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 
 import { Text } from '@/layouts/Text'
 import { CLEAR_SEARCH } from '@/layouts/searchKit'
 import { SEARCH_EVERY_LIBRARY } from '@/layouts/shelfKit'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
+import { useSearchFocus } from '@/stores/searchFocus'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
-import { BODY_FONT } from '@/theme/fonts'
+import { DISPLAY_FONT } from '@/theme/fonts'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
 
@@ -23,9 +25,11 @@ type TouchSearchBarProps = {
 }
 
 /**
- * The search box every touch page that searches wears: always in view, in large type, with a
- * button beside it that runs the search and, while it holds text, one that empties it. The
- * keyboard's Search key runs it too, and either at once: nothing is asked while typing.
+ * The search box every touch page that searches wears, the web's site search: an underline
+ * rather than a box, its words in the display face, the search icon at its start, which runs
+ * the search, and while it holds text a button that empties it. The keyboard's Search key runs
+ * it too, and either at once: nothing is asked while typing. Focused, the underline darkens
+ * and the header fades the page's top under it (`SearchFade`).
  */
 export const TouchSearchBar = ({
   search,
@@ -35,15 +39,33 @@ export const TouchSearchBar = ({
 }: TouchSearchBarProps) => {
   const styles = useStyles()
   const colours = useTheme((theme) => theme.palette)
+  const [isFocused, setFocused] = useState(false)
+  const focus = (isNow: boolean) => {
+    setFocused(isNow)
+    useSearchFocus.setState({ isFocused: isNow })
+  }
+  // A field that leaves the screen while focused takes the fade with it.
+  useEffect(() => () => useSearchFocus.setState({ isFocused: false }), [])
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, isFocused && styles.focused]}>
+      <Pressable
+        accessibilityLabel={TOUCH_NAV_COPY.runSearch}
+        accessibilityRole="button"
+        hitSlop={SIZES.space1}
+        onPress={onRun}
+        style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+      >
+        <Icon colour={colours.muted} name={APP_ICONS.search} size={SIZES.textXl} />
+      </Pressable>
       <TextInput
         accessibilityLabel={label}
         autoCapitalize="none"
         // oxlint-disable-next-line jsx-a11y/no-autofocus -- a search screen opens to be typed in, as iOS's own do
         autoFocus={isPreferred}
         autoCorrect={false}
+        onBlur={() => focus(false)}
         onChangeText={search.setText}
+        onFocus={() => focus(true)}
         onSubmitEditing={onRun}
         placeholder={label}
         placeholderTextColor={colours.muted}
@@ -62,15 +84,6 @@ export const TouchSearchBar = ({
           <Text style={styles.clear}>{CLEAR_SEARCH.text}</Text>
         </Pressable>
       )}
-      <Pressable
-        accessibilityLabel={TOUCH_NAV_COPY.runSearch}
-        accessibilityRole="button"
-        hitSlop={SIZES.space1}
-        onPress={onRun}
-        style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-      >
-        <Icon colour={colours.text} name={APP_ICONS.search} size={SIZES.textXl} />
-      </Pressable>
     </View>
   )
 }
@@ -98,24 +111,27 @@ export const SearchEveryLibrary = ({ onSearch }: SearchEveryLibraryProps) => {
   )
 }
 
+/** The underline's width at rest, and focused, when it thickens as the web's ring does. */
+const UNDERLINE = { rest: 1, focused: 2 } as const
+
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     bar: {
       flexDirection: 'row',
       alignItems: 'center',
       minHeight: SIZES.fieldHeight,
-      borderRadius: SIZES.radius,
-      borderWidth: 1,
-      borderColor: colours.line,
-      backgroundColor: colours.raised,
+      borderBottomWidth: UNDERLINE.rest,
+      borderBottomColor: colours.line,
+      backgroundColor: 'transparent',
     },
+    focused: { borderBottomWidth: UNDERLINE.focused, borderBottomColor: colours.text },
     input: {
       flex: 1,
       alignSelf: 'stretch',
       color: colours.text,
-      fontFamily: BODY_FONT,
+      fontFamily: DISPLAY_FONT,
       fontSize: SIZES.textXl,
-      paddingHorizontal: SIZES.space2,
+      paddingRight: SIZES.space1,
     },
     action: {
       minWidth: SIZES.fieldHeight,

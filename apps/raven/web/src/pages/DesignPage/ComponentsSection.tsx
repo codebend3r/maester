@@ -144,9 +144,9 @@ export const ComponentsSection = () => (
         <WatchedMark watched />
         <WatchedCount watched={3} total={9} />
         <WatchedCount watched={9} total={9} />
-        <WatchedToggle state="unwatched" onToggle={noop} />
-        <WatchedToggle state="partly" onToggle={noop} />
-        <WatchedToggle state="watched" onToggle={noop} />
+        <WatchedToggle state="unwatched" onToggle={noop} isLabelShown />
+        <WatchedToggle state="partly" onToggle={noop} isLabelShown />
+        <WatchedToggle state="watched" onToggle={noop} isLabelShown />
       </div>
     </Specimen>
 

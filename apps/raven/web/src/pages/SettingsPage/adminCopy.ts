@@ -10,6 +10,12 @@ import {
 
 export const ADMIN_COPY = {
   heading: 'Admin',
+  tabs: {
+    label: 'Admin',
+    playback: 'Playback and display',
+    server: 'Server',
+    access: 'Access',
+  },
   scans: 'Library scans',
   stop: 'Cancel all running scans',
   hint: 'Shows scans running across every library. Cancelling stops only the work running now; scans can be started again from each library.',

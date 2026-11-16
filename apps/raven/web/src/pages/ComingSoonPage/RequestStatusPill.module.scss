@@ -1,0 +1,22 @@
+.pill {
+  display: inline-grid;
+  padding: var(--space-0) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: var(--line-tight);
+  white-space: nowrap;
+}
+
+.pill[data-status='willDownload'],
+.pill[data-status='downloading'],
+.pill[data-status='downloaded'] {
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+}
+
+.pill[data-status='notDownloadable'] {
+  background: var(--color-amber);
+  color: var(--color-night);
+}

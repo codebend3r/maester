@@ -44,12 +44,15 @@ describe('DownloadButton', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('marks itself wide, so the header makes room for its label', () => {
+  it('is the arrow alone, named by its hover title', () => {
     usePlayerPrefs.setState({ opensInRavenPlayer: true })
     render(
       <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.saga, libraryId: 2, tmdbId: '119' }} />,
     )
-    expect(screen.getByRole('button', { name: 'Download to Raven' })).toHaveAttribute('data-wide')
+    const button = screen.getByRole('button', { name: 'Download to Raven' })
+    expect(button).toHaveAttribute('title', 'Download to Raven')
+    expect(button).not.toHaveAttribute('data-wide')
+    expect(button).toHaveTextContent('')
   })
 
   it('opens the saga download link in Raven when pressed', async () => {

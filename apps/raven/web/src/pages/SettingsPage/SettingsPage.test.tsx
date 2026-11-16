@@ -15,6 +15,7 @@ import {
 } from '@raven/core'
 import { usePlayerPrefs } from '@raven/ui/headless'
 import { api } from '@/lib/api'
+import { ADMIN_COPY } from '@/pages/SettingsPage/adminCopy'
 import { AdminPage } from '@/pages/SettingsPage/AdminPage'
 import { SettingsPage as ViewerSettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { held } from '@/test/held'
@@ -276,6 +277,7 @@ describe('the admin lock on AdminPage', () => {
     await userEvent.type(screen.getByLabelText('Admin password'), rightPassword)
     await userEvent.click(screen.getByRole('button', { name: 'Turn off' }))
     await waitFor(() => expect(screen.queryByLabelText('Admin password')).toBeNull())
+    await userEvent.click(await screen.findByRole('tab', { name: ADMIN_COPY.tabs.access }))
     expect(toggle()).not.toBeChecked()
     expect(spies.unlock.mock.calls).toEqual([['soft-wing-27'], [rightPassword]])
   })
@@ -293,6 +295,7 @@ describe('the admin lock on AdminPage', () => {
     spies.lock.mockImplementation(async () => ({ state: 'turningOn', remainingMs: 15_000 }))
     spies.keep.mockImplementation(async () => ({ state: 'off' }))
     renderWithProviders({ ui: <SettingsPage />, adminLock: { state: 'off' } })
+    await userEvent.click(screen.getByRole('tab', { name: ADMIN_COPY.tabs.access }))
     expect(toggle()).not.toBeChecked()
 
     await userEvent.click(toggle())
@@ -525,9 +528,10 @@ describe('accounts on SettingsPage', () => {
       renderSignedIn(fakeAccount({ isOwner: true }))
       cleanup()
       renderWithProviders({ ui: <AdminPage />, account: fakeAccount({ isOwner: true }) })
-      await screen.findByRole('heading', { name: 'Users' })
       const remuxOnly = await screen.findByRole('radio', { name: /Remux only/ })
       expect(remuxOnly).toBeEnabled()
+      await userEvent.click(screen.getByRole('tab', { name: ADMIN_COPY.tabs.access }))
+      await screen.findByRole('heading', { name: 'Users' })
       expect(screen.queryByText(/admin lock/i)).toBeNull()
       expect(screen.queryByRole('checkbox', { name: /^Admin lock/ })).toBeNull()
       expect(adminLock).not.toHaveBeenCalled()

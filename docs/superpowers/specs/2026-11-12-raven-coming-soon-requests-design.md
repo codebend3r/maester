@@ -18,7 +18,7 @@ Coming soon shelves what TMDB says is on its way, but a card only opens TMDB, an
 | Status | Shown as | When |
 | --- | --- | --- |
 | `searching` | Searching | The arr's search command is still queued or running |
-| `notDownloadable` | Not downloadable | The search finished and nothing was grabbed, queued or kept |
+| `notDownloadable` | Tracked and ready | The search finished and nothing was grabbed, queued or kept |
 | `willDownload` | Will download soon | A release is grabbed and waits in the download client's queue |
 | `downloading` | Currently downloading | The download client is fetching it |
 | `downloaded` | Download complete, moving to library | The download finished and is importing, or the arr holds the file |
@@ -119,7 +119,7 @@ stateDiagram-v2
 `GET /api/requests` reads each request's status from its arr, at most once every 30 seconds per request, and keeps the answer in the row. In order: a `queue/details` entry importing or completed is `downloaded`; one downloading is `downloading`; any other queue entry is `willDownload`; no queue entry and a file (Radarr's `hasFile`, Sonarr's `episodeFileCount` over 0) is `downloaded`; else a search command still queued or started is `searching`; else `notDownloadable`. Both arrs keep the title monitored, so a title not out yet reads as Not downloadable until its release appears, then moves on by itself.
 
 > [!WARNING]
-> Many Coming soon titles are not released yet, so most requests will read Not downloadable for weeks. That is true, and the arr keeps watching, but members may read it as final. The page's line under the status says the server keeps looking.
+> Many Coming soon titles are not released yet, so most requests will read Tracked and ready for weeks. That is true, and the arr keeps watching, but members may read it as final. The page's line under the status says the server keeps looking.
 
 ### Web
 

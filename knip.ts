@@ -59,7 +59,10 @@ export default {
        * function's deno.json, which knip does not read.
        */
       entry: ['functions/*/index.ts', 'functions/*/*.test.ts'],
-      paths: { '@/alert': ['functions/signup-alert/alert.ts'] },
+      paths: {
+        '@/alert': ['functions/signup-alert/alert.ts'],
+        '@/template': ['functions/signup-alert/template.ts'],
+      },
       ignoreDependencies: ['nodemailer'],
     },
     'libs/raven/core': {

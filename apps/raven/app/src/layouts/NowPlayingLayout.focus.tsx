@@ -108,7 +108,7 @@ const QueueEntry = ({ row, onJump }: QueueEntryProps) => {
           {row.title}
         </Text>
         <Text numberOfLines={1} style={styles.muted}>
-          {row.line}
+          {MUSIC_COPY.facts([row.line, row.length])}
         </Text>
       </View>
     </FocusRow>
