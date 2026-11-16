@@ -8,9 +8,11 @@ import {
   Inject,
   Param,
   Post,
+  Req,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  type MemberRequest,
   type TitleHolding,
   type TitleRequest,
   type TitleRequests,
@@ -20,7 +22,9 @@ import {
   UPCOMING_TITLE_PARAMS,
 } from '@raven/core'
 import { CACHE_POLICIES, HEADERS } from '@shared/server'
-import { ForViewers } from '@/admin/adminGuard'
+import type { FastifyRequest } from 'fastify'
+import { AdminOnly, ForViewers } from '@/admin/adminGuard'
+import { Management } from '@/auth/management'
 import { Public } from '@/lock/lockGuard'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 import { ViewingAccount } from '@/media/viewingAccountParam'
@@ -42,13 +46,27 @@ const answerOf = (error: unknown): never => {
 /** Coming soon's requests: members ask for a title to be downloaded for everyone. */
 @Controller()
 export class RequestsController {
-  constructor(@Inject(DownloadRequests) private readonly requests: DownloadRequests) {}
+  constructor(
+    @Inject(DownloadRequests) private readonly requests: DownloadRequests,
+    @Inject(Management) private readonly management: Pick<Management, 'canManage'>,
+  ) {}
 
   /** Every request and where it stands, and the caller's own budget. No library holds any of it. */
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(REQUEST_PATHS.requests)
-  list(@ViewingAccount() account: AccountKey): Promise<TitleRequests> {
-    return this.requests.list({ account })
+  list(
+    @ViewingAccount() account: AccountKey,
+    @Req() request: FastifyRequest,
+  ): Promise<TitleRequests> {
+    return this.requests.list({ account, isUnlimited: this.management.canManage({ request }) })
+  }
+
+  /** Every account's requests and whose each was, for the owner alone: the one read of requests that names accounts. */
+  @AdminOnly()
+  @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
+  @Get(REQUEST_PATHS.everyone)
+  everyone(@ViewingAccount() account: AccountKey): Promise<MemberRequest[]> {
+    return this.requests.everyone({ account })
   }
 
   /**
@@ -66,11 +84,12 @@ export class RequestsController {
     return this.requests.holding(titleAskOf({ type, tmdbId })).catch(answerOf)
   }
 
-  /** Asks for `{ type, tmdbId }` to be downloaded; 409 once someone has or its arr holds it already, or while the caller's budget is spent. */
+  /** Asks for `{ type, tmdbId }` to be downloaded; 409 once someone has or its arr holds it already, or while the caller's budget is spent, which whoever manages raven has none of. */
   @ForViewers()
   @Post(REQUEST_PATHS.requests)
   async create(
     @ViewingAccount() account: AccountKey,
+    @Req() request: FastifyRequest,
     @Body() body: unknown,
   ): Promise<TitleRequest> {
     const ask = parseBody({
@@ -78,6 +97,9 @@ export class RequestsController {
       body,
       message: 'Send { type, tmdbId }: a movie or show and its TMDB id.',
     })
-    return this.requests.request({ account, ask }).catch(answerOf)
+    // Whoever manages raven asks as often as they like; the budget is the members'.
+    return this.requests
+      .request({ account, ask, isUnlimited: this.management.canManage({ request }) })
+      .catch(answerOf)
   }
 }

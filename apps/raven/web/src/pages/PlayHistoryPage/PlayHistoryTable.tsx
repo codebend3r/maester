@@ -4,11 +4,9 @@ import { PartLink, PlayedFrom } from '@/pages/PlayHistoryPage/PlayedCells'
 import { playedLinks } from '@/pages/PlayHistoryPage/playedLinks'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
 import styles from '@/pages/PlayHistoryPage/PlayHistoryPage.module.scss'
+import type { AccountName } from '@/lib/useAccounts'
 
 const when = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-
-/** How a table names an account: by its email when the owner's list has it. */
-export type AccountName = (accountId: string) => string
 
 const COLUMNS = {
   when: 'when',

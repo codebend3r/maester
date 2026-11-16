@@ -23,6 +23,10 @@ import styles from '@/pages/ComingSoonPage/UpcomingTitlePage.module.scss'
 
 const BACK_TO_COMING_SOON = { to: APP_PATHS.comingSoon, label: COMING_SOON_COPY.title } as const
 
+/** What the title is: a movie, a show, a documentary or anime as the server names it, else its type alone from an older server. */
+const kindOf = ({ kind, type }: UpcomingDetails): string =>
+  kind === undefined ? COMING_SOON_COPY.kinds[type] : COMING_SOON_COPY.upcomingKinds[kind]
+
 type TitleDetailsProps = {
   /** The title as the address names it, which is all a request sends. */
   ask: TitleRequestAsk
@@ -34,7 +38,7 @@ const TitleDetails = ({ ask, details }: TitleDetailsProps) => {
   const headingId = useId()
   const facts = [
     details.released === null ? null : formatAirDate(details.released),
-    COMING_SOON_COPY.kinds[details.type],
+    kindOf(details),
     details.runtime === null ? null : COMING_SOON_COPY.minutes(details.runtime),
     ...details.genres,
   ].filter((fact): fact is string => fact !== null)

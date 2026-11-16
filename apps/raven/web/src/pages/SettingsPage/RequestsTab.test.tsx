@@ -23,6 +23,7 @@ const REQUESTS: TitleRequests = {
       status: REQUEST_STATUSES.downloading,
       requestedAt: '2026-11-12T10:00:00.000Z',
       isMine: true,
+      libraryItemId: null,
     },
     {
       type: ITEM_TYPES.show,
@@ -31,6 +32,7 @@ const REQUESTS: TitleRequests = {
       status: REQUEST_STATUSES.notDownloadable,
       requestedAt: '2026-11-11T10:00:00.000Z',
       isMine: true,
+      libraryItemId: null,
     },
     {
       type: ITEM_TYPES.movie,
@@ -39,6 +41,7 @@ const REQUESTS: TitleRequests = {
       status: REQUEST_STATUSES.willDownload,
       requestedAt: '2026-11-10T10:00:00.000Z',
       isMine: false,
+      libraryItemId: null,
     },
   ],
   budget: { limit: 10, left: 8, nextAt: null },
@@ -85,7 +88,7 @@ describe("Settings' Requests tab", () => {
     expect(within(focker!).getByText('Movie')).toBeInTheDocument()
     expect(within(focker!).getByText('Currently downloading')).toBeInTheDocument()
     expect(within(bear!).getByText('TV show')).toBeInTheDocument()
-    expect(within(bear!).getByText('Not downloadable')).toBeInTheDocument()
+    expect(within(bear!).getByText('Tracked and ready')).toBeInTheDocument()
     expect(within(table).queryByText('Sinners')).toBeNull()
     expect(screen.getByText('8 of 10 requests left today')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Playback' })).toBeNull()

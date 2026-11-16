@@ -1,23 +1,34 @@
 import {
   UPCOMING_SHELF_SIZES,
   UPCOMING_SHELVES,
+  type TitleRequest,
+  type TitleRequests,
+  type Upcoming,
   type UpcomingShelf,
   type UpcomingTitle,
+  addedRequestsOf,
+  pendingRequestsOf,
 } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
-import { useId } from 'react'
-import { Link } from 'react-router-dom'
+import { type ComponentType, useId } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Loading, SkeletonCards } from '@/components/Skeleton/Skeleton'
+import { Tabs } from '@/components/Tabs/Tabs'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
-import { upcomingQuery } from '@/lib/queries'
+import { useCanManage } from '@/lib/management'
+import { everyonesRequestsQuery, requestsQuery, upcomingQuery } from '@/lib/queries'
 import styles from '@/pages/ComingSoonPage/ComingSoonPage.module.scss'
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { UpcomingCard } from '@/pages/ComingSoonPage/UpcomingCard'
-import { comingSoonShelfPath } from '@/lib/appPaths'
+import { APP_PATHS, comingSoonShelfPath } from '@/lib/appPaths'
 import { CARD_PICTURES } from '@/lib/cardPictures'
+import { handled } from '@/lib/handled'
+import { COMING_SOON_TABS, type ComingSoonTab } from '@/pages/ComingSoonPage/comingSoonTabs'
+import { EveryonesRequests } from '@/pages/ComingSoonPage/EveryonesRequests'
+import { AddedRequests, PendingRequests } from '@/pages/ComingSoonPage/RequestsGrid'
 
 /** How many rows of posters a shelf holds, however many fit across. */
 const SHELF_ROWS = { one: 'one', two: 'two' } as const
@@ -40,6 +51,7 @@ const SHELVES = [
   { name: UPCOMING_SHELVES.movies, rows: SHELF_ROWS.two },
   { name: UPCOMING_SHELVES.shows, rows: SHELF_ROWS.two },
   { name: UPCOMING_SHELVES.documentaries, rows: SHELF_ROWS.one },
+  { name: UPCOMING_SHELVES.anime, rows: SHELF_ROWS.one },
 ] as const satisfies readonly ShelfPlan[]
 
 type ShelfProps = {
@@ -83,14 +95,95 @@ const Shelf = ({ plan, titles }: ShelfProps) => {
   )
 }
 
+type ShelfOfProps = { upcoming: Upcoming | undefined; plan: ShelfPlan }
+
+/** A shelf's titles once the shelves are read; an older server sends no anime, which reads as none announced. */
+const shelfOf = ({ upcoming, plan }: ShelfOfProps): readonly UpcomingTitle[] | undefined =>
+  upcoming === undefined ? undefined : (upcoming[plan.name] ?? [])
+
 /**
- * `/coming-soon`: what TMDB says is on its way, the most popular first. Two
- * rows of movies, two of TV shows, then one row of documentaries of both
- * kinds, each card a poster as a library shows them.
+ * The Upcoming tab: what TMDB says is on its way, the most popular first.
+ * Two rows of movies, two of TV shows, then one row of documentaries and one
+ * of anime, each of both kinds, each card a poster as a library shows them.
  */
-export const ComingSoonPage = () => {
-  const titleId = useId()
+const UpcomingShelves = () => {
   const upcoming = useQuery(upcomingQuery)
+  return (
+    <div className={styles.panel}>
+      {upcoming.isError && (
+        <p className={styles.message} role="alert">
+          {upcoming.error.message}
+        </p>
+      )}
+      {!upcoming.isError &&
+        SHELVES.map((plan) => (
+          <Shelf key={plan.name} plan={plan} titles={shelfOf({ upcoming: upcoming.data, plan })} />
+        ))}
+    </div>
+  )
+}
+
+const NotManaging = () => <p className={styles.message}>{COMING_SOON_COPY.everyone.managersOnly}</p>
+
+const MANAGE_STATES = { managing: 'managing', refused: 'refused' } as const
+
+type ManageState = (typeof MANAGE_STATES)[keyof typeof MANAGE_STATES]
+
+const EVERYONE_VIEWS = {
+  [MANAGE_STATES.managing]: EveryonesRequests,
+  [MANAGE_STATES.refused]: NotManaging,
+} as const satisfies Record<ManageState, ComponentType>
+
+/** The All requests tab to whoever manages raven; anyone else who opens its address is told whose it is, and the server is asked nothing. */
+const EveryonesPanel = () => {
+  const View = EVERYONE_VIEWS[useCanManage() ? MANAGE_STATES.managing : MANAGE_STATES.refused]
+  return <View />
+}
+
+const TAB_PANELS = {
+  [COMING_SOON_TABS.upcoming]: UpcomingShelves,
+  [COMING_SOON_TABS.pending]: PendingRequests,
+  [COMING_SOON_TABS.added]: AddedRequests,
+  [COMING_SOON_TABS.everyone]: EveryonesPanel,
+} as const satisfies Record<ComingSoonTab, ComponentType>
+
+/** Where each tab lives, so a tab is a link that survives a reload. */
+const TAB_PATHS = {
+  [COMING_SOON_TABS.upcoming]: APP_PATHS.comingSoon,
+  [COMING_SOON_TABS.pending]: APP_PATHS.comingSoonPending,
+  [COMING_SOON_TABS.added]: APP_PATHS.comingSoonAdded,
+  [COMING_SOON_TABS.everyone]: APP_PATHS.comingSoonEveryone,
+} as const satisfies Record<ComingSoonTab, string>
+
+type ComingSoonPageProps = { tab: ComingSoonTab }
+
+/** Picks the caller's requests one tab holds, to count them. */
+type RequestPick = (list: TitleRequests) => readonly TitleRequest[]
+
+/**
+ * `/coming-soon`, `/coming-soon/pending` and `/coming-soon/added`: three
+ * tabs, each its own route. Upcoming is what TMDB says is on its way;
+ * Pending is the caller's requests, and the titles the downloaders hold
+ * already, that are still on their way, with how many requests are left
+ * today; Added is those a library holds now or that have downloaded.
+ * Whoever manages raven has a fourth, All requests: every account's
+ * requests and whose each was.
+ */
+export const ComingSoonPage = ({ tab }: ComingSoonPageProps) => {
+  const titleId = useId()
+  const navigate = useNavigate()
+  const { data: requests } = useQuery(requestsQuery)
+  const countOf = (pick: RequestPick) =>
+    requests === undefined ? {} : { count: pick(requests).length }
+  // Only whoever manages raven sees the tab of every account's requests, or is asked for them.
+  const canManage = useCanManage()
+  const { data: everyones } = useQuery({ ...everyonesRequestsQuery, enabled: canManage })
+  const everyoneTab = {
+    value: COMING_SOON_TABS.everyone,
+    label: COMING_SOON_COPY.tabs.everyone,
+    ...(everyones === undefined ? {} : { count: everyones.length }),
+  }
+  const Panel = TAB_PANELS[tab]
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <header className={styles.header}>
@@ -100,15 +193,27 @@ export const ComingSoonPage = () => {
         </PageTitle>
         <p className={styles.intro}>{COMING_SOON_COPY.intro}</p>
       </header>
-      {upcoming.isError && (
-        <p className={styles.message} role="alert">
-          {upcoming.error.message}
-        </p>
-      )}
-      {!upcoming.isError &&
-        SHELVES.map((plan) => (
-          <Shelf key={plan.name} plan={plan} titles={upcoming.data?.[plan.name]} />
-        ))}
+      <Tabs
+        label={COMING_SOON_COPY.tabs.label}
+        tabs={[
+          { value: COMING_SOON_TABS.upcoming, label: COMING_SOON_COPY.tabs.upcoming },
+          {
+            value: COMING_SOON_TABS.pending,
+            label: COMING_SOON_COPY.tabs.pending,
+            ...countOf(pendingRequestsOf),
+          },
+          {
+            value: COMING_SOON_TABS.added,
+            label: COMING_SOON_COPY.tabs.added,
+            ...countOf(addedRequestsOf),
+          },
+          ...(canManage || tab === COMING_SOON_TABS.everyone ? [everyoneTab] : []),
+        ]}
+        chosen={tab}
+        onChoose={(next) => handled(Promise.resolve(navigate(TAB_PATHS[next])))}
+      >
+        <Panel />
+      </Tabs>
       <TmdbCredit />
     </section>
   )

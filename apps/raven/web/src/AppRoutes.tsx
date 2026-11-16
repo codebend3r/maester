@@ -23,6 +23,7 @@ import { useIsDesktop } from '@/stores/desktop'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useLogToasts } from '@/lib/useLogToasts'
 import { APP_PATHS, comingSoonShelfPath } from '@/lib/appPaths'
+import { COMING_SOON_TABS } from '@/pages/ComingSoonPage/comingSoonTabs'
 
 /** What react-router matches when no other route of a frame does. */
 const NOT_FOUND_ROUTE = '*'
@@ -261,7 +262,22 @@ export const AppRoutes = () => {
                 <Route path={NOW_PLAYING_PATH} element={<NowPlayingPage />} />
                 <Route path={APP_PATHS.binge} element={<BingePage />} />
                 <Route path={APP_PATHS.continueWatching} element={<ContinueWatchingPage />} />
-                <Route path={APP_PATHS.comingSoon} element={<ComingSoonPage />} />
+                <Route
+                  path={APP_PATHS.comingSoon}
+                  element={<ComingSoonPage tab={COMING_SOON_TABS.upcoming} />}
+                />
+                <Route
+                  path={APP_PATHS.comingSoonPending}
+                  element={<ComingSoonPage tab={COMING_SOON_TABS.pending} />}
+                />
+                <Route
+                  path={APP_PATHS.comingSoonAdded}
+                  element={<ComingSoonPage tab={COMING_SOON_TABS.added} />}
+                />
+                <Route
+                  path={APP_PATHS.comingSoonEveryone}
+                  element={<ComingSoonPage tab={COMING_SOON_TABS.everyone} />}
+                />
                 {Object.values(UPCOMING_SHELVES).map((shelf) => (
                   <Route
                     key={shelf}

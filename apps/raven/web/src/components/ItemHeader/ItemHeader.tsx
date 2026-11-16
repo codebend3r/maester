@@ -164,8 +164,8 @@ const Backdrop = ({ backdrop }: BackdropProps) => (
 
 /** The content's columns for each kind of picture, or for none. */
 const LAYOUTS = {
-  [PICTURE_SHAPES.poster]: styles.content,
-  [PICTURE_SHAPES.still]: classNames([styles.content, styles.withStill]),
+  [PICTURE_SHAPES.poster]: classNames([styles.content, styles.withPicture]),
+  [PICTURE_SHAPES.still]: classNames([styles.content, styles.withPicture, styles.withStill]),
   [PICTURE_SHAPES.none]: classNames([styles.content, styles.noPicture]),
 } as const satisfies Record<PictureShape, string | undefined>
 
@@ -228,7 +228,7 @@ const PlayablePicture = ({
   className,
   content,
 }: PlayablePictureProps) => (
-  <Link {...link} className={`${className} ${styles.playable}`} aria-label={label}>
+  <Link {...link} className={`${className} ${styles.playable}`} aria-label={label} title={label}>
     {content}
     <span className={styles.playCorner} aria-hidden="true">
       <span className={styles.playMark}>
@@ -339,11 +339,12 @@ type ItemHeaderProps = {
   /** How the header sits under the way back; a movie's or show's pulls its poster and title closer. */
   variant?: ItemHeaderVariant
   /**
-   * The page's own actions: Play, favourite, Watched, Select. One whose label
-   * cannot shrink marks itself `data-wide`, and the row makes room for it.
+   * The page's own actions: Play, favourite, Watched, Select, and a movie's or
+   * an episode's menu at the end. One whose label cannot shrink marks itself
+   * `data-wide`, and the row makes room for it.
    */
   children?: ReactNode
-  /** The actions that change the item: the editors, Fix match, the file's menu. */
+  /** The actions that change the item: the editors, Fix match, In hero. */
   manage?: ReactNode
 }
 

@@ -5,21 +5,20 @@ import { Animated, StyleSheet, View, type ViewStyle } from 'react-native'
 
 import { PLAYER_COPY } from '@/layouts/playerKit'
 import { Text } from '@/layouts/Text'
-import { useMarkFade } from '@/layouts/useMarkFade'
+import { MARK_TIMINGS, useMarkFade } from '@/layouts/useMarkFade'
 import { SIZES } from '@/theme/appTheme'
 import { pictureStyles, useTheme } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
 
 const MARK_ICON = 24
 
-/** Where a mark stands over the picture: at the side a skip was tapped on, or along the top for a hold. */
-const MARK_PLACES = { left: 'left', right: 'right', top: 'top' } as const
+/** Where a mark stands: in the middle for a skip, of the picture or of an album's cover, or along the top for a hold. */
+const MARK_PLACES = { centre: 'centre', top: 'top' } as const
 
 type MarkPlace = (typeof MARK_PLACES)[keyof typeof MARK_PLACES]
 
 type SideLook = {
   icon: IconName
-  place: MarkPlace
   /** What a skip that way is called aloud, by its seconds. */
   skipped: (seconds: number) => string
   /** What a finger held on that side is called aloud, by its speed. */
@@ -30,13 +29,11 @@ type SideLook = {
 const SIDE_LOOKS = {
   [-1]: {
     icon: APP_ICONS.rewind,
-    place: MARK_PLACES.left,
     skipped: PLAYER_COPY.back,
     held: PLAYER_COPY.holdBack,
   },
   [1]: {
     icon: APP_ICONS.forward,
-    place: MARK_PLACES.right,
     skipped: PLAYER_COPY.forward,
     held: PLAYER_COPY.holdForward,
   },
@@ -52,14 +49,13 @@ type PictureMarkProps = {
   sides: ViewStyle
 }
 
-/** A mark on the player's glass over the picture, out of the finger's way. Said aloud as it appears. */
+/** A mark on the player's glass over the picture or a cover. Said aloud as it appears. */
 const PictureMark = ({ icon, text, label, place, isFading, sides }: PictureMarkProps) => {
   const styles = useStyles()
   const colour = useTheme((theme) => theme.overPicture.text)
-  const { opacity, isGone } = useMarkFade({ isFading })
+  const { opacity, isGone } = useMarkFade({ isFading, timing: MARK_TIMINGS.mark })
   const slots = {
-    [MARK_PLACES.left]: styles.left,
-    [MARK_PLACES.right]: styles.right,
+    [MARK_PLACES.centre]: styles.centre,
     [MARK_PLACES.top]: styles.top,
   } as const satisfies Record<MarkPlace, ViewStyle>
   return (
@@ -81,7 +77,11 @@ const PictureMark = ({ icon, text, label, place, isFading, sides }: PictureMarkP
 
 type SkipMarkProps = Pick<PictureMarkProps, 'sides'> & { step: SkipStep }
 
-/** A skip's seconds at the side it went, standing a moment and fading. Key it by the skip, so each starts afresh. */
+/**
+ * How far a skip went, "10s" beside its way's icon, in the middle of what it stands over (the
+ * picture, or Now Playing's cover), standing a moment and fading. Key it by the skip, so each
+ * starts afresh.
+ */
 export const SkipMark = ({ step, sides }: SkipMarkProps) => {
   const look = SIDE_LOOKS[step.direction]
   return (
@@ -89,7 +89,7 @@ export const SkipMark = ({ step, sides }: SkipMarkProps) => {
       icon={look.icon}
       isFading
       label={look.skipped(step.seconds)}
-      place={look.place}
+      place={MARK_PLACES.centre}
       sides={sides}
       text={PLAYER_COPY.seconds(step.seconds)}
     />
@@ -110,11 +110,46 @@ export const HoldMark = ({ side, sides }: HoldMarkProps) => (
   />
 )
 
+/** How strongly the wash over a tapped half shows at its brightest, 0 to 1. */
+const AREA_WASH = 0.16
+
+type TapAreaFlashProps = { side: TouchSide }
+
+/**
+ * The half of the picture a double tap landed on, washed in the on-picture colour for a second
+ * and fading, so the viewer sees where each way's taps go. It says nothing aloud: the skip's
+ * mark does. Key it by the tap, so each starts afresh.
+ */
+export const TapAreaFlash = ({ side }: TapAreaFlashProps) => {
+  const styles = useStyles()
+  const { opacity, isGone } = useMarkFade({ isFading: true, timing: MARK_TIMINGS.area })
+  // The left half for back, the right for forward.
+  const halves = {
+    [-1]: styles.leftHalf,
+    [1]: styles.rightHalf,
+  } as const satisfies Record<TouchSide, ViewStyle>
+  return (
+    !isGone && (
+      <Animated.View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+        style={[styles.area, halves[side], { opacity }]}
+      >
+        <View style={styles.wash} />
+      </Animated.View>
+    )
+  )
+}
+
 const useStyles = pictureStyles((colours) =>
   StyleSheet.create({
-    left: { alignItems: 'flex-start', justifyContent: 'center' },
-    right: { alignItems: 'flex-end', justifyContent: 'center' },
+    centre: { alignItems: 'center', justifyContent: 'center' },
     top: { alignItems: 'center', justifyContent: 'flex-start' },
+    area: { position: 'absolute', top: 0, bottom: 0, width: '50%' },
+    leftHalf: { left: 0 },
+    rightHalf: { right: 0 },
+    wash: { flex: 1, backgroundColor: colours.text, opacity: AREA_WASH },
     // The player's glass, as the buttons wear it.
     mark: {
       flexDirection: 'row',

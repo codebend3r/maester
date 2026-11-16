@@ -4,6 +4,7 @@ import { type ComponentRef, type ReactNode, type Ref, useRef } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 import { openPickerSheet } from '@/layouts/Picker.touch'
+import { SearchFade } from '@/layouts/SearchFade'
 import { TouchBack } from '@/layouts/TouchBack'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
 import { useGoHome } from '@/layouts/useGoHome'
@@ -122,6 +123,7 @@ export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: T
   const styles = useStyles()
   return (
     <View style={styles.nav}>
+      {search !== undefined && <SearchFade />}
       <View style={styles.bar}>
         <View style={styles.side}>
           {onBack !== undefined && <TouchBack isRaised={isRaised} onPress={onBack} />}

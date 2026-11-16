@@ -143,11 +143,12 @@
 }
 
 /*
- * A still's top lines up with the title's, the library and the line over
- * the title in a row above both: the details share the content's rows.
+ * The picture's top, a poster's or a still's, lines up with the title's,
+ * the library and the line over the title in a row above both: the details
+ * share the content's rows. A subgrid is ignored inside layout containment,
+ * so the details are no size container; their body is.
  */
-.withStill {
-  grid-template-columns: var(--still-width) minmax(0, 1fr);
+.withPicture {
   grid-template-rows: auto auto;
   grid-template-areas:
     '. details'
@@ -173,6 +174,10 @@
     grid-area: body;
     align-self: start;
   }
+}
+
+.withStill {
+  grid-template-columns: var(--still-width) minmax(0, 1fr);
 }
 
 .noPicture {
@@ -265,7 +270,6 @@
 }
 
 .details {
-  container-type: inline-size;
   grid-area: details;
   display: grid;
   align-content: end;
@@ -279,6 +283,11 @@
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+}
+
+// The container the action rows' queries measure.
+.body {
+  container-type: inline-size;
 }
 
 .library {
@@ -414,6 +423,9 @@
  */
 .actions {
   --control-size: var(--control-size-tall);
+  --menu-trigger-size: var(--control-size);
+  --menu-trigger-fill: var(--color-moss);
+  --menu-trigger-hover: var(--color-moss-hi);
 
   display: grid;
   gap: var(--space-2);
@@ -450,6 +462,7 @@
   }
 
   .content,
+  .withPicture,
   .withStill {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
@@ -459,7 +472,7 @@
     gap: var(--space-4);
   }
 
-  .withStill {
+  .withPicture {
     .details {
       grid-template-rows: none;
       grid-template-areas: none;
@@ -508,7 +521,7 @@
 }
 
 /*
- * A wide action (`data-wide`, as Download to Raven is) has a label
+ * A wide action (`data-wide`, as Binge is) has a label
  * that neither wraps nor shrinks, so a row of four actions holding one needs
  * about 40rem on one line. Narrower than that, the row breaks into cells, and
  * the wide action takes a row of its own, as no cell holds it.

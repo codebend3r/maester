@@ -333,6 +333,7 @@ export const MediaMenu = (props: MediaMenuProps) => {
         type="button"
         className={styles.trigger}
         aria-label={label}
+        title={label}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}

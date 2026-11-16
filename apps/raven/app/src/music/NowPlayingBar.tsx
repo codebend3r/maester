@@ -42,8 +42,8 @@ const useCountMusicStarts = (): void => {
 
 /**
  * The strip while a track plays, each platform's own, under the screens by the thumb and across
- * the top of a TV: its cover, title and artists, play or pause and next; pressed, it opens Now
- * Playing.
+ * the top of a TV: its cover, title and artists, play or pause and next, and under the thumb an
+ * X that stops the music; pressed, it opens Now Playing.
  */
 export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) => {
   const router = useRouter()
@@ -52,6 +52,7 @@ export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) 
   const state = useAudioQueue((store) => store.state)
   const toggle = useAudioQueue((store) => store.toggle)
   const next = useAudioQueue((store) => store.next)
+  const clear = useAudioQueue((store) => store.clear)
   const isShown = useIsBarShown()
   useCountMusicStarts()
   return (
@@ -63,6 +64,7 @@ export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) 
           pictures === null ? null : trackCoverOf({ api, headersFor: pictures.headersFor, track })
         }
         isPlaying={state === AUDIO_STATES.playing || state === AUDIO_STATES.loading}
+        onClose={clear}
         onNext={next}
         onOpen={() => router.push(APP_ROUTES.nowPlaying)}
         onToggle={toggle}

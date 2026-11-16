@@ -7,7 +7,7 @@ import {
 import { Icon } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { api } from '@/lib/api'
+import { TmdbPoster } from '@/components/PosterImage/PosterImage'
 import { POSTER_SIZES } from '@/lib/posters'
 import { requestHoldingQuery, requestsQuery } from '@/lib/queries'
 import { comingSoonTitlePath } from '@/lib/appPaths'
@@ -21,14 +21,13 @@ const SHOWS_KIND = {
   [UPCOMING_SHELVES.movies]: false,
   [UPCOMING_SHELVES.shows]: false,
   [UPCOMING_SHELVES.documentaries]: true,
+  [UPCOMING_SHELVES.anime]: true,
 } as const satisfies Record<UpcomingShelf, boolean>
 
 type UpcomingCardProps = {
   title: UpcomingTitle
   /** The shelf it sits on, which says whether the card names its kind. */
   shelf: UpcomingShelf
-  /** How wide the poster shows, as the layout it sits in lays it out. */
-  sizes?: string
 }
 
 /**
@@ -38,7 +37,7 @@ type UpcomingCardProps = {
  * already, wears a green check in the poster's corner. It opens the title's
  * own page, where it can be requested.
  */
-export const UpcomingCard = ({ title, shelf, sizes = POSTER_SIZES.row }: UpcomingCardProps) => {
+export const UpcomingCard = ({ title, shelf }: UpcomingCardProps) => {
   const facts = [
     formatAirDate(title.released),
     SHOWS_KIND[shelf] ? COMING_SOON_COPY.kinds[title.type] : null,
@@ -52,13 +51,7 @@ export const UpcomingCard = ({ title, shelf, sizes = POSTER_SIZES.row }: Upcomin
     <li className={styles.card}>
       <Link to={comingSoonTitlePath(title)} className={styles.link}>
         <span className={styles.frame}>
-          <img
-            {...api.tmdbPosterSources(title.poster)}
-            sizes={sizes}
-            alt=""
-            loading="lazy"
-            decoding="async"
-          />
+          <TmdbPoster poster={title.poster} sizes={POSTER_SIZES.row} />
           {isRequested && (
             <span className={styles.marks}>
               <span className={styles.requested}>

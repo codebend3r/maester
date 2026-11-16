@@ -1,19 +1,32 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import {
   ITEM_TYPES,
   type MatchItemType,
+  REQUEST_STATUSES,
+  type TitleRequests,
   UPCOMING_SHELVES,
   type UpcomingPage,
   type UpcomingShelf,
   type UpcomingTitle,
 } from '@raven/core'
 import { api } from '@/lib/api'
+import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
+import { HIDE_REQUESTED_SEARCH } from '@/pages/ComingSoonPage/useHideRequested'
+import { useUpcomingFilter } from '@/stores/upcomingFilter'
 import { UpcomingShelfPage } from '@/pages/ComingSoonPage/UpcomingShelfPage'
 import { renderWithProviders } from '@/test/render'
 import { moveOnScreen, startOnScreen } from '@/test/viewport'
 
 const getUpcomingShelf = spyOn(api, 'getUpcomingShelf')
+const listRequests = spyOn(api, 'listRequests')
+const getRequestHolding = spyOn(api, 'getRequestHolding')
+
+const NO_REQUESTS: TitleRequests = {
+  requests: [],
+  budget: { limit: 10, left: 10, nextAt: null },
+  kinds: { movie: true, show: true },
+}
 
 type TitleProps = { type: MatchItemType; id: number }
 
@@ -45,7 +58,10 @@ describe('UpcomingShelfPage', () => {
   afterEach(() => {
     cleanup()
     getUpcomingShelf.mockReset()
+    listRequests.mockReset()
+    getRequestHolding.mockReset()
     startOnScreen(true)
+    useUpcomingFilter.setState({ isHidingRequested: false })
   })
 
   it('shows the shelf, each card opening its own page', async () => {
@@ -103,6 +119,85 @@ describe('UpcomingShelfPage', () => {
     await screen.findByRole('link', { name: 'Title 2' })
     expect(screen.getByText('Movie')).toBeInTheDocument()
     expect(screen.getByText('TV show')).toBeInTheDocument()
+  })
+
+  it('says which kind each anime is, on a shelf of its own', async () => {
+    answer({
+      first: {
+        titles: [title({ type: ITEM_TYPES.movie, id: 1 }), title({ type: ITEM_TYPES.show, id: 2 })],
+        next: null,
+      },
+    })
+    open(UPCOMING_SHELVES.anime)
+    expect(
+      await screen.findByRole('heading', { name: COMING_SOON_COPY.shelves.anime.title, level: 1 }),
+    ).toBeInTheDocument()
+    await screen.findByRole('link', { name: 'Title 2' })
+    expect(screen.getByText('Movie')).toBeInTheDocument()
+    expect(screen.getByText('TV show')).toBeInTheDocument()
+  })
+
+  it('leaves out what is requested already once its checkbox is ticked, and shows all of it at first', async () => {
+    answer({
+      first: {
+        titles: [1, 2, 3].map((id) => title({ type: ITEM_TYPES.movie, id })),
+        next: null,
+      },
+    })
+    listRequests.mockImplementation(async () => ({
+      requests: [
+        {
+          type: ITEM_TYPES.movie,
+          tmdbId: '2',
+          title: 'Title 2',
+          status: REQUEST_STATUSES.searching,
+          requestedAt: '2026-11-15T14:08:00.000Z',
+          isMine: false,
+          libraryItemId: null,
+        },
+        {
+          type: ITEM_TYPES.movie,
+          tmdbId: '3',
+          title: 'Title 3',
+          status: REQUEST_STATUSES.notDownloadable,
+          requestedAt: '2026-01-02T03:04:05Z',
+          isMine: false,
+          isHeld: true,
+          libraryItemId: null,
+        },
+      ],
+      budget: { limit: 10, left: 10, nextAt: null },
+      kinds: { movie: true, show: true },
+    }))
+    getRequestHolding.mockImplementation(async () => ({ status: null }))
+    open(UPCOMING_SHELVES.movies)
+    const hide = screen.getByRole('checkbox', { name: COMING_SOON_COPY.hideRequested })
+    expect(hide).not.toBeChecked()
+    await screen.findByRole('link', { name: /Title 3/ })
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    fireEvent.click(hide)
+    await waitFor(() => expect(cardNames()).toEqual(['Title 1']))
+    expect(useUpcomingFilter.getState().isHidingRequested).toBe(true)
+    fireEvent.click(hide)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(useUpcomingFilter.getState().isHidingRequested).toBe(false)
+  })
+
+  it('opens with the checkbox ticked from an address that says so, and from the choice kept before', async () => {
+    answer({ first: { titles: [title({ type: ITEM_TYPES.movie, id: 1 })], next: null } })
+    listRequests.mockImplementation(async () => NO_REQUESTS)
+    getRequestHolding.mockImplementation(async () => ({ status: null }))
+    renderWithProviders({
+      ui: <UpcomingShelfPage shelf={UPCOMING_SHELVES.shows} />,
+      route: `/coming-soon/shows?${HIDE_REQUESTED_SEARCH.name}=${HIDE_REQUESTED_SEARCH.value}`,
+    })
+    expect(screen.getByRole('checkbox', { name: COMING_SOON_COPY.hideRequested })).toBeChecked()
+    await screen.findByRole('link', { name: 'Title 1' })
+    expect(useUpcomingFilter.getState().isHidingRequested).toBe(true)
+    cleanup()
+    open(UPCOMING_SHELVES.movies)
+    expect(screen.getByRole('checkbox', { name: COMING_SOON_COPY.hideRequested })).toBeChecked()
+    await screen.findByRole('link', { name: 'Title 1' })
   })
 
   it('says when nothing is announced, and when the server cannot reach TMDB', async () => {

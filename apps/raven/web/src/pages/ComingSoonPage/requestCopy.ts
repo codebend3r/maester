@@ -13,7 +13,7 @@ export const REQUEST_STATUS_COPY = {
     line: 'The server is looking for a copy to download.',
   },
   [REQUEST_STATUSES.notDownloadable]: {
-    label: 'Not downloadable',
+    label: 'Tracked and ready',
     line: 'Nothing could be found to download yet. The server keeps looking and starts once a copy turns up.',
   },
   [REQUEST_STATUSES.willDownload]: {
@@ -46,8 +46,9 @@ export const REQUEST_COPY = {
   requested: 'Requested',
   /** What the green check on a requested title's poster says to a screen reader. */
   requestedMark: 'Requested',
-  left: ({ left, limit }: Pick<RequestBudget, 'left' | 'limit'>) =>
-    `${left} of ${limit} requests left today`,
+  /** What is left of the day's requests; whoever manages raven has no limit. */
+  left: ({ left, limit, isUnlimited }: RequestBudget) =>
+    isUnlimited ? 'Unlimited requests' : `${left} of ${limit} requests left today`,
   spent: (limit: number) => `You have used all ${limit} of today's requests.`,
   nextAt: (at: string) => `Your next one comes back ${TIME_FORMAT.format(new Date(at))}.`,
   off: {

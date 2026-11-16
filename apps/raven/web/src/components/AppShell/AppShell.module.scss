@@ -418,20 +418,29 @@
   padding: var(--page-top) var(--gutter) var(--section-gap);
 }
 
-// The search at the start, as wide as reads well, the corner's buttons at the end.
+// The search fills the row up to the corner's buttons at the end.
 .bar {
   grid-area: bar;
   display: grid;
-  grid-template-columns: minmax(0, 26.25rem) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas: 'search corner';
-  justify-content: space-between;
   align-items: center;
   gap: var(--space-4);
   min-height: var(--field-size);
 }
 
+/*
+ * Over the page, so nothing the page lifts (the way back, a hero card, a
+ * picture's play button) covers the suggestions; higher still while they
+ * are open, over a corner menu too. Only toasts rise over them.
+ */
 .search {
   grid-area: search;
+  z-index: 3;
+
+  &:has([aria-expanded='true']) {
+    z-index: 9;
+  }
 }
 
 .page {
@@ -457,6 +466,11 @@
   &:has([aria-expanded='true']) {
     z-index: 4;
   }
+}
+
+// Over the fade the focused search lays across the page's top.
+.bar:has(.search:focus-within) .corner {
+  z-index: 4;
 }
 
 @media (max-width: 48rem) {

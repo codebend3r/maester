@@ -2,53 +2,32 @@ import {
   type InfiniteData,
   type UseInfiniteQueryResult,
   useInfiniteQuery,
-  useQuery,
 } from '@tanstack/react-query'
 import {
   type Account,
   PLAY_HISTORY_SHOWS,
   type PlayHistoryPage as HistoryPage,
   type PlayHistoryShow,
-  isAccountId,
   isPlayHistoryShow,
 } from '@raven/core'
 import { Button } from '@raven/ui'
 import { type ComponentType, type ReactNode, useId } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
 import { type ManagementMode, useManagement } from '@/lib/management'
-import { everyonesHistoryQuery, membersQuery, playHistoryQuery } from '@/lib/queries'
+import { everyonesHistoryQuery, playHistoryQuery } from '@/lib/queries'
 import { PLAY_HISTORY_SEARCH } from '@/lib/playHistory'
+import { type AccountName, accountNamesOf, useAccounts } from '@/lib/useAccounts'
+import { useAddressValue } from '@/lib/useAddressValue'
 import { PLAY_HISTORY_COPY } from '@/pages/PlayHistoryPage/copy'
-import { type AccountName, PlayHistoryTable } from '@/pages/PlayHistoryPage/PlayHistoryTable'
+import { PlayHistoryTable } from '@/pages/PlayHistoryPage/PlayHistoryTable'
 import styles from '@/pages/PlayHistoryPage/PlayHistoryPage.module.scss'
 import { APP_PATHS } from '@/lib/appPaths'
 
 type HistoryQuery = UseInfiniteQueryResult<InfiniteData<HistoryPage>>
-
-type SearchParam = (typeof PLAY_HISTORY_SEARCH)[keyof typeof PLAY_HISTORY_SEARCH]
-
-type AddressValue = [string | null, (next: string | null) => void]
-
-/** One of the address's search params, and a setter that drops it for null and keeps the rest. */
-const useAddressValue = (name: SearchParam): AddressValue => {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const set = (next: string | null) =>
-    setSearchParams(
-      (params) => {
-        const kept = new URLSearchParams(params)
-        if (next === null) kept.delete(name)
-        else kept.set(name, next)
-        return kept
-      },
-      { replace: true },
-    )
-  return [searchParams.get(name), set]
-}
 
 type ShowState = [PlayHistoryShow, (show: PlayHistoryShow) => void]
 
@@ -216,14 +195,6 @@ const AccountPicker = ({ accounts, accountId, onAccount }: AccountPickerProps) =
 
 type EveryoneViewProps = { mode: ManagementMode }
 
-/** The accounts the owner's list knows, by id; none on a server without accounts. */
-const useAccounts = (): readonly Account[] => {
-  const access = useAccessState()
-  const ownerId = access.kind === ACCESS_KINDS.approved ? access.account.id : null
-  const members = useQuery(membersQuery(ownerId))
-  return members.data ?? []
-}
-
 /** Everyone's history once the viewer may manage: whose to read, what to show, and the table with an account column. */
 const EveryoneHistory = () => {
   const titleId = useId()
@@ -231,10 +202,7 @@ const EveryoneHistory = () => {
   const [accountId, setAccount] = useAddressValue(PLAY_HISTORY_SEARCH.account)
   const accounts = useAccounts()
   const history = useInfiniteQuery(everyonesHistoryQuery({ accountId, show }))
-  const emails = new Map(accounts.map((account) => [account.id, account.email]))
-  // Anything but a Supabase account is the viewer of a server without accounts, or from before them.
-  const nameOf: AccountName = (id) =>
-    emails.get(id) ?? (isAccountId(id) ? id : PLAY_HISTORY_COPY.thisServer)
+  const nameOf = accountNamesOf({ accounts, thisServer: PLAY_HISTORY_COPY.thisServer })
   return (
     <section className={styles.page} aria-labelledby={titleId}>
       <HistoryHeader

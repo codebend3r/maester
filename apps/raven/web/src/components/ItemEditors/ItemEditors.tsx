@@ -53,10 +53,20 @@ export const useItemEditors = (props: UseItemEditorsProps): ItemEditors => {
   return {
     buttons: (
       <>
-        <Button icon="edit" aria-haspopup="dialog" onClick={() => setEditor(ITEM_EDITORS.images)}>
+        <Button
+          icon="edit"
+          aria-haspopup="dialog"
+          title={COMMON_COPY.editImages}
+          onClick={() => setEditor(ITEM_EDITORS.images)}
+        >
           {COMMON_COPY.editImages}
         </Button>
-        <Button icon="edit" aria-haspopup="dialog" onClick={() => setEditor(ITEM_EDITORS.metadata)}>
+        <Button
+          icon="edit"
+          aria-haspopup="dialog"
+          title={COMMON_COPY.editMetadata}
+          onClick={() => setEditor(ITEM_EDITORS.metadata)}
+        >
           {COMMON_COPY.editMetadata}
         </Button>
       </>

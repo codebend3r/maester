@@ -223,6 +223,8 @@ export type NowPlayingStripProps = {
   onOpen: () => void
   onToggle: () => void
   onNext: () => void
+  /** Stops the music and empties the queue, which takes the strip away; the touch strip's X. */
+  onClose: () => void
 }
 
 /** Which edge of the screen the music strip keeps to while a track plays. */

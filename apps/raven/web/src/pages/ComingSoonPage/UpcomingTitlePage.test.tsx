@@ -6,9 +6,11 @@ import {
   type RequestStatus,
   type TitleHolding,
   type TitleRequests,
+  UPCOMING_KINDS,
   type UpcomingDetails,
 } from '@raven/core'
 import { Route, Routes } from 'react-router-dom'
+import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { api } from '@/lib/api'
 import { APP_PATHS } from '@/lib/appPaths'
 import { UpcomingTitlePage } from '@/pages/ComingSoonPage/UpcomingTitlePage'
@@ -52,6 +54,7 @@ const withRequest = ({ status, isMine }: WithRequestProps): TitleRequests => ({
       status,
       requestedAt: '2026-11-12T10:00:00.000Z',
       isMine,
+      libraryItemId: null,
     },
   ],
 })
@@ -93,6 +96,25 @@ describe('UpcomingTitlePage', () => {
     )
   })
 
+  it('says what the title is: a movie from an older server, and the kind a newer one names', async () => {
+    open({ requests: NO_REQUESTS })
+    expect(await screen.findByText(COMING_SOON_COPY.kinds.movie)).toBeInTheDocument()
+    cleanup()
+    getUpcomingDetails.mockImplementation(async () => ({
+      ...DUNE,
+      kind: UPCOMING_KINDS.animeMovie,
+    }))
+    renderWithProviders({
+      ui: (
+        <Routes>
+          <Route path={APP_PATHS.comingSoonTitle} element={<UpcomingTitlePage />} />
+        </Routes>
+      ),
+      route: '/coming-soon/movie/1',
+    })
+    expect(await screen.findByText(COMING_SOON_COPY.upcomingKinds.animeMovie)).toBeInTheDocument()
+  })
+
   it('requests the title for everyone, sending only its type and id', async () => {
     open({ requests: NO_REQUESTS })
     expect(await screen.findByText('10 of 10 requests left today')).toBeInTheDocument()
@@ -103,6 +125,7 @@ describe('UpcomingTitlePage', () => {
       status: REQUEST_STATUSES.searching,
       requestedAt: '2026-11-12T10:00:00.000Z',
       isMine: true,
+      libraryItemId: null,
     }))
     listRequests.mockImplementation(async () =>
       withRequest({ status: REQUEST_STATUSES.searching, isMine: true }),
@@ -124,7 +147,7 @@ describe('UpcomingTitlePage', () => {
 
   it('says a title its downloader holds already is requested, with no button', async () => {
     open({ requests: NO_REQUESTS, holding: { status: REQUEST_STATUSES.notDownloadable } })
-    expect(await screen.findByRole('status')).toHaveTextContent('Not downloadable')
+    expect(await screen.findByRole('status')).toHaveTextContent('Tracked and ready')
     expect(screen.getByText(/requested already/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Request download' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Requested' })).toBeDisabled()
@@ -132,9 +155,9 @@ describe('UpcomingTitlePage', () => {
     expect(requestDownload).not.toHaveBeenCalled()
   })
 
-  it('says a search found nothing as not downloadable', async () => {
+  it('says a search that found nothing is tracked and ready', async () => {
     open({ requests: withRequest({ status: REQUEST_STATUSES.notDownloadable, isMine: true }) })
-    expect(await screen.findByRole('status')).toHaveTextContent('Not downloadable')
+    expect(await screen.findByRole('status')).toHaveTextContent('Tracked and ready')
   })
 
   it('greys the button out once the budget is spent', async () => {

@@ -20,7 +20,7 @@ import {
 import { PlateButton } from '@/layouts/tvControls'
 import type { IconName } from '@raven/ui/iconDrawings'
 import { useClock } from '@raven/ui/headless'
-import { useMarkFade } from '@/layouts/useMarkFade'
+import { MARK_TIMINGS, useMarkFade } from '@/layouts/useMarkFade'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { useTheme } from '@/theme/useTheme'
 import {
@@ -165,7 +165,7 @@ type CentreProps = ShownMark
 export const Centre = ({ mark, seconds, isFading }: CentreProps) => {
   const styles = useDpadChromeStyles()
   const colour = useTheme((theme) => theme.overPicture.text)
-  const { opacity, isGone } = useMarkFade({ isFading })
+  const { opacity, isGone } = useMarkFade({ isFading, timing: MARK_TIMINGS.mark })
   const look = CENTRE_MARK_LOOKS[mark]
   return (
     !isGone && (

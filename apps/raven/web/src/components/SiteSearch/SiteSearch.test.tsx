@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { HomeSearch } from '@raven/core'
+import type { HomeSearch, Rating } from '@raven/core'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
@@ -41,6 +41,8 @@ const open = (route: string) =>
           <Route index element={<p>home</p>} />
           <Route path="movies/:id" element={<Link to="/movies/2">Another movie</Link>} />
           <Route path="shows/:id" element={<p>show</p>} />
+          <Route path="coming-soon" element={<p>coming soon</p>} />
+          <Route path="coming-soon/:type/:tmdbId" element={<p>upcoming title</p>} />
         </Routes>
       </>
     ),
@@ -55,6 +57,7 @@ describe('SiteSearch', () => {
   const spies = {
     search: spyOn(api, 'searchHome'),
     libraries: spyOn(api, 'listLibraries'),
+    upcoming: spyOn(api, 'searchUpcoming'),
   }
 
   const serve = (found: HomeSearch = FOUND) => {
@@ -66,6 +69,32 @@ describe('SiteSearch', () => {
     cleanup()
     spies.search.mockReset()
     spies.libraries.mockReset()
+    spies.upcoming.mockReset()
+  })
+
+  it('searches only what is coming soon on Coming soon, and Enter opens the first title', async () => {
+    spies.upcoming.mockImplementation(async () => ({
+      titles: [
+        {
+          type: 'movie',
+          tmdbId: '558449',
+          title: 'Gladiator III',
+          released: '2027-11-19',
+          poster: '/g3.jpg',
+        },
+      ],
+    }))
+    open('/coming-soon')
+    const box = screen.getByRole('combobox', { name: 'Search all upcoming' })
+    expect(box).toHaveAttribute('placeholder', 'Search all upcoming')
+    await userEvent.type(box, 'gladiator')
+    const list = await screen.findByRole('listbox', { name: 'Suggestions' })
+    expect(await within(list).findByText('Gladiator III')).toBeInTheDocument()
+    expect(within(list).queryByText(/See all results/)).toBeNull()
+    expect(spies.search).not.toHaveBeenCalled()
+    expect(spies.upcoming).toHaveBeenLastCalledWith('gladiator')
+    await userEvent.keyboard('{Enter}')
+    await waitFor(() => expect(address()).toHaveTextContent('/coming-soon/movie/558449'))
   })
 
   it('starts empty away from home, whatever the page asks for', () => {
@@ -133,8 +162,8 @@ describe('SiteSearch', () => {
           .getAllByRole('option')
           .map((option) => option.textContent),
       ).toEqual([
-        'BusboysMar 31, 1999·Films',
-        'Slow Horses2022·Series',
+        'BusboysMar 31, 1999·Films1080p HEVCTMDB: 8.2 out of 108.2/10TMDB',
+        'Slow Horses2022·SeriesTMDB: 8.2 out of 108.2/10TMDB',
         'See all results for “b us”',
       ])
       expect(searchbox()).toHaveAttribute('aria-expanded', 'true')
@@ -159,6 +188,40 @@ describe('SiteSearch', () => {
       await screen.findByRole('listbox', { name: 'Suggestions' })
       await userEvent.keyboard('{ArrowUp}{Enter}')
       await waitFor(() => expect(address()).toHaveTextContent(/^\/\?q=bus$/))
+    })
+
+    it("ends a title's row with its file's chips and two scores, its library's source first", async () => {
+      const ratings: Rating[] = [
+        { source: 'rottenTomatoes', kind: 'critic', value: 5.9, votes: null },
+        { source: 'imdb', kind: 'audience', value: 7.7, votes: 900 },
+        { source: 'metacritic', kind: 'critic', value: 4.8, votes: null },
+        { source: 'tmdb', kind: 'audience', value: 6.9, votes: 1200 },
+      ]
+      spies.search.mockImplementation(async () => [
+        {
+          libraryId: 2,
+          type: 'media',
+          media: [
+            matchedMovie({ width: 3840, height: 2160, hdr: true, item: itemSummary({ ratings }) }),
+          ],
+        },
+      ])
+      spies.libraries.mockImplementation(async () => [
+        library({
+          id: 2,
+          name: 'Films',
+          settings: { ...library().settings, ratingsSource: 'metacritic' },
+        }),
+      ])
+      open('/movies/1')
+      await userEvent.type(searchbox(), 'bus')
+      const row = await screen.findByRole('option', { name: /Busboys/ })
+      expect(within(row).getByText('4K')).toBeInTheDocument()
+      expect(within(row).getByText('HDR')).toBeInTheDocument()
+      expect(within(row).getByText(/^Metacritic: 48/)).toBeInTheDocument()
+      expect(within(row).getByText(/^Rotten Tomatoes: 59/)).toBeInTheDocument()
+      expect(within(row).queryByText(/^IMDb: /)).toBeNull()
+      expect(within(row).queryByText(/^TMDB: /)).toBeNull()
     })
 
     it('opens a title on a click', async () => {

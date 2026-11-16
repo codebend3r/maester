@@ -12,6 +12,7 @@ type WatchedToggleProps = {
   state: WatchedState
   onToggle: () => void
   label?: string
+  /** Whether the label shows beside the check; a header's toggle is the check alone. */
   isLabelShown?: boolean
   className?: string
 }
@@ -19,14 +20,14 @@ type WatchedToggleProps = {
 /**
  * The Watched button of a page or an episode row. `partly` reads as
  * `mixed`: pressing it marks everything watched, and pressing it again
- * everything unwatched. `label` is the name a screen reader hears, and is
- * shown unless the button is only its check.
+ * everything unwatched. `label` is the name a screen reader hears; the
+ * button is its check alone, `label` its hover title, unless `isLabelShown`.
  */
 export const WatchedToggle = ({
   state,
   onToggle,
   label = COMMON_COPY.watched,
-  isLabelShown = true,
+  isLabelShown = false,
   className,
 }: WatchedToggleProps) => (
   <Button

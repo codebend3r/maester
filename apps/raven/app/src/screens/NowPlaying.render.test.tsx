@@ -64,6 +64,35 @@ describe('Now Playing under the thumb', () => {
     await untilIdle(shown.client)
   })
 
+  it('skips on a double tap either side of the cover, climbing 10, 20 and 30, and says how far in its middle', async () => {
+    useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] })
+    await renderPlayingAt({ at: 60 })
+    const cover = screen.getByRole('button', { name: /equalizer/ })
+    const right = { nativeEvent: { locationX: 10_000 } }
+    const left = { nativeEvent: { locationX: 0 } }
+    await fireEvent.press(cover, right)
+    expect(useAudioQueue.getState().seek).toBeNull()
+    await fireEvent.press(cover, right)
+    expect(useAudioQueue.getState().seek?.seconds).toBe(70)
+    expect(screen.getByText('10s')).toBeTruthy()
+    await fireEvent.press(cover, right)
+    expect(useAudioQueue.getState().seek?.seconds).toBe(90)
+    expect(screen.getByText('20s')).toBeTruthy()
+    await fireEvent.press(cover, right)
+    expect(useAudioQueue.getState().seek?.seconds).toBe(120)
+    expect(screen.getByLabelText('Forward 30 seconds')).toBeTruthy()
+    await fireEvent.press(cover, left)
+    await fireEvent.press(cover, left)
+    expect(useAudioQueue.getState().seek?.seconds).toBe(110)
+    expect(screen.getByLabelText('Back 10 seconds')).toBeTruthy()
+  })
+
+  it('says how long each track in the queue runs', async () => {
+    useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] })
+    await renderPlayingAt({ at: 0 })
+    expect(screen.getAllByText('Radiohead · 5:00').length).toBeGreaterThan(0)
+  })
+
   it('marks the synced line being sung', async () => {
     useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID, LUCKY] })
     await renderPlayingAt({ at: 13 })

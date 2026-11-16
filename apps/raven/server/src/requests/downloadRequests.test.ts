@@ -3,7 +3,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { ArrClient } from '@/requests/arrClient'
-import { BUDGET_WINDOW_MS, DownloadRequests, STATUS_FRESH_MS } from '@/requests/downloadRequests'
+import {
+  BUDGET_WINDOW_MS,
+  DownloadRequests,
+  HOLDINGS_FRESH_MS,
+  STATUS_FRESH_MS,
+} from '@/requests/downloadRequests'
 import { REQUESTS_ENV } from '@/requests/requestsConfig'
 import { manualClock } from '@/test/clock'
 import { testDatabase } from '@/test/database'
@@ -23,6 +28,9 @@ type FakeArrState = {
   resolutions: number[]
   queue: unknown[]
   hasFile: boolean
+  /** What Radarr's calendar lists, and every series Sonarr holds. */
+  calendar: unknown[]
+  series: unknown[]
   commandStatus: string
   /** Paths answered 500, to stand for an arr that fails. */
   failing: string[]
@@ -40,6 +48,8 @@ const freshState = (): FakeArrState => ({
   resolutions: [1080, 1080],
   queue: [],
   hasFile: false,
+  calendar: [],
+  series: [],
   commandStatus: 'started',
   failing: [],
   sent: [],
@@ -97,6 +107,8 @@ const fakeArrs =
     if (method === 'POST' && path === '/api/v3/command') return json({ id: 900 })
     if (path.startsWith('/api/v3/command/')) return json({ status: state.commandStatus })
     if (path === '/api/v3/queue/details') return json(state.queue)
+    if (path === '/api/v3/calendar') return json(state.calendar)
+    if (method === 'GET' && path === '/api/v3/series') return json(state.series)
     if (path.startsWith('/api/v3/movie/')) return json({ hasFile: state.hasFile })
     if (path.startsWith('/api/v3/series/')) {
       return json({ statistics: { episodeFileCount: state.hasFile ? 3 : 0 } })
@@ -130,12 +142,14 @@ describe('download requests', () => {
   beforeEach(() => {
     state.arr = freshState()
     database.get().db.exec('DELETE FROM download_requests')
+    database.get().db.exec('DELETE FROM items')
     time.advance(BUDGET_WINDOW_MS * 2)
   })
 
   it('adds a movie under its letter folder, monitored, then searches for it', async () => {
     const made = await requests().request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
     })
     expect(made).toMatchObject({
@@ -144,6 +158,7 @@ describe('download requests', () => {
       title: 'A Beautiful Mind',
       status: REQUEST_STATUSES.searching,
       isMine: true,
+      libraryItemId: null,
     })
     const added = state.arr.sent.find(
       (sent) => sent.method === 'POST' && sent.url.endsWith('/movie'),
@@ -159,9 +174,27 @@ describe('download requests', () => {
     expect(search?.body).toEqual({ name: 'MoviesSearch', movieIds: [500] })
   })
 
+  it('names the library item once a scan has added the requested title', async () => {
+    await requests().request({
+      account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
+      ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
+    })
+    database.get().db.exec(
+      `INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at)
+         VALUES (42, 'movie', '1', 'A Beautiful Mind', 'Beautiful Mind', '2026-01-01')`,
+    )
+    const { requests: listed } = await requests().list({
+      account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
+    })
+    expect(listed.map((request) => request.libraryItemId)).toEqual([42])
+  })
+
   it('files a show under its letter without the article, and searches the series', async () => {
     await requests().request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.show, tmdbId: '10' },
     })
     const added = state.arr.sent.find(
@@ -175,11 +208,11 @@ describe('download requests', () => {
 
   it('refuses a title the arr already holds, sends it nothing, and spends nothing', async () => {
     const ask = { type: ITEM_TYPES.movie, tmdbId: '2' } as const
-    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow(
-      'holds this title already',
-    )
+    await expect(
+      requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask }),
+    ).rejects.toThrow('holds this title already')
     expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
-    const after = await requests().list({ account: TEST_ACCOUNTS.a })
+    const after = await requests().list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
     expect(after.requests).toHaveLength(0)
     expect(after.budget.left).toBe(2)
   })
@@ -203,9 +236,9 @@ describe('download requests', () => {
 
   it('refuses a show the arr already holds, and sends it nothing', async () => {
     const ask = { type: ITEM_TYPES.show, tmdbId: '11' } as const
-    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow(
-      'holds this title already',
-    )
+    await expect(
+      requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask }),
+    ).rejects.toThrow('holds this title already')
     expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
   })
 
@@ -225,13 +258,159 @@ describe('download requests', () => {
     expect(lookups()).toBe(3)
   })
 
+  it('lists the titles still to come an arr holds as requests nobody made', async () => {
+    const today = new Date(time.clock.now()).toISOString().slice(0, 10)
+    state.arr.calendar = [
+      {
+        id: 61,
+        title: 'Dune: Part Three',
+        tmdbId: 300,
+        added: '2026-01-02T03:04:05Z',
+        inCinemas: `${today}T00:00:00Z`,
+      },
+      {
+        id: 62,
+        title: 'Out Already',
+        tmdbId: 301,
+        added: '2026-01-03T00:00:00Z',
+        inCinemas: '1960-01-01T00:00:00Z',
+        digitalRelease: `${today}T00:00:00Z`,
+      },
+    ]
+    state.arr.series = [
+      {
+        id: 71,
+        title: 'Blade Runner 2099',
+        tmdbId: 400,
+        added: '2026-01-04T00:00:00Z',
+        firstAired: `${today}T00:00:00Z`,
+        statistics: { episodeFileCount: 8 },
+      },
+      {
+        id: 72,
+        title: 'Long Running',
+        tmdbId: 401,
+        added: '2020-01-01T00:00:00Z',
+        firstAired: '1960-02-02T00:00:00Z',
+      },
+      {
+        id: 73,
+        title: 'No TMDB id',
+        added: '2026-01-05T00:00:00Z',
+        firstAired: `${today}T00:00:00Z`,
+      },
+    ]
+    state.arr.queue = [{ movieId: 61, seriesId: null, status: 'downloading' }]
+    database
+      .get()
+      .db.prepare(
+        `INSERT INTO items (id, type, tmdb_id, title, sort_title, fetched_at)
+         VALUES (9, 'show', '400', 'Blade Runner 2099', 'blade runner 2099', '2026-01-01')`,
+      )
+      .run()
+    const service = requests()
+    const list = await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
+    expect(list.requests).toEqual([
+      {
+        type: ITEM_TYPES.show,
+        tmdbId: '400',
+        title: 'Blade Runner 2099',
+        status: REQUEST_STATUSES.downloaded,
+        requestedAt: '2026-01-04T00:00:00Z',
+        isMine: false,
+        isHeld: true,
+        libraryItemId: 9,
+      },
+      {
+        type: ITEM_TYPES.movie,
+        tmdbId: '300',
+        title: 'Dune: Part Three',
+        status: REQUEST_STATUSES.downloading,
+        requestedAt: '2026-01-02T03:04:05Z',
+        isMine: false,
+        isHeld: true,
+        libraryItemId: null,
+      },
+    ])
+    const asked = state.arr.sent.length
+    await service.list({ account: TEST_ACCOUNTS.b, isUnlimited: false })
+    expect(state.arr.sent).toHaveLength(asked)
+    time.advance(HOLDINGS_FRESH_MS)
+    await service.list({ account: TEST_ACCOUNTS.b, isUnlimited: false })
+    expect(state.arr.sent.length).toBeGreaterThan(asked)
+  })
+
+  it('lists a held title someone asked raven for once, as their request', async () => {
+    const today = new Date(time.clock.now()).toISOString().slice(0, 10)
+    const service = requests()
+    await service.request({
+      account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
+      ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
+    })
+    state.arr.calendar = [
+      {
+        id: 500,
+        title: 'A Beautiful Mind',
+        tmdbId: 1,
+        added: '2026-01-02T00:00:00Z',
+        inCinemas: `${today}T00:00:00Z`,
+      },
+    ]
+    const list = await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
+    expect(list.requests).toMatchObject([{ tmdbId: '1', isMine: true, isHeld: false }])
+  })
+
+  it('lists the requests alone while an arr cannot say what it holds', async () => {
+    state.arr.failing = ['/api/v3/calendar', '/api/v3/series']
+    const list = await requests().list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
+    expect(list.requests).toEqual([])
+  })
+
+  it('tells the owner whose each request was, and which titles an arr holds with nobody asking', async () => {
+    const today = new Date(time.clock.now()).toISOString().slice(0, 10)
+    state.arr.series = [
+      {
+        id: 71,
+        title: 'Held',
+        tmdbId: 400,
+        added: '1960-01-04T00:00:00Z',
+        firstAired: `${today}T00:00:00Z`,
+      },
+    ]
+    const service = requests()
+    await service.request({
+      account: TEST_ACCOUNTS.b,
+      isUnlimited: false,
+      ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
+    })
+    expect(await service.everyone({ account: TEST_ACCOUNTS.a })).toMatchObject([
+      { tmdbId: '1', title: 'A Beautiful Mind', isMine: false, requestedBy: TEST_ACCOUNTS.b },
+      { tmdbId: '400', title: 'Held', isHeld: true, requestedBy: null },
+    ])
+  })
+
+  it('never runs whoever manages raven out of requests, and counts none of theirs', async () => {
+    const service = requests()
+    const owner = { account: TEST_ACCOUNTS.a, isUnlimited: true }
+    await service.request({ ...owner, ask: { type: ITEM_TYPES.movie, tmdbId: '1' } })
+    await service.request({ ...owner, ask: { type: ITEM_TYPES.movie, tmdbId: '4' } })
+    await service.request({ ...owner, ask: { type: ITEM_TYPES.show, tmdbId: '10' } })
+    expect((await service.list(owner)).budget).toEqual({
+      limit: 2,
+      left: 2,
+      nextAt: null,
+      isUnlimited: true,
+    })
+  })
+
   it('takes one request a title, for everyone', async () => {
     const ask = { type: ITEM_TYPES.movie, tmdbId: '1' } as const
-    await requests().request({ account: TEST_ACCOUNTS.a, ask })
-    await expect(requests().request({ account: TEST_ACCOUNTS.b, ask })).rejects.toThrow(
-      'requested this already',
-    )
-    const seen = await requests().list({ account: TEST_ACCOUNTS.b })
+    await requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask })
+    await expect(
+      requests().request({ account: TEST_ACCOUNTS.b, isUnlimited: false, ask }),
+    ).rejects.toThrow('requested this already')
+    const seen = await requests().list({ account: TEST_ACCOUNTS.b, isUnlimited: false })
     expect(seen.requests).toHaveLength(1)
     expect(seen.requests[0]?.isMine).toBe(false)
     expect(seen.budget.left).toBe(2)
@@ -240,8 +419,8 @@ describe('download requests', () => {
   it('answers two members asking at once with one request', async () => {
     const ask = { type: ITEM_TYPES.movie, tmdbId: '1' } as const
     const results = await Promise.allSettled([
-      requests().request({ account: TEST_ACCOUNTS.a, ask }),
-      requests().request({ account: TEST_ACCOUNTS.b, ask }),
+      requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask }),
+      requests().request({ account: TEST_ACCOUNTS.b, isUnlimited: false, ask }),
     ])
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
   })
@@ -250,29 +429,41 @@ describe('download requests', () => {
     const service = requests()
     await service.request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
     })
     time.advance(1000)
     await service.request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '4' },
     })
-    const spent = await service.list({ account: TEST_ACCOUNTS.a })
+    const spent = await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
     expect(spent.budget).toMatchObject({ limit: 2, left: 0 })
     expect(spent.budget.nextAt).not.toBeNull()
     await expect(
-      service.request({ account: TEST_ACCOUNTS.a, ask: { type: ITEM_TYPES.show, tmdbId: '10' } }),
+      service.request({
+        account: TEST_ACCOUNTS.a,
+        isUnlimited: false,
+        ask: { type: ITEM_TYPES.show, tmdbId: '10' },
+      }),
     ).rejects.toThrow('spent')
-    expect((await service.list({ account: TEST_ACCOUNTS.b })).budget.left).toBe(2)
+    expect((await service.list({ account: TEST_ACCOUNTS.b, isUnlimited: false })).budget.left).toBe(
+      2,
+    )
     time.advance(BUDGET_WINDOW_MS - 500)
-    expect((await service.list({ account: TEST_ACCOUNTS.a })).budget.left).toBe(1)
+    expect((await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })).budget.left).toBe(
+      1,
+    )
   })
 
   it('spends nothing when the arr fails, and leaves the title free to request', async () => {
     state.arr.failing = ['/api/v3/command']
     const ask = { type: ITEM_TYPES.movie, tmdbId: '1' } as const
-    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow('500')
-    const after = await requests().list({ account: TEST_ACCOUNTS.a })
+    await expect(
+      requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask }),
+    ).rejects.toThrow('500')
+    const after = await requests().list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
     expect(after.requests).toHaveLength(0)
     expect(after.budget.left).toBe(2)
   })
@@ -280,11 +471,13 @@ describe('download requests', () => {
   it('refuses a profile that would download anything but 1080p, and spends nothing', async () => {
     state.arr.resolutions = [1080, 2160]
     const ask = { type: ITEM_TYPES.movie, tmdbId: '1' } as const
-    await expect(requests().request({ account: TEST_ACCOUNTS.a, ask })).rejects.toThrow(
-      'allows more than 1080p',
-    )
+    await expect(
+      requests().request({ account: TEST_ACCOUNTS.a, isUnlimited: false, ask }),
+    ).rejects.toThrow('allows more than 1080p')
     expect(state.arr.sent.some((sent) => sent.method === 'POST')).toBe(false)
-    expect((await requests().list({ account: TEST_ACCOUNTS.a })).budget.left).toBe(2)
+    expect(
+      (await requests().list({ account: TEST_ACCOUNTS.a, isUnlimited: false })).budget.left,
+    ).toBe(2)
   })
 
   it('refuses a title whose letter folder the arr does not list', async () => {
@@ -292,6 +485,7 @@ describe('download requests', () => {
     await expect(
       requests().request({
         account: TEST_ACCOUNTS.a,
+        isUnlimited: false,
         ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
       }),
     ).rejects.toThrow('/Meleys/Movies/B')
@@ -301,12 +495,14 @@ describe('download requests', () => {
     const service = requests()
     await service.request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
     })
     const statusAfter = async (change: () => void): Promise<string | undefined> => {
       change()
       time.advance(STATUS_FRESH_MS)
-      return (await service.list({ account: TEST_ACCOUNTS.a })).requests[0]?.status
+      return (await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })).requests[0]
+        ?.status
     }
     expect(await statusAfter(() => undefined)).toBe(REQUEST_STATUSES.searching)
     expect(
@@ -336,7 +532,7 @@ describe('download requests', () => {
       }),
     ).toBe(REQUEST_STATUSES.downloaded)
     const asked = state.arr.sent.length
-    await service.list({ account: TEST_ACCOUNTS.a })
+    await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })
     expect(state.arr.sent.length).toBe(asked)
   })
 
@@ -344,13 +540,14 @@ describe('download requests', () => {
     const service = requests()
     await service.request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
     })
     state.arr.failing = ['/api/v3/queue/details']
     time.advance(STATUS_FRESH_MS)
-    expect((await service.list({ account: TEST_ACCOUNTS.a })).requests[0]?.status).toBe(
-      REQUEST_STATUSES.searching,
-    )
+    expect(
+      (await service.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })).requests[0]?.status,
+    ).toBe(REQUEST_STATUSES.searching)
   })
 
   it('says which kinds can be requested, and refuses one that is off', async () => {
@@ -361,12 +558,16 @@ describe('download requests', () => {
       offConfig,
       time.clock,
     )
-    expect((await off.list({ account: TEST_ACCOUNTS.a })).kinds).toEqual({
+    expect((await off.list({ account: TEST_ACCOUNTS.a, isUnlimited: false })).kinds).toEqual({
       movie: false,
       show: false,
     })
     await expect(
-      off.request({ account: TEST_ACCOUNTS.a, ask: { type: ITEM_TYPES.movie, tmdbId: '1' } }),
+      off.request({
+        account: TEST_ACCOUNTS.a,
+        isUnlimited: false,
+        ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
+      }),
     ).rejects.toThrow('off')
     expect(state.arr.sent).toHaveLength(0)
   })
@@ -374,6 +575,7 @@ describe('download requests', () => {
   it('never sends the key anywhere but the header', async () => {
     await requests().request({
       account: TEST_ACCOUNTS.a,
+      isUnlimited: false,
       ask: { type: ITEM_TYPES.movie, tmdbId: '1' },
     })
     expect(state.arr.sent.every((sent) => !sent.url.includes('radarr-key'))).toBe(true)

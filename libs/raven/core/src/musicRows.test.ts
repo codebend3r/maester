@@ -95,15 +95,23 @@ describe('playlists', () => {
 describe('queueRowsOf', () => {
   const tracks = { [AIRBAG.id]: AIRBAG, [PARANOID.id]: PARANOID }
 
-  it('lists the queue in play order, the playing track marked', () => {
+  it('lists the queue in play order with each track’s length, the playing track marked', () => {
     const queue = startQueue({ items: [AIRBAG.id, PARANOID.id], startAt: 1 })
     expect(queueRowsOf({ queue, tracks })).toEqual([
-      { key: `${AIRBAG.id}:0`, place: 0, title: 'Airbag', line: 'Radiohead', isCurrent: false },
+      {
+        key: `${AIRBAG.id}:0`,
+        place: 0,
+        title: 'Airbag',
+        line: 'Radiohead',
+        length: '5:00',
+        isCurrent: false,
+      },
       {
         key: `${PARANOID.id}:1`,
         place: 1,
         title: 'Paranoid Android',
         line: 'Radiohead',
+        length: '5:00',
         isCurrent: true,
       },
     ])

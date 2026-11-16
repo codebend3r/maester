@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
+  type MemberRequest,
   type TitleHolding,
   type TitleRequest,
   type TitleRequestAsk,
@@ -13,12 +14,18 @@ import {
   type RequestStatus,
   requestKeyOf,
 } from '@raven/core'
-import { CLOCK, type Clock } from '@/clock'
+import { CLOCK, type Clock, utcDayOf } from '@/clock'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DatabaseService } from '@/db/database'
 import { errorMessage } from '@/errorMessage'
 import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
-import { ARR_ERROR_KINDS, ArrClient, ArrError, type ArrTitle } from '@/requests/arrClient'
+import {
+  ARR_ERROR_KINDS,
+  ArrClient,
+  ArrError,
+  type ArrHolding,
+  type ArrTitle,
+} from '@/requests/arrClient'
 import { FreshReads } from '@/requests/freshReads'
 import { letterFolderOf } from '@/requests/letterFolders'
 import { statusOf } from '@/requests/requestStatus'
@@ -28,6 +35,9 @@ export const BUDGET_WINDOW_MS = 24 * 60 * 60 * 1000
 
 /** How long a status read from an arr stands before a list asks the arr again. */
 export const STATUS_FRESH_MS = 30_000
+
+/** How long the titles an arr holds are kept before the arr is asked for them all again. */
+export const HOLDINGS_FRESH_MS = 5 * 60 * 1000
 
 /** The only resolution a requested title may download at; a profile that allows any other is refused. */
 const REQUEST_RESOLUTION = 1080
@@ -53,6 +63,8 @@ type RequestRow = {
   arr_id: number | null
   command_id: number | null
   status: string
+  /** The library's item for the title, joined from `items`; null while no library holds it. */
+  library_item_id: number | null
 }
 
 /** A row whose type and status the contract's guards have read. */
@@ -66,13 +78,18 @@ const keptOf = (row: RequestRow): KeptRequest | null =>
     ? { ...row, type: row.type, status: row.status }
     : null
 
-type ListProps = { account: AccountKey }
+/** Who is asking: their account, and whether no budget holds their requests, as for whoever manages raven. */
+type Caller = { account: AccountKey; isUnlimited: boolean }
 
-type RequestProps = { account: AccountKey; ask: TitleRequestAsk }
+type ListProps = Caller
+
+type EveryoneProps = { account: AccountKey }
+
+type RequestProps = Caller & { ask: TitleRequestAsk }
 
 type ViewOfProps = { row: KeptRequest; account: AccountKey }
 
-type BudgetOfProps = { account: AccountKey; now: number }
+type BudgetOfProps = Caller & { now: number }
 
 type ReserveProps = RequestProps & { now: number }
 
@@ -109,11 +126,24 @@ const viewOf = ({ row, account }: ViewOfProps): TitleRequest => ({
   status: row.status,
   requestedAt: row.requested_at,
   isMine: row.account_id === account,
+  isHeld: false,
+  libraryItemId: row.library_item_id,
 })
+
+/** Newest first, as the list is sent. */
+const byNewest = (a: TitleRequest, b: TitleRequest): number =>
+  Date.parse(b.requestedAt) - Date.parse(a.requestedAt)
+
+type LibraryItemRow = { id: number }
+
+type HeldViewOfProps = { type: MatchItemType; holding: ArrHolding }
+
+type Everything = { rows: KeptRequest[]; held: TitleRequest[] }
 
 /**
  * Coming soon's requests. One request covers everyone, so a title is asked
- * for once; each account may ask for `dailyLimit` in any 24 hours. A request
+ * for once; each account may ask for `dailyLimit` in any 24 hours, but
+ * whoever manages raven as often as they like. A request
  * goes to Sonarr for a show and Radarr for a movie, filed under the
  * library's letter folder, and where it stands is read back from that arr.
  */
@@ -124,6 +154,8 @@ export class DownloadRequests {
   private readonly statusReads: FreshReads<void>
   /** Each title's holding as its arr answered it, at most once every `STATUS_FRESH_MS`. */
   private readonly holdingReads: FreshReads<TitleHolding>
+  /** Each arr's held titles still to come, at most once every `HOLDINGS_FRESH_MS`. */
+  private readonly holdingLists: FreshReads<ArrHolding[]>
 
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
@@ -133,6 +165,7 @@ export class DownloadRequests {
   ) {
     this.statusReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
     this.holdingReads = new FreshReads({ clock, freshMs: STATUS_FRESH_MS })
+    this.holdingLists = new FreshReads({ clock, freshMs: HOLDINGS_FRESH_MS })
   }
 
   private get db() {
@@ -141,13 +174,21 @@ export class DownloadRequests {
 
   private rows(): KeptRequest[] {
     return this.db
-      .prepare<[], RequestRow>('SELECT * FROM download_requests ORDER BY requested_at DESC')
+      .prepare<[], RequestRow>(
+        `SELECT requests.*, items.id AS library_item_id
+           FROM download_requests AS requests
+           LEFT JOIN items ON items.type = requests.type AND items.tmdb_id = requests.tmdb_id
+          ORDER BY requests.requested_at DESC`,
+      )
       .all()
       .map(keptOf)
       .filter((row): row is KeptRequest => row !== null)
   }
 
-  private budgetOf({ account, now }: BudgetOfProps): RequestBudget {
+  private budgetOf({ account, isUnlimited, now }: BudgetOfProps): RequestBudget {
+    const limit = this.config.requests.dailyLimit
+    // Whoever manages raven is never out of requests, so theirs are not counted.
+    if (isUnlimited) return { limit, left: limit, nextAt: null, isUnlimited: true }
     const since = new Date(now - BUDGET_WINDOW_MS).toISOString()
     const times = this.db
       .prepare<SinceParams, RequestedAtRow>(
@@ -157,26 +198,91 @@ export class DownloadRequests {
       )
       .all({ account, since })
       .map((row) => row.requested_at)
-    const limit = this.config.requests.dailyLimit
     const left = Math.max(0, limit - times.length)
     const oldest = times[0]
     const nextAt =
       left > 0 || oldest === undefined
         ? null
         : new Date(Date.parse(oldest) + BUDGET_WINDOW_MS).toISOString()
-    return { limit, left, nextAt }
+    return { limit, left, nextAt, isUnlimited: false }
   }
 
-  /** Every request with its status read again where it is stale, the caller's budget, and which kinds are on. */
-  async list({ account }: ListProps): Promise<TitleRequests> {
-    await Promise.all(this.rows().map((row) => this.refresh(row)))
+  /**
+   * Every request with its status read again where it is stale, then the
+   * titles still to come an arr holds that nobody asked for, newest first;
+   * the caller's budget, and which kinds are on.
+   */
+  async list({ account, isUnlimited }: ListProps): Promise<TitleRequests> {
+    const { rows, held } = await this.everything()
     return {
-      requests: this.rows().map((row) => viewOf({ row, account })),
-      budget: this.budgetOf({ account, now: this.clock.now() }),
+      requests: [...rows.map((row) => viewOf({ row, account })), ...held].toSorted(byNewest),
+      budget: this.budgetOf({ account, isUnlimited, now: this.clock.now() }),
       kinds: {
         [ITEM_TYPES.movie]: this.arrs.isOn(ITEM_TYPES.movie),
         [ITEM_TYPES.show]: this.arrs.isOn(ITEM_TYPES.show),
       },
+    }
+  }
+
+  /**
+   * What `list` answers, each with whose it was: the account that asked, or
+   * null for a title its arr holds that nobody asked for. The owner's read.
+   */
+  async everyone({ account }: EveryoneProps): Promise<MemberRequest[]> {
+    const { rows, held } = await this.everything()
+    return [
+      ...rows.map((row) => ({ ...viewOf({ row, account }), requestedBy: row.account_id })),
+      ...held.map((title) => ({ ...title, requestedBy: null })),
+    ].toSorted(byNewest)
+  }
+
+  /** Every request's row, its status read again where it is stale, and the titles still to come an arr holds that none of them asked for. */
+  private async everything(): Promise<Everything> {
+    const [held] = await Promise.all([
+      this.held(),
+      Promise.all(this.rows().map((row) => this.refresh(row))),
+    ])
+    const rows = this.rows()
+    const asked = new Set(rows.map((row) => requestKeyOf({ type: row.type, tmdbId: row.tmdb_id })))
+    return { rows, held: held.filter((title) => !asked.has(requestKeyOf(title))) }
+  }
+
+  /** The titles still to come each arr holds, as requests nobody made; an arr that is off or fails holds none. */
+  private async held(): Promise<TitleRequest[]> {
+    const from = utcDayOf(this.clock.now())
+    const lists = await Promise.all(
+      [ITEM_TYPES.movie, ITEM_TYPES.show]
+        .filter((type) => this.arrs.isOn(type))
+        .map((type) =>
+          this.holdingLists
+            .read({ key: `${type}|${from}`, read: () => this.arrs.holdings({ type, from }) })
+            .then((holdings) => holdings.map((holding) => this.heldViewOf({ type, holding })))
+            .catch((error: unknown) => {
+              this.log.warn(
+                `Left out the titles the ${type} downloader holds: ${errorMessage(error)}`,
+              )
+              return []
+            }),
+        ),
+    )
+    return lists.flat()
+  }
+
+  private heldViewOf({ type, holding }: HeldViewOfProps): TitleRequest {
+    const item = this.db
+      .prepare<TitleKeyParams, LibraryItemRow>(
+        'SELECT id FROM items WHERE type = @type AND tmdb_id = @tmdbId',
+      )
+      .get({ type, tmdbId: holding.tmdbId })
+    return {
+      type,
+      tmdbId: holding.tmdbId,
+      title: holding.title,
+      status: statusOf({ progress: holding.progress, isSearching: false }),
+      requestedAt: holding.addedAt,
+      isMine: false,
+      isHeld: true,
+      libraryItemId: item?.id ?? null,
     }
   }
 
@@ -232,14 +338,14 @@ export class DownloadRequests {
    * called, so two members asking at once get one request; if the arr then
    * fails, the request is taken back and spends nothing.
    */
-  async request({ account, ask }: RequestProps): Promise<TitleRequest> {
+  async request({ account, isUnlimited, ask }: RequestProps): Promise<TitleRequest> {
     if (!this.arrs.isOn(ask.type)) {
       throw new ArrError({
         kind: ARR_ERROR_KINDS.off,
         message: `Requests for a ${ask.type} are off`,
       })
     }
-    this.reserve({ account, ask, now: this.clock.now() })
+    this.reserve({ account, isUnlimited, ask, now: this.clock.now() })
     try {
       const found = await this.arrs.lookUp(ask)
       if (found === null) {
@@ -300,7 +406,7 @@ export class DownloadRequests {
     return profile.id
   }
 
-  private reserve({ account, ask, now }: ReserveProps): void {
+  private reserve({ account, isUnlimited, ask, now }: ReserveProps): void {
     this.db.transaction(() => {
       const taken = this.db
         .prepare<TitleKeyParams, TakenRow>(
@@ -310,7 +416,7 @@ export class DownloadRequests {
       if (taken !== undefined) {
         throw new RequestRefusal('Someone has requested this already')
       }
-      const budget = this.budgetOf({ account, now })
+      const budget = this.budgetOf({ account, isUnlimited, now })
       if (budget.left === 0) {
         throw new RequestRefusal(`Every one of the ${budget.limit} requests a day is spent`)
       }

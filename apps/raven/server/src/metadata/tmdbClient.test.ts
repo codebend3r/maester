@@ -2,12 +2,7 @@ import { ITEM_TYPES } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import { readServerConfig } from '@/config'
 import { HEADERS } from '@shared/server'
-import {
-  DOCUMENTARY_FILTERS,
-  type MetadataFetch,
-  TmdbClient,
-  TmdbError,
-} from '@/metadata/tmdbClient'
+import { UPCOMING_LISTS, type MetadataFetch, TmdbClient, TmdbError } from '@/metadata/tmdbClient'
 import { mergeCredits, pickLogo, toMovie, toPerson, toSeason, toShow } from '@/metadata/tmdbShapes'
 import { fakeTmdb, keanuReeves, movieBody, personBody, seasonBody, showBody } from '@/test/fakeTmdb'
 
@@ -799,21 +794,24 @@ describe('toPerson and person', () => {
     await expect(client.person('1')).rejects.toMatchObject({ kind: 'unavailable' })
   })
 
-  it('asks for the popular movies out from a day on, without documentaries', async () => {
+  it('asks for the popular movies out from a day on, without documentaries, each in its place', async () => {
     const asked: string[] = []
     const client = new TmdbClient(config(), async ({ url }) => {
       asked.push(url)
       return json({
         body: {
+          total_results: 41,
           results: [
+            { id: 8, title: 'Undated', release_date: '' },
             {
               id: 7,
               title: 'Soon',
               release_date: '2026-12-25',
               poster_path: '/soon.jpg',
               popularity: 12.5,
+              genre_ids: [16],
+              original_language: 'ja',
             },
-            { id: 8, title: 'Undated', release_date: '' },
           ],
         },
       })
@@ -822,18 +820,27 @@ describe('toPerson and person', () => {
       await client.upcoming({
         type: ITEM_TYPES.movie,
         from: '2026-11-10',
-        documentaries: DOCUMENTARY_FILTERS.never,
+        list: UPCOMING_LISTS.general,
         page: 2,
       }),
-    ).toEqual([
-      {
-        tmdbId: '7',
-        title: 'Soon',
-        released: '2026-12-25',
-        poster: '/soon.jpg',
-        popularity: 12.5,
-      },
-    ])
+    ).toEqual({
+      titles: [
+        {
+          at: 1,
+          title: {
+            tmdbId: '7',
+            title: 'Soon',
+            released: '2026-12-25',
+            poster: '/soon.jpg',
+            popularity: 12.5,
+            genreIds: [16],
+            originalLanguage: 'ja',
+          },
+        },
+      ],
+      size: 2,
+      total: 41,
+    })
     const url = new URL(asked[0] ?? '')
     expect(url.pathname).toBe('/3/discover/movie')
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
@@ -856,77 +863,34 @@ describe('toPerson and person', () => {
     const shows = await client.upcoming({
       type: ITEM_TYPES.show,
       from: '2026-11-10',
-      documentaries: DOCUMENTARY_FILTERS.only,
+      list: UPCOMING_LISTS.documentaries,
       page: 1,
     })
-    expect(shows).toMatchObject([{ tmdbId: '9', title: 'Wild', released: '2027-01-03' }])
+    expect(shows.titles).toMatchObject([
+      { title: { tmdbId: '9', title: 'Wild', released: '2027-01-03' } },
+    ])
     const url = new URL(asked[0] ?? '')
     expect(url.pathname).toBe('/3/discover/tv')
     expect(url.searchParams.get('first_air_date.gte')).toBe('2026-11-10')
     expect(url.searchParams.get('with_genres')).toBe('99')
   })
 
-  it('asks for the movies out from a day on, the soonest first, each in its place', async () => {
-    const asked: string[] = []
-    const client = new TmdbClient(config(), async ({ url }) => {
-      asked.push(url)
-      return json({
-        body: {
-          total_results: 41,
-          results: [
-            { id: 8, title: 'Undated', release_date: '' },
-            { id: 7, title: 'Soon', release_date: '2026-11-12', poster_path: null },
-          ],
-        },
-      })
-    })
-    expect(
-      await client.soonest({
-        type: ITEM_TYPES.movie,
-        from: '2026-11-10',
-        documentaries: DOCUMENTARY_FILTERS.never,
-        page: 3,
-      }),
-    ).toEqual({
-      titles: [
-        {
-          at: 1,
-          title: {
-            tmdbId: '7',
-            title: 'Soon',
-            released: '2026-11-12',
-            poster: null,
-            popularity: 0,
-          },
-        },
-      ],
-      size: 2,
-      total: 41,
-    })
-    const url = new URL(asked[0] ?? '')
-    expect(url.pathname).toBe('/3/discover/movie')
-    expect(Object.fromEntries(url.searchParams)).toMatchObject({
-      'primary_release_date.gte': '2026-11-10',
-      without_genres: '99',
-      sort_by: 'primary_release_date.asc',
-      page: '3',
-    })
-  })
-
-  it('orders the shows by their first episode', async () => {
+  it('asks for anime as animation made in Japanese, documentaries kept out', async () => {
     const asked: string[] = []
     const client = new TmdbClient(config(), async ({ url }) => {
       asked.push(url)
       return json({ body: { results: [] } })
     })
-    expect(
-      await client.soonest({
-        type: ITEM_TYPES.show,
-        from: '2026-11-10',
-        documentaries: DOCUMENTARY_FILTERS.only,
-        page: 1,
-      }),
-    ).toEqual({ titles: [], size: 0, total: 0 })
-    expect(new URL(asked[0] ?? '').searchParams.get('sort_by')).toBe('first_air_date.asc')
+    await client.upcoming({
+      type: ITEM_TYPES.show,
+      from: '2026-11-10',
+      list: UPCOMING_LISTS.anime,
+      page: 1,
+    })
+    expect(Object.fromEntries(new URL(asked[0] ?? '').searchParams)).toMatchObject({
+      with_genres: '16',
+      with_original_language: 'ja',
+      without_genres: '99',
+    })
   })
 })

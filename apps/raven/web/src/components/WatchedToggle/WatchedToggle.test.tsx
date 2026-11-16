@@ -20,16 +20,14 @@ describe('WatchedToggle', () => {
     expect(presses).toBe(1)
   })
 
-  it('is only its check, named for a screen reader, when the label is not shown', () => {
-    render(
-      <WatchedToggle
-        state="watched"
-        onToggle={() => undefined}
-        label="Watched Pilot"
-        isLabelShown={false}
-      />,
-    )
+  it('is only its check, named for a screen reader, unless the label is shown', () => {
+    render(<WatchedToggle state="watched" onToggle={() => undefined} label="Watched Pilot" />)
     const button = screen.getByRole('button', { name: 'Watched Pilot' })
     expect(button).toHaveTextContent('')
+  })
+
+  it('shows its label beside the check when asked', () => {
+    render(<WatchedToggle state="watched" onToggle={() => undefined} isLabelShown />)
+    expect(screen.getByRole('button', { name: 'Watched' })).toHaveTextContent('Watched')
   })
 })

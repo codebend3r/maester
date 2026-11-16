@@ -144,10 +144,14 @@ export const queryKeys = {
   upcoming: ['upcoming'],
   /** One Coming soon shelf a page at a time, under Coming soon's key. */
   upcomingShelf: (shelf: UpcomingShelf) => ['upcoming', shelf],
+  /** What a search of upcoming titles found, under Coming soon's key. */
+  upcomingSearch: (query: string) => ['upcoming', 'search', query],
   /** One upcoming title's own page, under Coming soon's key. */
   upcomingTitle: ({ type, tmdbId }: TitleRequestAsk) => ['upcoming', type, tmdbId],
   /** Coming soon's requests, and the account's budget. */
   requests: ['requests'],
+  /** Every account's requests, for the owner, under the requests' key so a new request reads them again. */
+  everyonesRequests: ['requests', 'everyone'],
   /** Whether one title's arr holds it already, under the requests' key so a new request reads it again. */
   requestHolding: ({ type, tmdbId }: TitleRequestAsk) => ['requests', type, tmdbId],
   history: ({ libraryId, show, limit }: QueryKeysHistoryProps) => [

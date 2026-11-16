@@ -11,8 +11,10 @@ import {
   type PosterEntry,
   type Upcoming,
   type UpcomingPage,
+  type UpcomingSearch,
   type UpcomingShelf,
   UPCOMING_PARAMS,
+  UPCOMING_SEARCH_PARAM,
 } from '@/contract'
 import { HOME_SEARCH_PARAM } from '@/search'
 
@@ -47,13 +49,17 @@ export const homeCalls = ({ ask }: Transport) => ({
   /** The movies, shows and documentaries TMDB says are still to come, the most popular first. */
   getUpcoming: (): Promise<Upcoming> => ask({ route: ROUTES.getUpcoming }),
 
-  /** One page of a Coming soon shelf, the soonest out first. */
+  /** One page of a Coming soon shelf, the most popular first. */
   getUpcomingShelf: ({ shelf, after }: UpcomingShelfQuery): Promise<UpcomingPage> =>
     ask({
       route: ROUTES.getUpcomingShelf,
       params: { [UPCOMING_PARAMS.shelf]: shelf },
       query: after === null ? {} : { [UPCOMING_PARAMS.after]: after },
     }),
+
+  /** Upcoming movies and shows `query` finds on TMDB that no library holds, the most popular first. */
+  searchUpcoming: (query: string): Promise<UpcomingSearch> =>
+    ask({ route: ROUTES.searchUpcoming, query: { [UPCOMING_SEARCH_PARAM]: query.trim() } }),
 
   /** Every favourite across every library with the poster its card shows, most recently favourited first. */
   listFavourites: (): Promise<PosterEntry[]> => ask({ route: ROUTES.listFavourites }),

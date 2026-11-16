@@ -54,7 +54,10 @@ type Shared = {
 
 type ButtonProps = Shared & ComponentProps<'button'>
 
-/** A button with an optional leading icon. Icon-only buttons must pass an aria-label. */
+/**
+ * A button with an optional leading icon. Icon-only buttons must pass an
+ * aria-label, which is also their hover title unless they pass one of their own.
+ */
 export const Button = ({
   tone = BUTTON_TONES.quiet,
   size = BUTTON_SIZES.regular,
@@ -62,11 +65,13 @@ export const Button = ({
   children,
   className,
   type = 'button',
+  title,
   ...rest
 }: ButtonProps) => (
   <button
     type={type}
     className={classes({ tone, size, iconOnly: !children, extra: className })}
+    title={title ?? rest['aria-label']}
     {...rest}
   >
     {!!icon && <Icon name={icon} size={ICON_SIZES[size]} />}
@@ -76,16 +81,21 @@ export const Button = ({
 
 type ButtonLinkProps = Shared & ComponentProps<typeof Link>
 
-/** A router link that looks like a button, for actions that are really navigation. */
+/** A router link that looks like a button, for actions that are really navigation. Its aria-label is its hover title too, as a Button's is. */
 export const ButtonLink = ({
   tone = BUTTON_TONES.quiet,
   size = BUTTON_SIZES.regular,
   icon,
   children,
   className,
+  title,
   ...rest
 }: ButtonLinkProps) => (
-  <Link className={classes({ tone, size, iconOnly: !children, extra: className })} {...rest}>
+  <Link
+    className={classes({ tone, size, iconOnly: !children, extra: className })}
+    title={title ?? rest['aria-label']}
+    {...rest}
+  >
     {!!icon && <Icon name={icon} size={ICON_SIZES[size]} />}
     {children}
   </Link>

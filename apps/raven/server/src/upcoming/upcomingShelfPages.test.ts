@@ -2,35 +2,44 @@ import {
   ITEM_TYPES,
   type MatchItemType,
   UPCOMING_PAGE_SIZE,
+  UPCOMING_SHELF_SIZES,
   UPCOMING_SHELVES,
   type UpcomingPage,
   type UpcomingShelf,
 } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import {
-  DOCUMENTARY_FILTERS,
-  type DocumentaryFilter,
   TMDB_ERROR_KINDS,
   type TmdbClient,
   TmdbError,
+  UPCOMING_LISTS,
+  type UpcomingList,
 } from '@/metadata/tmdbClient'
 import type { DiscoveredPage } from '@/metadata/tmdbShapes'
 import { manualClock } from '@/test/clock'
 import { cursorOf, UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
 import { UPCOMING_FRESH_MS } from '@/upcoming/freshReads'
 
-type Asked = Parameters<TmdbClient['soonest']>[0]
+type Asked = Parameters<TmdbClient['upcoming']>[0]
 
-/** One result of a fake TMDB list: its id, its day, and whether it has a poster or a name at all. */
-type Listed = { id: number; released: string; hasPoster?: boolean; isNamed?: boolean }
+/** One result of a fake TMDB list: its id, its day, how popular it is, and whether it has a poster or a name at all. */
+type Listed = {
+  id: number
+  released: string
+  popularity?: number
+  /** Animation made in Japanese, as TMDB lists anime. */
+  isAnime?: boolean
+  hasPoster?: boolean
+  isNamed?: boolean
+}
 
-type ListKey = `${MatchItemType} ${DocumentaryFilter}`
+type ListKey = `${MatchItemType} ${UpcomingList}`
 
 type Lists = Partial<Record<ListKey, readonly Listed[]>>
 
-type KeyOfProps = Pick<Asked, 'type' | 'documentaries'>
+type KeyOfProps = Pick<Asked, 'type' | 'list'>
 
-const keyOf = ({ type, documentaries }: KeyOfProps): ListKey => `${type} ${documentaries}`
+const keyOf = ({ type, list }: KeyOfProps): ListKey => `${type} ${list}`
 
 type PageOfProps = { lists: Lists; asked: Asked }
 
@@ -39,19 +48,22 @@ const pageOf = ({ lists, asked }: PageOfProps): DiscoveredPage => {
   const list = lists[keyOf(asked)] ?? []
   const results = list.slice((asked.page - 1) * 20, asked.page * 20)
   return {
-    titles: results.flatMap(({ id, released, hasPoster = true, isNamed = true }, at) =>
-      isNamed
-        ? {
-            at,
-            title: {
-              tmdbId: String(id),
-              title: `Title ${id}`,
-              released,
-              poster: hasPoster ? `/p${id}.jpg` : null,
-              popularity: 0,
-            },
-          }
-        : [],
+    titles: results.flatMap(
+      ({ id, released, popularity = 0, isAnime = false, hasPoster = true, isNamed = true }, at) =>
+        isNamed
+          ? {
+              at,
+              title: {
+                tmdbId: String(id),
+                title: `Title ${id}`,
+                released,
+                poster: hasPoster ? `/p${id}.jpg` : null,
+                popularity,
+                genreIds: isAnime ? [16] : [18],
+                originalLanguage: isAnime ? 'ja' : 'en',
+              },
+            }
+          : [],
     ),
     size: results.length,
     total: list.length,
@@ -60,29 +72,40 @@ const pageOf = ({ lists, asked }: PageOfProps): DiscoveredPage => {
 
 type DayOf = (index: number) => string
 
-type DaysProps = { from: number; count: number; day: DayOf } & Partial<Listed>
+type DaysProps = {
+  from: number
+  count: number
+  day: DayOf
+  /** How popular the result at an index is; TMDB lists the most popular first. */
+  popular?: (index: number) => number
+} & Partial<Listed>
 
 /** `count` results with ids from `from`, each out on the day `day` gives its index. */
-const run = ({ from, count, day, ...rest }: DaysProps): Listed[] =>
-  Array.from({ length: count }, (_, index) => ({ id: from + index, released: day(index), ...rest }))
+const run = ({ from, count, day, popular = () => 0, ...rest }: DaysProps): Listed[] =>
+  Array.from({ length: count }, (_, index) => ({
+    id: from + index,
+    released: day(index),
+    popularity: popular(index),
+    ...rest,
+  }))
 
 /** The day `n` days after 2026-11-10. */
 const dayAfter = (n: number): string =>
   new Date(Date.parse('2026-11-10T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10)
 
-type Soonest = TmdbClient['soonest']
+type Upcoming = TmdbClient['upcoming']
 
-type SetUpProps = { lists: Lists; soonest?: Soonest }
+type SetUpProps = { lists: Lists; upcoming?: Upcoming }
 
-const setUp = ({ lists, soonest }: SetUpProps) => {
+const setUp = ({ lists, upcoming }: SetUpProps) => {
   const asked: Asked[] = []
   const { clock, advance } = manualClock()
   advance(Date.parse('2026-11-10T15:00:00Z'))
   const pages = new UpcomingShelfPages(
     {
-      soonest: (props) => {
+      upcoming: (props) => {
         asked.push(props)
-        return soonest?.(props) ?? Promise.resolve(pageOf({ lists, asked: props }))
+        return upcoming?.(props) ?? Promise.resolve(pageOf({ lists, asked: props }))
       },
     },
     clock,
@@ -105,15 +128,17 @@ const readAll = async ({ pages, shelf }: ReadAllProps): Promise<UpcomingPage[]> 
   return step({ after: null, read: [] })
 }
 
-const MOVIES = keyOf({ type: ITEM_TYPES.movie, documentaries: DOCUMENTARY_FILTERS.never })
+const MOVIES = keyOf({ type: ITEM_TYPES.movie, list: UPCOMING_LISTS.general })
 const DOCUMENTARY_MOVIES = keyOf({
   type: ITEM_TYPES.movie,
-  documentaries: DOCUMENTARY_FILTERS.only,
+  list: UPCOMING_LISTS.documentaries,
 })
-const DOCUMENTARY_SHOWS = keyOf({ type: ITEM_TYPES.show, documentaries: DOCUMENTARY_FILTERS.only })
+const DOCUMENTARY_SHOWS = keyOf({ type: ITEM_TYPES.show, list: UPCOMING_LISTS.documentaries })
+const ANIME_MOVIES = keyOf({ type: ITEM_TYPES.movie, list: UPCOMING_LISTS.anime })
+const ANIME_SHOWS = keyOf({ type: ITEM_TYPES.show, list: UPCOMING_LISTS.anime })
 
 describe('UpcomingShelfPages', () => {
-  it('pages through the movies from today on, the soonest first, to the last', async () => {
+  it("pages through the movies from today on, in TMDB's order of popularity, to the last", async () => {
     const { pages, asked } = setUp({
       lists: { [MOVIES]: run({ from: 1, count: 55, day: (index) => dayAfter(index) }) },
     })
@@ -130,9 +155,7 @@ describe('UpcomingShelfPages', () => {
     })
     expect(read.at(-1)?.next).toBeNull()
     expect(new Set(asked.map((each) => each.from))).toEqual(new Set(['2026-11-10']))
-    expect(new Set(asked.map((each) => each.documentaries))).toEqual(
-      new Set([DOCUMENTARY_FILTERS.never]),
-    )
+    expect(new Set(asked.map((each) => each.list))).toEqual(new Set([UPCOMING_LISTS.general]))
   })
 
   it('leaves out titles with no poster, reading on to fill the page', async () => {
@@ -170,30 +193,120 @@ describe('UpcomingShelfPages', () => {
     expect(ids).toEqual(Array.from({ length: 44 }, (_, index) => index + 1))
   })
 
-  it('merges documentary movies and shows by the day each comes out', async () => {
+  it('merges documentary movies and shows by how popular each is', async () => {
     const { pages } = setUp({
       lists: {
-        [DOCUMENTARY_MOVIES]: run({ from: 1000, count: 50, day: (index) => dayAfter(index * 2) }),
-        [DOCUMENTARY_SHOWS]: run({ from: 2000, count: 7, day: (index) => dayAfter(index * 3 + 1) }),
+        [DOCUMENTARY_MOVIES]: run({
+          from: 1000,
+          count: 50,
+          day: () => dayAfter(3),
+          popular: (index) => 1000 - index * 2,
+        }),
+        [DOCUMENTARY_SHOWS]: run({
+          from: 2000,
+          count: 7,
+          day: () => dayAfter(1),
+          popular: (index) => 999 - index * 3,
+        }),
       },
     })
     const read = await readAll({ pages, shelf: UPCOMING_SHELVES.documentaries })
     const titles = read.flatMap((page) => page.titles)
     expect(titles).toHaveLength(57)
-    const days = titles.map((title) => title.released)
-    expect(days).toEqual(days.toSorted())
-    expect(titles.slice(0, 3).map((title) => `${title.type} ${title.tmdbId}`)).toEqual([
+    expect(titles.slice(0, 4).map((title) => `${title.type} ${title.tmdbId}`)).toEqual([
       'movie 1000',
       'show 2000',
       'movie 1001',
+      'movie 1002',
+    ])
+  })
+
+  it("keeps a list in TMDB's order where its popularity figures disagree with it", async () => {
+    const { pages } = setUp({
+      lists: {
+        [MOVIES]: [
+          { id: 1, released: dayAfter(0), popularity: 5 },
+          { id: 2, released: dayAfter(0), popularity: 9 },
+          { id: 3, released: dayAfter(0), popularity: 7 },
+        ],
+      },
+    })
+    const first = await pages.read({ shelf: UPCOMING_SHELVES.movies, after: null })
+    expect(first?.titles.map((title) => title.tmdbId)).toEqual(['1', '2', '3'])
+  })
+
+  it('keeps anime off the movies, on a shelf of its own with both kinds merged', async () => {
+    const { pages, asked } = setUp({
+      lists: {
+        [MOVIES]: [
+          { id: 1, released: dayAfter(1) },
+          { id: 2, released: dayAfter(1), isAnime: true },
+          { id: 3, released: dayAfter(1) },
+        ],
+        [ANIME_MOVIES]: [{ id: 2, released: dayAfter(1), isAnime: true, popularity: 5 }],
+        [ANIME_SHOWS]: [{ id: 9, released: dayAfter(2), isAnime: true, popularity: 8 }],
+      },
+    })
+    const movies = await pages.read({ shelf: UPCOMING_SHELVES.movies, after: null })
+    expect(movies?.titles.map((title) => title.tmdbId)).toEqual(['1', '3'])
+    const anime = await pages.read({ shelf: UPCOMING_SHELVES.anime, after: null })
+    expect(anime?.titles.map((title) => `${title.type} ${title.tmdbId}`)).toEqual([
+      'show 9',
+      'movie 2',
+    ])
+    expect(asked.some((each) => each.list === UPCOMING_LISTS.anime)).toBe(true)
+    expect((await pages.shelves()).anime).toEqual(anime?.titles)
+  })
+
+  it("shows the start of each shelf's first page as Coming soon's shelves", async () => {
+    const { pages } = setUp({
+      lists: {
+        [MOVIES]: run({ from: 1, count: 55, day: () => dayAfter(2) }),
+        [DOCUMENTARY_MOVIES]: run({
+          from: 1000,
+          count: 30,
+          day: () => dayAfter(2),
+          popular: (index) => 100 - index,
+        }),
+        [DOCUMENTARY_SHOWS]: run({
+          from: 2000,
+          count: 30,
+          day: () => dayAfter(2),
+          popular: (index) => 99.5 - index,
+        }),
+      },
+    })
+    const shelves = await pages.shelves()
+    expect(shelves.movies).toHaveLength(UPCOMING_SHELF_SIZES.movies)
+    expect(shelves.shows).toEqual([])
+    expect(shelves.documentaries).toHaveLength(UPCOMING_SHELF_SIZES.documentaries)
+    const movies = await pages.read({ shelf: UPCOMING_SHELVES.movies, after: null })
+    expect(shelves.movies).toEqual(movies?.titles.slice(0, UPCOMING_SHELF_SIZES.movies))
+    const documentaries = await pages.read({ shelf: UPCOMING_SHELVES.documentaries, after: null })
+    expect(shelves.documentaries).toEqual(
+      documentaries?.titles.slice(0, UPCOMING_SHELF_SIZES.documentaries),
+    )
+    expect(shelves.documentaries.slice(0, 2).map((title) => title.type)).toEqual([
+      ITEM_TYPES.movie,
+      ITEM_TYPES.show,
     ])
   })
 
   it('never lets a page get ahead of a list it has not finished reading', async () => {
     const { pages } = setUp({
       lists: {
-        [DOCUMENTARY_MOVIES]: run({ from: 1000, count: 60, day: () => dayAfter(0) }),
-        [DOCUMENTARY_SHOWS]: run({ from: 2000, count: 5, day: () => dayAfter(5) }),
+        [DOCUMENTARY_MOVIES]: run({
+          from: 1000,
+          count: 60,
+          day: () => dayAfter(0),
+          popular: () => 9,
+        }),
+        [DOCUMENTARY_SHOWS]: run({
+          from: 2000,
+          count: 5,
+          day: () => dayAfter(5),
+          popular: () => 1,
+        }),
       },
     })
     const read = await readAll({ pages, shelf: UPCOMING_SHELVES.documentaries })
@@ -238,7 +351,7 @@ describe('UpcomingShelfPages', () => {
     const lists = { [MOVIES]: run({ from: 1, count: 10, day: () => dayAfter(0) }) }
     const { pages, asked, advance } = setUp({
       lists,
-      soonest: async (props) => {
+      upcoming: async (props) => {
         if (state.isFailing) {
           throw new TmdbError({ kind: TMDB_ERROR_KINDS.unavailable, message: 'TMDB is down.' })
         }

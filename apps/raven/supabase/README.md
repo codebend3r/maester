@@ -86,7 +86,7 @@ Setting the three Supabase variables on raven turns enforcement on for everyone 
 
 A server that has run `ready` stays closed if its Supabase settings go missing: it answers `503` everywhere but `/api/health`, `/api/auth/config` and `/api/media-origins/ping`. Rolling back is `RAVEN_ACCOUNTS=off` with the Supabase variables removed, which reopens anonymous access and brings the admin password and the browser PIN back. It is an explicit security decision, not an automatic fallback, and raven logs a warning on every start while it is set.
 
-## Sign-up alerts and the approval window, operator only
+## Member emails and the approval window, operator only
 
 Until `approve_until` (Dec 1 2026 at 00:00 New York time, set by the migration) a confirmed sign-up is approved at once; after it, it waits for the owner in the Users section of raven's Admin page (`/admin`). Move the cutoff as the database operator in the SQL editor:
 
@@ -94,7 +94,7 @@ Until `approve_until` (Dec 1 2026 at 00:00 New York time, set by the migration) 
 update private.enrolment set approve_until = '2027-01-01 00:00 America/New_York';
 ```
 
-Every sign-up, approved or pending, emails the owner through the `signup-alert` Edge Function: who signed up (their address), that they want to become a member, and a link to `RAVEN_WEB_URL` plus `/admin`, where the owner approves them. The alert goes out when the address is confirmed, since that is when the membership row appears; an unconfirmed sign-up sends none. The `alert_signup` trigger posts the new address and status to it with `pg_net`, sending a shared secret the function checks. Without the two Vault secrets below, sign-ups still enrol and the database logs a warning instead. Edge Functions refuse outbound SMTP on ports 25 and 587, so the function connects on 465 (implicit TLS); Gmail's `smtp.gmail.com` accepts it with an app password.
+Every sign-up, approved or pending, emails the owner through the `signup-alert` Edge Function: who signed up (their address), that they want to become a member, and a link to `RAVEN_WEB_URL` plus `/admin`, where the owner approves them. The alert goes out when the address is confirmed, since that is when the membership row appears; an unconfirmed sign-up sends none. A member is emailed once they are approved, by the owner (`set_member_status`, or access restored after a removal) or by the approval window at sign-up, with a link to `RAVEN_WEB_URL` to sign in; a removal sends nothing. Both are HTML in raven's colours (`functions/signup-alert/template.ts`, every address escaped) with a plain text copy. The `alert_signup` trigger (an `event` of `signedUp`, with the address and status) and the `mail_approval_on_insert` and `mail_approval_on_update` triggers (an `event` of `approved`, with the address) post through `private.post_member_mail` with `pg_net`, sending a shared secret the function checks. Without the two Vault secrets below, sign-ups still enrol and the database logs a warning instead. Edge Functions refuse outbound SMTP on ports 25 and 587, so the function connects on 465 (implicit TLS); Gmail's `smtp.gmail.com` accepts it with an app password.
 
 1. Generate the shared secret with `openssl rand -hex 32`. Keep it out of every committed file.
 2. Set the function's secrets with the pinned CLI, then deploy it from the repo root (`deploy` runs `deploy:functions` last). The secrets go straight to the CLI, not through Nx, which would print them in its task output:
@@ -113,8 +113,8 @@ Every sign-up, approved or pending, emails the owner through the `signup-alert` 
    select vault.create_secret('THE_SHARED_SECRET', 'signup_alert_secret');
    ```
 
-4. Check the wiring as the database operator: `supabase_migrations.schema_migrations` lists `20261020000000`, `public.members` has the `alert_signup` trigger, `pg_net` is installed and `vault.secrets` holds both names. A project missing any of them enrols sign-ups silently.
-5. Sign up a test address and check that the email arrives. `net._http_response` holds each call's status for a few hours; a `401` means the two secrets differ.
+4. Check the wiring as the database operator: `supabase_migrations.schema_migrations` lists `20261020000000` and `20261115000000`, `public.members` has the `alert_signup`, `mail_approval_on_insert` and `mail_approval_on_update` triggers, `pg_net` is installed and `vault.secrets` holds both names. A project missing any of them enrols sign-ups silently.
+5. Sign up a test address and check that the owner's email arrives, then approve it and check the member's. `net._http_response` holds each call's status for a few hours; a `401` means the two secrets differ.
 
 ## CI and rollout
 

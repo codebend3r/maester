@@ -1,5 +1,6 @@
 import type { Transport } from '@/apiClient/transport'
 import {
+  type MemberRequest,
   type TitleHolding,
   type TitleRequest,
   type TitleRequestAsk,
@@ -20,6 +21,10 @@ export const requestCalls = ({ ask }: Transport) => ({
 
   /** Every request with where it stands, and how many the caller has left. */
   listRequests: (): Promise<TitleRequests> => ask({ route: ROUTES.listRequests }),
+
+  /** Every request made through raven with whose it was, newest first; the owner's alone. */
+  listEveryonesRequests: (): Promise<MemberRequest[]> =>
+    ask({ route: ROUTES.listEveryonesRequests }),
 
   /** Whether the title's Sonarr or Radarr holds it already, and where it stands there. */
   getRequestHolding: ({ type, tmdbId }: TitleRequestAsk): Promise<TitleHolding> =>

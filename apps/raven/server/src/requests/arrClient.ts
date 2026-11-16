@@ -51,6 +51,9 @@ const QUEUE_FILTERS = {
   [ITEM_TYPES.show]: 'seriesId',
 } as const satisfies Record<MatchItemType, string>
 
+/** How far ahead of a day Radarr's calendar is read for the movies still to come: ten years. */
+const CALENDAR_REACH_MS = 10 * 365 * 24 * 60 * 60 * 1000
+
 /** The values the arrs' add calls take: monitor every season, and wait for a movie's release. */
 const ADD_VALUES = { released: 'released', allSeasons: 'all' } as const
 
@@ -105,8 +108,10 @@ const isIdentified = object({ id: isNumber })
 
 const isCommand = object({ status: isString })
 
-/** One download in the arr's queue: how far the client is, and what the arr is doing with it. */
+/** One download in the arr's queue: whose it is, how far the client is, and what the arr is doing with it. */
 const isQueueEntry = object({
+  movieId: optional(nullable(isNumber)),
+  seriesId: optional(nullable(isNumber)),
   status: optional(isString),
   trackedDownloadState: optional(isString),
 })
@@ -118,6 +123,26 @@ const isMovie = object({ hasFile: optional(isBoolean) })
 const isSeries = object({
   statistics: optional(object({ episodeFileCount: optional(isNumber) })),
 })
+
+/** A title in an arr's library: its ids, when it was added, and each day the arr knows it comes out on. */
+const isHeldTitle = object({
+  id: isNumber,
+  title: isString,
+  added: isString,
+  tmdbId: optional(nullable(isNumber)),
+  firstAired: optional(nullable(isString)),
+  inCinemas: optional(nullable(isString)),
+  digitalRelease: optional(nullable(isString)),
+  physicalRelease: optional(nullable(isString)),
+})
+
+type HeldTitle = Infer<typeof isHeldTitle>
+
+/** The first day a held title comes out on, `YYYY-MM-DD`: a show's first episode, or the earliest of a movie's releases. */
+const releasedOf = (held: HeldTitle): string | null =>
+  [held.firstAired, held.inCinemas, held.digitalRelease, held.physicalRelease]
+    .flatMap((day) => (day == null || day === '' ? [] : [day.slice(0, 10)]))
+    .toSorted()[0] ?? null
 
 /** A lookup's answer: the arr's own record of the title, sent back whole to add it. */
 const isLookedUp = object({
@@ -159,6 +184,22 @@ type AddProps = {
   title: ArrTitle
   rootFolder: string
   qualityProfileId: number
+}
+
+/** A title an arr holds that is still to come: when the arr took it on, and how far its download is. */
+export type ArrHolding = {
+  arrId: number
+  tmdbId: string
+  title: string
+  /** When it was added to the arr, as an ISO time. */
+  addedAt: string
+  progress: ArrProgress
+}
+
+type HoldingsProps = {
+  type: MatchItemType
+  /** `YYYY-MM-DD`, the earliest day out a title still to come has. */
+  from: string
 }
 
 type ByTitleProps = { type: MatchItemType; arrId: number }
@@ -327,6 +368,44 @@ export class ArrClient {
     if (answer === null) return false
     if (!isCommand(answer)) throw this.unreadable('the search command')
     return RUNNING_COMMAND_STATES.has(answer.status)
+  }
+
+  /**
+   * Every title the arr holds that first comes out on `from` or later, with
+   * its downloads in the queue and whether it has a file. Radarr's whole
+   * library is tens of megabytes, so its movies are read from its calendar,
+   * which lists the ones with a release from `from` on; Sonarr has no such
+   * list of series, so every series is read.
+   */
+  async holdings({ type, from }: HoldingsProps): Promise<ArrHolding[]> {
+    const until = new Date(Date.parse(from) + CALENDAR_REACH_MS).toISOString().slice(0, 10)
+    const path =
+      type === ITEM_TYPES.movie
+        ? `${API}/calendar?${toQueryString({ start: from, end: until, unmonitored: 'true' })}`
+        : TITLE_ROUTES[type]
+    const [titles, queue] = await Promise.all([
+      this.call({ type, path }),
+      this.call({ type, path: `${API}/queue/details` }),
+    ])
+    if (!listOf(isHeldTitle)(titles)) throw this.unreadable(`the ${type} library`)
+    if (!listOf(isQueueEntry)(queue)) throw this.unreadable('the download queue')
+    return titles.flatMap((held) => {
+      const tmdbId = idOf(held.tmdbId)
+      const released = releasedOf(held)
+      if (tmdbId === null || released === null || released < from) return []
+      return [
+        {
+          arrId: held.id,
+          tmdbId: String(tmdbId),
+          title: held.title,
+          addedAt: held.added,
+          progress: {
+            queue: queue.filter((entry) => entry[QUEUE_FILTERS[type]] === held.id),
+            hasFile: hasFileOf({ type, held }),
+          },
+        },
+      ]
+    })
   }
 
   /** The title's downloads in the queue, and whether the arr holds a file of it. */

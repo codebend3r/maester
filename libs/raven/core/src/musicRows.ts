@@ -122,6 +122,8 @@ export type QueueRow = {
   place: number
   title: string
   line: string
+  /** How long the track runs, "4:05", so every listing of songs says it. */
+  length: string
   isCurrent: boolean
 }
 
@@ -133,7 +135,16 @@ export const queueRowsOf = ({ queue, tracks }: QueueRowsOfProps): QueueRow[] =>
     const track = tracks[id]
     return track === undefined
       ? []
-      : [{ key: `${id}:${place}`, place, title: track.title, line: artistNames(track), isCurrent }]
+      : [
+          {
+            key: `${id}:${place}`,
+            place,
+            title: track.title,
+            line: artistNames(track),
+            length: formatDuration(track.duration),
+            isCurrent,
+          },
+        ]
   })
 
 type PlayTimeOfProps = { position: number; duration: number | null }

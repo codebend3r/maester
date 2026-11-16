@@ -107,6 +107,7 @@ export const MUSIC_COPY = {
   remove: 'Remove',
   removeTrack: (title: string) => `Remove ${title}`,
   openNowPlaying: 'Open Now Playing',
+  closePlayer: 'Stop the music and close the player',
   goTo: (name: string) => `Go to ${name}`,
   favourite: 'Favourite',
   playlist: 'Playlist',
