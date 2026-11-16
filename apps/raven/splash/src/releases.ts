@@ -6,8 +6,21 @@ const REPO_URL = 'https://github.com/codebend3r/maester'
 /** The splash's own pages. */
 export const PATHS = { versions: '/releases/' } as const
 
-/** GitHub's releases, newest first; a page of 100 covers every version so far. */
-const RELEASES_URL = 'https://api.github.com/repos/codebend3r/maester/releases?per_page=100'
+/*
+ * GitHub's releases, newest first, a page at a time. CI tags every merge as a build
+ * (vX.Y.Z.N), so a version's release can sit pages down; the cap bounds the asks against
+ * GitHub's 60 an hour for a visitor.
+ */
+const RELEASES_PAGE_SIZE = 100
+const RELEASES_MAX_PAGES = 10
+
+type ReleasesUrlProps = { page: number }
+
+const releasesUrl = ({ page }: ReleasesUrlProps): string =>
+  `https://api.github.com/repos/codebend3r/maester/releases?per_page=${RELEASES_PAGE_SIZE}&page=${page}`
+
+// A version's tag, vX.Y.Z; the build tags CI puts on each merge have a fourth number.
+const VERSION_TAG = /^v\d+\.\d+\.\d+$/
 
 export const PLATFORMS = { mac: 'mac', windows: 'windows', androidTv: 'androidTv' } as const
 type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS]
@@ -47,12 +60,19 @@ export const CATALOGS = {
   },
 } as const satisfies Record<string, Catalog>
 
-type DownloadOfProps = { catalog: Catalog; name: string }
+type CatalogDownloadProps = { catalog: Catalog; name: string }
 
-const downloadOf = ({ catalog, name }: DownloadOfProps): Download | null => {
+const catalogDownload = ({ catalog, name }: CatalogDownloadProps): Download | null => {
   const suffix = catalog.fileName.exec(name)?.[1] ?? ''
   return Object.entries(catalog.downloads).find(([key]) => key === suffix)?.[1] ?? null
 }
+
+type DownloadOfProps = { catalogs: readonly Catalog[]; name: string }
+
+const downloadOf = ({ catalogs, name }: DownloadOfProps): Download | null =>
+  catalogs
+    .map((catalog) => catalogDownload({ catalog, name }))
+    .find((download) => download !== null) ?? null
 
 export type ReleaseFile = Download & {
   url: string
@@ -66,25 +86,25 @@ export type Release = {
   files: readonly ReleaseFile[]
 }
 
-type FileOfProps = { catalog: Catalog; asset: unknown }
+type FileOfProps = { catalogs: readonly Catalog[]; asset: unknown }
 
-const fileOf = ({ catalog, asset }: FileOfProps): ReleaseFile | null => {
+const fileOf = ({ catalogs, asset }: FileOfProps): ReleaseFile | null => {
   if (!isRecord(asset)) return null
   const { name, browser_download_url: url, size } = asset
   if (typeof name !== 'string' || typeof url !== 'string' || typeof size !== 'number') return null
-  const download = downloadOf({ catalog, name })
+  const download = downloadOf({ catalogs, name })
   if (download === null) return null
   return { ...download, url, bytes: size }
 }
 
-type ReleaseOfProps = { catalog: Catalog; release: unknown }
+type ReleaseOfProps = { catalogs: readonly Catalog[]; release: unknown }
 
-const releaseOf = ({ catalog, release }: ReleaseOfProps): Release | null => {
+const releaseOf = ({ catalogs, release }: ReleaseOfProps): Release | null => {
   if (!isRecord(release)) return null
   const { tag_name: tag, published_at: date, assets, draft, prerelease } = release
   if (typeof tag !== 'string' || typeof date !== 'string' || !Array.isArray(assets)) return null
-  if (!!draft || !!prerelease) return null
-  const files = assets.map((asset) => fileOf({ catalog, asset })).filter((file) => file !== null)
+  if (!!draft || !!prerelease || !VERSION_TAG.test(tag)) return null
+  const files = assets.map((asset) => fileOf({ catalogs, asset })).filter((file) => file !== null)
   if (files.length === 0) return null
   return {
     version: tag.replace(/^v/, ''),
@@ -96,14 +116,17 @@ const releaseOf = ({ catalog, release }: ReleaseOfProps): Release | null => {
 
 type ParseReleasesProps = {
   releases: unknown
-  catalog: Catalog
+  catalogs: readonly Catalog[]
 }
 
-/** The published releases that carry a file of the catalog, newest first, as GitHub lists them. */
-export const parseReleases = ({ releases, catalog }: ParseReleasesProps): readonly Release[] =>
+/**
+ * The published versions (never a build tag) that carry a file of the catalogs, newest
+ * first, as GitHub lists them.
+ */
+export const parseReleases = ({ releases, catalogs }: ParseReleasesProps): readonly Release[] =>
   Array.isArray(releases)
     ? releases
-        .map((release) => releaseOf({ catalog, release }))
+        .map((release) => releaseOf({ catalogs, release }))
         .filter((release) => release !== null)
     : []
 
@@ -168,17 +191,49 @@ export const platformList = ({ release }: PlatformListProps): string =>
     .map((platform) => PLATFORM_COPY[platform].computers)
     .join(SPLASH_COPY.platformsJoiner)
 
+type FetchPageProps = { page: number }
+
+// One page of GitHub's releases; a refusal or anything but a list reads as an empty page.
+const fetchPage = async ({ page }: FetchPageProps): Promise<readonly unknown[]> => {
+  const response = await fetch(releasesUrl({ page }))
+  if (!response.ok) return []
+  const body: unknown = await response.json()
+  return Array.isArray(body) ? body : []
+}
+
+type CollectReleasesProps = {
+  catalogs: readonly Catalog[]
+  limit: number
+  page: number
+  found: readonly Release[]
+}
+
+const collectReleases = async ({
+  catalogs,
+  limit,
+  page,
+  found,
+}: CollectReleasesProps): Promise<readonly Release[]> => {
+  const raw = await fetchPage({ page })
+  const releases = [...found, ...parseReleases({ releases: raw, catalogs })]
+  const isLastPage = raw.length < RELEASES_PAGE_SIZE || page >= RELEASES_MAX_PAGES
+  if (isLastPage || releases.length >= limit) return releases.slice(0, limit)
+  return collectReleases({ catalogs, limit, page: page + 1, found: releases })
+}
+
 type FetchReleasesProps = {
-  catalog: Catalog
+  catalogs: readonly Catalog[]
+  /** Stops asking GitHub for pages once this many releases are found. */
+  limit?: number
 }
 
 /** Reads the releases from GitHub; no network, an outage or a rate limit answers an empty list. */
 export const fetchReleases = async ({
-  catalog,
+  catalogs,
+  limit = Number.POSITIVE_INFINITY,
 }: FetchReleasesProps): Promise<readonly Release[]> => {
   try {
-    const response = await fetch(RELEASES_URL)
-    return response.ok ? parseReleases({ releases: await response.json(), catalog }) : []
+    return await collectReleases({ catalogs, limit, page: 1, found: [] })
   } catch {
     return []
   }

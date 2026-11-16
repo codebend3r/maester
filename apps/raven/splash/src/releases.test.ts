@@ -1,10 +1,11 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 
 import {
   CATALOGS,
   PLATFORMS,
   downloadMenu,
   formatBytes,
+  fetchReleases,
   formatDate,
   parseReleases,
   platformList,
@@ -48,7 +49,7 @@ const url = (name: string) => `https://example.test/${name}`
 
 describe('parseReleases', () => {
   test('keeps the Raven downloads of each release, in GitHub order', () => {
-    expect(parseReleases({ releases: [latest, older], catalog: CATALOGS.desktop })).toEqual([
+    expect(parseReleases({ releases: [latest, older], catalogs: [CATALOGS.desktop] })).toEqual([
       {
         version: '0.8.0',
         date: '2026-10-29T18:00:00Z',
@@ -108,14 +109,19 @@ describe('parseReleases', () => {
       { tag_name: 'v0.7.2', assets: [] },
       null,
     ]
-    expect(parseReleases({ releases, catalog: CATALOGS.desktop })).toEqual([])
+    expect(parseReleases({ releases, catalogs: [CATALOGS.desktop] })).toEqual([])
   })
 
   test('answers an empty list for anything that is not a list', () => {
-    expect(parseReleases({ releases: null, catalog: CATALOGS.desktop })).toEqual([])
+    expect(parseReleases({ releases: null, catalogs: [CATALOGS.desktop] })).toEqual([])
     expect(
-      parseReleases({ releases: { message: 'rate limited' }, catalog: CATALOGS.desktop }),
+      parseReleases({ releases: { message: 'rate limited' }, catalogs: [CATALOGS.desktop] }),
     ).toEqual([])
+  })
+
+  test('leaves out the build tags CI puts on each merge', () => {
+    const build = { ...latest, tag_name: 'v0.8.0.3' }
+    expect(parseReleases({ releases: [build], catalogs: [CATALOGS.desktop] })).toEqual([])
   })
 
   test('skips a file the release workflow does not make', () => {
@@ -126,7 +132,7 @@ describe('parseReleases', () => {
         asset({ name: 'raven-player-0.8.0-arm64.pkg' }),
       ],
     }
-    expect(parseReleases({ releases: [release], catalog: CATALOGS.desktop })).toEqual([])
+    expect(parseReleases({ releases: [release], catalogs: [CATALOGS.desktop] })).toEqual([])
   })
 })
 
@@ -139,7 +145,7 @@ describe('parseReleases with the device catalog', () => {
         asset({ name: 'raven-app-0.8.0-android-tv.apk', size: 87_000_000 }),
       ],
     }
-    expect(parseReleases({ releases: [release, older], catalog: CATALOGS.devices })).toEqual([
+    expect(parseReleases({ releases: [release, older], catalogs: [CATALOGS.devices] })).toEqual([
       {
         version: '0.8.0',
         date: '2026-10-29T18:00:00Z',
@@ -158,12 +164,71 @@ describe('parseReleases with the device catalog', () => {
 
   test('keeps the device app out of the desktop downloads', () => {
     const release = { ...older, assets: [asset({ name: 'raven-app-0.7.5-android-tv.apk' })] }
-    expect(parseReleases({ releases: [release], catalog: CATALOGS.desktop })).toEqual([])
+    expect(parseReleases({ releases: [release], catalogs: [CATALOGS.desktop] })).toEqual([])
+  })
+})
+
+describe('parseReleases with every catalog', () => {
+  test('keeps the desktop and device files of a release together', () => {
+    const release = {
+      ...latest,
+      assets: [...latest.assets, asset({ name: 'raven-app-0.8.0-android-tv.apk' })],
+    }
+    const [first] = parseReleases({ releases: [release, older], catalogs: Object.values(CATALOGS) })
+    expect(first?.files.map((file) => file.label)).toEqual([
+      'Mac, disk image',
+      'Windows, installer',
+      'Windows, zip archive',
+      'Android TV, APK',
+    ])
+  })
+})
+
+const buildTags = Array.from({ length: 100 }, (_, n) => ({
+  ...latest,
+  tag_name: `v0.8.0.${n + 1}`,
+}))
+
+type AnswerOf = () => Response
+
+// Bun's fetch type carries preconnect, so a stand-in needs one too.
+const answering = (answerOf: AnswerOf) =>
+  Object.assign(async () => answerOf(), { preconnect: () => undefined })
+
+describe('fetchReleases', () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
+  test('reads on past a page of build tags to the versions', async () => {
+    const pages = [buildTags, [latest, older]]
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation(
+      answering(() => Response.json(pages[fetched.mock.calls.length - 1] ?? [])),
+    )
+    const releases = await fetchReleases({ catalogs: [CATALOGS.desktop] })
+    expect(releases.map((release) => release.version)).toEqual(['0.8.0', '0.7.5'])
+    expect(fetched).toHaveBeenCalledTimes(2)
+  })
+
+  test('stops asking once the limit is found', async () => {
+    const fetched = spyOn(globalThis, 'fetch').mockImplementation(
+      answering(() => Response.json([latest, ...buildTags.slice(1)])),
+    )
+    const releases = await fetchReleases({ catalogs: [CATALOGS.desktop], limit: 1 })
+    expect(releases.map((release) => release.version)).toEqual(['0.8.0'])
+    expect(fetched).toHaveBeenCalledTimes(1)
+  })
+
+  test('answers an empty list when GitHub refuses', async () => {
+    spyOn(globalThis, 'fetch').mockImplementation(
+      answering(() => Response.json({ message: 'rate limited' }, { status: 403 })),
+    )
+    expect(await fetchReleases({ catalogs: [CATALOGS.desktop] })).toEqual([])
   })
 })
 
 const parsed = (release: unknown): Release => {
-  const [first] = parseReleases({ releases: [release], catalog: CATALOGS.desktop })
+  const [first] = parseReleases({ releases: [release], catalogs: [CATALOGS.desktop] })
   if (first === undefined) throw new Error('the release carries no download')
   return first
 }

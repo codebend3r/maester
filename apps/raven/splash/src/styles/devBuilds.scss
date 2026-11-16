@@ -1,8 +1,9 @@
 /*
- * The dev builds page: the versions page's list, then a card per kind of device
- * saying how its builds get onto it.
+ * The dev builds page: a card per kind of device saying how its builds get onto it,
+ * above the versions page's list, which runs long.
  */
 .install-notes {
+  grid-area: notes;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
   gap: var(--space-8);

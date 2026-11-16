@@ -35,16 +35,16 @@ const versionItem = ({ release }: VersionItemProps): HTMLElement =>
 const IDS = { versions: 'versions', status: 'versions-status' } as const
 
 type ShowVersionsProps = {
-  catalog: Catalog
+  catalogs: readonly Catalog[]
   emptyText: string
 }
 
 /** Fills the page's version list, or says why it is empty in the status line. */
-export const showVersions = async ({ catalog, emptyText }: ShowVersionsProps): Promise<void> => {
+export const showVersions = async ({ catalogs, emptyText }: ShowVersionsProps): Promise<void> => {
   const list = document.getElementById(IDS.versions)
   const status = document.getElementById(IDS.status)
   if (list === null || status === null) return
-  const releases = await fetchReleases({ catalog })
+  const releases = await fetchReleases({ catalogs })
   if (releases.length === 0) {
     status.textContent = emptyText
     return
