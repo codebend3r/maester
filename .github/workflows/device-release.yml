@@ -1,0 +1,102 @@
+name: 📺 Device app release
+
+# Builds raven's device app for Android TV and attaches the APK to the release of each
+# pushed vX.Y.Z tag (scripts/bump_version.sh --push), as raven-app-<version>-android-tv.apk,
+# for the splash's dev builds page (maester.netlify.app/dev-builds/) to list. release.yml
+# creates that release; this workflow waits for it and uploads with --clobber, so a re-run
+# replaces the APK. Only three-number tags run it: a vX.Y.Z.N build tag never builds the app.
+#
+# A run from the Actions tab names a tag and builds that tag's app, to give a release that
+# came out before this workflow its APK: `gh workflow run device-release.yml -f tag=v0.8.10`.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag (vX.Y.Z) to build the app of and attach it to
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: device-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  # Keep this the same as APP_NODE_VERSION in native-checks.yml.
+  APP_NODE_VERSION: 24.21.0
+
+jobs:
+  android-tv:
+    name: 📺 Build and attach the Android TV APK
+    runs-on: ubuntu-24.04
+    # A Release build of React Native for two ABIs, warm or cold.
+    timeout-minutes: 90
+    # Uploading the APK writes to the repo; nothing else here does.
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: 📥 Checkout the tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      # Fails before the long build when the tag is not a release or the app disagrees on it.
+      - name: 🏷️ Check the tag
+        run: |
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$TAG is not a vX.Y.Z release tag."
+            exit 1
+          fi
+          version=$(jq -r .version apps/raven/app/package.json)
+          if [ "$TAG" != "v$version" ]; then
+            echo "::error::$TAG is not v$version, the version in apps/raven/app/package.json."
+            exit 1
+          fi
+
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
+        with:
+          platform: android-tv
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # The setup writes the e2e build's environment: the development variant, the fixture
+      # server's address and an x86_64-only APK for the emulator. A later write wins, so the
+      # release build signs in at the public raven and runs on TVs, which are ARM.
+      - name: 🌱 Release build environment
+        run: |
+          {
+            echo "APP_VARIANT=production"
+            echo "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN="
+            echo "ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a,armeabi-v7a"
+          } >> "$GITHUB_ENV"
+
+      # Runs `prebuild:android-tv` first, then Gradle's Release APK. Nx keys the build on all
+      # three variables above, so no cached emulator APK stands in for it.
+      - name: 📺 Build the Android TV APK
+        run: bun run app:build:android-tv --excludeTaskDependencies
+
+      - name: 🗂️ Name the APK
+        run: |
+          mkdir -p release
+          cp apps/raven/app/android/app/build/outputs/apk/release/app-release.apk \
+            "release/raven-app-${TAG#v}-android-tv.apk"
+          ls -l release
+
+      # release.yml makes the release from the same tag push, and may not be done yet. A
+      # backfill's release already exists, and its tag predates this action.
+      - name: ⏳ Wait for the release
+        if: github.event_name == 'push'
+        uses: ./.github/actions/wait-for-release
+        with:
+          tag: ${{ env.TAG }}
+
+      - name: 📤 Upload the APK
+        run: gh release upload "$TAG" release/* --clobber

@@ -8,6 +8,7 @@ import { SPLASH_COPY } from '@/copy'
 import { el, link } from '@/dom'
 import { fileItem } from '@/fileItem'
 import {
+  CATALOGS,
   PATHS,
   downloadMenu,
   fetchReleases,
@@ -35,7 +36,7 @@ const showLatestRelease = async (): Promise<void> => {
   const note = document.getElementById(IDS.note)
   const title = document.getElementById(IDS.title)
   if (menu === null || note === null || title === null) return
-  const [latest] = await fetchReleases()
+  const [latest] = await fetchReleases({ catalog: CATALOGS.desktop })
   if (latest === undefined) return
   const offer = downloadMenu({
     release: latest,

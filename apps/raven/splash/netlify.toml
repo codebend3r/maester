@@ -14,12 +14,12 @@ BUN_VERSION = "1.4.2"
 BUN_FLAGS = "--frozen-lockfile"
 NX_DAEMON = "false"
 
-# A short address to type into a TV's Downloader app. The APK is too big for git, so it
-# lives on the `android-tv` prerelease, whose asset each preview build replaces; the tag
-# starts with no `v`, so it starts no release workflow, and the splash lists no prerelease.
+# A short address to type into a TV's Downloader app: the dev builds page, which lists the
+# APK device-release.yml attaches to each release. GitHub's releases/latest is no use here,
+# since the newest release is often a build tag (vX.Y.Z.N), which carries no APK.
 [[redirects]]
 from = "/tv"
-to = "https://github.com/codebend3r/maester/releases/download/android-tv/raven-android-tv.apk"
+to = "/dev-builds/"
 status = 302
 
 # Vite hashes every file under assets/.

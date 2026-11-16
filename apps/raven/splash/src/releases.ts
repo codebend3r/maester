@@ -9,32 +9,50 @@ export const PATHS = { versions: '/releases/' } as const
 /** GitHub's releases, newest first; a page of 100 covers every version so far. */
 const RELEASES_URL = 'https://api.github.com/repos/codebend3r/maester/releases?per_page=100'
 
-export const PLATFORMS = { mac: 'mac', windows: 'windows' } as const
+export const PLATFORMS = { mac: 'mac', windows: 'windows', androidTv: 'androidTv' } as const
 type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS]
 
 /** What the button calls each platform, and what the line under it calls its computers. */
 const PLATFORM_COPY = {
   mac: { name: 'Mac', computers: 'Macs with Apple silicon' },
   windows: { name: 'Windows', computers: 'Windows PCs' },
+  androidTv: { name: 'Android TV', computers: 'Android TV' },
 } as const satisfies Record<Platform, { name: string; computers: string }>
 
 type Download = { platform: Platform; label: string }
 
+/** How one workflow names its files, `<prefix>-<version>-<download>`, and the downloads it ships. */
+export type Catalog = { fileName: RegExp; downloads: Readonly<Record<string, Download>> }
+
 /*
- * The release workflow names Raven's files raven-player-<version>-<download>, one row
- * here per download it ships. Intel Macs are not built, so x64 is always Windows.
+ * The files each release workflow ships, one row per download. desktop-release.yml names
+ * Raven's raven-player-<version>-<download>; Intel Macs are not built, so x64 is always
+ * Windows. device-release.yml names the device app's raven-app-<version>-<download>.
  */
-const DOWNLOADS = {
-  'arm64.dmg': { platform: PLATFORMS.mac, label: 'Mac, disk image' },
-  'arm64.zip': { platform: PLATFORMS.mac, label: 'Mac, zip archive' },
-  'x64-setup.exe': { platform: PLATFORMS.windows, label: 'Windows, installer' },
-  'x64.zip': { platform: PLATFORMS.windows, label: 'Windows, zip archive' },
-} as const satisfies Record<string, Download>
+export const CATALOGS = {
+  desktop: {
+    fileName: /^raven-player-\d+\.\d+\.\d+-(.+)$/,
+    downloads: {
+      'arm64.dmg': { platform: PLATFORMS.mac, label: 'Mac, disk image' },
+      'arm64.zip': { platform: PLATFORMS.mac, label: 'Mac, zip archive' },
+      'x64-setup.exe': { platform: PLATFORMS.windows, label: 'Windows, installer' },
+      'x64.zip': { platform: PLATFORMS.windows, label: 'Windows, zip archive' },
+    },
+  },
+  devices: {
+    fileName: /^raven-app-\d+\.\d+\.\d+-(.+)$/,
+    downloads: {
+      'android-tv.apk': { platform: PLATFORMS.androidTv, label: 'Android TV, APK' },
+    },
+  },
+} as const satisfies Record<string, Catalog>
 
-const FILE_NAME = /^raven-player-\d+\.\d+\.\d+-(.+)$/
+type DownloadOfProps = { catalog: Catalog; name: string }
 
-const downloadOf = (suffix: string): Download | null =>
-  Object.entries(DOWNLOADS).find(([name]) => name === suffix)?.[1] ?? null
+const downloadOf = ({ catalog, name }: DownloadOfProps): Download | null => {
+  const suffix = catalog.fileName.exec(name)?.[1] ?? ''
+  return Object.entries(catalog.downloads).find(([key]) => key === suffix)?.[1] ?? null
+}
 
 export type ReleaseFile = Download & {
   url: string
@@ -48,21 +66,25 @@ export type Release = {
   files: readonly ReleaseFile[]
 }
 
-const fileOf = (asset: unknown): ReleaseFile | null => {
+type FileOfProps = { catalog: Catalog; asset: unknown }
+
+const fileOf = ({ catalog, asset }: FileOfProps): ReleaseFile | null => {
   if (!isRecord(asset)) return null
   const { name, browser_download_url: url, size } = asset
   if (typeof name !== 'string' || typeof url !== 'string' || typeof size !== 'number') return null
-  const download = downloadOf(FILE_NAME.exec(name)?.[1] ?? '')
+  const download = downloadOf({ catalog, name })
   if (download === null) return null
   return { ...download, url, bytes: size }
 }
 
-const releaseOf = (release: unknown): Release | null => {
+type ReleaseOfProps = { catalog: Catalog; release: unknown }
+
+const releaseOf = ({ catalog, release }: ReleaseOfProps): Release | null => {
   if (!isRecord(release)) return null
   const { tag_name: tag, published_at: date, assets, draft, prerelease } = release
   if (typeof tag !== 'string' || typeof date !== 'string' || !Array.isArray(assets)) return null
   if (!!draft || !!prerelease) return null
-  const files = assets.map(fileOf).filter((file) => file !== null)
+  const files = assets.map((asset) => fileOf({ catalog, asset })).filter((file) => file !== null)
   if (files.length === 0) return null
   return {
     version: tag.replace(/^v/, ''),
@@ -74,11 +96,16 @@ const releaseOf = (release: unknown): Release | null => {
 
 type ParseReleasesProps = {
   releases: unknown
+  catalog: Catalog
 }
 
-/** The published releases that carry a Raven download, newest first, as GitHub lists them. */
-export const parseReleases = ({ releases }: ParseReleasesProps): readonly Release[] =>
-  Array.isArray(releases) ? releases.map(releaseOf).filter((release) => release !== null) : []
+/** The published releases that carry a file of the catalog, newest first, as GitHub lists them. */
+export const parseReleases = ({ releases, catalog }: ParseReleasesProps): readonly Release[] =>
+  Array.isArray(releases)
+    ? releases
+        .map((release) => releaseOf({ catalog, release }))
+        .filter((release) => release !== null)
+    : []
 
 type FormatBytesProps = {
   bytes: number
@@ -141,11 +168,17 @@ export const platformList = ({ release }: PlatformListProps): string =>
     .map((platform) => PLATFORM_COPY[platform].computers)
     .join(SPLASH_COPY.platformsJoiner)
 
+type FetchReleasesProps = {
+  catalog: Catalog
+}
+
 /** Reads the releases from GitHub; no network, an outage or a rate limit answers an empty list. */
-export const fetchReleases = async (): Promise<readonly Release[]> => {
+export const fetchReleases = async ({
+  catalog,
+}: FetchReleasesProps): Promise<readonly Release[]> => {
   try {
     const response = await fetch(RELEASES_URL)
-    return response.ok ? parseReleases({ releases: await response.json() }) : []
+    return response.ok ? parseReleases({ releases: await response.json(), catalog }) : []
   } catch {
     return []
   }
