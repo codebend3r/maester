@@ -105,6 +105,8 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
     stored = library.store.get_report(reported.id)
     assert stored.status is ReportStatus.REPLACED and stored.decision is Decision.REPLACEABLE
     assert library.services.seerr.issues[0]["comments"] == [out.content]
+    again = await replace_media(library, reported.id, "vermithor")
+    assert again.content == f"Report {reported.id} can't be acted on: it was already replaced."
 
 
 async def test_an_episode_file_is_replaced_with_every_episode_it_held(library):
@@ -197,18 +199,6 @@ async def test_over_the_daily_cap_it_refuses_until_the_day_is_over(library):
     assert ctx.store.get_report(reported.id).status is ReportStatus.OPEN
     out = await replace_media(capped(ctx, 10), reported.id, "vermithor")
     assert isinstance(out, Ok) and ctx.services.radarr["vermithor"].deleted == [55]
-
-
-async def test_a_report_the_admin_declined_stays_declined(library):
-    reported = await broken(library)
-    library.store.move_report(reported.id, [ReportStatus.OPEN], ReportStatus.DECLINED)
-    out = await replace_media(library, reported.id, "vermithor")
-    assert out.content.endswith("the admin decided not to replace it.")
-    # It doesn't speak for the file: a new report stands on its own evidence.
-    link_pal(library)
-    pal = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, user="d2")
-    assert pal.report.decision is Decision.REPLACEABLE  # its own file check failed
-    assert library.services.radarr["vermithor"].deleted == []
 
 
 async def test_two_confirmations_at_once_cannot_both_slip_under_the_cap(library):

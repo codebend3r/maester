@@ -1,7 +1,6 @@
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
 import type { BrowserDownloads } from '@/browserDownloads/engine'
-import { STORE_KEYS } from '@/stores/storage'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 
 type BrowserDownloadsState = {
   /** The browser's own downloads, set once before the first render; null inside Raven or where the browser cannot keep any. */
@@ -16,20 +15,15 @@ type BrowserDownloadsState = {
 }
 
 export const useBrowserDownloads = create<BrowserDownloadsState>()(
-  devtools(
-    persist(
-      (set): BrowserDownloadsState => ({
-        engine: null,
-        lastAccountId: null,
-        remember: (lastAccountId) => set({ lastAccountId }),
-        forget: () => set({ lastAccountId: null }),
-      }),
-      {
-        name: STORE_KEYS.browserDownloads,
-        storage: createJSONStorage(() => window.localStorage),
-        partialize: ({ lastAccountId }) => ({ lastAccountId }),
-      },
-    ),
-    { name: 'raven/browserDownloads' },
-  ),
+  keptInStorage({
+    key: STORE_KEYS.browserDownloads,
+    name: 'raven/browserDownloads',
+    state: (set) => ({
+      engine: null,
+      lastAccountId: null,
+      remember: (lastAccountId) => set({ lastAccountId }),
+      forget: () => set({ lastAccountId: null }),
+    }),
+    keep: ({ lastAccountId }) => ({ lastAccountId }),
+  }),
 )

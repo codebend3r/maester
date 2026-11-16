@@ -86,6 +86,33 @@ export const askMain = async <R extends DesktopRequest>({
   return isReplyTo<R['type']>(type)(reply) ? reply : UNREADABLE
 }
 
+/** A reply main gives a request of `R`'s type, a refusal aside. */
+type AnswerTo<R extends DesktopRequest> = Exclude<RepliesFor<R['type']>, Refusal>
+
+const isAnswerTo =
+  <R extends DesktopRequest>(request: R) =>
+  (reply: DesktopReply): reply is AnswerTo<R> =>
+    reply.type !== DESKTOP_REPLIES.refused && isReplyTo(request.type)(reply)
+
+type ReadMainProps<R extends DesktopRequest> = AskMainProps<R> & {
+  /** What the error says when main answered with another kind of reply than the one asked for. */
+  fallback: string
+}
+
+/**
+ * Main's answer to a read, for a query function: a refusal throws in main's words, and a reply
+ * of another kind throws `fallback`.
+ */
+export const readMain = async <R extends DesktopRequest>({
+  client,
+  request,
+  fallback,
+}: ReadMainProps<R>): Promise<AnswerTo<R>> => {
+  const reply = await client.request(request)
+  if (isAnswerTo(request)(reply)) return reply
+  throw new Error(refusalText({ reply, fallback }))
+}
+
 /** A reply to a way of opening something, as `useOpenReply` takes it; any other reads as a refusal. */
 export const openReplyOf = (reply: DesktopReply): OpenReply | Refusal =>
   isOpenReply(reply) ? reply : UNREADABLE

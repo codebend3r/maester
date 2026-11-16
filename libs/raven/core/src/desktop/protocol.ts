@@ -38,8 +38,6 @@ export const pictureUrlFor = (pictureId: string): string => `${PICTURE_SCHEME}:/
 
 export const isPlayTarget = object({ fileId: isOpaqueId, queue: listOf(isOpaqueId) })
 
-export type PlayTarget = Infer<typeof isPlayTarget>
-
 /** The longest path main asks the page to show. */
 const MAX_PAGE_PATH = 2048
 

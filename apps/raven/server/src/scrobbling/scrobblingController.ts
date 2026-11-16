@@ -34,7 +34,7 @@ import {
   isScrobbleService,
   isString,
 } from '@raven/core'
-import { CACHE_POLICIES, HEADERS } from '@shared/server'
+import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import type { FastifyReply } from 'fastify'
 import { ForViewers } from '@/admin/adminGuard'
 import { OpenToAnyone } from '@/auth/accountGuard'
@@ -208,7 +208,7 @@ export class ScrobblingController {
   /** Last.fm's sign-in page for the account, which comes back to `returnTo` once allowed. */
   @ForViewers()
   @Post(SCROBBLING_PATHS.lastFmStart)
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   startLastFm(@Body() body: unknown, @ViewingAccount() account: AccountKey): LastFmAuthPage {
     const origin = this.lastFmOrigin()
     if (origin === null) throw new ConflictException(SCROBBLING_COPY.lastFmOff)
@@ -259,7 +259,7 @@ export class ScrobblingController {
     const outcome = linked === null ? SCROBBLE_OUTCOMES.failed : SCROBBLE_OUTCOMES.linked
     await reply
       .header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
-      .redirect(returnAddress({ returnTo: address, outcome }), 302)
+      .redirect(returnAddress({ returnTo: address, outcome }), HTTP_STATUSES.found)
   }
 
   /** Stops forwarding to the service, forgetting its token and the listens waiting for it. */

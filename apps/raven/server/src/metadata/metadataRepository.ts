@@ -12,13 +12,13 @@ import {
   type LibraryPictures,
   type ItemType,
   type MatchItemType,
-  type PersonDetails,
   type Review,
   sortTitle,
 } from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
+import { under } from '@/media/mediaSql'
 import { ItemImagesRepository, lineOf } from '@/metadata/itemImagesRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { LOCAL } from '@/metadata/localItems'
@@ -64,16 +64,6 @@ const seasonOf = (row: SummaryRow): number | null => {
   return row.type === ITEM_TYPES.episode ? row.parent_number : null
 }
 
-/**
- * `under(root, id)`: each item `roots` selects (as `root, id` pairs of
- * itself), and every item beneath it. "A file somewhere under it" is then
- * one join to `media_items`, whichever level the file is linked at: a show,
- * a season or an episode.
- */
-const under = (roots: string): string => `under(root, id) AS (
-  ${roots}
-  UNION SELECT u.root, i.id FROM items i JOIN under u ON i.parent_id = u.id)`
-
 /** A stored item as matching and refreshing need it. */
 export type StoredItem = {
   id: number
@@ -82,17 +72,6 @@ export type StoredItem = {
   parentId: number | null
   /** A season's or episode's number; null for a movie or show. */
   number: number | null
-}
-
-/** A credit on a movie or show raven holds, with the title's TMDB id and date, which only the server reads. */
-export type LocalCredit = PersonDetails['credits'][number] & {
-  tmdbId: string
-  released: string | null
-}
-
-/** A person as raven's own credits know them; what TMDB says of them is the people store's. */
-export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photoVersion'> & {
-  credits: LocalCredit[]
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -734,59 +713,6 @@ export class MetadataRepository {
     )
   }
 
-  /** A person's page: the movies and shows on disk they are credited on, newest first. */
-  person(id: number): StoredPerson | null {
-    const row = this.db
-      .prepare<[number], { id: number; tmdb_id: string; name: string; photo: string | null }>(
-        'SELECT id, tmdb_id, name, photo FROM people WHERE id = ?',
-      )
-      .get(id)
-    if (!row) return null
-    const credits = this.db
-      .prepare<
-        [number, number],
-        {
-          item_id: number
-          tmdb_id: string
-          released: string | null
-          job: string
-          role: string | null
-        }
-      >(
-        `WITH RECURSIVE ${under('SELECT item_id, item_id FROM credits WHERE person_id = ?')}
-         SELECT c.item_id, i.tmdb_id, i.released, c.job, c.role
-           FROM credits c JOIN items i ON i.id = c.item_id
-          WHERE c.person_id = ? AND i.type IN ('movie', 'show')
-            AND c.item_id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
-          ORDER BY i.released DESC, i.title`,
-      )
-      .all(id, id)
-    const summaries = this.summaries({
-      ids: credits.map((credit) => credit.item_id),
-      libraryId: null,
-    })
-    return {
-      id: row.id,
-      tmdbId: row.tmdb_id,
-      name: row.name,
-      photoVersion: this.pictureVersions.photo({ id: row.id, photo: row.photo }),
-      credits: credits.flatMap((credit) => {
-        const item = summaries.get(credit.item_id)
-        return item && isCreditJob(credit.job)
-          ? [
-              {
-                item,
-                job: credit.job,
-                role: credit.role,
-                tmdbId: credit.tmdb_id,
-                released: credit.released,
-              },
-            ]
-          : []
-      }),
-    }
-  }
-
   /** An item's credits in page order. */
   credits(itemId: number): Credit[] {
     return this.db
@@ -813,15 +739,6 @@ export class MetadataRepository {
             ]
           : [],
       )
-  }
-
-  /** A person's photo path on TMDB, or null. */
-  photo(personId: number): string | null {
-    return (
-      this.db
-        .prepare<[number], { photo: string | null }>('SELECT photo FROM people WHERE id = ?')
-        .get(personId)?.photo ?? null
-    )
   }
 
   /**

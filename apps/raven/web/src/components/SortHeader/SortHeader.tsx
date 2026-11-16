@@ -1,6 +1,6 @@
-import { ARIA_SORTS, type AriaSort } from '@raven/core'
+import { ARIA_SORTS, type AriaSort } from '@/lib/tableSort'
 import type { ReactNode } from 'react'
-import { Icon } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import styles from '@/components/SortHeader/SortHeader.module.scss'
 
 type SortHeaderProps = {
@@ -16,12 +16,10 @@ export const SortHeader = ({ sort, onToggle, className, children }: SortHeaderPr
     <button type="button" className={styles.button} onClick={onToggle}>
       {children}
       <span
-        className={[
+        className={classNames([
           sort === ARIA_SORTS.none ? styles.hint : styles.mark,
-          sort === ARIA_SORTS.descending ? styles.flipped : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
+          sort === ARIA_SORTS.descending && styles.flipped,
+        ])}
         aria-hidden="true"
       >
         <Icon name="up" size={12} />

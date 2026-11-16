@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Library, ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
+import { type Library, routeState } from '@raven/core'
 import { useId } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { KeyedView, LIBRARY_LOCK_STATES, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { LibraryActionErrors, useLibraryActions } from '@/components/LibraryActions/LibraryActions'
 import { LockedLibrary } from '@/components/LockedLibrary/LockedLibrary'
 import { MediaGridSkeleton } from '@/components/MediaGrid/MediaGrid'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { libraryPollDelay } from '@/lib/libraryPolling'
 import { useLibraryLock } from '@/lib/libraryLock'
@@ -127,30 +127,6 @@ const LibrarySkeleton = () => (
   </>
 )
 
-const LIBRARY_PAGE_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type LibraryPageViewsProps = {
-  [LIBRARY_PAGE_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [LIBRARY_PAGE_VIEW_KEYS.ready]: LibraryViewProps
-}
-
-const LIBRARY_PAGE_VIEWS = {
-  [LIBRARY_PAGE_VIEW_KEYS.pending]: RouteState,
-  [LIBRARY_PAGE_VIEW_KEYS.ready]: LibraryView,
-} as const satisfies ViewsOf<LibraryPageViewsProps>
-
-type LibraryPageViewProps = { page: RouteQuery<Library>; param: string | undefined }
-
-/** Which view the page shows: its library on its way or failing, or the library. */
-const libraryPageView = ({ page, param }: LibraryPageViewProps): ViewOf<LibraryPageViewsProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: LIBRARY_PAGE_VIEW_KEYS.pending,
-      props: { state: page, noun: LIBRARY_COPY.noun, shape: <LibrarySkeleton /> },
-    }
-  return { key: LIBRARY_PAGE_VIEW_KEYS.ready, props: { library: page.data, param } }
-}
-
 /**
  * `/libraries/:id`: a library's videos or shows, searched, sorted and laid
  * out as it was left, with its other tabs at `/libraries/:id/:section`. A
@@ -171,9 +147,8 @@ export const LibraryPage = () => {
   })
   const page = routeState({ id: libraryId, query: library })
   return (
-    <KeyedView<LibraryPageViewsProps>
-      views={LIBRARY_PAGE_VIEWS}
-      view={libraryPageView({ page, param })}
-    />
+    <RouteView page={page} noun={LIBRARY_COPY.noun} shape={<LibrarySkeleton />}>
+      {(read) => <LibraryView library={read} param={param} />}
+    </RouteView>
   )
 }

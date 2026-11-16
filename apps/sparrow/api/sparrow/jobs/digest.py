@@ -28,7 +28,7 @@ from sparrow.config import Settings
 from sparrow.formatting import ago
 from sparrow.jobs.sweep import downloads as queued_downloads
 from sparrow.jobs.sweep import read_queues
-from sparrow.media import episode_code, version_label
+from sparrow.media import MediaType, episode_code, version_label
 from sparrow.notify import AdminPost, Notice
 from sparrow.playback.reports import POLICIES
 from sparrow.releases import new_bad_releases
@@ -218,15 +218,15 @@ class Titles:
 
     def __init__(self, services: Services):
         self.services = services
-        self._known: dict[tuple[str, int], asyncio.Task[str]] = {}
+        self._known: dict[tuple[MediaType, int], asyncio.Task[str]] = {}
 
-    async def of(self, media_type: str, tmdb_id: int) -> str:
+    async def of(self, media_type: MediaType, tmdb_id: int) -> str:
         key = (media_type, tmdb_id)
         if key not in self._known:
             self._known[key] = asyncio.create_task(self._look_up(media_type, tmdb_id))
         return await self._known[key]
 
-    async def _look_up(self, media_type: str, tmdb_id: int) -> str:
+    async def _look_up(self, media_type: MediaType, tmdb_id: int) -> str:
         try:
             return (await self.services.seerr.media_details(media_type, tmdb_id)).display
         except ClientError:

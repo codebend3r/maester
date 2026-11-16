@@ -6,7 +6,7 @@ import {
   type WindowChrome,
   windowChromeFor,
 } from '@raven/core'
-import { Icon, type IconName } from '@raven/ui'
+import { Icon, type IconName, classNames } from '@raven/ui'
 import type { ComponentType } from 'react'
 import { WINDOW_CONTROLS_COPY } from '@/desktop/WindowControls/copy'
 import { handled } from '@/lib/handled'
@@ -27,7 +27,7 @@ const DrawnControls = () => {
   const isShown = useWindowChrome((state) => state.isShown)
   return (
     <nav
-      className={[styles.controls, isShown ? '' : styles.hidden].filter(Boolean).join(' ')}
+      className={classNames([styles.controls, !isShown && styles.hidden])}
       aria-label={WINDOW_CONTROLS_COPY.window}
     >
       {CONTROLS.map(({ action, label, icon }) => (

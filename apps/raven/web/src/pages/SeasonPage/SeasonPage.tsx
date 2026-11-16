@@ -4,7 +4,6 @@ import {
   type EpisodeSummary,
   type ItemDetails,
   ROUTE_STATES,
-  type RoutePending,
   type RouteQuery,
   SESSION_KINDS,
   SHOW_SESSION,
@@ -43,7 +42,7 @@ import {
   PICTURE_SHAPES,
 } from '@/components/ItemHeader/ItemHeader'
 import { PartlyWatched, ResumeBar } from '@/components/ResumeBar/ResumeBar'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { SelectButton } from '@/components/SelectButton/SelectButton'
 import { SelectCheckbox } from '@/components/SelectCheckbox/SelectCheckbox'
@@ -60,7 +59,6 @@ import { useRouteId } from '@/lib/routeQuery'
 import { useItemFavourite } from '@/lib/useItemFavourite'
 import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
-import { NotFoundPage } from '@/pages/NotFoundPage/NotFoundPage'
 import { SEASON_COPY } from '@/pages/SeasonPage/copy'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
 
@@ -267,48 +265,13 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
   )
 }
 
-const SEASON_VIEW_KEYS = { pending: 'pending', missing: 'missing', ready: 'ready' } as const
+type SeasonRouteProps = { show: RouteQuery<ItemDetails>; season: RouteQuery<ItemDetails> }
 
-type SeasonViewsProps = {
-  [SEASON_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [SEASON_VIEW_KEYS.missing]: Record<never, never>
-  [SEASON_VIEW_KEYS.ready]: SeasonViewProps
-}
-
-const SEASON_VIEWS = {
-  [SEASON_VIEW_KEYS.pending]: RouteState,
-  [SEASON_VIEW_KEYS.missing]: NotFoundPage,
-  [SEASON_VIEW_KEYS.ready]: SeasonView,
-} as const satisfies ViewsOf<SeasonViewsProps>
-
-type PendingSeasonProps = { state: RoutePending }
-
-const pendingSeason = ({ state }: PendingSeasonProps): ViewOf<SeasonViewsProps> => ({
-  key: SEASON_VIEW_KEYS.pending,
-  props: {
-    state,
-    noun: SEASON_COPY.noun,
-    shape: <ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />,
-  },
-})
-
-type SeasonPageViewProps = {
-  show: RouteQuery<ItemDetails>
-  summaryId: number | null
-  seasonQuery: Parameters<typeof routeState<ItemDetails>>[0]['query']
-}
-
-/** The show then the season on their way or failing, a season the show lacks, else the season. */
-const seasonPageView = ({
-  show,
-  summaryId,
-  seasonQuery,
-}: SeasonPageViewProps): ViewOf<SeasonViewsProps> => {
-  if (show.state !== ROUTE_STATES.ready) return pendingSeason({ state: show })
-  if (summaryId == null) return { key: SEASON_VIEW_KEYS.missing, props: {} }
-  const season = routeState({ id: summaryId, query: seasonQuery })
-  if (season.state !== ROUTE_STATES.ready) return pendingSeason({ state: season })
-  return { key: SEASON_VIEW_KEYS.ready, props: { show: show.data, season: season.data } }
+/** The show then the season on their way, failing or not there, else both. */
+const seasonRoute = ({ show, season }: SeasonRouteProps): RouteQuery<SeasonViewProps> => {
+  if (show.state !== ROUTE_STATES.ready) return show
+  if (season.state !== ROUTE_STATES.ready) return season
+  return { state: ROUTE_STATES.ready, data: { show: show.data, season: season.data } }
 }
 
 /**
@@ -325,10 +288,14 @@ export const SeasonPage = () => {
   const seasonQuery = useQuery(itemQuery(summary?.id ?? null))
 
   const show = routeState({ id: number == null ? null : showId, query: showQuery })
+  const season = routeState({ id: summary?.id ?? null, query: seasonQuery })
   return (
-    <KeyedView<SeasonViewsProps>
-      views={SEASON_VIEWS}
-      view={seasonPageView({ show, summaryId: summary?.id ?? null, seasonQuery })}
-    />
+    <RouteView
+      page={seasonRoute({ show, season })}
+      noun={SEASON_COPY.noun}
+      shape={<ItemHeaderSkeleton picture={PICTURE_SHAPES.poster} />}
+    >
+      {(shown) => <SeasonView {...shown} />}
+    </RouteView>
   )
 }

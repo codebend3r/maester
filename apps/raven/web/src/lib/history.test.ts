@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import type { HistoryEntry } from '@/contract'
-import { finishedNote, historyDays, historyNote } from '@/history'
+import type { HistoryEntry } from '@raven/core'
+import { finishedNote, historyDays, historyNote } from '@/lib/history'
 import { mediaItem } from '@/test/fixtures'
 
-const entry = ({
-  id = 1,
-  playedAt,
-  ...rest
-}: { id?: number; playedAt: Date } & Partial<
+type EntryProps = { id?: number; playedAt: Date } & Partial<
   Pick<HistoryEntry, 'plays' | 'furthest' | 'watched' | 'marked'>
->): HistoryEntry => ({
+>
+
+const entry = ({ id = 1, playedAt, ...rest }: EntryProps): HistoryEntry => ({
   media: mediaItem({ id, duration: 100 }),
   lastPlayedAt: playedAt.toISOString(),
   plays: 1,

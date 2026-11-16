@@ -9,12 +9,11 @@ import {
   plural,
 } from '@raven/core'
 import { Button } from '@raven/ui'
-import { type ComponentType, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
-import { ManagersOnly } from '@/components/ManagersOnly/ManagersOnly'
+import { ForManagers } from '@/components/ManagersOnly/ManagersOnly'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
 import { copyText } from '@/lib/clipboard'
-import { useManagement } from '@/lib/management'
 import { api } from '@/lib/api'
 import { bugReportsQuery } from '@/lib/queries'
 import {
@@ -209,19 +208,6 @@ const summaryOf = (reports: readonly BugReport[]): string => {
   })
 }
 
-type BugReportsViewProps = { mode: ReturnType<typeof useManagement>['mode'] }
-
-type NotManagingProps = BugReportsViewProps
-
-const NotManaging = ({ mode }: NotManagingProps) => (
-  <ManagersOnly
-    mode={mode}
-    name={BUG_REPORTS_COPY.title}
-    forAdmin={BUG_REPORTS_COPY.managersOnlyFor}
-    forOwner={BUG_REPORTS_COPY.managersOnlyFor}
-  />
-)
-
 /** The reports, newest first, with how many there are and how many are new. */
 const ReportsList = () => {
   const reports = useQuery(bugReportsQuery)
@@ -252,22 +238,18 @@ const ReportsList = () => {
   )
 }
 
-const MANAGE_STATES = { managing: 'managing', refused: 'refused' } as const
-type ManageState = (typeof MANAGE_STATES)[keyof typeof MANAGE_STATES]
-
-const BUG_REPORTS_VIEWS = {
-  [MANAGE_STATES.managing]: ReportsList,
-  [MANAGE_STATES.refused]: NotManaging,
-} as const satisfies Record<ManageState, ComponentType<BugReportsViewProps>>
-
 /**
  * `/reports`: what viewers sent with Report this error when a video would
  * not play, newest first, for the admin to work through. It is for the
  * admin, or the owner once accounts are on, so it asks only while the
  * viewer may manage, and says so otherwise.
  */
-export const BugReportsPage = () => {
-  const { mode, canManage } = useManagement()
-  const View = BUG_REPORTS_VIEWS[canManage ? MANAGE_STATES.managing : MANAGE_STATES.refused]
-  return <View mode={mode} />
-}
+export const BugReportsPage = () => (
+  <ForManagers
+    name={BUG_REPORTS_COPY.title}
+    forAdmin={BUG_REPORTS_COPY.managersOnlyFor}
+    forOwner={BUG_REPORTS_COPY.managersOnlyFor}
+  >
+    <ReportsList />
+  </ForManagers>
+)

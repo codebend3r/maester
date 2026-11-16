@@ -1,4 +1,4 @@
-import { HEADERS } from '@shared/server'
+import { HEADERS, HTTP_STATUSES } from '@shared/server'
 import {
   Body,
   Controller,
@@ -30,7 +30,7 @@ export class LockController {
   @ForViewers()
   @StrictlyLimited()
   @Post('unlock')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   unlock(
     @Body() body: unknown,
     @Req() request: FastifyRequest,
@@ -49,7 +49,7 @@ export class LockController {
    */
   @ForViewers()
   @Post('lock')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   relock(
     @Req() request: FastifyRequest,
     @Res({ passthrough: true }) reply: FastifyReply,

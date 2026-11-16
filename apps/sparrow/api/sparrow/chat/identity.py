@@ -152,7 +152,9 @@ class IdentityService:
             None,
         )
 
-    def set_tier_override(self, user_id: str, tier: str | None) -> str:
-        normalized = Tier.parse(tier).name.lower() if tier else None
-        self.store.upsert_user(user_id, tier_override=normalized)
-        return f"Tier for {user_id} is now {normalized or 'the default'}."
+    def set_tier_override(self, user_id: str, tier: Tier | None) -> str:
+        """Give `user_id` the tier `tier` whatever else they are, or their own again (None);
+        says what changed."""
+        name = tier.name.lower() if tier is not None else None
+        self.store.upsert_user(user_id, tier_override=name)
+        return f"Tier for {user_id} is now {name or 'the default'}."

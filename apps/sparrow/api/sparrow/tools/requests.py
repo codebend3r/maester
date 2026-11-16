@@ -154,7 +154,7 @@ def plan_request(
     version = version_label(is_4k)
     reply: dict[str, Any] = {"title": details.display, "version": version}
     nothing = f"Nothing was requested for {details.display} in {version}"
-    if details.media_type == "tv":
+    if details.media_type == MediaType.TV:
         plan = plan_seasons(details, seasons, latest_season, is_4k)
         if isinstance(plan, Refused):
             return plan
@@ -217,11 +217,13 @@ async def submit(
     )
 
 
-async def explain(seerr: Seerr, user: LinkedUser, refused: RequestRefused, media_type: str) -> str:
+async def explain(
+    seerr: Seerr, user: LinkedUser, refused: RequestRefused, media_type: MediaType
+) -> str:
     if refused.reason != Refusal.QUOTA:
         return REFUSALS[refused.reason]
     quota = (await seerr.quota(user.seerr_user_id)).of(media_type)
-    kind = "movie" if media_type == "movie" else "TV season"
+    kind = "movie" if media_type == MediaType.MOVIE else "TV season"
     return (
         f"That's over this account's {kind} request quota: {quota.used} of {quota.limit} used "
         f"in the last {quota.days} days. Room frees up as older requests age out."
@@ -390,7 +392,7 @@ async def follow_show(
     tmdb_id: Annotated[int, Field(description="The show's TMDB id.")],
     host: Annotated[str, Field(description="The Sonarr host that owns the show.")],
 ) -> dict[str, Any] | Result:
-    details = await ctx.services.seerr.media_details("tv", tmdb_id)
+    details = await ctx.services.seerr.media_details(MediaType.TV, tmdb_id)
     try:
         owner = await show_owner_on(ctx.services, details, host)
     except NotLocated as exc:

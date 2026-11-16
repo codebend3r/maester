@@ -50,7 +50,7 @@ def web(services, store):
         rookery=rookery,
     )
     auth = Auth(SessionVerifier(rookery), app.chat.identity, sign_in=SIGN_IN)
-    web = create_app(api=Api(auth, app.console))
+    web = create_app(api=Api(auth, app.chat.identity, app.store))
 
     @web.get("/api/linked-only")
     async def linked_only(viewer: Annotated[Viewer, Depends(auth.linked)]) -> dict[str, str]:
@@ -133,7 +133,12 @@ def test_only_the_admin_sets_a_tier_and_it_counts_on_the_next_request(web):
     assert r.status_code == 200
     assert r.json() == {"user_id": "r-dany", "tier_override": "trusted", "tier": "trusted"}
     assert as_("t-dany").get("/api/me").json()["tier"] == "trusted"
-    assert store.audit_recent(1)[0].tool == "/tier"
+    (audited,) = store.audit_recent(1)
+    assert (audited.tool, audited.user_id, audited.args) == (
+        "/tier",
+        "r-boss",
+        {"target": "r-dany", "tier": "trusted"},
+    )
 
     r = set_tier(as_("t-boss"), "r-dany", None)
     assert r.json() == {"user_id": "r-dany", "tier_override": None, "tier": "friend"}

@@ -6,15 +6,13 @@ import {
   type FilmographyEntry,
   type ItemSummary,
   type PersonDetails,
-  ROUTE_STATES,
-  type RouteQuery,
   itemPath,
   routeState,
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
@@ -264,35 +262,6 @@ const PersonView = ({ person }: PersonViewProps) => {
   )
 }
 
-type KeyedPersonViewProps = PersonViewProps
-
-// Keyed, so another person's page opens with their own toggle, sort and biography.
-const KeyedPersonView = ({ person }: KeyedPersonViewProps) => (
-  <PersonView key={person.id} person={person} />
-)
-
-const PERSON_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type PersonPageViewProps = {
-  [PERSON_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [PERSON_VIEW_KEYS.ready]: PersonViewProps
-}
-
-const PERSON_VIEWS = {
-  [PERSON_VIEW_KEYS.pending]: RouteState,
-  [PERSON_VIEW_KEYS.ready]: KeyedPersonView,
-} as const satisfies ViewsOf<PersonPageViewProps>
-
-/** The person on their way or failing, or their page. */
-const personView = (page: RouteQuery<PersonDetails>): ViewOf<PersonPageViewProps> => {
-  if (page.state !== ROUTE_STATES.ready)
-    return {
-      key: PERSON_VIEW_KEYS.pending,
-      props: { state: page, noun: PERSON_COPY.noun, shape: <PersonSkeleton /> },
-    }
-  return { key: PERSON_VIEW_KEYS.ready, props: { person: page.data } }
-}
-
 /**
  * `/people/:id`: who a person is, then everything TMDB credits them on with
  * raven's titles marked, asked for again while that is on its way.
@@ -300,5 +269,10 @@ const personView = (page: RouteQuery<PersonDetails>): ViewOf<PersonPageViewProps
 export const PersonPage = () => {
   const id = useRouteId()
   const page = routeState({ id, query: useQuery(personQuery(id)) })
-  return <KeyedView<PersonPageViewProps> views={PERSON_VIEWS} view={personView(page)} />
+  return (
+    <RouteView page={page} noun={PERSON_COPY.noun} shape={<PersonSkeleton />}>
+      {/* Keyed, so another person's page opens with their own toggle, sort and biography. */}
+      {(person) => <PersonView key={person.id} person={person} />}
+    </RouteView>
+  )
 }

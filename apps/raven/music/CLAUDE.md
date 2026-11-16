@@ -27,7 +27,7 @@
 - **`WrenRoot` reads the stores before any route,** pins `RAVEN_SERVER` (`pinRavenServer`), renews the access token a minute before it ends (`@raven/native/headless`'s `tokenRenewalFor`, the app's too), and guards the `(tabs)` group with `Stack.Protected`, so a listener signed out lands on `/sign-in`. `useWren()` gives the active server's `api` and `ravenQueriesFor(api)`, made once per server (`lastPerServer`), null until a server is active.
 - **The tabs are Home, Library, Search and Settings** (`src/WrenTabs.tsx`, named in `WREN_TABS`), each labelled and drawn with raven's line icons through `@raven/native`'s `Icon` (the web's drawings from `@raven/ui/iconDrawings`, over react-native-svg, which Wren links through `@raven/native`). `src/theme/icons.ts` names the drawings Wren uses. Settings shows the account, the server, Sign out and the version from `#package`.
 - **The cache is per account.** `src/queryClient.ts` holds Wren's one query client, and `forgetWrenAccount`, over `@raven/native`'s `forgetOnAccountChange`, empties it whenever the signed-in account's id changes, signing out included, so the next account never sees the last one's playlists or favourites, and clears the queue, so the last one's music stops rather than counting listens or saving a book's spot under the next one's token; a renewed token keeps both.
-- **The look is raven's default theme** through `src/theme/wrenTheme.ts`, which reads `themeTokens[DEFAULT_THEME]` and `designTokens` with `nativeTokens`; there is no theme picker.
+- **The look is raven's default theme** through `src/theme/wrenTheme.ts`, which reads `themeTokens[DEFAULT_THEME]` and `designTokenValues` through `@raven/native`'s `tokenReaderOf`, the app's too; there is no theme picker.
 
 ## Browsing
 

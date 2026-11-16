@@ -94,56 +94,63 @@ export const itemFavouriteEdits = ({ item, favourite }: ItemFavouriteEditsProps)
   }),
 ]
 
-type FavouriteEditsProps = {
+type VideoPlacesProps = {
   media: MediaItem
-  favourite: boolean
+  /** Whether a file is one the change reaches and still differs from it. */
+  matches: (item: MediaItem) => boolean
+  change: (item: MediaItem) => MediaItem
+  /** What In progress, a library's and home's, does with the video. */
+  inProgress: (entries: PosterEntry[]) => PosterEntry[]
+  /** What the favourites, across libraries and the library's own, do with it. */
+  favourites: (entries: PosterEntry[]) => PosterEntry[]
 }
 
-/**
- * A video marked or unmarked as a favourite wherever a heart or its menu
- * shows it: its own record, its library's listings, files not matched and
- * In progress, home and its searches, its item's page, and the favourites, which an unmarked
- * one leaves. Its history, sagas and duplicates follow once read again.
- */
-export const favouriteEdits = ({ media, favourite }: FavouriteEditsProps): Edit[] => {
-  const isVideo = (item: MediaItem): boolean => item.id === media.id
-  const mark = (item: MediaItem): MediaItem => ({ ...item, favourite })
-  const markAll = (items: MediaItem[]): MediaItem[] =>
-    mapWhere({ items, matches: isVideo, change: mark })
-  const markEntries = (entries: PosterEntry[]): PosterEntry[] =>
+type MarkEntriesProps = Pick<VideoPlacesProps, 'matches' | 'change'>
+
+/** Poster entries with `change` made to the video of each one `matches`. */
+const markEntriesWith =
+  ({ matches, change }: MarkEntriesProps) =>
+  (entries: PosterEntry[]): PosterEntry[] =>
     mapWhere({
       items: entries,
-      matches: (entry) => isVideo(entry.media),
-      change: (entry) => ({ ...entry, media: mark(entry.media) }),
+      matches: (entry) => matches(entry.media),
+      change: (entry) => ({ ...entry, media: change(entry.media) }),
     })
-  const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
-    mapWhere({
-      items: shelves,
-      matches: (shelf) => shelf.type === HOME_SHELF_TYPES.media && shelf.media.some(isVideo),
-      change: (shelf) =>
-        shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: markAll(shelf.media) } : shelf,
-    })
-  const favourites = (entries: PosterEntry[]): PosterEntry[] => {
-    if (favourite) return markEntries(entries)
-    const kept = withoutEntry({ entries, id: media.id })
-    return kept.length === entries.length ? entries : kept
-  }
+
+/**
+ * Wherever a video's file shows a heart or a watched mark: its library's listings, files not
+ * matched, In progress, the favourites, home and its searches, and its item's versions.
+ */
+const videoPlaces = ({
+  media,
+  matches,
+  change,
+  inProgress,
+  favourites,
+}: VideoPlacesProps): Edit[] => {
   const { libraryId } = media
+  const all = (items: MediaItem[]): MediaItem[] => mapWhere({ items, matches, change })
+  const shelves = (held: HomeShelf[]): HomeShelf[] =>
+    mapWhere({
+      items: held,
+      matches: (shelf) => shelf.type === HOME_SHELF_TYPES.media && shelf.media.some(matches),
+      change: (shelf) =>
+        shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: all(shelf.media) } : shelf,
+    })
   return [
-    editKey<MediaItem>({ queryKey: queryKeys.mediaItem(media.id), update: mark }),
     editAll<MediaItem[]>({
       filters: { queryKey: queryKeys.mediaLists(libraryId) },
-      update: markAll,
+      update: all,
     }),
     editAll<ShowListing>({
       filters: { queryKey: queryKeys.showLists(libraryId) },
       update: (listing) => {
-        const unmatched = markAll(listing.unmatched)
+        const unmatched = all(listing.unmatched)
         return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
       },
     }),
-    editKey<MediaItem[]>({ queryKey: queryKeys.unmatched(libraryId), update: markAll }),
-    editKey<PosterEntry[]>({ queryKey: queryKeys.inProgress(libraryId), update: markEntries }),
+    editKey<MediaItem[]>({ queryKey: queryKeys.unmatched(libraryId), update: all }),
+    editKey<PosterEntry[]>({ queryKey: queryKeys.inProgress(libraryId), update: inProgress }),
     editKey<PosterEntry[]>({ queryKey: queryKeys.favourites, update: favourites }),
     editKey<PosterEntry[]>({
       queryKey: queryKeys.libraryFavourites(libraryId),
@@ -152,26 +159,57 @@ export const favouriteEdits = ({ media, favourite }: FavouriteEditsProps): Edit[
     editKey<Home>({
       queryKey: queryKeys.home,
       update: (home) => {
-        const inProgress = markEntries(home.inProgress)
-        const shelves = markShelves(home.shelves)
-        return inProgress === home.inProgress && shelves === home.shelves
+        const progressing = inProgress(home.inProgress)
+        const shelved = shelves(home.shelves)
+        return progressing === home.inProgress && shelved === home.shelves
           ? home
-          : { ...home, inProgress, shelves }
+          : { ...home, inProgress: progressing, shelves: shelved }
       },
     }),
-    editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
+    editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: shelves }),
     ...(media.item
       ? [
           editKey<ItemDetails>({
             queryKey: queryKeys.item(media.item.id),
             update: (details) => {
-              const versions = markAll(details.versions)
+              const versions = all(details.versions)
               if (versions === details.versions) return details
               return { ...details, versions }
             },
           }),
         ]
       : []),
+  ]
+}
+
+type FavouriteEditsProps = {
+  media: MediaItem
+  favourite: boolean
+}
+
+/**
+ * A video marked or unmarked as a favourite wherever a heart or its menu
+ * shows it: its own record and every place `videoPlaces` names, the
+ * favourites among them, which an unmarked one leaves. Its history, sagas
+ * and duplicates follow once read again.
+ */
+export const favouriteEdits = ({ media, favourite }: FavouriteEditsProps): Edit[] => {
+  const matches = (item: MediaItem): boolean => item.id === media.id
+  const mark = (item: MediaItem): MediaItem => ({ ...item, favourite })
+  const markEntries = markEntriesWith({ matches, change: mark })
+  return [
+    editKey<MediaItem>({ queryKey: queryKeys.mediaItem(media.id), update: mark }),
+    ...videoPlaces({
+      media,
+      matches,
+      change: mark,
+      inProgress: markEntries,
+      favourites: (entries) => {
+        if (favourite) return markEntries(entries)
+        const kept = withoutEntry({ entries, id: media.id })
+        return kept.length === entries.length ? entries : kept
+      },
+    }),
   ]
 }
 
@@ -182,10 +220,10 @@ type WatchedEditsProps = {
 
 /**
  * A card marked watched or unwatched, wherever one of its files shows: the
- * same files as `favouriteEdits` reaches, plus sagas, duplicates, history
- * and the item's versions. Marking clears every resume spot on the card
- * either way, so the position goes to 0 and the card leaves In progress.
- * A card is the files of one movie that share it, else a file by itself.
+ * same places as `favouriteEdits` reaches, plus sagas, duplicates, history.
+ * Marking clears every resume spot on the card either way, so the position
+ * goes to 0 and the card leaves In progress. A card is the files of one
+ * movie that share it, else a file by itself.
  */
 export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
   const { libraryId } = media
@@ -197,25 +235,12 @@ export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
   const needsMark = (item: MediaItem): boolean =>
     isOnCard(item) && (item.watched !== watched || item.position !== 0)
   const mark = (item: MediaItem): MediaItem => ({ ...item, watched, position: 0 })
-  const markAll = (items: MediaItem[]): MediaItem[] =>
-    mapWhere({ items, matches: needsMark, change: mark })
-  const markEntries = (entries: PosterEntry[]): PosterEntry[] =>
-    mapWhere({
-      items: entries,
-      matches: (entry) => needsMark(entry.media),
-      change: (entry) => ({ ...entry, media: mark(entry.media) }),
-    })
   const dropEntries = (entries: PosterEntry[]): PosterEntry[] => {
     const kept = entries.filter((entry) => !isOnCard(entry.media))
     return kept.length === entries.length ? entries : kept
   }
-  const markShelves = (shelves: HomeShelf[]): HomeShelf[] =>
-    mapWhere({
-      items: shelves,
-      matches: (shelf) => shelf.type === HOME_SHELF_TYPES.media && shelf.media.some(needsMark),
-      change: (shelf) =>
-        shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: markAll(shelf.media) } : shelf,
-    })
+  const markAll = (items: MediaItem[]): MediaItem[] =>
+    mapWhere({ items, matches: needsMark, change: mark })
   const markHistory = (entries: HistoryEntry[]): HistoryEntry[] =>
     mapWhere({
       items: entries,
@@ -259,35 +284,13 @@ export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
       },
       update: (item) => (needsMark(item) ? mark(item) : item),
     }),
-    editAll<MediaItem[]>({
-      filters: { queryKey: queryKeys.mediaLists(libraryId) },
-      update: markAll,
+    ...videoPlaces({
+      media,
+      matches: needsMark,
+      change: mark,
+      inProgress: dropEntries,
+      favourites: markEntriesWith({ matches: needsMark, change: mark }),
     }),
-    editAll<ShowListing>({
-      filters: { queryKey: queryKeys.showLists(libraryId) },
-      update: (listing) => {
-        const unmatched = markAll(listing.unmatched)
-        return unmatched === listing.unmatched ? listing : { ...listing, unmatched }
-      },
-    }),
-    editKey<MediaItem[]>({ queryKey: queryKeys.unmatched(libraryId), update: markAll }),
-    editKey<PosterEntry[]>({ queryKey: queryKeys.inProgress(libraryId), update: dropEntries }),
-    editKey<PosterEntry[]>({ queryKey: queryKeys.favourites, update: markEntries }),
-    editKey<PosterEntry[]>({
-      queryKey: queryKeys.libraryFavourites(libraryId),
-      update: markEntries,
-    }),
-    editKey<Home>({
-      queryKey: queryKeys.home,
-      update: (home) => {
-        const inProgress = dropEntries(home.inProgress)
-        const shelves = markShelves(home.shelves)
-        return inProgress === home.inProgress && shelves === home.shelves
-          ? home
-          : { ...home, inProgress, shelves }
-      },
-    }),
-    editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: markShelves }),
     editKey<Saga[]>({ queryKey: queryKeys.sagas(libraryId), update: markSagas }),
     editKey<Duplicates>({ queryKey: queryKeys.duplicates(libraryId), update: markDuplicates }),
     // The library's history, and the one across every library.
@@ -299,18 +302,6 @@ export const watchedEdits = ({ media, watched }: WatchedEditsProps): Edit[] => {
       filters: { queryKey: queryKeys.historyLists(null) },
       update: markHistory,
     }),
-    ...(media.item
-      ? [
-          editKey<ItemDetails>({
-            queryKey: queryKeys.item(media.item.id),
-            update: (details) => {
-              const versions = markAll(details.versions)
-              if (versions === details.versions) return details
-              return { ...details, versions }
-            },
-          }),
-        ]
-      : []),
   ]
 }
 

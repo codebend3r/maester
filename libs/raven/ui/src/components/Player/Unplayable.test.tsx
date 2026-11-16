@@ -15,7 +15,7 @@ import { Player } from '@/components/Player/Player'
 import type { ErrorReporter } from '@/components/Player/PlayerServices'
 import { api } from '@/test/api'
 import { setBrowserSupport } from '@/test/canPlay'
-import { mediaItem } from '@/test/fixtures'
+import { mediaItem, mediaPlane } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { useHostPlayer } from '@/stores/playerServices'
@@ -50,7 +50,13 @@ const ReportingPlayer = ({ media, report }: ReportingPlayerProps) => {
     progress: { started: () => {}, save: () => {}, left: () => {}, duration: null },
     ...(report && { report }),
   })
-  return isHosting && <Player engine={{ kind: 'html', source: { kind: 'server', media, api } }} />
+  return (
+    isHosting && (
+      <Player
+        engine={{ kind: 'html', source: { kind: 'server', media, api, mediaPlane: mediaPlane() } }}
+      />
+    )
+  )
 }
 
 type AppProps = { media?: MediaItem; report?: ErrorReporter }

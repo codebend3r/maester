@@ -1,22 +1,19 @@
 """Playback reports: who reported which file, what the checks found, what became of it.
 
 A report's `decision` is written once, when it is filed. Its `status` only
-moves through `move_report`, a compare-and-set: the move happens only from
-the statuses it names, so two presses can't both replace one report and a
-stale read can't undo a newer move. Which moves exist is the playback
-flow's (`sparrow/playback/reports.py`).
+moves from `open` to `replaced`, through `mark_replaced`, which touches only
+open reports, so a stale read can't move one back.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sparrow.media import Copy, Decision, ReportKind, ReportStatus
+from sparrow.media import Copy, Decision, MediaType, ReportKind, ReportStatus
 from sparrow.store.base import Database, now, stamp
 
 
@@ -106,20 +103,17 @@ class Reports(Database):
             raise LookupError(f"no report {report_id}")
         return self._report(row)
 
-    def move_report(
-        self, report_id: int, from_: Iterable[ReportStatus], to: ReportStatus
-    ) -> ReportRow | None:
-        """Move a report's status to `to` only from one of `from_`; None when it wasn't there."""
-        start = list(from_)
-        marks = ", ".join("?" for _ in start)
+    def mark_replaced(self, host: str, media_type: MediaType, file_id: int) -> None:
+        """Every open report of one file marked replaced at once, since its new copy settles
+        them all."""
         with self.transaction() as conn:
-            moved = conn.execute(
-                f"UPDATE reports SET status = ? WHERE id = ? AND status IN ({marks}) RETURNING *",
-                (to, report_id, *start),
-            ).fetchone()
-        return self._report(moved) if moved else None
+            conn.execute(
+                "UPDATE reports SET status = ?"
+                " WHERE host = ? AND media_type = ? AND file_id = ? AND status = ?",
+                (ReportStatus.REPLACED, host, media_type, file_id, ReportStatus.OPEN),
+            )
 
-    def reports_for_file(self, host: str, media_type: str, file_id: int) -> list[ReportRow]:
+    def reports_for_file(self, host: str, media_type: MediaType, file_id: int) -> list[ReportRow]:
         """Every report about one file, oldest first: the evidence a replacement needs."""
         with self._lock:
             rows = self._conn.execute(
@@ -155,7 +149,13 @@ class Reports(Database):
             ts=r["ts"],
             user_id=r["user_id"],
             kind=ReportKind(r["kind"]),
-            copy=Copy(r["media_type"], r["tmdb_id"], bool(r["is_4k"]), r["season"], r["episode"]),
+            copy=Copy(
+                MediaType(r["media_type"]),
+                r["tmdb_id"],
+                bool(r["is_4k"]),
+                r["season"],
+                r["episode"],
+            ),
             title=r["title"],
             host=r["host"],
             file_id=r["file_id"],

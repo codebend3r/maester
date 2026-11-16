@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { AUTH_HEADERS, isBoolean, isRecord, isString } from '@raven/core'
-import { CONTENT_TYPES, HEADERS, HTTP_METHODS } from '@shared/server'
+import { CONTENT_TYPES, HEADERS, HTTP_METHODS, HTTP_STATUSES } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
 import { LISTENBRAINZ_API, LISTENBRAINZ_TIMEOUT_MS } from '@/music/listenBrainzClient'
 import { RAVEN_USER_AGENT } from '@/music/userAgent'
@@ -82,7 +82,11 @@ export class ListenBrainzScrobbler implements Scrobbler {
       url: `${LISTENBRAINZ_API}${LISTENBRAINZ_ROUTES.validate}`,
       init: { headers: headersOf({ token }), signal: AbortSignal.timeout(this.timeoutMs) },
     })
-    if (response.status === 400 || response.status === 401) return null
+    if (
+      response.status === HTTP_STATUSES.badRequest ||
+      response.status === HTTP_STATUSES.unauthorized
+    )
+      return null
     if (!response.ok) throw new Error(`ListenBrainz answered ${response.status}.`)
     const body: unknown = await response.json()
     if (!isRecord(body) || !isBoolean(body.valid)) {

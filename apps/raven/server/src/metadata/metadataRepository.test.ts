@@ -90,7 +90,8 @@ describe('the metadata store', () => {
     expect(stored.childrenOnDisk(state.showId).map((child) => child.id)).toEqual([state.seasonId])
     expect(stored.itemsUnder(state.showId)).toContain(state.seasonId)
     const personId = stored.credits(state.showId)[0]?.personId ?? -1
-    expect(stored.person(personId)?.credits.map((credit) => credit.item.id)).toEqual([state.showId])
+    const person = peopleRepositoryOf(database.get()).person(personId)
+    expect(person?.credits.map((credit) => credit.item.id)).toEqual([state.showId])
   })
 
   it('keeps a Fix match by place: none, not one at all, or a TMDB id', () => {

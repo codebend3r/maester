@@ -1,4 +1,4 @@
-import { BUTTON_TONES, Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon, classNames } from '@raven/ui'
 import type { Track } from '@raven/core'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType, ReactNode } from 'react'
@@ -57,13 +57,11 @@ const TrackRow = ({
   const Lead = LEADS[isPlaying ? LEAD_KINDS.speaker : LEAD_KINDS.number]
   return (
     <li
-      className={[
+      className={classNames([
         styles.row,
-        isPlaying || isPaused ? styles.current : '',
-        shouldShowAlbumCover ? styles.withCover : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        (isPlaying || isPaused) && styles.current,
+        shouldShowAlbumCover && styles.withCover,
+      ])}
       aria-current={isPlaying || isPaused ? 'true' : undefined}
     >
       {shouldShowAlbumCover && (

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'bun:test'
-import { describeLayout, groupFolderOf, isLetterFolder } from '@/folderLayout'
+import { FOLDER_LAYOUTS, LIBRARY_KINDS, PATH_LAYOUTS } from '@raven/core'
+import { describe, expect, it } from 'vitest'
+import { describeLayout, groupFolderOf, isLetterFolder } from '@/scanner/folderLayout'
 
 describe('isLetterFolder', () => {
   it.each(['A', 'z', '#', '0-9', 'A-C', 'a - c'])('reads %s as a letter folder', (name) => {
@@ -12,8 +13,10 @@ describe('isLetterFolder', () => {
 })
 
 describe('groupFolderOf', () => {
-  const shows = (folder: string) => groupFolderOf({ kind: 'animeShows', folder, layout: 'auto' })
-  const movies = (folder: string) => groupFolderOf({ kind: 'movies', folder, layout: 'auto' })
+  const shows = (folder: string) =>
+    groupFolderOf({ kind: LIBRARY_KINDS.animeShows, folder, layout: FOLDER_LAYOUTS.auto })
+  const movies = (folder: string) =>
+    groupFolderOf({ kind: LIBRARY_KINDS.movies, folder, layout: FOLDER_LAYOUTS.auto })
 
   it('reads a letter folder of shows as a container', () => {
     expect(shows('A/Andor/Season 1')).toBe('A')
@@ -62,24 +65,40 @@ describe('groupFolderOf', () => {
   })
 
   it('reads nothing as a container in a flat layout, or in a library that is never matched', () => {
-    expect(groupFolderOf({ kind: 'shows', folder: 'A/Andor/Season 1', layout: 'flat' })).toBeNull()
-    expect(groupFolderOf({ kind: 'other', folder: 'A/Clip', layout: 'auto' })).toBeNull()
     expect(
-      groupFolderOf({ kind: 'youtube', folder: 'Requests/Lofi Girl (2024)', layout: 'auto' }),
+      groupFolderOf({
+        kind: LIBRARY_KINDS.shows,
+        folder: 'A/Andor/Season 1',
+        layout: FOLDER_LAYOUTS.flat,
+      }),
+    ).toBeNull()
+    expect(
+      groupFolderOf({ kind: LIBRARY_KINDS.other, folder: 'A/Clip', layout: FOLDER_LAYOUTS.auto }),
+    ).toBeNull()
+    expect(
+      groupFolderOf({
+        kind: LIBRARY_KINDS.youtube,
+        folder: 'Requests/Lofi Girl (2024)',
+        layout: FOLDER_LAYOUTS.auto,
+      }),
     ).toBeNull()
   })
 
   it('reads group folders in a Sporting events library, as it is matched like movies', () => {
     expect(
-      groupFolderOf({ kind: 'sports', folder: 'Requests/UFC 300 (2024)', layout: 'auto' }),
+      groupFolderOf({
+        kind: LIBRARY_KINDS.sports,
+        folder: 'Requests/UFC 300 (2024)',
+        layout: FOLDER_LAYOUTS.auto,
+      }),
     ).toBe('Requests')
   })
 })
 
 describe('describeLayout', () => {
   it('names a path by its group folders', () => {
-    expect(describeLayout([])).toBe('flat')
-    expect(describeLayout(['A', 'B', 'A', 'Requests'])).toBe('lettered')
-    expect(describeLayout(['Requests', 'Star Trek', 'A'])).toBe('grouped')
+    expect(describeLayout([])).toBe(PATH_LAYOUTS.flat)
+    expect(describeLayout(['A', 'B', 'A', 'Requests'])).toBe(PATH_LAYOUTS.lettered)
+    expect(describeLayout(['Requests', 'Star Trek', 'A'])).toBe(PATH_LAYOUTS.grouped)
   })
 })

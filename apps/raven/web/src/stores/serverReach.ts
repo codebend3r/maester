@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 
 type ServerReach = {
   /**
@@ -12,12 +11,10 @@ type ServerReach = {
 }
 
 export const useServerReach = create<ServerReach>()(
-  devtools(
-    persist((): ServerReach => ({ isOffline: false }), {
-      name: STORE_KEYS.serverReach,
-      storage: createJSONStorage(() => window.localStorage),
-      partialize: ({ isOffline }) => ({ isOffline }),
-    }),
-    { name: 'raven/serverReach' },
-  ),
+  keptInStorage({
+    key: STORE_KEYS.serverReach,
+    name: 'raven/serverReach',
+    state: (): ServerReach => ({ isOffline: false }),
+    keep: ({ isOffline }) => ({ isOffline }),
+  }),
 )

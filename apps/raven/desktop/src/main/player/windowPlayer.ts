@@ -11,7 +11,6 @@ import {
   type Mpv,
   type MpvSurface,
   type NativeTarget,
-  openMpv,
 } from '@raven/mpv'
 import { app, BrowserWindow, powerSaveBlocker, screen } from 'electron'
 import { NIGHT, showWindowButtons } from '@/main/appWindow'
@@ -22,14 +21,7 @@ import { errorText } from '@/main/log/errorText'
 import { openLine } from '@/main/log/opens'
 import { CLEAR, createActivity } from '@/main/player/activity'
 import { displayReading } from '@/main/player/displayOptions'
-import {
-  addonPathFor,
-  ENGINE_MODES,
-  ENGINE_STATUSES,
-  ENGINE_WORDS,
-  engineOptionsFor,
-  openEngine,
-} from '@/main/player/engine'
+import { ENGINE_MODES, ENGINE_STATUSES, ENGINE_WORDS, openEngine } from '@/main/player/engine'
 import { resolveSourceWith } from '@/main/player/loadTarget'
 import type { createMarks } from '@/main/player/marks'
 import { readDevices } from '@/main/player/outputOptions'
@@ -40,7 +32,7 @@ import {
 } from '@/main/player/playerService'
 import { createSleepGuard } from '@/main/player/sleepGuard'
 import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
-import { attachWindowEngine, engineMode } from '@/main/player/windowEngine'
+import { attachWindowEngine, engineMode, openAppMpv } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { ServerSources } from '@/main/servers/serverSources'
 import type { Timers } from '@/main/timers'
@@ -158,54 +150,41 @@ export const attachPlayer = ({
   const surfaceFor = (kind: MpvSurface['kind']): MpvSurface =>
     kind === MPV_SURFACE_KINDS.window ? { kind, handle: window.getNativeWindowHandle() } : { kind }
 
-  const openNative = async (surface: MpvSurface): Promise<NativeEngine> => {
-    const mpv = await openMpv({
+  const openNative = (surface: MpvSurface): Promise<NativeEngine> =>
+    openAppMpv({
       surface,
-      // Always explicit: the addon and libmpv sit outside the bundle (Ruling 2).
-      addonPath: addonPathFor({
-        target: nativeTarget,
-        isPackaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        resourcesPath: process.resourcesPath,
+      nativeTarget,
+      options: subtitleLookOptions({
+        fontsDir: fontsDirFor({
+          isPackaged: app.isPackaged,
+          appPath: app.getAppPath(),
+          resourcesPath: process.resourcesPath,
+        }),
       }),
       onEvent: (event) => {
         if (sink.service !== null) sink.service.receive(event)
       },
+      setUp: async (mpv) => {
+        // Made before anything can load: it hardens mpv first and refuses loads if that fails.
+        const service = createPlayerService({
+          mpv,
+          resolveSource,
+          explain: sources.explain,
+          refusedAccount: sources.refusedAccount,
+          canChooseAo: mode === ENGINE_MODES.window,
+          platform,
+          timers,
+          onActivity: activity.report,
+          onFirstFrame: marks.firstFrame,
+          warn,
+        })
+        sink.service = service
+        const engine = { mpv, service: marks.tracking(service) }
+        await service.applyOutput({ output: config.read().output, devices: await readDevices(mpv) })
+        await applyDisplayTo({ window, engine })
+        return engine
+      },
     })
-    try {
-      const fontsDir = fontsDirFor({
-        isPackaged: app.isPackaged,
-        appPath: app.getAppPath(),
-        resourcesPath: process.resourcesPath,
-      })
-      await Promise.all(
-        [...engineOptionsFor({ surface }), ...subtitleLookOptions({ fontsDir })].map((option) =>
-          mpv.set(option),
-        ),
-      )
-      // Made before anything can load: it hardens mpv first and refuses loads if that fails.
-      const service = createPlayerService({
-        mpv,
-        resolveSource,
-        explain: sources.explain,
-        refusedAccount: sources.refusedAccount,
-        canChooseAo: mode === ENGINE_MODES.window,
-        platform,
-        timers,
-        onActivity: activity.report,
-        onFirstFrame: marks.firstFrame,
-        warn,
-      })
-      sink.service = service
-      const engine = { mpv, service: marks.tracking(service) }
-      await service.applyOutput({ output: config.read().output, devices: await readDevices(mpv) })
-      await applyDisplayTo({ window, engine })
-      return engine
-    } catch (error) {
-      await mpv.destroy()
-      throw error
-    }
-  }
 
   const openLogged = async (surface: MpvSurface): Promise<NativeEngine> => {
     const opened = await openNative(surface)

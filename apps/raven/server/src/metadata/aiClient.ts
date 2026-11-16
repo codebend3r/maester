@@ -8,7 +8,7 @@ import {
   PermissionDeniedError,
 } from '@anthropic-ai/sdk'
 import { Inject, Injectable } from '@nestjs/common'
-import { isRecord, isString, type MetadataServiceState } from '@raven/core'
+import { isRecord, isString, METADATA_SERVICE_STATES, type MetadataServiceState } from '@raven/core'
 import { SERVER_CONFIG, type ServerConfig } from '@/config'
 import { DailyBudget } from '@/metadata/dailyBudget'
 
@@ -95,8 +95,12 @@ export class AiClient {
   }
 
   state(): AiState {
-    if (this.client == null) return { state: 'off', error: null }
-    return { state: this.status.error == null ? 'ok' : 'failing', error: this.status.error }
+    if (this.client == null) return { state: METADATA_SERVICE_STATES.off, error: null }
+    return {
+      state:
+        this.status.error == null ? METADATA_SERVICE_STATES.ok : METADATA_SERVICE_STATES.failing,
+      error: this.status.error,
+    }
   }
 
   /** One request to Claude. Failing throws an `AiError` whose message never holds the key. */

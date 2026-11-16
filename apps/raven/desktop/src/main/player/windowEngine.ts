@@ -1,8 +1,22 @@
 import type { AudioEvent, Guard, PlayerEvent } from '@raven/core'
+import {
+  type Mpv,
+  type MpvEvent,
+  type MpvOption,
+  type MpvSurface,
+  type NativeTarget,
+  openMpv,
+} from '@raven/mpv'
 import { app, type BrowserWindow, MessageChannelMain, type MessagePortMain } from 'electron'
 import { errorText } from '@/main/log/errorText'
 import { createConnector } from '@/main/player/connector'
-import { type EngineWords, engineModeFrom, type OpenedEngine } from '@/main/player/engine'
+import {
+  addonPathFor,
+  type EngineWords,
+  engineModeFrom,
+  engineOptionsFor,
+  type OpenedEngine,
+} from '@/main/player/engine'
 import { createEngineSlot, type WatchedService, watchService } from '@/main/player/engineSlot'
 import type { PortLike, PortRequest, PortService } from '@/main/player/playerPort'
 import { isPageUrl } from '@/main/security'
@@ -11,6 +25,49 @@ import type { IPC_CHANNELS } from '@/shared/hostNames'
 
 // A test hook too: an unpackaged run reads `RAVEN_DESKTOP_MPV` (`headless` or `off`).
 export const engineMode = () => engineModeFrom({ isPackaged: app.isPackaged, env: process.env })
+
+type OpenAppMpvProps<T> = {
+  surface: MpvSurface
+  /** The addon build this process loads, or null where raven has none. */
+  nativeTarget: NativeTarget | null
+  /** Set after the engine's own options, before `setUp`. */
+  options: readonly MpvOption[]
+  onEvent: (event: MpvEvent) => void
+  /** Makes the engine from its mpv; a throw destroys the mpv. */
+  setUp: (mpv: Mpv) => Promise<T>
+}
+
+/**
+ * Opens one of the app's engines: mpv from the addon outside the bundle (Ruling 2), always named
+ * explicitly, its options set, then whatever the engine builds on it.
+ */
+export const openAppMpv = async <T>({
+  surface,
+  nativeTarget,
+  options,
+  onEvent,
+  setUp,
+}: OpenAppMpvProps<T>): Promise<T> => {
+  const mpv = await openMpv({
+    surface,
+    addonPath: addonPathFor({
+      target: nativeTarget,
+      isPackaged: app.isPackaged,
+      appPath: app.getAppPath(),
+      resourcesPath: process.resourcesPath,
+    }),
+    onEvent,
+  })
+  try {
+    await Promise.all(
+      [...engineOptionsFor({ surface }), ...options].map((option) => mpv.set(option)),
+    )
+    return await setUp(mpv)
+  } catch (error) {
+    await mpv.destroy()
+    throw error
+  }
+}
 
 /** Electron's port behind the bridge's `PortLike`, so the bridge never sees Electron. */
 const portLike = (port: MessagePortMain): PortLike => ({

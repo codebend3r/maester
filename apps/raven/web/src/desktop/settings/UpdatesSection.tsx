@@ -8,7 +8,7 @@ import {
 import { BUTTON_TONES, Button } from '@raven/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
-import { refusalText } from '@/desktop/client'
+import { readMain, refusalText } from '@/desktop/client'
 import { handled } from '@/lib/handled'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { UPDATES_SECTION_COPY } from '@/desktop/settings/copy'
@@ -66,9 +66,12 @@ export const UpdatesSection = () => {
   const read = useQuery({
     queryKey: DESKTOP_QUERY_KEYS.updates,
     queryFn: async (): Promise<UpdateStatus> => {
-      const reply = await client.request({ type: DESKTOP_REQUESTS.readUpdates })
-      if (reply.type === DESKTOP_REPLIES.updates) return reply.status
-      throw new Error(refusalText({ reply, fallback: UPDATES_SECTION_COPY.unreadable }))
+      const reply = await readMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.readUpdates },
+        fallback: UPDATES_SECTION_COPY.unreadable,
+      })
+      return reply.status
     },
     retry: false,
   })

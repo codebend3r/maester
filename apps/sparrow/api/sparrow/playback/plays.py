@@ -35,7 +35,7 @@ from sparrow.clients import ClientError, Services
 from sparrow.clients.base import every_host
 from sparrow.clients.seerr import MediaDetails
 from sparrow.clients.tautulli import HistoryRow, Session, StreamData, Tautulli
-from sparrow.media import Copy
+from sparrow.media import Copy, MediaType
 
 # Finished plays asked of each host.
 RECENT = 5
@@ -183,9 +183,9 @@ class Play:
         return isinstance(self.source, Session)
 
     @property
-    def kind(self) -> str:
-        """Seerr's media type: "movie" or "tv"."""
-        return "tv" if self.show_key else "movie"
+    def kind(self) -> MediaType:
+        """Seerr's media type for what was played."""
+        return MediaType.TV if self.show_key else MediaType.MOVIE
 
     @property
     def plex_key(self) -> str:

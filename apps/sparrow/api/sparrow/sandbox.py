@@ -55,7 +55,7 @@ from sparrow.notify import LogNotifier
 from sparrow.registry import instances_from_env
 from sparrow.store import Store
 from sparrow.web import create_app
-from sparrow.web.auth import Auth, Refused, Viewer, require_json
+from sparrow.web.auth import Auth, Reason, Refused, Viewer, require_json
 from sparrow.web.chat import ChatApi
 
 log = logging.getLogger("sparrow.sandbox")
@@ -151,14 +151,14 @@ class Sandbox:
         agent = build_agent(self.model, registry, services, store, model_client=self.client)
         agent.limiter = self.limiter
         identity = IdentityService(store, services)
-        identity.set_tier_override(EVAL_USER, case.tier.name.lower())
+        identity.set_tier_override(EVAL_USER, case.tier)
         return World(case_id, case, store, ChatService(agent=agent, identity=identity, store=store))
 
     def open(self, case_id: str) -> None:
         """Swaps in a fresh world for `case_id`. The old one isn't closed: a turn still
         running in it finishes there, and its in-memory store goes with it."""
         if case_id != BLANK and case_id not in self.cases:
-            raise Refused(404, {"reason": "unknown_case"})
+            raise Refused(404, Reason.UNKNOWN_CASE)
         self.world = self._open(case_id)
         self.chat.chat = self.world.chat
 
@@ -201,7 +201,7 @@ class Sandbox:
 
         @router.post("/sandbox/tier", dependencies=[Depends(require_json)])
         async def set_tier(pick: TierPick) -> dict[str, str]:
-            self.world.chat.identity.set_tier_override(EVAL_USER, pick.tier.value)
+            self.world.chat.identity.set_tier_override(EVAL_USER, Tier.parse(pick.tier))
             return {"tier": pick.tier.value}
 
         return router

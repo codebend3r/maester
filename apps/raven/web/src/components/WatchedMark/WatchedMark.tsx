@@ -1,4 +1,4 @@
-import { Icon } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import styles from '@/components/WatchedMark/WatchedMark.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -24,7 +24,7 @@ type WatchedMarkProps = {
 export const WatchedMark = ({ watched, decorative = false, className }: WatchedMarkProps) =>
   watched && (
     <span
-      className={[styles.mark, className ?? ''].filter(Boolean).join(' ')}
+      className={classNames([styles.mark, className])}
       aria-hidden={decorative ? 'true' : undefined}
     >
       <Icon name="check" size={14} />

@@ -1,9 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { isMatchItemType, isNumber, listOf, type PersonProfile } from '@raven/core'
+import {
+  type CreditJob,
+  isCreditJob,
+  isMatchItemType,
+  isNumber,
+  ITEM_TYPES,
+  listOf,
+  type PersonDetails,
+  type PersonProfile,
+} from '@raven/core'
 import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
-import { likePattern } from '@/media/mediaSql'
+import { likePattern, under } from '@/media/mediaSql'
+import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbShapes'
 
@@ -62,6 +72,30 @@ type CreditRow = {
 
 const isGenreIds = listOf(isNumber)
 
+/** A credit on a movie or show raven holds, with the title's TMDB id and date, which only the server reads. */
+export type LocalCredit = PersonDetails['credits'][number] & {
+  tmdbId: string
+  released: string | null
+}
+
+/** A person as raven's own credits know them; what TMDB says of them is `profile`'s. */
+export type StoredPerson = Pick<PersonDetails, 'id' | 'tmdbId' | 'name' | 'photoVersion'> & {
+  credits: LocalCredit[]
+}
+
+type PersonRow = { id: number; tmdb_id: string; name: string; photo: string | null }
+
+type CreditOnDiskRow = {
+  item_id: number
+  tmdb_id: string
+  released: string | null
+  job: string
+  role: string | null
+}
+
+/** A credit on a title on disk whose job the contract knows. */
+type CreditOnDisk = Omit<CreditOnDiskRow, 'job'> & { job: CreditJob }
+
 /** A person whose name a search matched. */
 export type NamedPerson = { id: number; name: string; photoVersion: string | null }
 
@@ -83,10 +117,73 @@ export class PeopleRepository {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(PictureVersions) private readonly pictureVersions: PictureVersions,
+    @Inject(MetadataRepository) private readonly metadata: MetadataRepository,
   ) {}
 
   private get db(): Sqlite.Database {
     return this.database.db
+  }
+
+  /** A person's page: the movies and shows on disk they are credited on, newest first. */
+  person(id: number): StoredPerson | null {
+    const row = this.db
+      .prepare<[number], PersonRow>('SELECT id, tmdb_id, name, photo FROM people WHERE id = ?')
+      .get(id)
+    if (!row) return null
+    const credits = this.creditsOnDisk(id)
+    const summaries = this.metadata.summaries({
+      ids: credits.map((credit) => credit.item_id),
+      libraryId: null,
+    })
+    return {
+      id: row.id,
+      tmdbId: row.tmdb_id,
+      name: row.name,
+      photoVersion: this.pictureVersions.photo({ id: row.id, photo: row.photo }),
+      credits: credits.flatMap((credit) => {
+        const item = summaries.get(credit.item_id)
+        return item
+          ? [
+              {
+                item,
+                job: credit.job,
+                role: credit.role,
+                tmdbId: credit.tmdb_id,
+                released: credit.released,
+              },
+            ]
+          : []
+      }),
+    }
+  }
+
+  /** The ids of the movies and shows on disk a person is credited on, once for each credit; a search counts them without reading each title. */
+  creditedItemIds(personId: number): number[] {
+    return this.creditsOnDisk(personId).map((credit) => credit.item_id)
+  }
+
+  /** A person's credits on movies and shows a file of is on disk, newest first. */
+  private creditsOnDisk(personId: number): CreditOnDisk[] {
+    return this.db
+      .prepare<[number, number], CreditOnDiskRow>(
+        `WITH RECURSIVE ${under('SELECT item_id, item_id FROM credits WHERE person_id = ?')}
+         SELECT c.item_id, i.tmdb_id, i.released, c.job, c.role
+           FROM credits c JOIN items i ON i.id = c.item_id
+          WHERE c.person_id = ? AND i.type IN ('${ITEM_TYPES.movie}', '${ITEM_TYPES.show}')
+            AND c.item_id IN (SELECT u.root FROM under u JOIN media_items mi ON mi.item_id = u.id)
+          ORDER BY i.released DESC, i.title`,
+      )
+      .all(personId, personId)
+      .flatMap((row) => (isCreditJob(row.job) ? [{ ...row, job: row.job }] : []))
+  }
+
+  /** A person's photo path on TMDB, or null. */
+  photo(personId: number): string | null {
+    return (
+      this.db
+        .prepare<[number], { photo: string | null }>('SELECT photo FROM people WHERE id = ?')
+        .get(personId)?.photo ?? null
+    )
   }
 
   /** Null for an id that names no one. */

@@ -1,3 +1,4 @@
+import { classNames } from '@raven/ui'
 import { KEYS } from '@raven/core'
 import type { ComponentProps } from 'react'
 import type { Search } from '@raven/ui/headless'
@@ -20,7 +21,7 @@ export const SearchField = ({ search, className, onKeyDown, ...input }: SearchFi
   <input
     {...input}
     type="search"
-    className={[styles.field, className].filter(Boolean).join(' ')}
+    className={classNames([styles.field, className])}
     value={search.text}
     onChange={(event) => search.setText(event.target.value)}
     onKeyDown={(event) => {

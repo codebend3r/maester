@@ -58,7 +58,8 @@ type WithoutExtrasProps = {
 /** Extras are never matched; the rest are what a unit is about. */
 const withoutExtras = ({ files, deps }: WithoutExtrasProps): MatchFile[] => {
   const extras = files.filter((file) => isExtra(file))
-  if (extras.length > 0) deps.files.setMatch({ ids: extras.map((file) => file.id), match: 'off' })
+  if (extras.length > 0)
+    deps.files.setMatch({ ids: extras.map((file) => file.id), match: MATCH_STATES.off })
   return files.filter((file) => !isExtra(file))
 }
 

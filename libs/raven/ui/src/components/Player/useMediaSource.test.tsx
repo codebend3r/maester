@@ -110,7 +110,12 @@ type HarnessProps = {
   onFailure?: (message: string) => void
 }
 
-const Harness = ({ mode, mediaPlane, onCommit = ignore, onFailure = ignore }: HarnessProps) => {
+const Harness = ({
+  mode,
+  mediaPlane = planeWith(null),
+  onCommit = ignore,
+  onFailure = ignore,
+}: HarnessProps) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const position = useRef(0)
   const playing = useRef(false)

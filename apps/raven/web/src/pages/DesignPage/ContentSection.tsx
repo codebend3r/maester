@@ -1,15 +1,45 @@
-import { useId, useRef } from 'react'
+import { useId, useState } from 'react'
 import { BUTTON_TONES, Button } from '@raven/ui'
+import { DialogFrame, DIALOG_WIDTHS } from '@/components/DialogFrame/DialogFrame'
+import { useModal } from '@/lib/useModal'
 import { SECTION_IDS } from '@/pages/DesignPage/contents'
 import { DESIGN_COPY } from '@/pages/DesignPage/copy'
 import { DesignSection, Specimen } from '@/pages/DesignPage/DesignSection'
-
-const COPY = DESIGN_COPY.content
 import styles from '@/pages/DesignPage/DesignPage.module.scss'
 
+const COPY = DESIGN_COPY.content
+
+type SampleDialogProps = { onClose: () => void }
+
+/** The dialog specimen: the frame every modal dialog in raven opens in. */
+const SampleDialog = ({ onClose }: SampleDialogProps) => {
+  const { dialog, keepKeys, close } = useModal()
+  const titleId = useId()
+  return (
+    <DialogFrame
+      dialog={dialog}
+      width={DIALOG_WIDTHS.question}
+      labelledBy={titleId}
+      onClose={onClose}
+      onKeyDown={keepKeys}
+    >
+      <div className={styles.dialogBody}>
+        <h2 id={titleId} className={styles.dialogTitle}>
+          {COPY.dialogTitle}
+        </h2>
+        <p className={styles.dialogText}>{COPY.dialogText}</p>
+        <div className={styles.dialogActions}>
+          <Button tone={BUTTON_TONES.primary} onClick={close}>
+            {COPY.close}
+          </Button>
+        </div>
+      </div>
+    </DialogFrame>
+  )
+}
+
 export const ContentSection = () => {
-  const dialog = useRef<HTMLDialogElement>(null)
-  const dialogTitleId = useId()
+  const [isOpen, setOpen] = useState(false)
   return (
     <DesignSection id={SECTION_IDS.content}>
       <Specimen name={COPY.table}>
@@ -63,21 +93,9 @@ export const ContentSection = () => {
 
       <Specimen name={COPY.dialog} note={COPY.dialogNote}>
         <div className={styles.row}>
-          <Button onClick={() => dialog.current?.showModal()}>{COPY.openDialog}</Button>
+          <Button onClick={() => setOpen(true)}>{COPY.openDialog}</Button>
         </div>
-        <dialog ref={dialog} className={styles.dialog} aria-labelledby={dialogTitleId}>
-          <div className={styles.dialogBody}>
-            <h2 id={dialogTitleId} className={styles.dialogTitle}>
-              {COPY.dialogTitle}
-            </h2>
-            <p className={styles.dialogText}>{COPY.dialogText}</p>
-            <div className={styles.dialogActions}>
-              <Button tone={BUTTON_TONES.primary} onClick={() => dialog.current?.close()}>
-                {COPY.close}
-              </Button>
-            </div>
-          </div>
-        </dialog>
+        {isOpen && <SampleDialog onClose={() => setOpen(false)} />}
       </Specimen>
     </DesignSection>
   )

@@ -1,5 +1,5 @@
 import { THEMES, type ThemeId } from '@raven/core'
-import { Icon } from '@raven/ui'
+import { Icon, classNames } from '@raven/ui'
 import { useId } from 'react'
 import { THEME_PICKER_COPY } from '@/components/ThemePicker/copy'
 import { useMenu } from '@/lib/useMenu'
@@ -36,7 +36,7 @@ export const ThemePicker = ({ className }: ThemePickerProps) => {
   const { theme, pick } = useTheme()
 
   return (
-    <div ref={root} className={[styles.picker, className].filter(Boolean).join(' ')}>
+    <div ref={root} className={classNames([styles.picker, className])}>
       <button
         ref={trigger}
         type="button"

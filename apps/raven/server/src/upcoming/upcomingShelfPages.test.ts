@@ -18,7 +18,7 @@ import {
 import type { DiscoveredPage } from '@/metadata/tmdbShapes'
 import { manualClock } from '@/test/clock'
 import { cursorOf, UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
-import { UPCOMING_FRESH_MS } from '@/upcoming/freshReads'
+import { UPCOMING_FRESH_MS } from '@/upcoming/shelfStreams'
 
 type Asked = Parameters<TmdbClient['upcoming']>[0]
 

@@ -34,7 +34,7 @@ const READS = {
   'its sagas': ({ database, libraryId }) =>
     repositories(database).media.listSagas({ libraryId, account }),
   'its count of sagas': ({ database, libraryId }) =>
-    repositories(database).media.countSagas({ libraryId, account }),
+    repositories(database).media.countSagas(libraryId),
   'its duplicates': ({ database, libraryId }) =>
     new MovieSplits(database, repositories(database).media).list({ libraryId, account }),
 } as const satisfies Record<string, Read>

@@ -14,19 +14,19 @@ import {
   musicListQuery,
 } from '@raven/core'
 import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
-import { type Search, useAudioQueue } from '@raven/ui/headless'
+import { type Search, isNone, keptRead, useAudioQueue } from '@raven/ui/headless'
 import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { ArtistList, ArtistListSkeleton } from '@/components/ArtistList/ArtistList'
-import { Loading } from '@/components/Skeleton/Skeleton'
 import { SearchField } from '@/components/SearchField/SearchField'
 import { libraryTracks } from '@/lib/music'
 import { albumsQuery, artistsQuery } from '@/lib/queries'
 import { useAddressSearch } from '@/lib/useSearch'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
+import { SectionQuery } from '@/pages/LibraryPage/sections/sectionParts'
 import styles from '@/pages/LibraryPage/LibraryPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { api } from '@/lib/api'
@@ -190,22 +190,24 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
         onOrder={reverse}
         isPlayable={(albums.data?.length ?? 0) > 0}
       />
-      {albums.isPending && <AlbumGridSkeleton />}
       {albums.data && <output>{LIBRARY_COPY.albumCount(albums.data.length)}</output>}
-      {albums.error && (
-        <p className={styles.message} role="alert">
-          {albums.error.message}
-        </p>
-      )}
-      {albums.data && albums.data.length === 0 && (
-        <p className={styles.message}>
-          {search.query
+      <SectionQuery
+        query={keptRead(albums)}
+        shape={<AlbumGridSkeleton />}
+        isEmpty={isNone}
+        empty={
+          search.query
             ? LIBRARY_COPY.noAlbumMatches({ name: library.name, query: search.query })
-            : LIBRARY_COPY.noAlbums(library.name)}
-        </p>
-      )}
-      {albums.data && albums.data.length > 0 && <AlbumGrid albums={albums.data} />}
-      {albums.data && albums.data.length > 0 && scale && <JumpPicker scale={scale} scope={cards} />}
+            : LIBRARY_COPY.noAlbums(library.name)
+        }
+      >
+        {(listed) => (
+          <>
+            <AlbumGrid albums={listed} />
+            {scale && <JumpPicker scale={scale} scope={cards} />}
+          </>
+        )}
+      </SectionQuery>
     </div>
   )
 }
@@ -229,11 +231,11 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
     refetchInterval: (current) =>
       current.state.data?.some((album) => album.match === MATCH_STATES.pending) ? 2000 : false,
   })
-  const unmatched = albums.data?.filter((album) => album.match === MATCH_STATES.unmatched) ?? []
+  const unmatched = albums.data?.filter((album) => album.match === MATCH_STATES.unmatched)
   const scale = albumJumpScale({
     sort: MUSIC_SORTS.title,
     direction: SORT_DIRECTIONS.ascending,
-    albums: unmatched,
+    albums: unmatched ?? [],
     thisYear,
   })
   const showToast = useToasts((state) => state.show)
@@ -251,7 +253,7 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
         <AdminOnly>
           <Button
             icon="wand"
-            disabled={smartMatch.isPending || unmatched.length === 0}
+            disabled={smartMatch.isPending || (unmatched?.length ?? 0) === 0}
             onClick={() => smartMatch.mutate()}
           >
             {LIBRARY_COPY.smartMatchAlbums}
@@ -263,17 +265,19 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
           {smartMatch.error.message}
         </p>
       )}
-      {albums.isPending && <AlbumGridSkeleton />}
-      {albums.error && (
-        <p className={styles.message} role="alert">
-          {albums.error.message}
-        </p>
-      )}
-      {albums.data && unmatched.length === 0 && (
-        <p className={styles.message}>{LIBRARY_COPY.noUnmatchedAlbums(library.name)}</p>
-      )}
-      {unmatched.length > 0 && <AlbumGrid albums={unmatched} />}
-      {unmatched.length > 0 && scale && <JumpPicker scale={scale} scope={cards} />}
+      <SectionQuery
+        query={keptRead({ data: unmatched, error: albums.error })}
+        shape={<AlbumGridSkeleton />}
+        isEmpty={isNone}
+        empty={LIBRARY_COPY.noUnmatchedAlbums(library.name)}
+      >
+        {(listed) => (
+          <>
+            <AlbumGrid albums={listed} />
+            {scale && <JumpPicker scale={scale} scope={cards} />}
+          </>
+        )}
+      </SectionQuery>
     </div>
   )
 }
@@ -295,22 +299,15 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
           placeholder={LIBRARY_COPY.searchArtists}
         />
       </div>
-      {artists.isPending && (
-        <Loading label={LIBRARY_COPY.loadingArtists}>
-          <ArtistListSkeleton />
-        </Loading>
-      )}
-      {artists.error && (
-        <p className={styles.message} role="alert">
-          {artists.error.message}
-        </p>
-      )}
-      {albumArtists && albumArtists.length === 0 && (
-        <p className={styles.message}>{LIBRARY_COPY.noArtists(library.name)}</p>
-      )}
-      {albumArtists && albumArtists.length > 0 && (
-        <ArtistList artists={albumArtists} label={LIBRARY_COPY.artists} />
-      )}
+      <SectionQuery
+        query={keptRead({ data: albumArtists, error: artists.error })}
+        shape={<ArtistListSkeleton />}
+        loading={LIBRARY_COPY.loadingArtists}
+        isEmpty={isNone}
+        empty={LIBRARY_COPY.noArtists(library.name)}
+      >
+        {(listed) => <ArtistList artists={listed} label={LIBRARY_COPY.artists} />}
+      </SectionQuery>
     </div>
   )
 }

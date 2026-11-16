@@ -121,7 +121,7 @@ apps/sparrow/
 │   │   ├── store/          SQLite schema, migrations, audit log
 │   │   ├── evals/          the eval runner and the fake world a case runs in
 │   │   ├── sandbox.py      the chat API over an eval case's fakes, with no sign-in, for testing
-│   │   ├── app.py          wires settings into clients, store, agent, admin console and web app
+│   │   ├── app.py          wires settings into clients, store, agent and web app
 │   │   ├── config.py       environment, read once
 │   │   └── *.py            shared modules: service registry, title ownership, media, notices
 │   ├── evals/cases/        scripted conversations against the fakes, one YAML file each (checked by `sparrow/evals/seed.py`; an unknown key fails the case)

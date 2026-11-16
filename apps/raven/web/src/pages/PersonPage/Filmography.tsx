@@ -1,11 +1,11 @@
+import { type FilmographyEntry } from '@raven/core'
 import {
-  type FilmographyEntry,
   entriesOn,
   hasSelfCredits,
   isFilmographyTab,
   tabCounts,
   FILMOGRAPHY_TAB_NAMES,
-} from '@raven/core'
+} from '@/pages/PersonPage/filmographyTabs'
 import { type ComponentType, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loading } from '@/components/Skeleton/Skeleton'

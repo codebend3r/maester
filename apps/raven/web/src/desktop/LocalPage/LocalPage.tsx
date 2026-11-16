@@ -2,7 +2,7 @@ import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type RecentView } from '@raven/core'
 import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
-import { refusalText, askMain } from '@/desktop/client'
+import { askMain, readMain } from '@/desktop/client'
 import { handled } from '@/lib/handled'
 import { useOpenReply } from '@/desktop/openReply'
 import { LOCAL_PAGE_COPY } from '@/desktop/LocalPage/copy'
@@ -19,9 +19,12 @@ const useRecents = () => {
   return useQuery({
     queryKey: DESKTOP_QUERY_KEYS.recents,
     queryFn: async (): Promise<RecentView[]> => {
-      const reply = await client.request({ type: DESKTOP_REQUESTS.listRecents })
-      if (reply.type === DESKTOP_REPLIES.recents) return reply.recents
-      throw new Error(refusalText({ reply, fallback: LOCAL_PAGE_COPY.noRecents }))
+      const reply = await readMain({
+        client,
+        request: { type: DESKTOP_REQUESTS.listRecents },
+        fallback: LOCAL_PAGE_COPY.noRecents,
+      })
+      return reply.recents
     },
     retry: false,
   })

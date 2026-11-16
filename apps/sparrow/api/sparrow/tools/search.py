@@ -55,7 +55,7 @@ def describe(result: SearchResult) -> dict[str, Any]:
 
 
 def as_choice(result: SearchResult) -> Choice:
-    kind = "Movie" if result.media_type == "movie" else "TV show"
+    kind = "Movie" if result.media_type == MediaType.MOVIE else "TV show"
     overview = result.overview[:OVERVIEW_CHARS]
     return Choice(
         label=result.title,

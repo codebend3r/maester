@@ -135,13 +135,7 @@ async def test_seerr_tv_details_merge_tmdb_seasons_with_server_status(fixture):
 async def test_seerr_request_actions_quota_and_services(fixture):
     client = SeerrClient(BASE, "k")
     respx.get(f"{BASE}/api/v1/request/77").respond(json=fixture("seerr_request"))
-    approved = {**fixture("seerr_request"), "status": 2}
-    approve = respx.post(f"{BASE}/api/v1/request/77/approve").respond(json=approved)
-    declined = {**fixture("seerr_request"), "status": 3}
-    decline = respx.post(f"{BASE}/api/v1/request/77/decline").respond(json=declined)
     assert (await client.get_request(77)).status == RequestStatus.PENDING
-    assert (await client.approve_request(77)).status == RequestStatus.APPROVED and approve.called
-    assert (await client.decline_request(77)).status == RequestStatus.DECLINED and decline.called
 
     respx.get(f"{BASE}/api/v1/user/4/quota").respond(json=fixture("seerr_quota"))
     quotas = await client.quota(4)
@@ -383,7 +377,6 @@ async def test_fake_seerr_round_trip():
     assert [r.title for r in await seerr.search("du")] == ["Dune"]
     req = await seerr.create_request("movie", 1, is_4k=True, as_user=4)
     assert (await seerr.list_requests(user_id=4)) == [req]
-    assert (await seerr.approve_request(req.id)).status == RequestStatus.APPROVED
     with pytest.raises(ClientError, match="404"):
         await seerr.media_details("movie", 2)
 
@@ -607,3 +600,11 @@ async def test_gather_each_names_who_couldnt_answer_and_raises_a_bug():
     assert found.unreachable == {"down": "sonarr GET /api/v3/queue failed (None): timeout"}
     with pytest.raises(KeyError):
         await gather_each(["a", "bug"], ask)
+
+
+@respx.mock
+async def test_a_body_that_is_not_json_names_the_method_that_got_it():
+    respx.post(f"{BASE}/api/v1/thing").respond(text="<html>")
+    with pytest.raises(ClientError) as raised:
+        await SeerrClient(BASE, "k").post_json("/api/v1/thing", {})
+    assert (raised.value.method, raised.value.detail) == ("POST", "not JSON")

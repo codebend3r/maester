@@ -208,6 +208,14 @@ const heldFoldersOf = (entry: DownloadEntry): string[] =>
       ]
     : foldersOfEntry(entry)
 
+type UnheldFoldersOfProps = { entry: DownloadEntry; entries: DownloadsValues['entries'] }
+
+/** The folders `entry` held that no entry in `entries` holds any more. */
+const unheldFoldersOf = ({ entry, entries }: UnheldFoldersOfProps): string[] => {
+  const held = new Set(Object.values(entries).flatMap(heldFoldersOf))
+  return heldFoldersOf(entry).filter((folder) => !held.has(folder))
+}
+
 /** The bytes the finished downloads take. */
 export const usedBytesOf = (entries: DownloadsValues['entries']): number =>
   Object.values(entries)
@@ -340,6 +348,11 @@ export const useDownloads = create<Downloads>()(
         }
       }
 
+      const removeFolders = async (folders: readonly string[]): Promise<void> => {
+        const { disk } = get().device
+        await Promise.allSettled(folders.map((folder) => disk.remove(folder)))
+      }
+
       /** Fetches the queued tracks one after another, until none is left. */
       const runQueue = async (): Promise<void> => {
         const next = Object.values(get().entries).find(
@@ -351,12 +364,16 @@ export const useDownloads = create<Downloads>()(
         const now = get().entries[keyOfEntry(next)]
         const isCurrent = now !== undefined && now.queueStamp === next.queueStamp
         /*
-         * Removed while it downloaded, what it wrote goes too, and a failure leaves no file.
+         * Removed while it downloaded, what it wrote goes too, its album's cover with it unless
+         * another track still holds that, and a failure leaves no file.
          * Removed and queued again, the folder is the newer fetch's, and this one, done or
          * failed, lands nowhere.
          */
-        if (now === undefined || (isCurrent && fetched.status === DOWNLOAD_STATUSES.failed)) {
-          await get().device.disk.remove(folderOfPath(next.path)).catch(IGNORED)
+        if (now === undefined) {
+          await removeFolders(unheldFoldersOf({ entry: next, entries: get().entries }))
+        }
+        if (isCurrent && fetched.status === DOWNLOAD_STATUSES.failed) {
+          await removeFolders([folderOfPath(next.path)])
         }
         if (isCurrent) put({ entry: { ...now, ...fetched } })
         return runQueue()
@@ -369,7 +386,7 @@ export const useDownloads = create<Downloads>()(
        * track's own, and its album's cover once no track left wears it or is on its way to.
        */
       const dropUnheld = async ({ keys }: DropUnheldProps): Promise<void> => {
-        const { entries, playlists, device } = get()
+        const { entries, playlists } = get()
         const gone = new Set(unheldOf({ entries, playlists, keys }))
         if (gone.size === 0) return
         const kept = Object.entries(entries).filter(([key]) => !gone.has(key))
@@ -385,7 +402,7 @@ export const useDownloads = create<Downloads>()(
             Object.entries(state.entries).filter(([key]) => !gone.has(key)),
           ),
         }))
-        await Promise.allSettled([...new Set(folders)].map((folder) => device.disk.remove(folder)))
+        await removeFolders([...new Set(folders)])
       }
 
       const worker = async (): Promise<void> => {

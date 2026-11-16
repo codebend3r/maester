@@ -97,7 +97,7 @@ async def check_availability(
         "availability_4k": details.status_4k.label,
         "copies": await plex_copies(services.plex, details),
     }
-    if media_type == "tv":
+    if media_type == MediaType.TV:
         reply["seasons"] = await season_counts(services.plex, details)
         reply.update(await show_details(services, details))
     return reply

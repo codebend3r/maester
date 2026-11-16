@@ -1,5 +1,5 @@
 import type { WatchedState } from '@raven/core'
-import { Button } from '@raven/ui'
+import { Button, classNames } from '@raven/ui'
 import styles from '@/components/WatchedToggle/WatchedToggle.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 
@@ -34,7 +34,7 @@ export const WatchedToggle = ({
     icon="check"
     aria-label={isLabelShown ? undefined : label}
     aria-pressed={PRESSED[state]}
-    className={[styles.toggle, className ?? ''].filter(Boolean).join(' ')}
+    className={classNames([styles.toggle, className])}
     onClick={onToggle}
   >
     {isLabelShown && label}

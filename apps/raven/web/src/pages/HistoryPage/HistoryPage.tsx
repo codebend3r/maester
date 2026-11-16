@@ -1,28 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  type HistoryEntry,
-  type Library,
-  ROUTE_STATES,
-  type RouteQuery,
-  historyDays,
-  historyNote,
-  routeState,
-  libraryPath,
-} from '@raven/core'
+import { type HistoryEntry, type Library, routeState, libraryPath } from '@raven/core'
+import { historyDays, historyNote } from '@/lib/history'
 import { useId, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button } from '@raven/ui'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaTiles, MediaTilesSkeleton } from '@/components/MediaTiles/MediaTiles'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { Bone, Loading } from '@/components/Skeleton/Skeleton'
-import {
-  HISTORY_SHOWS,
-  type HistoryShow,
-  KeyedView,
-  type ViewOf,
-  type ViewsOf,
-} from '@raven/ui/headless'
+import { HISTORY_SHOWS, type HistoryShow } from '@raven/ui/headless'
 import { historyQuery, libraryQuery } from '@/lib/queries'
 import { useRouteId } from '@/lib/routeQuery'
 import { HISTORY_COPY } from '@/pages/HistoryPage/copy'
@@ -167,30 +153,6 @@ const HistoryView = ({ library }: HistoryViewProps) => {
   )
 }
 
-const HISTORY_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
-
-type HistoryPageViewProps = {
-  [HISTORY_VIEW_KEYS.pending]: Parameters<typeof RouteState>[0]
-  [HISTORY_VIEW_KEYS.ready]: HistoryViewProps
-}
-
-const HISTORY_VIEWS = {
-  [HISTORY_VIEW_KEYS.pending]: RouteState,
-  [HISTORY_VIEW_KEYS.ready]: HistoryView,
-} as const satisfies ViewsOf<HistoryPageViewProps>
-
-type HistoryPageViewOfProps = { library: RouteQuery<Library> }
-
-/** Which view the page shows: its library on its way, missing or failing, or the history. */
-const historyPageViewOf = ({ library }: HistoryPageViewOfProps): ViewOf<HistoryPageViewProps> => {
-  if (library.state !== ROUTE_STATES.ready)
-    return {
-      key: HISTORY_VIEW_KEYS.pending,
-      props: { state: library, noun: HISTORY_COPY.noun, shape: <HistorySkeleton /> },
-    }
-  return { key: HISTORY_VIEW_KEYS.ready, props: { library: library.data } }
-}
-
 /**
  * A library's history: what was watched by its own measure, or everything
  * that played, last played first and split into days. Which of the two is
@@ -198,8 +160,10 @@ const historyPageViewOf = ({ library }: HistoryPageViewOfProps): ViewOf<HistoryP
  */
 export const HistoryPage = () => {
   const libraryId = useRouteId()
-  const library = routeState({ id: libraryId, query: useQuery(libraryQuery(libraryId)) })
+  const page = routeState({ id: libraryId, query: useQuery(libraryQuery(libraryId)) })
   return (
-    <KeyedView<HistoryPageViewProps> views={HISTORY_VIEWS} view={historyPageViewOf({ library })} />
+    <RouteView page={page} noun={HISTORY_COPY.noun} shape={<HistorySkeleton />}>
+      {(library) => <HistoryView library={library} />}
+    </RouteView>
   )
 }

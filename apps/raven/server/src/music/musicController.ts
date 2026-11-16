@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Inject,
   NotFoundException,
@@ -33,7 +32,7 @@ import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService, PRIVACIES } from '@/lock/lockService'
-import { FAVOURITE_OUTCOMES, type FavouriteOutcome } from '@/media/favouriteOutcomes'
+import { favouriteAnswered } from '@/media/favouriteOutcomes'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { AlbumMatching } from '@/music/albumMatching'
 import { MUSICBRAINZ_ERROR_KINDS, MusicBrainzError } from '@/music/musicBrainzClient'
@@ -54,24 +53,6 @@ const musicBrainzFailed = (error: unknown): never => {
     throw new ServiceUnavailableException(error.message)
   }
   throw error
-}
-
-type FavouriteAnsweredProps = { outcome: FavouriteOutcome; missing: string; locked: string }
-
-/** Throws for a favourite that could not be marked: 404 for nothing by that id, 403 for a locked library's. */
-const favouriteAnswered = ({ outcome, missing, locked }: FavouriteAnsweredProps): void => {
-  switch (outcome) {
-    case FAVOURITE_OUTCOMES.done:
-      return
-    case FAVOURITE_OUTCOMES.missing:
-      throw new NotFoundException(missing)
-    case FAVOURITE_OUTCOMES.locked:
-      throw new ForbiddenException(locked)
-    default: {
-      const unknown: never = outcome
-      return unknown
-    }
-  }
 }
 
 /** A listing's search, sort and page, read as the client's `musicListQuery.encode` wrote them. */

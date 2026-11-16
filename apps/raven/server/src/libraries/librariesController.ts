@@ -37,6 +37,7 @@ import { ROUTE_PARAMS } from '@/requestParts'
 import { LibraryWatcher } from '@/scanner/libraryWatcher'
 import { ScannerService } from '@/scanner/scannerService'
 import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
+import { HTTP_STATUSES } from '@shared/server'
 
 const parseInput = (body: unknown): LibraryInput => {
   const result = validateLibraryInput(body)
@@ -186,7 +187,7 @@ export class LibrariesController {
   @Public()
   @AdminOnly()
   @Put('order')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   reorder(@Body() body: unknown): void {
     const { ids } = parseBody({
       guard: isLibraryOrder,
@@ -219,7 +220,7 @@ export class LibrariesController {
 
   @AdminOnly()
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   async remove(
     @Param(ROUTE_PARAMS.id, ParseIntPipe, LibraryById) library: LibraryRecord,
   ): Promise<void> {

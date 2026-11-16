@@ -34,9 +34,21 @@ const lastLine = (text: string): string =>
     .findLast((line) => line.trim() !== '')
     ?.trim() ?? 'ffmpeg failed'
 
-type FfmpegTimeoutErrorProps = { tool: string; seconds: number }
+/** The tools raven runs, as a timeout names them. */
+const TOOLS = { ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' } as const
+
+type Tool = (typeof TOOLS)[keyof typeof TOOLS]
+
+type FfmpegTimeoutErrorProps = { tool: Tool; seconds: number }
 
 type FfmpegServiceExecProps = { args: string[]; timeoutSeconds?: number }
+
+type FfmpegServiceRunTimedProps = {
+  tool: Tool
+  args: string[]
+  timeoutSeconds: number
+  maxBuffer: number
+}
 
 /**
  * ffmpeg or ffprobe ran out of time. Almost always the share being slow to
@@ -124,20 +136,14 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** ffprobe's full `-show_format -show_streams -show_chapters` report, parsed but unchecked. */
   async probeJson(path: string): Promise<unknown> {
-    try {
-      const { stdout } = await run(
-        this.config.ffprobePath,
-        ['-v', 'error', '-show_format', '-show_streams', '-show_chapters', '-of', 'json', path],
-        { maxBuffer: 16 * 1024 * 1024, timeout: this.config.ffmpegTimeoutSeconds * 1000 },
-      )
-      const parsed: unknown = JSON.parse(stdout)
-      return parsed
-    } catch (error) {
-      if (wasKilled(error)) {
-        throw new FfmpegTimeoutError({ tool: 'ffprobe', seconds: this.config.ffmpegTimeoutSeconds })
-      }
-      throw new Error(failureText(error), { cause: error })
-    }
+    const stdout = await this.runTimed({
+      tool: TOOLS.ffprobe,
+      args: ['-v', 'error', '-show_format', '-show_streams', '-show_chapters', '-of', 'json', path],
+      timeoutSeconds: this.config.ffmpegTimeoutSeconds,
+      maxBuffer: 16 * 1024 * 1024,
+    })
+    const parsed: unknown = JSON.parse(stdout)
+    return parsed
   }
 
   /**
@@ -147,32 +153,23 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
    * has its own time limit.
    */
   async probeKeyframes(path: string): Promise<number[]> {
-    try {
-      const { stdout } = await run(
-        this.config.ffprobePath,
-        [
-          '-v',
-          'error',
-          '-select_streams',
-          'V:0',
-          '-show_entries',
-          'packet=pts_time,flags',
-          '-of',
-          'csv=p=0',
-          path,
-        ],
-        { maxBuffer: 256 * 1024 * 1024, timeout: this.config.keyframeProbeTimeoutSeconds * 1000 },
-      )
-      return parseKeyframes(stdout)
-    } catch (error) {
-      if (wasKilled(error)) {
-        throw new FfmpegTimeoutError({
-          tool: 'ffprobe',
-          seconds: this.config.keyframeProbeTimeoutSeconds,
-        })
-      }
-      throw new Error(failureText(error), { cause: error })
-    }
+    const stdout = await this.runTimed({
+      tool: TOOLS.ffprobe,
+      args: [
+        '-v',
+        'error',
+        '-select_streams',
+        'V:0',
+        '-show_entries',
+        'packet=pts_time,flags',
+        '-of',
+        'csv=p=0',
+        path,
+      ],
+      timeoutSeconds: this.config.keyframeProbeTimeoutSeconds,
+      maxBuffer: 256 * 1024 * 1024,
+    })
+    return parseKeyframes(stdout)
   }
 
   /**
@@ -283,7 +280,7 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
             return
           }
           if (wasKilled(error)) {
-            reject(new FfmpegTimeoutError({ tool: 'ffmpeg', seconds: timeoutSeconds }))
+            reject(new FfmpegTimeoutError({ tool: TOOLS.ffmpeg, seconds: timeoutSeconds }))
             return
           }
           const said = lastLine(stderr.toString())
@@ -444,15 +441,26 @@ export class FfmpegService implements OnApplicationBootstrap, OnModuleDestroy {
     args,
     timeoutSeconds = this.config.ffmpegTimeoutSeconds,
   }: FfmpegServiceExecProps): Promise<void> {
+    await this.runTimed({ tool: TOOLS.ffmpeg, args, timeoutSeconds, maxBuffer: 4 * 1024 * 1024 })
+  }
+
+  /**
+   * One run of `tool` within `timeoutSeconds`, as its stdout. A run killed
+   * for its time is a `FfmpegTimeoutError`; any other failure says the last
+   * line the tool printed.
+   */
+  private async runTimed({
+    tool,
+    args,
+    timeoutSeconds,
+    maxBuffer,
+  }: FfmpegServiceRunTimedProps): Promise<string> {
+    const path = tool === TOOLS.ffprobe ? this.config.ffprobePath : this.config.ffmpegPath
     try {
-      await run(this.config.ffmpegPath, args, {
-        timeout: timeoutSeconds * 1000,
-        maxBuffer: 4 * 1024 * 1024,
-      })
+      const { stdout } = await run(path, args, { timeout: timeoutSeconds * 1000, maxBuffer })
+      return stdout
     } catch (error) {
-      if (wasKilled(error)) {
-        throw new FfmpegTimeoutError({ tool: 'ffmpeg', seconds: timeoutSeconds })
-      }
+      if (wasKilled(error)) throw new FfmpegTimeoutError({ tool, seconds: timeoutSeconds })
       throw new Error(failureText(error), { cause: error })
     }
   }

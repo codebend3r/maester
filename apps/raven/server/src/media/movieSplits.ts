@@ -11,6 +11,7 @@ import {
   ITEM_TYPES,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
+import { cutSplit, fileSplit } from '@/media/cardSplits'
 import { groupBy } from '@/groupBy'
 import { MediaRepository } from '@/media/mediaRepository'
 import { BEST_FIRST, FIRST_ITEM } from '@/media/mediaSql'
@@ -168,8 +169,7 @@ export class MovieSplits {
       'UPDATE media SET split = ? WHERE id = ?',
     )
     if (how === SPLIT_HOWS.apart) {
-      // A file's id outlives a rename, so its card can be named by it.
-      this.db.transaction(() => card.forEach((row) => update.run(`file:${row.id}`, row.id)))()
+      this.db.transaction(() => card.forEach((row) => update.run(fileSplit(row.id), row.id)))()
       return this.list({ libraryId, account })
     }
     const files = card.map((row) => ({ row, cut: cutOf(row) }))
@@ -183,7 +183,7 @@ export class MovieSplits {
     this.db.transaction(() =>
       [...byCut.values()].forEach((group) => {
         const named = group[0]?.cut
-        group.forEach(({ row }) => update.run(named == null ? null : `cut:${named.label}`, row.id))
+        group.forEach(({ row }) => update.run(named == null ? null : cutSplit(named.label), row.id))
       }),
     )()
     return this.list({ libraryId, account })

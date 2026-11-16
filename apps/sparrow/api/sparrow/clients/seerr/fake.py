@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
@@ -24,6 +24,7 @@ from sparrow.clients.seerr.models import (
     SeerrUser,
     ServerOptions,
 )
+from sparrow.media import MediaType
 
 
 @dataclass
@@ -53,7 +54,7 @@ class FakeSeerrClient(Downable):
         q = query.lower()
         return [r for r in self.results if q in r.title.lower()]
 
-    async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails:
+    async def media_details(self, media_type: MediaType, tmdb_id: int) -> MediaDetails:
         try:
             return self.details[(media_type, tmdb_id)]
         except KeyError:
@@ -68,7 +69,7 @@ class FakeSeerrClient(Downable):
 
     async def create_request(
         self,
-        media_type: str,
+        media_type: MediaType,
         tmdb_id: int,
         *,
         as_user: int,
@@ -118,22 +119,6 @@ class FakeSeerrClient(Downable):
         elif filter == "pending":
             rows = [r for r in rows if r.status == RequestStatus.PENDING]
         return rows[-take:]
-
-    async def approve_request(self, request_id: int) -> MediaRequest:
-        return self._set_status(request_id, RequestStatus.APPROVED)
-
-    async def decline_request(self, request_id: int) -> MediaRequest:
-        return self._set_status(request_id, RequestStatus.DECLINED)
-
-    def _set_status(self, request_id: int, status: RequestStatus) -> MediaRequest:
-        if self.down:
-            path = f"/api/v1/request/{request_id}"
-            raise ClientError("seerr", "POST", path, None, "connection refused")
-        for i, r in enumerate(self.requests):
-            if r.id == request_id:
-                self.requests[i] = replace(r, status=status)
-                return self.requests[i]
-        raise KeyError(request_id)
 
     async def quota(self, user_id: int) -> Quotas:
         return self.quotas.get(user_id, Quotas(UNLIMITED, UNLIMITED))

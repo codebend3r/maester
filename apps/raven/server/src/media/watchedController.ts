@@ -9,6 +9,7 @@ import { WatchedRepository } from '@/media/watchedRepository'
 import { parseBody } from '@/parseBody'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 import type { AccountKey } from '@/media/viewingAccountKeys'
+import { HTTP_STATUSES } from '@shared/server'
 
 /**
  * Marking cuts across libraries, so it hangs off its own root, like
@@ -28,7 +29,7 @@ export class WatchedController {
   /** Marks every target watched or unwatched; see `WatchedRepository.set` for what that does. */
   @ForViewers()
   @Put()
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   set(
     @Body() body: unknown,
     @Req() request: FastifyRequest,

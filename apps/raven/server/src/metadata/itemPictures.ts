@@ -101,16 +101,16 @@ export class ItemPictures {
           ownFolder: folders.ownFolder({ libraryId: file.libraryId, folder: file.folder }),
         })
         return {
-          ...found({ kind: 'poster', dir, name: assets.poster }),
-          ...found({ kind: 'backdrop', dir, name: assets.backdrop }),
+          ...found({ kind: ITEM_IMAGE_KINDS.poster, dir, name: assets.poster }),
+          ...found({ kind: ITEM_IMAGE_KINDS.backdrop, dir, name: assets.backdrop }),
         }
       }
       case ITEM_TYPES.show: {
         const showDir = showDirOf(file)
         const assets = showAssets(await folders.names(showDir))
         return {
-          ...found({ kind: 'poster', dir: showDir, name: assets.poster }),
-          ...found({ kind: 'backdrop', dir: showDir, name: assets.backdrop }),
+          ...found({ kind: ITEM_IMAGE_KINDS.poster, dir: showDir, name: assets.poster }),
+          ...found({ kind: ITEM_IMAGE_KINDS.backdrop, dir: showDir, name: assets.backdrop }),
         }
       }
       case ITEM_TYPES.season: {
@@ -121,9 +121,10 @@ export class ItemPictures {
           names: await folders.names(showDir),
           number: item.number,
         })
-        if (inShowFolder != null) return found({ kind: 'poster', dir: showDir, name: inShowFolder })
+        if (inShowFolder != null)
+          return found({ kind: ITEM_IMAGE_KINDS.poster, dir: showDir, name: inShowFolder })
         return found({
-          kind: 'poster',
+          kind: ITEM_IMAGE_KINDS.poster,
           dir,
           name: seasonPoster({ names: await folders.names(dir), number: item.number }),
         })
@@ -133,7 +134,7 @@ export class ItemPictures {
         const [first] = parseEpisodeName(file).episodes
         if (item.number == null || first !== item.number) return {}
         return found({
-          kind: 'still',
+          kind: ITEM_IMAGE_KINDS.still,
           dir,
           name: episodeStill({ names: await folders.names(dir), stem: stemOf(file.fileName) }),
         })

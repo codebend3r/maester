@@ -1,3 +1,5 @@
+import { HTTP_STATUSES, isServerErrorStatus, isSuccessStatus } from '@shared/server'
+
 /** How sending one listen ended: sent, worth trying again, refused for the account's link, or refused for good. */
 export const SEND_OUTCOMES = {
   sent: 'sent',
@@ -41,8 +43,10 @@ export type Scrobbler = {
 
 /** What an HTTP status says of a send: 401 is the account's link, 429 and 5xx a service having a moment. */
 export const outcomeOfStatus = (status: number): SendOutcome => {
-  if (status >= 200 && status < 300) return SEND_OUTCOMES.sent
-  if (status === 401) return SEND_OUTCOMES.unlinked
-  if (status === 429 || status >= 500) return SEND_OUTCOMES.retry
+  if (isSuccessStatus(status)) return SEND_OUTCOMES.sent
+  if (status === HTTP_STATUSES.unauthorized) return SEND_OUTCOMES.unlinked
+  if (status === HTTP_STATUSES.tooManyRequests || isServerErrorStatus(status)) {
+    return SEND_OUTCOMES.retry
+  }
   return SEND_OUTCOMES.rejected
 }

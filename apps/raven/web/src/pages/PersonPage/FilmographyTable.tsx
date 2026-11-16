@@ -1,13 +1,12 @@
 import {
   type FilmographyDepartment,
   type FilmographyEntry,
-  type FilmographyTab,
-  type SortColumn,
   ITEM_TYPES,
   itemPath,
   sortTitle,
-  FILMOGRAPHY_TAB_NAMES,
 } from '@raven/core'
+import { type SortColumn } from '@/lib/tableSort'
+import { type FilmographyTab, FILMOGRAPHY_TAB_NAMES } from '@/pages/PersonPage/filmographyTabs'
 import { memo, useState } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { CardLink } from '@/components/CardLink/CardLink'

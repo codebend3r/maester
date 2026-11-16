@@ -30,14 +30,10 @@ export const SCAN_STATES = {
 
 export const isScanState = oneOf(Object.values(SCAN_STATES))
 
-export type ScanState = Infer<typeof isScanState>
-
 /** Which scan the status is of: one that reads every file, or one that takes in what is new. */
 export const SCAN_KINDS = { full: 'full', quick: 'quick' } as const
 
 export const isScanKind = oneOf(Object.values(SCAN_KINDS))
-
-export type ScanKind = Infer<typeof isScanKind>
 
 export const isScanStatus = object({
   state: isScanState,

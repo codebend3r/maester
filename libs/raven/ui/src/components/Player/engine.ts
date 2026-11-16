@@ -82,7 +82,7 @@ export type HtmlSource =
       kind: typeof PLAYER_SOURCE_KINDS.server
       media: MediaItem
       api: ApiClient
-      mediaPlane?: MediaPlane
+      mediaPlane: MediaPlane
     }
   | { kind: typeof PLAYER_SOURCE_KINDS.file; url: string; subtitles?: FileSubtitles }
 

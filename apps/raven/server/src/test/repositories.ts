@@ -23,7 +23,7 @@ export const pictureVersionsOf = (database: DatabaseService): PictureVersions =>
 
 /** The people store over `database`, wired as the app wires it. */
 export const peopleRepositoryOf = (database: DatabaseService): PeopleRepository =>
-  new PeopleRepository(database, pictureVersionsOf(database))
+  repositories(database).people
 
 /** The stores a test reads items and videos through, over one database, wired as the app wires them. */
 export const repositories = (database: DatabaseService) => {
@@ -36,6 +36,7 @@ export const repositories = (database: DatabaseService) => {
     images,
     scores,
     metadata,
+    people: new PeopleRepository(database, pictureVersions, metadata),
     sagaBackdrops,
     media: new MediaRepository(
       database,

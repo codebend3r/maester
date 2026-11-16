@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   DOWNLOAD_TARGET_KINDS,
   ITEM_TYPES,
@@ -59,13 +59,11 @@ import { Versions } from '@/components/Versions/Versions'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { displaySettingsQuery, itemQuery, librariesQuery, tracksQuery } from '@/lib/queries'
-import { queryKeys } from '@raven/ui/headless'
 import { useCanFavourite } from '@/lib/useCanFavourite'
 import { useMediaMutations } from '@/lib/useMediaMutations'
 import { PLAYABLE_ITEM_VIEW_COPY } from '@/components/PlayableItemView/copy'
 import styles from '@/components/PlayableItemView/PlayableItemView.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-import { handled } from '@/lib/handled'
 
 type Facts = { details: ItemDetails; primary: MediaItem }
 
@@ -273,7 +271,6 @@ export const PlayableItemView = ({
   const config: PlayableConfig = PLAYABLE[kind]
   const titleId = useId()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const [menuOpen, setMenuOpen] = useState(false)
   const { favourite, watched } = useMediaMutations({ media: primary })
   // A locked library's videos are never marked, but one marked before it locked can be unmarked.
@@ -385,9 +382,9 @@ export const PlayableItemView = ({
                 { replace: true },
               )
             }}
+            // A title with other versions stays, and the delete already reads its page again.
             onDeleted={() => {
               if (details.versions.length <= 1) navigate(back.to)
-              else handled(queryClient.invalidateQueries({ queryKey: queryKeys.item(details.id) }))
             }}
           />
         </AdminOnly>

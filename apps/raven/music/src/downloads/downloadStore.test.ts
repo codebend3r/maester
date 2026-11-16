@@ -439,6 +439,19 @@ describe('useDownloads', () => {
     expect(files.size).toBe(0)
   })
 
+  it('leaves no cover behind for a track removed while it downloaded', async () => {
+    const gate = Promise.withResolvers<void>()
+    const { files } = await setUp({ writeHold: () => gate.promise })
+    await useDownloads
+      .getState()
+      .downloadTracks({ serverId: SERVER_ID, tracks: [FIRST], collection: albumOf })
+    await useDownloads.getState().removeAll()
+    gate.resolve()
+    await untilIdle()
+    expect(useDownloads.getState().entries).toEqual({})
+    expect([...files]).toEqual([])
+  })
+
   it('removes a playlist and its tracks', async () => {
     const { files } = await setUp()
     await useDownloads

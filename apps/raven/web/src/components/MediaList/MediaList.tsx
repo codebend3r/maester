@@ -1,9 +1,8 @@
 import {
   type MatchItemType,
   type MediaItem,
-  RATING_SOURCES,
   type RatingSource,
-  type SortColumn,
+  type Rating,
   cardLink,
   cardTitle,
   formatBitrate,
@@ -12,8 +11,8 @@ import {
   mediaEntryKey,
   sortTitle,
 } from '@raven/core'
+import { TABLE_SORT_DIRECTIONS, type SortColumn } from '@/lib/tableSort'
 import type { ComponentType } from 'react'
-import { RatingBadge } from '@/components/RatingPanel/RatingPanel'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { FavouriteMark } from '@/components/FavouriteMark/FavouriteMark'
 import { useCardMenu } from '@/components/MediaMenu/useCardMenu'
@@ -31,6 +30,7 @@ import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { MEDIA_LIST_COPY } from '@/components/MediaList/copy'
 import styles from '@/components/MediaList/MediaList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { RATING_COLUMNS, RatingCells, ratingSortColumns } from '@/lib/ratingColumns'
 import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 
 const day = new Intl.DateTimeFormat(undefined, {
@@ -107,15 +107,9 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
           <PartlyWatched media={media} />
         </div>
       </th>
-      {movies &&
-        RATING_COLUMNS.map((column) => {
-          const rating = media.item?.ratings.find((entry) => entry.source === column.source)
-          return (
-            <td key={column.source} className={`${styles.score} ${styles.roomy}`}>
-              {rating && <RatingBadge rating={rating} isBare />}
-            </td>
-          )
-        })}
+      {movies && (
+        <RatingCells ratings={ratingsOf(media)} className={`${styles.score} ${styles.roomy}`} />
+      )}
       <td className={movies ? `${styles.number} ${styles.spare}` : styles.number}>
         {formatRuntime(media.duration)}
       </td>
@@ -133,61 +127,45 @@ const MediaRow = ({ media, movies, matchType }: MediaRowProps) => {
   )
 }
 
-const RATING_COLUMNS: readonly { source: RatingSource; label: string }[] = [
-  { source: RATING_SOURCES.rottenTomatoes, label: MEDIA_LIST_COPY.rottenTomatoes },
-  { source: RATING_SOURCES.imdb, label: COMMON_COPY.imdb },
-  { source: RATING_SOURCES.metacritic, label: MEDIA_LIST_COPY.metacritic },
-  { source: RATING_SOURCES.tmdb, label: COMMON_COPY.tmdb },
-]
+/** The columns besides the scores that the video table sorts by. */
+const FACT_COLUMNS = {
+  title: 'title',
+  length: 'length',
+  resolution: 'resolution',
+  size: 'size',
+  bitrate: 'bitrate',
+  added: 'added',
+  changed: 'changed',
+  released: 'released',
+} as const
 
-type Column =
-  | 'title'
-  | 'rottenTomatoes'
-  | 'imdb'
-  | 'metacritic'
-  | 'tmdb'
-  | 'length'
-  | 'resolution'
-  | 'size'
-  | 'bitrate'
-  | 'added'
-  | 'changed'
-  | 'released'
+type Column = (typeof FACT_COLUMNS)[keyof typeof FACT_COLUMNS] | RatingSource
 
-type ScoreProps = { media: MediaItem; source: RatingSource }
-
-const score = ({ media, source }: ScoreProps): number | null =>
-  media.item?.ratings.find((rating) => rating.source === source)?.value ?? null
+const ratingsOf = (media: MediaItem): readonly Rating[] => media.item?.ratings ?? []
 
 const COLUMNS: Record<Column, SortColumn<MediaItem>> = {
-  title: { value: (media) => sortTitle(cardTitle(media).title), first: 'asc' },
-  rottenTomatoes: {
-    value: (media) => score({ media, source: RATING_SOURCES.rottenTomatoes }),
-    first: 'desc',
+  [FACT_COLUMNS.title]: {
+    value: (media) => sortTitle(cardTitle(media).title),
+    first: TABLE_SORT_DIRECTIONS.asc,
   },
-  imdb: { value: (media) => score({ media, source: RATING_SOURCES.imdb }), first: 'desc' },
-  metacritic: {
-    value: (media) => score({ media, source: RATING_SOURCES.metacritic }),
-    first: 'desc',
-  },
-  tmdb: { value: (media) => score({ media, source: RATING_SOURCES.tmdb }), first: 'desc' },
-  length: { value: (media) => media.duration, first: 'desc' },
-  resolution: {
+  ...ratingSortColumns({ ratingsOf }),
+  [FACT_COLUMNS.length]: { value: (media) => media.duration, first: TABLE_SORT_DIRECTIONS.desc },
+  [FACT_COLUMNS.resolution]: {
     value: (media) =>
       media.width != null && media.height != null ? media.width * media.height : null,
-    first: 'desc',
+    first: TABLE_SORT_DIRECTIONS.desc,
   },
-  size: { value: (media) => media.size, first: 'desc' },
-  bitrate: { value: (media) => media.bitrate, first: 'desc' },
-  added: { value: (media) => media.addedAt, first: 'desc' },
-  changed: { value: (media) => media.changedAt, first: 'desc' },
+  [FACT_COLUMNS.size]: { value: (media) => media.size, first: TABLE_SORT_DIRECTIONS.desc },
+  [FACT_COLUMNS.bitrate]: { value: (media) => media.bitrate, first: TABLE_SORT_DIRECTIONS.desc },
+  [FACT_COLUMNS.added]: { value: (media) => media.addedAt, first: TABLE_SORT_DIRECTIONS.desc },
+  [FACT_COLUMNS.changed]: { value: (media) => media.changedAt, first: TABLE_SORT_DIRECTIONS.desc },
   // The cell's own fallback: a movie TMDB gave no day sorts by its year, which sorts before any day in it.
-  released: {
+  [FACT_COLUMNS.released]: {
     value: (media) => {
       const year = media.item?.year ?? media.year
       return media.item?.released ?? (year == null ? null : String(year))
     },
-    first: 'desc',
+    first: TABLE_SORT_DIRECTIONS.desc,
   },
 }
 
@@ -226,7 +204,7 @@ export const MediaList = ({ items, movies = false, matchType = null }: MediaList
       >
         <thead>
           <tr>
-            {header({ key: 'title', label: COMMON_COPY.title })}
+            {header({ key: FACT_COLUMNS.title, label: COMMON_COPY.title })}
             {movies &&
               RATING_COLUMNS.map((column) =>
                 header({
@@ -236,28 +214,32 @@ export const MediaList = ({ items, movies = false, matchType = null }: MediaList
                 }),
               )}
             {header({
-              key: 'length',
+              key: FACT_COLUMNS.length,
               label: MEDIA_LIST_COPY.length,
               className: movies ? `${styles.number} ${styles.spare}` : styles.number,
             })}
             {header({
-              key: 'resolution',
+              key: FACT_COLUMNS.resolution,
               label: MEDIA_LIST_COPY.resolution,
               className: movies ? styles.extra : styles.roomy,
             })}
             {header({
-              key: 'size',
+              key: FACT_COLUMNS.size,
               label: MEDIA_LIST_COPY.size,
               className: `${styles.number} ${styles.extra}`,
             })}
             {header({
-              key: 'bitrate',
+              key: FACT_COLUMNS.bitrate,
               label: MEDIA_LIST_COPY.bitrate,
               className: `${styles.number} ${styles.extra}`,
             })}
-            {header({ key: 'added', label: MEDIA_LIST_COPY.added, className: styles.extra })}
             {header({
-              key: movies ? 'released' : 'changed',
+              key: FACT_COLUMNS.added,
+              label: MEDIA_LIST_COPY.added,
+              className: styles.extra,
+            })}
+            {header({
+              key: movies ? FACT_COLUMNS.released : FACT_COLUMNS.changed,
               label: movies ? MEDIA_LIST_COPY.released : MEDIA_LIST_COPY.changed,
               className: movies ? undefined : styles.extra,
             })}

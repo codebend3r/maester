@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Req,
   HttpCode,
@@ -40,7 +39,7 @@ import { sendImage } from '@/items/sendImage'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
-import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
+import { favouriteAnswered } from '@/media/favouriteOutcomes'
 import { MediaRepository } from '@/media/mediaRepository'
 import { TitleFavourites } from '@/media/titleFavourites'
 import { ViewingAccounts } from '@/media/viewingAccounts'
@@ -60,6 +59,7 @@ import { QUERY_PARAMS, queryText } from '@/queryValues'
 import { PRIVACIES } from '@/lock/lockService'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 import type { AccountKey } from '@/media/viewingAccountKeys'
+import { HTTP_STATUSES } from '@shared/server'
 
 type ItemsControllerDetailsProps = { id: number; request: FastifyRequest }
 
@@ -168,23 +168,12 @@ export class ItemsController {
     @ViewingAccount() account: AccountKey,
   ): ItemDetails {
     if (!isFavouriteChange(body)) throw new BadRequestException('favourite must be true or false')
-    const outcome = this.titleFavourites.set({
-      itemId: id,
-      favourite: body.favourite,
-      account,
+    favouriteAnswered({
+      outcome: this.titleFavourites.set({ itemId: id, favourite: body.favourite, account }),
+      missing: `No show or season ${id}`,
+      locked: 'A locked library’s shows cannot be favourites.',
     })
-    switch (outcome) {
-      case FAVOURITE_OUTCOMES.done:
-        return this.details({ id, request })
-      case FAVOURITE_OUTCOMES.missing:
-        throw new NotFoundException(`No show or season ${id}`)
-      case FAVOURITE_OUTCOMES.locked:
-        throw new ForbiddenException('A locked library’s shows cannot be favourites.')
-      default: {
-        const unknown: never = outcome
-        return unknown
-      }
-    }
+    return this.details({ id, request })
   }
 
   @Get(':id')
@@ -239,7 +228,7 @@ export class ItemsController {
   /** Fetches the item from TMDB again now. One TMDB no longer has is gone after, so 404. */
   @AdminOnly()
   @Post(':id/refresh')
-  @HttpCode(200)
+  @HttpCode(HTTP_STATUSES.ok)
   async refresh(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,

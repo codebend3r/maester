@@ -50,8 +50,11 @@ export const useHtmlEngine = ({
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const muted = usePlayerPrefs((prefs) => prefs.muted)
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
+  // A library file's server, and a local file kept beside its own subtitles; each is null for the other.
+  const server = source.kind === PLAYER_SOURCE_KINDS.server ? source : null
+  const file = source.kind === PLAYER_SOURCE_KINDS.file ? source : null
   // A local file has no server to ask, so it draws the look last read.
-  const captions = useCaptionStyle(source.kind === PLAYER_SOURCE_KINDS.server ? source.api : null)
+  const captions = useCaptionStyle(server?.api ?? null)
   const shift = rendition.mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,
@@ -122,20 +125,14 @@ export const useHtmlEngine = ({
   // A picture track is burned into the picture: it has no cues.
   const textTrack = isPictureSubtitle(selection.subtitle) ? null : selection.subtitle
   const served = useTrackCues({
-    video:
-      source.kind === PLAYER_SOURCE_KINDS.server
-        ? { api: source.api, mediaId: source.media.id }
-        : null,
+    video: server && { api: server.api, mediaId: server.media.id },
     track: textTrack,
     time: playback.state.time,
     duration: playback.duration,
   })
   // A local file's subtitles are the ones its host kept beside it, read whole.
-  const kept = useFileCues({
-    file: source.kind === PLAYER_SOURCE_KINDS.file ? source : null,
-    track: textTrack,
-  })
-  const subtitles = source.kind === PLAYER_SOURCE_KINDS.file ? kept : served
+  const kept = useFileCues({ file, track: textTrack })
+  const subtitles = file ? kept : served
   const actions: EngineHandle['actions'] = {
     play: () => {
       videoRef.current?.play()?.catch(() => undefined)

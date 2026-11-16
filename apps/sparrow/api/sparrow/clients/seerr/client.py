@@ -21,16 +21,17 @@ from sparrow.clients.seerr.models import (
     SeerrUser,
     ServerOptions,
 )
+from sparrow.media import MediaType
 
 
 class Seerr(Protocol):
     async def ping(self) -> None: ...
     async def search(self, query: str) -> list[SearchResult]: ...
-    async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails: ...
+    async def media_details(self, media_type: MediaType, tmdb_id: int) -> MediaDetails: ...
     async def collection(self, collection_id: int) -> Collection: ...
     async def create_request(
         self,
-        media_type: str,
+        media_type: MediaType,
         tmdb_id: int,
         *,
         as_user: int,
@@ -42,8 +43,6 @@ class Seerr(Protocol):
     async def list_requests(
         self, *, user_id: int | None = None, take: int = 20, filter: str = "all"
     ) -> list[MediaRequest]: ...
-    async def approve_request(self, request_id: int) -> MediaRequest: ...
-    async def decline_request(self, request_id: int) -> MediaRequest: ...
     async def quota(self, user_id: int) -> Quotas: ...
     async def servers(self, kind: str) -> list[ArrServer]: ...
     async def server_options(self, kind: str, server_id: int) -> ServerOptions: ...
@@ -74,10 +73,10 @@ class SeerrClient(HttpClient):
         return [
             SearchResult.from_api(r)
             for r in data.get("results", [])
-            if r.get("mediaType") in ("movie", "tv")
+            if r.get("mediaType") in MediaType
         ]
 
-    async def media_details(self, media_type: str, tmdb_id: int) -> MediaDetails:
+    async def media_details(self, media_type: MediaType, tmdb_id: int) -> MediaDetails:
         path = f"/api/v1/{media_type}/{tmdb_id}"
         return MediaDetails.from_api(media_type, await self.get_json(path))
 
@@ -86,7 +85,7 @@ class SeerrClient(HttpClient):
 
     async def create_request(
         self,
-        media_type: str,
+        media_type: MediaType,
         tmdb_id: int,
         *,
         as_user: int,
@@ -95,7 +94,7 @@ class SeerrClient(HttpClient):
         routing: Routing | None = None,
     ) -> MediaRequest:
         body: dict[str, Any] = {"mediaType": media_type, "mediaId": tmdb_id, "is4k": is_4k}
-        if media_type == "tv":
+        if media_type == MediaType.TV:
             body["seasons"] = seasons if seasons else "all"
         if routing is not None:
             body["serverId"] = routing.server_id
@@ -128,12 +127,6 @@ class SeerrClient(HttpClient):
             params["requestedBy"] = user_id
         data = await self.get_json("/api/v1/request", params=params)
         return [MediaRequest.from_api(r) for r in data.get("results", [])]
-
-    async def approve_request(self, request_id: int) -> MediaRequest:
-        return MediaRequest.from_api(await self.post_json(f"/api/v1/request/{request_id}/approve"))
-
-    async def decline_request(self, request_id: int) -> MediaRequest:
-        return MediaRequest.from_api(await self.post_json(f"/api/v1/request/{request_id}/decline"))
 
     async def quota(self, user_id: int) -> Quotas:
         data = await self.get_json(f"/api/v1/user/{user_id}/quota")

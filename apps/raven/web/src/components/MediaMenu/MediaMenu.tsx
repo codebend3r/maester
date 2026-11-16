@@ -12,7 +12,7 @@ import {
 import { Fragment, type RefObject, useId, useRef, useState } from 'react'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { ConfirmDelete } from '@/components/ConfirmDelete/ConfirmDelete'
-import { Icon, type IconName } from '@raven/ui'
+import { Icon, type IconName, classNames } from '@raven/ui'
 import { FixMatchDialog } from '@/components/FixMatchDialog/FixMatchDialog'
 import { ImageEditorDialog } from '@/components/ImageEditor/ImageEditorDialog'
 import { api } from '@/lib/api'
@@ -324,9 +324,7 @@ export const MediaMenu = (props: MediaMenuProps) => {
   return (
     <div
       ref={root}
-      className={[styles.root, inline && styles.inline, beside && styles.beside]
-        .filter((name): name is string => !!name)
-        .join(' ')}
+      className={classNames([styles.root, inline && styles.inline, beside && styles.beside])}
     >
       <button
         ref={trigger}

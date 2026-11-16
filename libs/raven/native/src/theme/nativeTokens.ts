@@ -44,3 +44,33 @@ export const nativeTokens = (tokens: Readonly<Record<string, string>>): NativeTo
     },
     { colours: {}, numbers: {} },
   )
+
+type TokenReaderOfProps = {
+  /** The web's custom properties by name, as `nativeTokens` takes them. */
+  tokens: Readonly<Record<string, string>>
+  /** Who reads them, named in the error a missing token throws. */
+  owner: string
+}
+
+type TokenReadProps<T> = { from: Readonly<Record<string, T>>; name: string }
+
+/** What a screen paints with, read by name from one set of tokens. */
+type TokenReader = { colour: (name: string) => string; size: (name: string) => number }
+
+/**
+ * Reads colours and lengths by name out of `tokens`, through `nativeTokens`. A token the
+ * stylesheets dropped or renamed throws as the app loads, and fails every render test with it,
+ * rather than painting the screen with nothing.
+ */
+export const tokenReaderOf = ({ tokens, owner }: TokenReaderOfProps): TokenReader => {
+  const { colours, numbers } = nativeTokens(tokens)
+  const read = <T>({ from, name }: TokenReadProps<T>): T => {
+    const value = from[name]
+    if (value === undefined) throw new Error(`${owner} has no design token ${name}`)
+    return value
+  }
+  return {
+    colour: (name) => read({ from: colours, name }),
+    size: (name) => read({ from: numbers, name }),
+  }
+}

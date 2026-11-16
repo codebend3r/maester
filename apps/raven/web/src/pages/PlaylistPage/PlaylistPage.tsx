@@ -3,8 +3,6 @@ import {
   DOWNLOAD_TARGET_KINDS,
   type PlaylistDetails,
   QUEUE_SOURCE_KINDS,
-  ROUTE_STATES,
-  type RouteQuery,
   routeState,
   movedUp,
 } from '@raven/core'
@@ -15,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { PlaylistNameDialog } from '@/components/PlaylistNameDialog/PlaylistNameDialog'
-import { RouteState } from '@/components/RouteState/RouteState'
+import { RouteView } from '@/components/RouteState/RouteState'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { TrackList, type TrailProps } from '@/components/TrackList/TrackList'
 import { playlistFacts } from '@/lib/music'
@@ -302,36 +300,14 @@ const PlaylistSkeleton = () => (
   </>
 )
 
-type PlaylistPageViewProps = { page: RouteQuery<PlaylistDetails> }
-
-type PlaylistPendingProps = PlaylistPageViewProps
-
-/** The playlist missing, failing or on its way. */
-const PlaylistPending = ({ page }: PlaylistPendingProps) =>
-  page.state !== ROUTE_STATES.ready && (
-    <RouteState state={page} noun={PLAYLIST_PAGE_COPY.noun} shape={<PlaylistSkeleton />} />
-  )
-
-type PlaylistReadyProps = PlaylistPageViewProps
-
-const PlaylistReady = ({ page }: PlaylistReadyProps) =>
-  page.state === ROUTE_STATES.ready && <PlaylistView details={page.data} />
-
-const PLAYLIST_PAGE_VIEWS = {
-  [ROUTE_STATES.missing]: PlaylistPending,
-  [ROUTE_STATES.error]: PlaylistPending,
-  [ROUTE_STATES.loading]: PlaylistPending,
-  [ROUTE_STATES.ready]: PlaylistReady,
-} as const satisfies Record<
-  RouteQuery<PlaylistDetails>['state'],
-  ComponentType<PlaylistPageViewProps>
->
-
 /** `/playlists/:id`: one of the account's playlists, or another's shared one, its tracks in order, played here; the owner's reordered, renamed and shared here too. */
 export const PlaylistPage = () => {
   const id = useRouteId()
   const playlist = useQuery(playlistQuery(id))
   const page = routeState({ id, query: playlist })
-  const View: ComponentType<PlaylistPageViewProps> = PLAYLIST_PAGE_VIEWS[page.state]
-  return <View page={page} />
+  return (
+    <RouteView page={page} noun={PLAYLIST_PAGE_COPY.noun} shape={<PlaylistSkeleton />}>
+      {(details) => <PlaylistView details={details} />}
+    </RouteView>
+  )
 }

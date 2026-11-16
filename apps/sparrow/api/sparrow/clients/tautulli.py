@@ -1,4 +1,4 @@
-"""Tautulli: live sessions, watch history, stream details, users and recent additions.
+"""Tautulli: live sessions, watch history, stream details and users.
 
 This is where playback diagnosis gets its facts: the server's decision on
 each stream (Tautulli gives no reasons for a transcode), LAN vs WAN, relay,
@@ -273,7 +273,6 @@ class Tautulli(Protocol):
     ) -> list[HistoryRow]: ...
     async def stream_data(self, row_id: int) -> StreamData: ...
     async def users(self) -> list[TautulliUser]: ...
-    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]: ...
 
 
 class TautulliClient(HttpClient):
@@ -336,10 +335,6 @@ class TautulliClient(HttpClient):
     async def users(self) -> list[TautulliUser]:
         return [TautulliUser.from_api(u) for u in await self._cmd("get_users") or []]
 
-    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]:
-        data = await self._cmd("get_recently_added", count=count) or {}
-        return list(data.get("recently_added", []))
-
 
 @dataclass
 class FakeTautulliClient(Downable):
@@ -351,7 +346,6 @@ class FakeTautulliClient(Downable):
     # What each history row's play was sent, by row id.
     streams: dict[int, StreamData] = field(default_factory=dict)
     user_list: list[TautulliUser] = field(default_factory=list)
-    recent: list[dict[str, Any]] = field(default_factory=list)
     # The title's TMDB id per rating key of its Plex server's items.
     titles: dict[str, int] = field(default_factory=dict)
 
@@ -396,6 +390,3 @@ class FakeTautulliClient(Downable):
 
     async def users(self) -> list[TautulliUser]:
         return list(self.user_list)
-
-    async def recently_added(self, count: int = 25) -> list[dict[str, Any]]:
-        return self.recent[:count]

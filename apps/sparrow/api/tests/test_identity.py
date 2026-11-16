@@ -158,9 +158,7 @@ async def test_each_refresh_takes_the_account_s_latest_plex_details(identity):
 def test_tier_override(identity):
     svc, store, _ = identity
     store.upsert_user("d1", seerr_user_id=4)
-    assert svc.set_tier_override("d1", "TRUSTED").endswith("trusted.")
+    assert svc.set_tier_override("d1", Tier.TRUSTED).endswith("trusted.")
     assert svc.tier_for("d1") == Tier.TRUSTED
-    svc.set_tier_override("d1", None)
+    assert svc.set_tier_override("d1", None).endswith("the default.")
     assert svc.tier_for("d1") == Tier.FRIEND
-    with pytest.raises(ValueError):
-        svc.set_tier_override("d1", "king")

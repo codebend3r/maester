@@ -1,4 +1,5 @@
-import { type PersonDetails, type PersonProfile, ageOn, initialsOf } from '@raven/core'
+import { type PersonDetails, type PersonProfile, initialsOf } from '@raven/core'
+import { ageOn } from '@/pages/PersonPage/ageOn'
 import { BUTTON_TONES, Button, ButtonLink } from '@raven/ui'
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'

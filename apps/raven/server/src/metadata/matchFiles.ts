@@ -58,7 +58,7 @@ const toMatchFile = (row: FileRow): MatchFile => ({
   folder: row.folder,
   title: row.title,
   year: row.year,
-  match: isMatchState(row.match) ? row.match : 'pending',
+  match: isMatchState(row.match) ? row.match : MATCH_STATES.pending,
 })
 
 type MatchFilesFilesProps = {
@@ -268,7 +268,7 @@ export class MatchFiles {
   reset(ids: readonly number[]): void {
     this.db.transaction(() => {
       this.metadata.unlink(ids)
-      this.setMatch({ ids, match: 'pending' })
+      this.setMatch({ ids, match: MATCH_STATES.pending })
     })()
   }
 

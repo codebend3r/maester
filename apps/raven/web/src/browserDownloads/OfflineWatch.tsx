@@ -3,9 +3,7 @@ import type { ComponentType } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import type { BrowserDownloads } from '@/browserDownloads/engine'
 import { browserPlayPathOf } from '@/browserDownloads/paths'
-import { useDownloads } from '@/desktop/downloadsApi'
-import { visibleDownloadsOf } from '@/desktop/DownloadsPage/libraries'
-import { useDownloadsUnlocked } from '@/desktop/DownloadsPage/useDownloadsUnlocked'
+import { useVisibleDownloads } from '@/desktop/DownloadsPage/useVisibleDownloads'
 import { offlineReturnOf } from '@/desktop/paths'
 import { PlayerMessage } from '@/desktop/player/PlayerMessage'
 import { useBrowserDownloads } from '@/stores/browserDownloads'
@@ -69,12 +67,9 @@ export const OfflineWatch = ({ mediaId }: OfflineWatchProps) => {
   const engine = useBrowserDownloads((state) => state.engine)
   const { pathname, search } = useLocation()
   // Read so the page looks again when the list comes off the disk or the PIN's answer comes.
-  const listed = useDownloads().data?.downloads ?? null
-  const held = listed ?? []
-  const isUnlocked = useDownloadsUnlocked(held)
-  const visible = visibleDownloadsOf({ downloads: held, isUnlocked })
+  const { visible } = useVisibleDownloads()
   const ready = mediaId === null ? null : (engine?.readyFor(mediaId) ?? null)
-  const downloadId = visible.some((view) => view.downloadId === ready) ? ready : null
-  const View = OFFLINE_WATCH_VIEWS[kindOf({ engine, downloadId, isListed: listed !== null })]
+  const downloadId = (visible ?? []).some((view) => view.downloadId === ready) ? ready : null
+  const View = OFFLINE_WATCH_VIEWS[kindOf({ engine, downloadId, isListed: visible !== null })]
   return <View downloadId={downloadId} returnTo={`${pathname}${search}`} />
 }

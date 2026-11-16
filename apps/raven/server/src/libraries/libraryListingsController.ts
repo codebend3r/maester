@@ -111,7 +111,7 @@ export class LibraryListingsController {
       favourites:
         this.media.countFavourites({ libraryId, account }) +
         this.titles.count({ account, libraryId }),
-      sagas: isMovies ? this.media.countSagas({ libraryId, account }) : 0,
+      sagas: isMovies ? this.media.countSagas(libraryId) : 0,
       duplicates: isMovies ? this.splits.count(libraryId) : 0,
       finished: this.viewing.finishedCount({ libraryId, account }),
       dolbyVisionOnly: this.dolbyVisionOnly.count(libraryId),

@@ -95,7 +95,7 @@ class Owner:
 class MovieOwner(Owner):
     """The Radarr holding a movie's copy."""
 
-    kind: ClassVar[Kind] = KINDS["movie"]
+    kind: ClassVar[Kind] = KINDS[MediaType.MOVIE]
 
     async def locate(self, copy: Copy, title: str) -> Held:
         """The movie's file; Radarr keeps one per movie."""
@@ -109,7 +109,7 @@ class MovieOwner(Owner):
 class ShowOwner(Owner):
     """The Sonarr holding a show's copy."""
 
-    kind: ClassVar[Kind] = KINDS["tv"]
+    kind: ClassVar[Kind] = KINDS[MediaType.TV]
     arr: Sonarr
 
     async def episodes(self) -> list[Episode]:
@@ -135,7 +135,7 @@ class ShowOwner(Owner):
         await self.arr.follow(self.media_id)
 
 
-OWNERS: dict[MediaType, type[Owner]] = {"movie": MovieOwner, "tv": ShowOwner}
+OWNERS: dict[MediaType, type[Owner]] = {MediaType.MOVIE: MovieOwner, MediaType.TV: ShowOwner}
 
 
 def _address(url: str) -> tuple[str, int, str]:

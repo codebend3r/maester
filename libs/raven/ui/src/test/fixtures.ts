@@ -20,6 +20,16 @@ import {
   type PlaylistDetails,
   type Track,
 } from '@raven/core'
+import type { MediaPlane } from '@/components/Player/useMediaPlane'
+
+/** A media plane that names no origin, so the video plays through the web host's own address. */
+export const mediaPlane = (overrides: Partial<MediaPlane> = {}): MediaPlane => ({
+  access: null,
+  isAwaitingTicket: false,
+  refreshTicket: async () => true,
+  reportUnreachable: () => {},
+  ...overrides,
+})
 
 export const mediaItem = (overrides: Partial<MediaItem> = {}): MediaItem => ({
   id: 7,

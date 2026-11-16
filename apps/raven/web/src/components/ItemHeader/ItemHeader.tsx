@@ -25,7 +25,7 @@ type HeaderPicture = {
   play?: ReturnType<typeof watchLink> & { label: string }
 }
 
-const HEADER_BACKDROP_TYPES = { picture: 'picture', slideshow: 'slideshow' } as const
+export const HEADER_BACKDROP_TYPES = { picture: 'picture', slideshow: 'slideshow' } as const
 
 /** What fades into the page behind the header: one picture, or several in turn. */
 export type HeaderBackdrop =

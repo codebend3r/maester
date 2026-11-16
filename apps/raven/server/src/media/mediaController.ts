@@ -6,7 +6,6 @@ import {
   ConflictException,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   HttpCode,
   Inject,
@@ -50,7 +49,7 @@ import {
   STREAM_PURPOSES,
   readSessionQuery,
 } from '@raven/core'
-import { CONTENT_TYPES, HEADERS } from '@shared/server'
+import { CONTENT_TYPES, HEADERS, HTTP_STATUSES } from '@shared/server'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { merge } from 'rxjs'
 import { AdminOnly, ForViewers } from '@/admin/adminGuard'
@@ -64,7 +63,7 @@ import { LibrariesRepository } from '@/libraries/librariesRepository'
 import { PrivateBy } from '@/lock/lockGuard'
 import { LockService } from '@/lock/lockService'
 import { DeviceDownloadCache } from '@/media/deviceDownloadCache'
-import { FAVOURITE_OUTCOMES } from '@/media/favouriteOutcomes'
+import { favouriteAnswered } from '@/media/favouriteOutcomes'
 import { FilePasses } from '@/media/filePasses'
 import { MediaArtifacts } from '@/media/mediaArtifacts'
 import { type MediaFile, MediaIndex } from '@/media/mediaIndex'
@@ -229,7 +228,7 @@ export class MediaController {
 
   @ForViewers()
   @Put(':id/progress')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   saveProgress(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Body() body: unknown,
@@ -261,7 +260,7 @@ export class MediaController {
    */
   @ForViewers()
   @Post(':id/plays')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   recordPlay(
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @ViewingAccount() account: AccountKey,
@@ -288,19 +287,12 @@ export class MediaController {
       body,
       message: 'favourite must be true or false',
     })
-    const outcome = this.viewing.setFavourite({ id, favourite, account })
-    switch (outcome) {
-      case FAVOURITE_OUTCOMES.done:
-        return this.find({ id, account })
-      case FAVOURITE_OUTCOMES.missing:
-        throw new NotFoundException(`No media ${id}`)
-      case FAVOURITE_OUTCOMES.locked:
-        throw new ForbiddenException('A locked library’s videos cannot be favourites.')
-      default: {
-        const unknown: never = outcome
-        return unknown
-      }
-    }
+    favouriteAnswered({
+      outcome: this.viewing.setFavourite({ id, favourite, account }),
+      missing: `No media ${id}`,
+      locked: 'A locked library’s videos cannot be favourites.',
+    })
+    return this.find({ id, account })
   }
 
   /**
@@ -312,7 +304,7 @@ export class MediaController {
    */
   @AdminOnly()
   @Delete(':id')
-  @HttpCode(204)
+  @HttpCode(HTTP_STATUSES.noContent)
   async remove(@Param(ROUTE_PARAMS.id, ParseIntPipe) id: number): Promise<void> {
     const file = this.index.requireFile(id)
     await this.scanner.whenIdle(file.libraryId)
@@ -541,7 +533,10 @@ export class MediaController {
       .header(HEADERS.cacheControl, RAVEN_CACHE_POLICIES.privateRevalidate)
 
     if (range === RANGE_OUTCOMES.unsatisfiable) {
-      await reply.code(416).header(HEADERS.contentRange, `${RANGE_UNITS.bytes} */${size}`).send()
+      await reply
+        .code(HTTP_STATUSES.rangeNotSatisfiable)
+        .header(HEADERS.contentRange, `${RANGE_UNITS.bytes} */${size}`)
+        .send()
       return
     }
     if (range == null) {
@@ -549,7 +544,7 @@ export class MediaController {
       return
     }
     await reply
-      .code(206)
+      .code(HTTP_STATUSES.partialContent)
       .header(HEADERS.contentRange, `${RANGE_UNITS.bytes} ${range.start}-${range.end}/${size}`)
       .header(HEADERS.contentLength, range.end - range.start + 1)
       .send(readFile({ path, start: range.start, end: range.end }))

@@ -1,7 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { create } from 'zustand'
-import { createJSONStorage, devtools, persist } from 'zustand/middleware'
-import { STORE_KEYS } from '@/stores/storage'
+import { keptInStorage, STORE_KEYS } from '@/stores/storage'
 import {
   type AuthClient,
   type ReadyAuthConfig,
@@ -109,65 +108,60 @@ const followAccount = ({ previous, next }: FollowAccountProps): void => {
 
 /** Who is signed in on this browser, and the token every `/api/` call carries. */
 export const useAuthSession = create<AuthSessionState>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        client: null,
-        session: null,
-        status: AUTH_SESSION_STATUSES.booting,
-        isRecovery: false,
-        hasStarted: false,
-        endRecovery: () => set({ isRecovery: false }),
-        start: ({ config, createClient = createAuthClient, page = browserPage() }) => {
-          if (get().hasStarted) return
-          set({ hasStarted: true })
-          // A store emptied while Supabase's code loads (a sign out's reset, a test's) has moved on.
-          const settle = (session: Session | null) => {
-            if (!get().hasStarted) return
-            set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
-          }
-          const isSignedOut = isSurelySignedOut({ config, page })
-          if (isSignedOut) settle(null)
-          const follow = (client: AuthClient) => {
-            if (!get().hasStarted) return
-            set({ client })
-            client.onAuthStateChange((event, session) => {
-              const previous = get().session
-              const next = summaryOf(session)
-              set({
-                session: next,
-                isRecovery:
-                  next !== null &&
-                  (event === AUTH_EVENTS.passwordRecovery ||
-                    (get().isRecovery && (previous?.userId ?? null) === next.userId)),
-              })
-              followAccount({ previous, next })
+  keptInStorage({
+    key: STORE_KEYS.authSession,
+    name: 'raven/authSession',
+    state: (set, get) => ({
+      client: null,
+      session: null,
+      status: AUTH_SESSION_STATUSES.booting,
+      isRecovery: false,
+      hasStarted: false,
+      endRecovery: () => set({ isRecovery: false }),
+      start: ({ config, createClient = createAuthClient, page = browserPage() }) => {
+        if (get().hasStarted) return
+        set({ hasStarted: true })
+        // A store emptied while Supabase's code loads (a sign out's reset, a test's) has moved on.
+        const settle = (session: Session | null) => {
+          if (!get().hasStarted) return
+          set({ session: summaryOf(session), status: AUTH_SESSION_STATUSES.ready })
+        }
+        const isSignedOut = isSurelySignedOut({ config, page })
+        if (isSignedOut) settle(null)
+        const follow = (client: AuthClient) => {
+          if (!get().hasStarted) return
+          set({ client })
+          client.onAuthStateChange((event, session) => {
+            const previous = get().session
+            const next = summaryOf(session)
+            set({
+              session: next,
+              isRecovery:
+                next !== null &&
+                (event === AUTH_EVENTS.passwordRecovery ||
+                  (get().isRecovery && (previous?.userId ?? null) === next.userId)),
             })
-            client.getSession().then(
-              ({ data }) => settle(data.session),
-              () => settle(null),
-            )
-          }
-          // Supabase's code failing to load leaves nobody signed in, as a session that fails to read does.
-          const build = () => {
-            handled(createClient({ config }).then(follow, () => settle(null)))
-          }
-          /*
-           * Signed out, the sign-in page draws first and its form waits for the client, so the client
-           * loads once the page has, not beside the page's own code.
-           */
-          if (isSignedOut) return afterPageLoad(build)
-          build()
-        },
-      }),
-      {
-        name: STORE_KEYS.authSession,
-        storage: createJSONStorage(() => window.localStorage),
-        partialize: ({ session }) => ({ session }),
+            followAccount({ previous, next })
+          })
+          client.getSession().then(
+            ({ data }) => settle(data.session),
+            () => settle(null),
+          )
+        }
+        // Supabase's code failing to load leaves nobody signed in, as a session that fails to read does.
+        const build = () => {
+          handled(createClient({ config }).then(follow, () => settle(null)))
+        }
+        /*
+         * Signed out, the sign-in page draws first and its form waits for the client, so the client
+         * loads once the page has, not beside the page's own code.
+         */
+        if (isSignedOut) return afterPageLoad(build)
+        build()
       },
-    ),
-    { name: 'raven/authSession' },
-  ),
+    }),
+    keep: ({ session }) => ({ session }),
+  }),
 )
 
 /** Calls `listener` with the session's access token each time it changes, null on sign out; returns the unsubscribe. */

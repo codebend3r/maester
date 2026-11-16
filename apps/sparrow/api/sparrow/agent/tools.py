@@ -40,11 +40,8 @@ class Tier(enum.IntEnum):
     ADMIN = 3
 
     @classmethod
-    def parse(cls, name: str | None, default: Tier | None = None) -> Tier:
-        if not name:
-            if default is None:
-                raise ValueError("tier name is empty")
-            return default
+    def parse(cls, name: str) -> Tier:
+        """A tier from its name in any case: "trusted", "TRUSTED"."""
         try:
             return cls[name.upper()]
         except KeyError:
@@ -235,15 +232,15 @@ def schema_of(model: type[BaseModel]) -> dict[str, Any]:
     defs = schema.pop("$defs", {})
 
     def clean(node: dict[str, Any]) -> dict[str, Any]:
+        if options := node.get("anyOf"):
+            present = [o for o in options if o != {"type": "null"}]
+            if len(present) == 1:
+                node = {**{k: v for k, v in node.items() if k != "anyOf"}, **present[0]}
         if ref := node.get("$ref"):
             node = {
                 **defs[ref.rsplit("/", 1)[-1]],
                 **{k: v for k, v in node.items() if k != "$ref"},
             }
-        if options := node.get("anyOf"):
-            present = [o for o in options if o != {"type": "null"}]
-            if len(present) == 1:
-                node = {**{k: v for k, v in node.items() if k != "anyOf"}, **present[0]}
         node = {k: v for k, v in node.items() if k not in ("title", "default")}
         if "items" in node:
             node["items"] = clean(node["items"])
