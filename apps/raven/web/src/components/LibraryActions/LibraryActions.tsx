@@ -161,10 +161,10 @@ export const LibraryActions = ({
     rematch,
     scanMarkers,
     mergeAlbums,
-    isScanRunning,
     isQuickScanning,
     isFullScanning,
     isUpdatingRatings,
+    isBusy,
   },
 }: LibraryActionsProps) => {
   const [isEditing, setEditing] = useState(false)
@@ -220,7 +220,7 @@ export const LibraryActions = ({
             title={LIBRARY_ACTIONS_COPY.quickScanTitle}
             cancelTitle={LIBRARY_ACTIONS_COPY.cancelQuickScanTitle}
             isRunning={isQuickScanning}
-            isDisabled={isScanRunning || quickScan.isPending}
+            isDisabled={isBusy}
             isCancelling={cancelQuickScan.isPending}
             onStart={() => quickScan.mutate()}
             onCancel={() => cancelQuickScan.mutate()}
@@ -232,17 +232,13 @@ export const LibraryActions = ({
             title={LIBRARY_ACTIONS_COPY.fullScanTitle}
             cancelTitle={LIBRARY_ACTIONS_COPY.cancelFullScanTitle}
             isRunning={isFullScanning}
-            isDisabled={isScanRunning || fullScan.isPending}
+            isDisabled={isBusy}
             isCancelling={cancelFullScan.isPending}
             onStart={() => fullScan.mutate()}
             onCancel={() => cancelFullScan.mutate()}
           />
           {matchType && (
-            <Button
-              icon="skipNext"
-              disabled={scanMarkers.isPending}
-              onClick={() => scanMarkers.mutate()}
-            >
+            <Button icon="skipNext" disabled={isBusy} onClick={() => scanMarkers.mutate()}>
               {LIBRARY_ACTIONS_COPY.scanMarkers}
               {whose}
             </Button>
@@ -266,7 +262,7 @@ export const LibraryActions = ({
             title={LIBRARY_ACTIONS_COPY.updateRatingsTitle}
             cancelTitle={LIBRARY_ACTIONS_COPY.cancelRatingsTitle}
             isRunning={isUpdatingRatings}
-            isDisabled={updateRatings.isPending}
+            isDisabled={isBusy}
             isCancelling={cancelRatings.isPending}
             onStart={() => updateRatings.mutate()}
             onCancel={() => cancelRatings.mutate()}

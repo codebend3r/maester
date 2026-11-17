@@ -83,6 +83,9 @@ export const useServerLibraryActions = ({
   })
   const { scan } = library
   const isScanRunning = isScanning(scan)
+  const isQuickScanning = quickScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.quick)
+  const isFullScanning = fullScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.full)
+  const isUpdatingRatings = updateRatings.isPending || isRefreshingRatings(library)
   return {
     quickScan,
     cancelQuickScan,
@@ -93,9 +96,14 @@ export const useServerLibraryActions = ({
     cancelRatings,
     rematch,
     mergeAlbums,
-    isScanRunning,
-    isQuickScanning: quickScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.quick),
-    isFullScanning: fullScan.isPending || (isScanRunning && scan.kind === SCAN_KINDS.full),
-    isUpdatingRatings: updateRatings.isPending || isRefreshingRatings(library),
+    isQuickScanning,
+    isFullScanning,
+    isUpdatingRatings,
+    /*
+     * Whether any of the library's long work is starting or running: a scan of either kind, its
+     * intros and credits being queued, or its ratings. While it is, no other may start, so a
+     * second press never scans twice; the running one's own button stays, as its Cancel.
+     */
+    isBusy: isQuickScanning || isFullScanning || isUpdatingRatings || scanMarkers.isPending,
   }
 }

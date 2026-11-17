@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
-import { SCAN_STATES, isLibrary } from '@raven/core'
+import { SCAN_KINDS, SCAN_STATES, isLibrary } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { ScannerService } from '@/scanner/scannerService'
@@ -25,6 +25,19 @@ describe('cancelling a scan', () => {
     return state.app
   }
   const asAdmin = injectAs
+
+  /** A new library of the three clips, its first full scan finished. */
+  const scannedLibrary = async (name: string) => {
+    const created = await asAdmin({ app: app(), cookie: state.admin })({
+      method: 'POST',
+      url: '/api/libraries',
+      payload: { name, paths: [join(state.root, 'Clips')], settings: { kind: 'other' } },
+    })
+    const id: number = created.json().id
+    const scanner = app().get(ScannerService)
+    await scanner.whenIdle(id)
+    return { id, scanner }
+  }
 
   beforeAll(async () => {
     state.root = await mkdtemp(join(tmpdir(), 'raven-cancel-'))
@@ -89,7 +102,7 @@ describe('cancelling a scan', () => {
     await app().get(ScannerService).whenIdle(id)
 
     const started = await send({ method: 'POST', url: `/api/libraries/${id}/quick-scan` })
-    expect(started.json().scan).toMatchObject({ kind: 'quick' })
+    expect(started.json().scan).toMatchObject({ kind: SCAN_KINDS.quick })
     const cancelled = await send({ method: 'POST', url: `/api/libraries/${id}/quick-scan/cancel` })
     expect(cancelled.statusCode).toBe(200)
     await app().get(ScannerService).whenIdle(id)
@@ -101,6 +114,38 @@ describe('cancelling a scan', () => {
     await send({ method: 'POST', url: `/api/libraries/${id}/quick-scan` })
     await app().get(ScannerService).whenIdle(id)
     expect((await send({ method: 'GET', url: `/api/libraries/${id}` })).json().itemCount).toBe(3)
+  })
+
+  it('lets a full scan take over a quick scan under way, its status a full scan at once', async () => {
+    const send = asAdmin({ app: app(), cookie: state.admin })
+    const { id, scanner } = await scannedLibrary('Takeover')
+
+    expect(
+      (await send({ method: 'POST', url: `/api/libraries/${id}/quick-scan` })).json().scan,
+    ).toMatchObject({ kind: SCAN_KINDS.quick })
+    const full = await send({ method: 'POST', url: `/api/libraries/${id}/scan` })
+    expect(full.json().scan).toMatchObject({ kind: SCAN_KINDS.full, state: SCAN_STATES.walking })
+    expect(scanner.status(id)).toMatchObject({ kind: SCAN_KINDS.full })
+
+    await scanner.whenIdle(id)
+    const library = await send({ method: 'GET', url: `/api/libraries/${id}` })
+    expect(library.json().scan).toMatchObject({ kind: SCAN_KINDS.full, state: SCAN_STATES.idle })
+    expect(library.json().scan.finishedAt).not.toBeNull()
+    expect(library.json().itemCount).toBe(3)
+  })
+
+  it('leaves the status idle when a full scan that took over is cancelled before it begins', async () => {
+    const send = asAdmin({ app: app(), cookie: state.admin })
+    const { id, scanner } = await scannedLibrary('Takeover cancel')
+
+    await send({ method: 'POST', url: `/api/libraries/${id}/quick-scan` })
+    await send({ method: 'POST', url: `/api/libraries/${id}/scan` })
+    const cancelled = await send({ method: 'POST', url: `/api/libraries/${id}/scan/cancel` })
+    expect(cancelled.json().scan).toMatchObject({ state: SCAN_STATES.idle, error: null })
+    await scanner.whenIdle(id)
+    expect(scanner.status(id)).toMatchObject({ state: SCAN_STATES.idle, error: null })
+    // The full scan the library had when it was made still shows as its last.
+    expect(scanner.status(id).finishedAt).not.toBeNull()
   })
 
   it('stops every library and blocks watchers and marker work until allowed again', async () => {
