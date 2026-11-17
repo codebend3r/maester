@@ -6,8 +6,7 @@ Before editing files, running project tasks, creating branches or worktrees, or 
 
 1. Locate the repository root and read its `CLAUDE.md` in full. Follow it as this repository's instructions, subject to higher-priority instructions. Read and follow applicable product or project `CLAUDE.md` files before working in those directories.
 2. Discover every `SKILL.md` recursively under `<repo-root>/.claude/skills/` and read every discovered file in full, not just its frontmatter. These are local repository skills even if Pi's advertised available-skills list omits them.
-3. Always load `.claude/skills/create-new-worktree/SKILL.md`, regardless of the current task. Loading it does not mean creating a worktree unless the task calls for one.
-4. Before working in a nested project, also discover and fully read its local `.claude/skills/**/SKILL.md` files, if present.
+3. Before working in a nested project, also discover and fully read its local `.claude/skills/**/SKILL.md` files, if present.
 
 Repeat this gate for every new session, when switching repositories or worktrees, and after context compaction or resumption if the full instructions and skills are no longer in context. Listing paths or remembering a summary does not count as loading their contents.
 

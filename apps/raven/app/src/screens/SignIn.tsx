@@ -1,5 +1,13 @@
 import { apiFor } from '@raven/native'
-import { RAVEN_SERVER, SIGN_IN_STEPS, type SignInStep, signInFlowFor } from '@raven/native/headless'
+import {
+  RAVEN_SERVER,
+  SIGN_IN_ERRORS,
+  SIGN_IN_STEPS,
+  type SignInErrorCopy,
+  type SignInStep,
+  signInErrorTextOf,
+  signInFlowFor,
+} from '@raven/native/headless'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import type { Dispatch, SetStateAction } from 'react'
@@ -11,6 +19,15 @@ import { TEST_ACCOUNT } from '@/account/testAccount'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
+
+/** What each sign-in error says; a refusal says the service's or the server's own words. */
+const SIGN_IN_ERROR_COPY = {
+  [SIGN_IN_ERRORS.missing]: SIGN_IN_COPY.badAccount,
+  [SIGN_IN_ERRORS.badCredentials]: SIGN_IN_COPY.wrongAccount,
+  [SIGN_IN_ERRORS.unreachable]: SIGN_IN_COPY.unreachable,
+  [SIGN_IN_ERRORS.full]: SIGN_IN_COPY.full,
+  [SIGN_IN_ERRORS.notAdded]: SIGN_IN_COPY.notAdded,
+} as const satisfies SignInErrorCopy
 
 type ErrorLineProps = { error: string | null }
 
@@ -141,7 +158,6 @@ export const SignIn = () => {
   const goHome = () => router.dismissTo(APP_ROUTES.home)
   const { step, email, setEmail, password, setPassword, isBusy, error, submitAccount } =
     useSignInFlow({
-      copy: SIGN_IN_COPY,
       initial: { email: TEST_ACCOUNT?.email ?? '', password: TEST_ACCOUNT?.password ?? '' },
       onDone: goHome,
     })
@@ -153,7 +169,7 @@ export const SignIn = () => {
       setEmail,
       password,
       setPassword,
-      error,
+      error: error === null ? null : signInErrorTextOf({ error, copy: SIGN_IN_ERROR_COPY }),
       isBusy,
       onSubmit: (typedPassword) => submitAccount({ password: typedPassword }),
     },

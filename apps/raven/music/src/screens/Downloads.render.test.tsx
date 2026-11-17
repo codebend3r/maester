@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUDIO_BITRATES, QUEUE_SOURCE_KINDS } from '@raven/core'
+import { AUDIO_BITRATES, QUEUE_SOURCE_KINDS, formatBytes } from '@raven/core'
 import type * as Native from '@raven/native'
 import { RAVEN_SERVER } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
-import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
-import { Alert } from 'react-native'
+import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import {
   DOWNLOAD_COPY,
@@ -15,7 +14,9 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
-import { WREN_PAGES, WREN_ROUTES } from '@/routes'
+import { LIBRARY_SEGMENTS, WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
+import { DOWNLOAD_BUTTON_COPY } from '@/components/copy'
+import { LIBRARY_PAGE_COPY, OFFLINE_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
@@ -29,6 +30,8 @@ import {
 } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
+import { KIT_COPY, PLAYER_COPY } from '@/ui/copy'
+import { countsLineOf, factsLineOf } from '@/ui/counts'
 
 const mockApi = musicApi()
 const playTracks = jest.fn<ReturnType<typeof useAudioQueue.getState>['playTracks']>()
@@ -134,7 +137,10 @@ describe('Downloads', () => {
         ]),
       ),
     })
-    await fireEvent.press(await screen.findByRole('button', { name: 'Remove download' }))
+    await fireEvent.press(
+      await screen.findByRole('button', { name: DOWNLOAD_BUTTON_COPY.downloaded }),
+    )
+    await fireEvent.press(await screen.findByRole('button', { name: DOWNLOAD_BUTTON_COPY.remove }))
     expect(remove).toHaveBeenCalledWith({
       serverId: RAVEN_SERVER.id,
       collection: { kind: DOWNLOAD_SOURCES.album, album: OK_COMPUTER },
@@ -145,7 +151,18 @@ describe('Downloads', () => {
     mockApi.listLibraries.mockRejectedValue(new Error("raven can't be reached."))
     useDownloads.setState(DOWNLOADED)
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
-    await fireEvent.press(await screen.findByRole('tab', { name: 'Downloads' }))
+    await fireEvent.press(
+      await screen.findByRole('button', {
+        name: KIT_COPY.labelled({
+          label: LIBRARY_PAGE_COPY.downloads,
+          value: factsLineOf([countsLineOf({ albums: 1, playlists: 1 }), formatBytes(8_400_000)]),
+        }),
+      }),
+    )
+    expect(await screen.findByText(LIBRARY_PAGE_COPY.onThisDevice)).toBeTruthy()
+
+    await fireEvent.press(screen.getByRole('button', { name: PLAYER_COPY.shuffle }))
+    expect(playTracks).toHaveBeenCalledWith({ tracks: [AIRBAG, PARANOID], isShuffled: true })
 
     await fireEvent.press(await screen.findByRole('button', { name: OK_COMPUTER.title }))
     expect(playTracks).toHaveBeenCalledWith({
@@ -162,48 +179,16 @@ describe('Downloads', () => {
   it("offers the downloads from Home when the server can't be reached, and opens on them", async () => {
     mockApi.listLibraries.mockRejectedValue(new Error("raven can't be reached."))
     useDownloads.setState(DOWNLOADED)
-    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await fireEvent.press(await screen.findByRole('button', { name: 'Play your downloads' }))
+    const router = await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await fireEvent.press(await screen.findByRole('button', { name: OFFLINE_COPY.playDownloads }))
     expect(await screen.findByRole('button', { name: OK_COMPUTER.title })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Downloads' }).props.accessibilityState).toEqual({
-      selected: true,
-    })
+    expect(screen.getByRole('header', { name: LIBRARY_PAGE_COPY.downloads })).toBeTruthy()
+    expect(router.getPathname()).toBe(collectionPathOf(LIBRARY_SEGMENTS.downloads))
   })
 
   it('says when nothing is downloaded', async () => {
-    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
-    await fireEvent.press(await screen.findByRole('tab', { name: 'Downloads' }))
-    expect(
-      await screen.findByText(
-        'Nothing downloaded yet. Download an album or a playlist from its page.',
-      ),
-    ).toBeTruthy()
-  })
-
-  it("sets Settings' download quality, cellular quality and storage limit, and removes them all", async () => {
-    useDownloads.setState(DOWNLOADED)
-    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.settings })
-    expect(await screen.findByText('Download quality')).toBeTruthy()
-    expect(screen.getByText('8.4 MB used by downloads')).toBeTruthy()
-
-    const [downloadHigh, cellularHigh] = screen.getAllByRole('tab', { name: '320 kbps' })
-    await fireEvent.press(downloadHigh)
-    expect(useWrenPrefs.getState().downloadKbps).toBe(AUDIO_BITRATES.high)
-    expect(cellularHigh).toBeTruthy()
-    await fireEvent.press(screen.getByRole('tab', { name: 'Original' }))
-    expect(useWrenPrefs.getState().cellularKbps).toBeNull()
-    await fireEvent.press(screen.getByRole('tab', { name: '5 GB' }))
-    expect(useWrenPrefs.getState().storageLimitGb).toBe(5)
-
-    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined)
-    await fireEvent.press(screen.getByRole('button', { name: 'Remove all downloads' }))
-    expect(removeAll).not.toHaveBeenCalled()
-    const [title, , buttons] = alert.mock.calls[0] ?? []
-    expect(title).toBe('Remove all downloads?')
-    const choices = buttons ?? []
-    expect(choices.map(({ text }) => text)).toEqual(['Cancel', 'Remove'])
-    const confirm = choices[1]?.onPress ?? (() => undefined)
-    await act(async () => confirm())
-    expect(removeAll).toHaveBeenCalled()
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.downloads) })
+    expect(await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.noDownloads })).toBeTruthy()
+    expect(screen.getByText(LIBRARY_PAGE_COPY.noDownloadsHint)).toBeTruthy()
   })
 })

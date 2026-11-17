@@ -1,0 +1,78 @@
+import { type AlbumSummary, artistNames } from '@raven/core'
+import { useRouter } from 'expo-router'
+import { Pressable, Text, View } from 'react-native'
+
+import type { Cover, CoverOf } from '@/music/useCovers'
+import { WREN_PAGES, pageHref } from '@/routes'
+import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
+import { SPACE, TYPE } from '@/theme/wrenTokens'
+import { AlbumArt } from '@/ui/AlbumArt'
+import { KIT_COPY } from '@/ui/copy'
+import { pressedStyleOf } from '@/ui/press'
+
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  tile: { gap: SPACE.s2 },
+  title: { ...TYPE.tileTitle, color: colors.text },
+  subtitle: { ...TYPE.meta, color: colors.text2 },
+}))
+
+type AlbumTileProps = {
+  title: string
+  /** The line under the title: the artists, or a playlist's count. */
+  subtitle: string
+  cover: Cover | null
+  width: number
+  /** What the tile is called aloud: "OK Computer, Radiohead". */
+  label: string
+  onPress: () => void
+}
+
+/** An album or a playlist as a tile: its square art, its title and a line under it, each on one line. */
+export function AlbumTile({ title, subtitle, cover, width, label, onPress }: AlbumTileProps) {
+  const styles = useStyles()
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={pressedStyleOf({ style: [styles.tile, { width }] })}
+    >
+      <AlbumArt cover={cover} size={width} />
+      <View>
+        <Text numberOfLines={1} style={styles.title}>
+          {title}
+        </Text>
+        <Text numberOfLines={1} style={styles.subtitle}>
+          {subtitle}
+        </Text>
+      </View>
+    </Pressable>
+  )
+}
+
+type AlbumTileOfProps = {
+  album: AlbumSummary
+  coverOf: CoverOf
+  width: number
+  /** The line under the title; its artists unless the place says otherwise (an artist's years). */
+  subtitle?: string
+  /** What a press does; opening the album's page unless the place does more (Search remembers it). */
+  onPress?: (album: AlbumSummary) => void
+}
+
+/** An album as a tile, read out by its title and artists, that opens its page. */
+export function AlbumTileOf({ album, coverOf, width, subtitle, onPress }: AlbumTileOfProps) {
+  const router = useRouter()
+  const artists = artistNames(album)
+  const open = () => router.push(pageHref({ page: WREN_PAGES.album, id: album.id }))
+  return (
+    <AlbumTile
+      cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
+      label={KIT_COPY.labelled({ label: album.title, value: artists })}
+      onPress={() => (onPress === undefined ? open() : onPress(album))}
+      subtitle={subtitle ?? artists}
+      title={album.title}
+      width={width}
+    />
+  )
+}

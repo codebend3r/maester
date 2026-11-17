@@ -15,12 +15,15 @@ export const WREN_PAGES = {
   playlist: '/playlist/[id]',
 } as const
 
+/** Library's categories, each a page the stack pushes, named by its kind in its path. */
+const COLLECTION_PAGE = '/collection/[kind]'
+
 type WrenPage = (typeof WREN_PAGES)[keyof typeof WREN_PAGES]
 
 /** The params a page reads from its path, or Library from its query. */
-export const WREN_ROUTE_PARAMS = { id: 'id', segment: 'segment' } as const
+export const WREN_ROUTE_PARAMS = { id: 'id', segment: 'segment', kind: 'kind' } as const
 
-/** The lists the Library tab shows, one at a time, named in its query. */
+/** Library's lists, each a category page of its own and named in its path. */
 export const LIBRARY_SEGMENTS = {
   albums: 'albums',
   artists: 'artists',
@@ -38,11 +41,15 @@ const isLibrarySegment = (value: unknown): value is LibrarySegment =>
 export const librarySegmentOf = (value: unknown): LibrarySegment =>
   isLibrarySegment(value) ? value : LIBRARY_SEGMENTS.albums
 
-/** Where Library shows one of its lists. */
+/** Where one of Library's lists is: its category page, `/collection/albums`. */
 export const libraryHref = (segment: LibrarySegment) => ({
-  pathname: WREN_ROUTES.library,
-  params: { [WREN_ROUTE_PARAMS.segment]: segment },
+  pathname: COLLECTION_PAGE,
+  params: { [WREN_ROUTE_PARAMS.kind]: segment },
 })
+
+/** A category page's address as it shows in the path, for telling which one is open. */
+export const collectionPathOf = (segment: LibrarySegment): string =>
+  COLLECTION_PAGE.replace(`[${WREN_ROUTE_PARAMS.kind}]`, segment)
 
 /** Each route's name as its navigator knows it: its file under `app/`, without the extension. */
 export const WREN_SCREENS = {
@@ -51,6 +58,7 @@ export const WREN_SCREENS = {
   album: 'album/[id]',
   artist: 'artist/[id]',
   playlist: 'playlist/[id]',
+  collection: 'collection/[kind]',
   nowPlaying: 'now-playing',
 } as const
 

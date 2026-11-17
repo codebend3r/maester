@@ -1,14 +1,19 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { audioPlayer } from '@raven/audio'
-import { MEDIA_TICKET_PARAM } from '@raven/core'
+import { MEDIA_TICKET_PARAM, REPEAT_MODES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library'
+import { Dimensions } from 'react-native'
 
+import { scrubTextOf } from '@/player/playerModel'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
+import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
+import { LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { PLAYER_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 
@@ -32,6 +37,12 @@ jest.mock('@raven/native', () => ({
 
 const BAR = 'Now Playing: Airbag, Radiohead'
 
+// An 11 inch iPad's window, held sideways.
+const TABLET_WINDOW = { width: 1194, height: 834, scale: 2, fontScale: 1 } as const
+
+const holdAs = (window: typeof PHONE_WINDOW | typeof TABLET_WINDOW) =>
+  act(() => Dimensions.set({ window, screen: window }))
+
 describe('the now-playing bar', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -40,9 +51,11 @@ describe('the now-playing bar', () => {
     useAudioQueue.getState().clear()
   })
 
+  afterEach(() => holdAs(PHONE_WINDOW))
+
   it('stays away while nothing is queued', async () => {
     await renderRouter(WREN_TREE, { initialUrl: '/' })
-    expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy()
+    expect(await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })).toBeTruthy()
     expect(screen.queryByRole('button', { name: BAR })).toBeNull()
   })
 
@@ -68,5 +81,19 @@ describe('the now-playing bar', () => {
     await fireEvent.press(screen.getByRole('button', { name: BAR }))
     expect(await screen.findByRole('header', { name: 'Airbag' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: BAR })).toBeNull()
+  })
+
+  it("draws the tablet's bar from Now Playing's transport and scrubber", async () => {
+    await holdAs(TABLET_WINDOW)
+    await renderRouter(WREN_TREE, { initialUrl: '/' })
+    await act(async () => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] }))
+    await fireEvent.press(
+      await screen.findByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.off] }),
+    )
+    expect(screen.getByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.all] })).toBeTruthy()
+    const scrubber = screen.getByRole('adjustable', { name: PLAYER_COPY.position })
+    expect(scrubber.props.accessibilityValue).toEqual(
+      expect.objectContaining({ text: scrubTextOf({ position: 0, length: AIRBAG.duration ?? 0 }) }),
+    )
   })
 })

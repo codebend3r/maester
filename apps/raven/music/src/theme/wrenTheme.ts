@@ -1,51 +1,76 @@
-import { DEFAULT_THEME } from '@raven/core'
-import { tokenReaderOf } from '@raven/native/headless'
-import { designTokenValues, themeTokens } from '@raven/ui/designTokens'
+import {
+  type ImageStyle,
+  StyleSheet,
+  type TextStyle,
+  type ViewStyle,
+  useColorScheme,
+  useWindowDimensions,
+} from 'react-native'
 
-import { PALETTE_TOKENS, SHADE_TOKENS, SIZE_TOKENS } from '@/theme/tokenNames'
+import { APPEARANCES, type Appearance, useWrenPrefs } from '@/stores/wrenPrefs'
+import {
+  BREAKPOINTS,
+  COLOR_SCHEMES,
+  COLORS,
+  type ColorScheme,
+  FORM_FACTORS,
+  type FormFactor,
+  type Palette,
+} from '@/theme/wrenTokens'
 
-const READER = 'Wren'
+/** What a screen paints with: the scheme picked and its palette. */
+export type WrenTheme = { scheme: ColorScheme; colors: Palette }
 
-const { colour } = tokenReaderOf({ tokens: themeTokens[DEFAULT_THEME] ?? {}, owner: READER })
+const THEMES = {
+  [COLOR_SCHEMES.dark]: { scheme: COLOR_SCHEMES.dark, colors: COLORS.dark },
+  [COLOR_SCHEMES.light]: { scheme: COLOR_SCHEMES.light, colors: COLORS.light },
+} as const satisfies Record<ColorScheme, WrenTheme>
 
-const shared = tokenReaderOf({ tokens: designTokenValues, owner: READER })
+type SchemeOfProps = { appearance: Appearance; system: string | null | undefined }
 
-const { size } = shared
+/** The scheme an appearance picks: the system's (dark when it says neither), or the one kept. */
+const schemeOf = ({ appearance, system }: SchemeOfProps): ColorScheme => {
+  if (appearance !== APPEARANCES.system) return appearance
+  return system === COLOR_SCHEMES.light ? COLOR_SCHEMES.light : COLOR_SCHEMES.dark
+}
 
-/** Wren wears raven's default theme, read from themes.scss through the built tokens. */
-export const PALETTE = {
-  ground: colour(PALETTE_TOKENS.ground),
-  raised: colour(PALETTE_TOKENS.raised),
-  quiet: colour(PALETTE_TOKENS.quiet),
-  line: colour(PALETTE_TOKENS.line),
-  text: colour(PALETTE_TOKENS.text),
-  muted: colour(PALETTE_TOKENS.muted),
-  accent: colour(PALETTE_TOKENS.accent),
-  onAccent: colour(PALETTE_TOKENS.onAccent),
-  error: colour(PALETTE_TOKENS.error),
-  notice: colour(PALETTE_TOKENS.notice),
-} as const satisfies Record<keyof typeof PALETTE_TOKENS, string>
+/** The scheme Wren draws in now, following Settings' Appearance and the system. */
+export const useColorSchemeOf = (): ColorScheme => {
+  const appearance = useWrenPrefs((state) => state.appearance)
+  const system = useColorScheme()
+  return schemeOf({ appearance, system })
+}
 
-/** What Wren lays over a screen to hold a sheet above it, the same in every theme. */
-export const SHADES = {
-  scrim: shared.colour(SHADE_TOKENS.scrim),
-} as const satisfies Record<keyof typeof SHADE_TOKENS, string>
+/** The theme Wren draws in now. */
+export const useWrenTheme = (): WrenTheme => THEMES[useColorSchemeOf()]
 
-/** raven's scale in points, from globals.scss. */
-export const SIZES = {
-  space1: size(SIZE_TOKENS.space1),
-  space2: size(SIZE_TOKENS.space2),
-  space3: size(SIZE_TOKENS.space3),
-  space4: size(SIZE_TOKENS.space4),
-  space5: size(SIZE_TOKENS.space5),
-  radius: size(SIZE_TOKENS.radius),
-  textSm: size(SIZE_TOKENS.textSm),
-  text: size(SIZE_TOKENS.text),
-  textLg: size(SIZE_TOKENS.textLg),
-  textXl: size(SIZE_TOKENS.textXl),
-  measure: size(SIZE_TOKENS.measure),
-  fieldHeight: size(SIZE_TOKENS.fieldHeight),
-} as const satisfies Record<keyof typeof SIZE_TOKENS, number>
+type NamedStyles = Record<string, ViewStyle | TextStyle | ImageStyle>
 
-/** How faint a control is drawn while a finger holds it, and while it is turned off. */
-export const OPACITIES = { pressed: 0.6, disabled: 0.5 } as const
+/**
+ * A component's styles for both schemes, made once each when the module loads: the hook it
+ * returns hands back the sheet for the scheme showing, so a component re-renders with the other
+ * when the appearance changes and nothing is rebuilt.
+ */
+export const themedStyles = <S extends NamedStyles>(factory: (theme: WrenTheme) => S) => {
+  const sheets = {
+    [COLOR_SCHEMES.dark]: StyleSheet.create(factory(THEMES.dark)),
+    [COLOR_SCHEMES.light]: StyleSheet.create(factory(THEMES.light)),
+  } as const satisfies Record<ColorScheme, Readonly<S>>
+  return (): Readonly<S> => sheets[useColorSchemeOf()]
+}
+
+/** Whether the screen is a tablet's: its shortest side at least the tablet breakpoint. */
+const useIsTablet = (): boolean => {
+  const { width, height } = useWindowDimensions()
+  return Math.min(width, height) >= BREAKPOINTS.tablet
+}
+
+/** The form factor of the screen showing; anything that differs by it is a map keyed by it. */
+export const useFormFactor = (): FormFactor =>
+  useIsTablet() ? FORM_FACTORS.tablet : FORM_FACTORS.phone
+
+/** Whether a tablet is held upright, when its sidebar folds to a rail of icons. */
+export const useIsPortrait = (): boolean => {
+  const { width, height } = useWindowDimensions()
+  return height > width
+}

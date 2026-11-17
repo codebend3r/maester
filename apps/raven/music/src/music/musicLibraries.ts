@@ -4,9 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import type { WrenSession } from '@/useWren'
 import { musicLibrariesOf } from '@raven/core'
 
-/** What a page says while it waits, and when raven holds no music. */
+/** What a page says when raven holds no music. */
 export const LIBRARY_COPY = {
-  loading: 'Loading',
   noMusic: 'raven has no music library yet.',
 } as const
 

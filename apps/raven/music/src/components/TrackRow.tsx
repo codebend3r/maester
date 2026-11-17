@@ -1,84 +1,84 @@
 import type { Track } from '@raven/core'
+import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { View } from 'react-native'
 
-import { IconButton } from '@/components/Controls'
 import { MENU_VIEWS, type MenuView, TrackMenu } from '@/components/TrackMenu'
-import { TRACK_ROW_COPY } from '@/components/copy'
-import { WREN_ICONS } from '@/theme/icons'
-import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
+import { useDownloads } from '@/downloads/downloadStore'
+import { downloadedOf } from '@/downloads/downloadViews'
+import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
+import { RADIUS, SPACE } from '@/theme/wrenTokens'
+import type { SongLeadOf } from '@/ui/songLead'
+import { SongRow } from '@/ui/SongRow'
+import { useWren } from '@/useWren'
+
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  inset: { borderRadius: RADIUS.item, paddingHorizontal: SPACE.s3 },
+  highlighted: { backgroundColor: colors.accentSoft },
+}))
+
+/** Whether the active server's copy of a track is on the device. */
+const useIsDownloaded = (id: number): boolean => {
+  const serverId = useWren()?.server.id ?? null
+  return useDownloads(
+    (state) =>
+      serverId !== null &&
+      downloadedOf({ entries: state.entries, serverId, mediaId: id }) !== undefined,
+  )
+}
 
 type TrackRowProps = {
   track: Track
-  /** What leads the row: the track's number on its album, or nothing. */
-  lead: string | null
+  /** Its number on its album's page, or its cover in a list of many albums' songs. */
+  lead: SongLeadOf
   /** What sits under the title: the artists, or nothing on their own album. */
-  line: string | null
+  subtitle?: string | null
   length: string
   /** What the row is called aloud. */
   label: string
-  isPlaying: boolean
+  /** Whether it is the queue's track: its title in red, and its number the equalizer. */
+  isCurrent: boolean
+  /** Whether the row sits inset and the queue's track stands out in a soft fill: a tablet's tracklist. */
+  isHighlighted?: boolean
   onPress: () => void
 }
 
 /**
- * A track in a list: a press plays from it, and holding it, or its More, opens its menu: Play
- * next, Add to queue and Add to playlist.
+ * A track in a list: a press plays from it, and holding it, or its More, opens its sheet: Play
+ * next, Add to queue, Add to playlist, Go to album and Go to artist. A downloaded track shows a
+ * check.
  */
-export function TrackRow({ track, lead, line, length, label, isPlaying, onPress }: TrackRowProps) {
+export function TrackRow({
+  track,
+  lead,
+  subtitle = null,
+  length,
+  label,
+  isCurrent,
+  isHighlighted = false,
+  onPress,
+}: TrackRowProps) {
+  const styles = useStyles()
   const [menu, setMenu] = useState<MenuView | null>(null)
+  const isPlaying = useAudioQueue((store) => isCurrent && isPlayingOf(store))
+  const isDownloaded = useIsDownloaded(track.id)
+  const openMenu = () => setMenu(MENU_VIEWS.actions)
   return (
-    <View style={styles.row}>
-      <Pressable
-        accessibilityLabel={label}
-        accessibilityRole="button"
-        accessibilityState={{ selected: isPlaying }}
-        onLongPress={() => setMenu(MENU_VIEWS.actions)}
+    <View style={isHighlighted && [styles.inset, isCurrent && styles.highlighted]}>
+      <SongRow
+        duration={length}
+        isCurrent={isCurrent}
+        isDownloaded={isDownloaded}
+        isPlaying={isPlaying}
+        label={label}
+        lead={lead}
+        onLongPress={openMenu}
+        onMore={openMenu}
         onPress={onPress}
-        style={({ pressed }) => [styles.main, pressed && styles.pressed]}
-      >
-        {lead !== null && <Text style={[styles.lead, isPlaying && styles.on]}>{lead}</Text>}
-        <View style={styles.text}>
-          <Text numberOfLines={1} style={[styles.title, isPlaying && styles.on]}>
-            {track.title}
-          </Text>
-          {line !== null && (
-            <Text numberOfLines={1} style={styles.line}>
-              {line}
-            </Text>
-          )}
-        </View>
-        <Text style={styles.line}>{length}</Text>
-      </Pressable>
-      <IconButton
-        icon={WREN_ICONS.more}
-        label={TRACK_ROW_COPY.more(track.title)}
-        onPress={() => setMenu(MENU_VIEWS.actions)}
+        subtitle={subtitle}
+        title={track.title}
       />
       {menu !== null && <TrackMenu onView={setMenu} track={track} view={menu} />}
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  row: {
-    alignItems: 'center',
-    borderBottomColor: PALETTE.line,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-  },
-  main: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SIZES.space2,
-    minHeight: SIZES.fieldHeight,
-    paddingVertical: SIZES.space1,
-  },
-  lead: { color: PALETTE.muted, fontSize: SIZES.textSm, minWidth: SIZES.space4 },
-  text: { flex: 1 },
-  title: { color: PALETTE.text, fontSize: SIZES.text },
-  line: { color: PALETTE.muted, fontSize: SIZES.textSm },
-  on: { color: PALETTE.accent },
-  pressed: { opacity: OPACITIES.pressed },
-})

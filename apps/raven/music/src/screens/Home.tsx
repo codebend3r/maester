@@ -1,176 +1,288 @@
-import type { AlbumSummary, Library } from '@raven/core'
-import { useQuery } from '@tanstack/react-query'
-import type { ComponentType } from 'react'
+import { type AlbumSummary, MUSIC_PAGE, MUSIC_SORTS } from '@raven/core'
+import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
-import { FlatList, StyleSheet, Text, View } from 'react-native'
-import { BUTTON_TONES } from '@raven/native/headless'
+import { type ComponentType, useState } from 'react'
+import { ScrollView, Text, View } from 'react-native'
 
-import { useTileWidth } from '@/components/AlbumGrid'
-import { AlbumTile } from '@/components/AlbumTile'
-import { MaybeNotice, NOTICE_STATES, type NoticeState, noticeStateOf } from '@/components/Notice'
-import { FormButton } from '@/components/Form'
-import { TabPage } from '@/components/TabPage'
-import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
+import { Notice } from '@/components/Notice'
+import { WrenLockup } from '@/components/WrenLockup'
+import { useMusicLibraries } from '@/music/musicLibraries'
 import { type CoverOf, useCovers } from '@/music/useCovers'
-import { HOME_COPY, OFFLINE_COPY } from '@/screens/copy'
+import { HOME_COPY, LIBRARY_PAGE_COPY, OFFLINE_COPY } from '@/screens/copy'
+import { ContinueCard } from '@/screens/home/ContinueCard'
+import { greetingOf } from '@/screens/home/greeting'
+import { ShortcutCard } from '@/screens/home/ShortcutCard'
+import {
+  useDownloadsSummary,
+  usePlaylists,
+  useRecentAlbums,
+  useSongCount,
+} from '@/screens/library/listings'
+import { ListNotice } from '@/screens/library/ListNotice'
 import { LIBRARY_SEGMENTS, libraryHref } from '@/routes'
-import { PALETTE, SIZES } from '@/theme/wrenTheme'
+import { usePageInsets } from '@/shell/useShell'
+import { toastFailure } from '@/stores/toast'
+import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
+import { SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { AlbumTileOf } from '@/ui/AlbumTile'
+import { BUTTON_VARIANTS, Button } from '@/ui/Button'
+import { Card } from '@/ui/Card'
+import { countsLineOf } from '@/ui/counts'
+import { SectionHeader } from '@/ui/SectionHeader'
+import { ServerStatusChip } from '@/ui/ServerStatusChip'
+import { Shelf } from '@/ui/Shelf'
+import { GRID_COLUMNS, type GridColumns, TileGrid } from '@/ui/TileGrid'
+import { ICONS } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
 
-/** How many of a library's newest albums its shelf holds. */
-const RECENT_ALBUMS = 20
+/** How many of the newest albums the tablet's grid shows: two rows of six. */
+const TABLET_SHOWN = 12
 
-type RecentShelfProps = {
-  session: WrenSession
-  library: Library
-  title: string
-  coverOf: CoverOf
+/** Home's grid holds six to a tablet's row, one more than a list's. */
+const RECENT_COLUMNS = {
+  [FORM_FACTORS.phone]: GRID_COLUMNS[FORM_FACTORS.phone],
+  [FORM_FACTORS.tablet]: 6,
+} as const satisfies GridColumns
+
+type ValueOfProps = {
+  /** What it holds as a line, or null while that is on its way or could not be read. */
+  line: string | null
+  none: string
 }
 
-type ShelfViewProps = {
-  albums: readonly AlbumSummary[] | undefined
-  notice: string | null
-  coverOf: CoverOf
+/** A shortcut's value: what it holds, what none reads as, or nothing while it is not known. */
+const valueOf = ({ line, none }: ValueOfProps): string | undefined => {
+  if (line === null) return undefined
+  return line === '' ? none : line
 }
 
-type ShelfRowProps = ShelfViewProps
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  ground: { backgroundColor: colors.bg, flex: 1 },
+  content: { gap: SPACE.s5 },
+  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  offline: { padding: SPACE.s4 },
+  offlineBody: { gap: SPACE.s3 },
+  offlineTitle: { ...TYPE.rowStrong, color: colors.text },
+  [FORM_FACTORS.phone]: { gap: SPACE.s3 },
+  [FORM_FACTORS.tablet]: { flexDirection: 'row', gap: SPACE.s4 },
+  shortcuts: { flexDirection: 'row', flexGrow: 1, gap: SPACE.s3 },
+  section: { gap: SPACE.s3 },
+}))
 
-/** The shelf's albums in a row that scrolls sideways. */
-function ShelfRow({ albums, coverOf }: ShelfRowProps) {
-  const { tileWidth } = useTileWidth()
+type HomeHeaderProps = { session: WrenSession }
+
+/** The phone's header: the lockup, and whether the server answers. The tablet's sidebar has both. */
+function HomeHeader({ session }: HomeHeaderProps) {
+  const styles = useStyles()
   return (
-    <FlatList
-      contentContainerStyle={styles.row}
-      data={albums}
-      horizontal
-      keyExtractor={(album) => String(album.id)}
-      renderItem={({ item }) => (
-        <AlbumTile
-          album={item}
-          cover={coverOf({ albumId: item.id, coverVersion: item.coverVersion })}
-          width={tileWidth}
-        />
-      )}
-      showsHorizontalScrollIndicator={false}
-    />
-  )
-}
-
-/** What a shelf holds: its albums, or why it has none to show. */
-const SHELF_VIEWS = {
-  [NOTICE_STATES.notice]: MaybeNotice,
-  [NOTICE_STATES.ready]: ShelfRow,
-} as const satisfies Record<NoticeState, ComponentType<ShelfViewProps>>
-
-/** One music library's newest albums, newest first, in a row that scrolls sideways. */
-function RecentShelf({ session, library, title, coverOf }: RecentShelfProps) {
-  const albums = useQuery(
-    session.queries.recentAlbumsQuery({ libraryId: library.id, limit: RECENT_ALBUMS }),
-  )
-  const notice = ((): string | null => {
-    if (albums.error !== null) return albums.error.message
-    if (albums.data === undefined) return LIBRARY_COPY.loading
-    return albums.data.length === 0 ? HOME_COPY.noAlbums : null
-  })()
-  const Shelf = SHELF_VIEWS[noticeStateOf(notice)]
-  return (
-    <View style={styles.shelf}>
-      <Text accessibilityRole="header" style={styles.heading}>
-        {title}
-      </Text>
-      <Shelf albums={albums.data} coverOf={coverOf} notice={notice} />
+    <View style={styles.header}>
+      <WrenLockup size={SIZE.lockup} />
+      <ServerStatusChip session={session} />
     </View>
   )
 }
 
-type MusicLibraries = ReturnType<typeof useMusicLibraries>
+/** With the server out of reach: why, and the way to what plays without it. */
+type OfflineProps = { message: string }
 
-type HomeNoticeOfProps = MusicLibraries
-
-/** What Home says in place of its shelves: why the libraries could not be read, that they are, or that there is no music. */
-const homeNoticeOf = ({ libraries, isRead, failure }: HomeNoticeOfProps): string | null => {
-  if (failure !== null) return failure.message
-  if (!isRead) return LIBRARY_COPY.loading
-  return libraries.length === 0 ? LIBRARY_COPY.noMusic : null
-}
-
-type HomeViewProps = {
-  session: WrenSession
-  libraries: readonly Library[]
-  notice: string | null
-  /** Whether the server could not be read, when the downloads are what plays. */
-  hasFailed: boolean
-}
-
-type HomeNoticeProps = HomeViewProps
-
-/** Why Home has no shelves, and, with the server out of reach, the way to what plays without it. */
-function HomeNotice({ notice, hasFailed }: HomeNoticeProps) {
+function Offline({ message }: OfflineProps) {
+  const styles = useStyles()
   const router = useRouter()
   return (
-    <>
-      <MaybeNotice notice={notice} />
-      {hasFailed && (
-        <FormButton
+    <Card style={styles.offline}>
+      <View accessibilityLiveRegion="polite" style={styles.offlineBody}>
+        <Text accessibilityRole="header" style={styles.offlineTitle}>
+          {OFFLINE_COPY.title}
+        </Text>
+        <Notice text={message} />
+        <Button
+          icon={ICONS.downloads}
           label={OFFLINE_COPY.playDownloads}
           onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
-          tone={BUTTON_TONES.quiet}
+          variant={BUTTON_VARIANTS.secondary}
         />
-      )}
-    </>
+      </View>
+    </Card>
   )
 }
 
-type ShelvesProps = HomeViewProps
+const useGreetingStyles = themedStyles(({ colors }: WrenTheme) => ({
+  [FORM_FACTORS.phone]: { ...TYPE.largeTitle, color: colors.text },
+  [FORM_FACTORS.tablet]: { ...TYPE.tabletTitle, color: colors.text },
+}))
 
-/** A shelf for each music library. */
-function Shelves({ session, libraries }: ShelvesProps) {
-  const coverOf = useCovers(session)
-  return libraries.map((library) => (
-    <RecentShelf
-      coverOf={coverOf}
-      key={library.id}
-      library={library}
-      session={session}
-      title={libraries.length > 1 ? HOME_COPY.recentIn(library.name) : HOME_COPY.recent}
-    />
-  ))
-}
+// Beside Continue listening the shortcuts stack in a column on a tablet; alone they share the row.
+const useBesideStyles = themedStyles(() => ({
+  [FORM_FACTORS.phone]: { flexDirection: 'row', flexGrow: 1, gap: SPACE.s3 },
+  [FORM_FACTORS.tablet]: { flexDirection: 'column', flexGrow: 0, gap: SPACE.s3, width: '40%' },
+}))
 
-/** What Home holds: a shelf per music library, or why it has none. */
-const HOME_VIEWS = {
-  [NOTICE_STATES.notice]: HomeNotice,
-  [NOTICE_STATES.ready]: Shelves,
-} as const satisfies Record<NoticeState, ComponentType<HomeViewProps>>
+type PlaylistsShortcutProps = { session: WrenSession }
 
-type ServerHomeProps = { session: WrenSession }
-
-function ServerHome({ session }: ServerHomeProps) {
-  const music = useMusicLibraries(session)
-  const notice = homeNoticeOf(music)
-  const HomeView = HOME_VIEWS[noticeStateOf(notice)]
+/** The tablet's third shortcut: the account's playlists. */
+function PlaylistsShortcut({ session }: PlaylistsShortcutProps) {
+  const router = useRouter()
+  const playlists = usePlaylists(session)
   return (
-    <HomeView
-      hasFailed={music.failure !== null}
-      libraries={music.libraries}
-      notice={notice}
-      session={session}
+    <ShortcutCard
+      icon={ICONS.playlist}
+      onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.playlists))}
+      title={LIBRARY_PAGE_COPY.playlists}
+      value={valueOf({
+        line: playlists.isSuccess ? countsLineOf({ playlists: playlists.data.length }) : null,
+        none: HOME_COPY.firstPlaylist,
+      })}
     />
   )
 }
 
-/** Wren's first tab: what each music library gained lately, to play next. */
+// What a form factor shows where the other has a piece of its own.
+const Nothing = () => null
+
+const MORE_SHORTCUTS = {
+  [FORM_FACTORS.phone]: Nothing,
+  [FORM_FACTORS.tablet]: PlaylistsShortcut,
+} as const satisfies Record<FormFactor, ComponentType<PlaylistsShortcutProps>>
+
+// The phone's header: the lockup and the server's status; the tablet's sidebar has both.
+const HEADERS = {
+  [FORM_FACTORS.phone]: HomeHeader,
+  [FORM_FACTORS.tablet]: Nothing,
+} as const satisfies Record<FormFactor, ComponentType<HomeHeaderProps>>
+
+type ShortcutsProps = { session: WrenSession; formFactor: FormFactor }
+
+/** Shuffle all and Downloads, and on a tablet Playlists too. */
+function Shortcuts({ session, formFactor }: ShortcutsProps) {
+  const styles = useStyles()
+  const besideStyles = useBesideStyles()
+  const router = useRouter()
+  const music = useMusicLibraries(session)
+  const songs = useSongCount({ session, search: '' })
+  const downloads = useDownloadsSummary(session.server.id)
+  const playTracks = useAudioQueue((store) => store.playTracks)
+  const isBesideContinue = useAudioQueue((store) => playingTrackOf(store) !== null)
+  const MoreShortcut = MORE_SHORTCUTS[formFactor]
+  // A random page of each library, shuffled: every song at once would be too many to queue.
+  const shuffleAll = async () => {
+    const pages = await Promise.all(
+      music.libraries.map((library) =>
+        session.api.listTracks({
+          libraryId: library.id,
+          sort: MUSIC_SORTS.random,
+          limit: MUSIC_PAGE.most,
+          offset: 0,
+        }),
+      ),
+    )
+    playTracks({ tracks: pages.flatMap((page) => page.tracks), isShuffled: true })
+  }
+  return (
+    <View style={isBesideContinue ? besideStyles[formFactor] : styles.shortcuts}>
+      <ShortcutCard
+        icon={ICONS.shuffle}
+        isAccent
+        isDisabled={songs === 0}
+        onPress={() => {
+          shuffleAll().catch(toastFailure)
+        }}
+        title={HOME_COPY.shuffleAll}
+        value={valueOf({
+          line: songs === null ? null : countsLineOf({ songs }),
+          none: LIBRARY_PAGE_COPY.noneYet,
+        })}
+      />
+      <ShortcutCard
+        icon={ICONS.downloads}
+        onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
+        title={LIBRARY_PAGE_COPY.downloads}
+        value={valueOf({
+          line: countsLineOf({ albums: downloads.albums }),
+          none: LIBRARY_PAGE_COPY.noneYet,
+        })}
+      />
+      <MoreShortcut session={session} />
+    </View>
+  )
+}
+
+type RecentViewProps = { albums: readonly AlbumSummary[]; coverOf: CoverOf }
+
+/** The phone's newest albums: a shelf that scrolls sideways. */
+function RecentShelf({ albums, coverOf }: RecentViewProps) {
+  return <Shelf albums={albums} coverOf={coverOf} />
+}
+
+/** The tablet's: a grid of six to a row. */
+function RecentGrid({ albums, coverOf }: RecentViewProps) {
+  return (
+    <TileGrid
+      columns={RECENT_COLUMNS}
+      items={albums.slice(0, TABLET_SHOWN)}
+      keyOf={(album) => album.id}
+      renderTile={({ item, width }) => <AlbumTileOf album={item} coverOf={coverOf} width={width} />}
+    />
+  )
+}
+
+const RECENT_VIEWS = {
+  [FORM_FACTORS.phone]: RecentShelf,
+  [FORM_FACTORS.tablet]: RecentGrid,
+} as const satisfies Record<FormFactor, ComponentType<RecentViewProps>>
+
+type RecentlyAddedProps = { session: WrenSession; coverOf: CoverOf }
+
+/** Every music library's newest albums, and See all, which opens Albums. */
+function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
+  const styles = useStyles()
+  const router = useRouter()
+  const { albums, listing } = useRecentAlbums(session)
+  const Albums = RECENT_VIEWS[useFormFactor()]
+  return (
+    <View style={styles.section}>
+      <SectionHeader
+        onSeeAll={() => router.push(libraryHref(LIBRARY_SEGMENTS.albums))}
+        title={LIBRARY_PAGE_COPY.recent}
+      />
+      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      {albums.length > 0 && <Albums albums={albums} coverOf={coverOf} />}
+    </View>
+  )
+}
+
+type HomePageProps = { session: WrenSession }
+
+function HomePage({ session }: HomePageProps) {
+  const styles = useStyles()
+  const insets = usePageInsets()
+  const formFactor = useFormFactor()
+  const covers = useCovers(session)
+  const { music } = useRecentAlbums(session)
+  const greetingStyles = useGreetingStyles()
+  const Header = HEADERS[formFactor]
+  // Read once as Home opens, so a scroll never changes the greeting under the listener.
+  const [greeting] = useState(() => greetingOf(new Date().getHours()))
+  return (
+    <ScrollView contentContainerStyle={[insets, styles.content]} style={styles.ground}>
+      <Header session={session} />
+      <Text accessibilityRole="header" style={greetingStyles[formFactor]}>
+        {greeting}
+      </Text>
+      {music.failure !== null && <Offline message={music.failure.message} />}
+      <View style={styles[formFactor]}>
+        <ContinueCard covers={covers} />
+        <Shortcuts formFactor={formFactor} session={session} />
+      </View>
+      <RecentlyAdded coverOf={covers.coverOf} session={session} />
+    </ScrollView>
+  )
+}
+
+/**
+ * Wren's first tab: a greeting, the track to pick up again, the ways to shuffle everything or
+ * play what is downloaded, and what every music library gained lately.
+ */
 export function Home() {
   const session = useWren()
-  return (
-    <TabPage title={HOME_COPY.title}>
-      {session !== null && <ServerHome session={session} />}
-    </TabPage>
-  )
+  return session !== null && <HomePage session={session} />
 }
-
-const styles = StyleSheet.create({
-  shelf: { gap: SIZES.space2 },
-  heading: { color: PALETTE.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
-  row: { gap: SIZES.space3 },
-})

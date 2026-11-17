@@ -1,4 +1,11 @@
-import { AUDIO_BITRATES, type AudioBitrate, isAudioBitrate, isRecord } from '@raven/core'
+import {
+  AUDIO_BITRATES,
+  type AudioBitrate,
+  isAudioBitrate,
+  isRecord,
+  nullable,
+  oneOf,
+} from '@raven/core'
 import { loadPersisted } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import { create } from 'zustand'
@@ -12,12 +19,18 @@ export const STORAGE_LIMITS_GB = [null, 2, 5, 10, 20] as const
 
 type StorageLimitGb = (typeof STORAGE_LIMITS_GB)[number]
 
+/** How Wren picks its palette: the system's, or always light or dark. */
+export const APPEARANCES = { system: 'system', light: 'light', dark: 'dark' } as const
+
+export type Appearance = (typeof APPEARANCES)[keyof typeof APPEARANCES]
+
+const isAppearance = oneOf(Object.values(APPEARANCES))
+
 const isStorageLimitGb = (value: unknown): value is StorageLimitGb =>
   STORAGE_LIMITS_GB.some((limit) => limit === value)
 
 /** A cellular quality: a transcode's bitrate, or null for the file itself. */
-const isCellularKbps = (value: unknown): value is AudioBitrate | null =>
-  value === null || isAudioBitrate(value)
+const isCellularKbps = nullable(isAudioBitrate)
 
 /** What this device keeps of the listener's choices. */
 type WrenPrefsValues = {
@@ -27,6 +40,8 @@ type WrenPrefsValues = {
   cellularKbps: AudioBitrate | null
   /** How much the downloads may take, in gigabytes; null for no limit. */
   storageLimitGb: StorageLimitGb
+  /** Whether Wren follows the system's light or dark, or keeps one. */
+  appearance: Appearance
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -34,11 +49,15 @@ type WrenPrefs = WrenPrefsValues & {
   change: (change: Partial<WrenPrefsValues>) => void
 }
 
-/** A fresh install: downloads and the cellular stream at 256 kbps, and no storage limit. */
+/**
+ * A fresh install: downloads and the cellular stream at 256 kbps, no storage limit, and the
+ * system's appearance.
+ */
 export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   downloadKbps: AUDIO_BITRATES.standard,
   cellularKbps: AUDIO_BITRATES.standard,
   storageLimitGb: null,
+  appearance: APPEARANCES.system,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -54,10 +73,11 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
     storageLimitGb: isStorageLimitGb(kept.storageLimitGb)
       ? kept.storageLimitGb
       : DEFAULT_WREN_PREFS.storageLimitGb,
+    appearance: isAppearance(kept.appearance) ? kept.appearance : DEFAULT_WREN_PREFS.appearance,
   }
 }
 
-/** Settings' download and streaming choices, persisted to AsyncStorage and guarded when read. */
+/** Settings' appearance, download and streaming choices, persisted to AsyncStorage and guarded when read. */
 export const useWrenPrefs = create<WrenPrefs>()(
   persist(
     (set) => ({
@@ -68,10 +88,11 @@ export const useWrenPrefs = create<WrenPrefs>()(
       name: WREN_PREFS_KEY,
       storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
-      partialize: ({ downloadKbps, cellularKbps, storageLimitGb }) => ({
+      partialize: ({ downloadKbps, cellularKbps, storageLimitGb, appearance }) => ({
         downloadKbps,
         cellularKbps,
         storageLimitGb,
+        appearance,
       }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },

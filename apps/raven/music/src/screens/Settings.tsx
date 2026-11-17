@@ -1,156 +1,98 @@
-import { AUDIO_BITRATES, formatBytes } from '@raven/core'
-import { IGNORED, BUTTON_TONES } from '@raven/native/headless'
-import type { ReactNode } from 'react'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import type { ComponentType, ReactNode } from 'react'
+import { ScrollView, View } from 'react-native'
 
-import packageJson from '#package'
-import { FormButton } from '@/components/Form'
-import { type SegmentKey, Segments } from '@/components/Segments'
-import { TabPage } from '@/components/TabPage'
-import { usedBytesOf, useDownloads } from '@/downloads/downloadStore'
 import { SETTINGS_COPY } from '@/screens/copy'
-import { useWrenAccount } from '@/session'
-import { STORAGE_LIMITS_GB, useWrenPrefs } from '@/stores/wrenPrefs'
-import { PALETTE, SIZES } from '@/theme/wrenTheme'
+import { AboutGroup } from '@/screens/settings/AboutGroup'
+import { AccountCard } from '@/screens/settings/AccountCard'
+import { AppearanceGroup } from '@/screens/settings/AppearanceGroup'
+import { DownloadsGroup, RemoveAllDownloads } from '@/screens/settings/DownloadsGroup'
+import { ServerGroup } from '@/screens/settings/ServerGroup'
+import { usePageInsets } from '@/shell/useShell'
+import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
+import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { PageHeader } from '@/ui/PageHeader'
 import { useWren } from '@/useWren'
 
-type SectionProps = { title: string; children: ReactNode }
+const useStyles = themedStyles(() => ({
+  page: { gap: SPACE.s6 },
+  column: { gap: SPACE.s6 },
+  columns: { alignItems: 'flex-start', flexDirection: 'row', gap: SPACE.s8 },
+  half: { flex: 1, gap: SPACE.s6, minWidth: 0 },
+}))
 
-function Section({ title, children }: SectionProps) {
+/** Settings' groups, each drawn once, which a layout arranges. */
+type SettingsGroups = {
+  account: ReactNode
+  server: ReactNode
+  appearance: ReactNode
+  downloads: ReactNode
+  removeAll: ReactNode
+  about: ReactNode
+}
+
+type SettingsLayoutProps = { groups: SettingsGroups }
+
+/** The phone stacks the groups in one column, the downloads before About. */
+function OneColumn({ groups }: SettingsLayoutProps) {
+  const styles = useStyles()
   return (
-    <View style={styles.section}>
-      <Text accessibilityRole="header" style={styles.heading}>
-        {title}
-      </Text>
-      {children}
+    <View style={styles.column}>
+      {groups.account}
+      {groups.server}
+      {groups.appearance}
+      {groups.downloads}
+      {groups.removeAll}
+      {groups.about}
     </View>
   )
 }
 
-const BITRATE_CHOICES = Object.values(AUDIO_BITRATES).map((kbps) => ({
-  key: kbps,
-  label: SETTINGS_COPY.kbps(kbps),
-}))
-
-/** A cellular stream at a transcode's bitrate, or the file itself. */
-const CELLULAR_CHOICES = [{ key: null, label: SETTINGS_COPY.original }, ...BITRATE_CHOICES]
-
-const STORAGE_CHOICES = STORAGE_LIMITS_GB.map((gigabytes) => ({
-  key: gigabytes,
-  label: gigabytes === null ? SETTINGS_COPY.noLimit : SETTINGS_COPY.gigabytes(gigabytes),
-}))
-
-type ChoiceRowProps<K extends SegmentKey> = {
-  label: string
-  choices: readonly { key: K; label: string }[]
-  selected: K
-  onSelect: (key: K) => void
-}
-
-/** A setting named over the values it may take, one of them picked. */
-function ChoiceRow<K extends SegmentKey>({
-  label,
-  choices,
-  selected,
-  onSelect,
-}: ChoiceRowProps<K>) {
+/** The tablet sets the downloads beside the account, the server, the appearance and About. */
+function TwoColumns({ groups }: SettingsLayoutProps) {
+  const styles = useStyles()
   return (
-    <View style={styles.choice}>
-      <Text style={styles.line}>{label}</Text>
-      <Segments onSelect={onSelect} segments={choices} selected={selected} />
+    <View style={styles.columns}>
+      <View style={styles.half}>
+        {groups.account}
+        {groups.server}
+        {groups.appearance}
+        {groups.about}
+      </View>
+      <View style={styles.half}>
+        {groups.downloads}
+        {groups.removeAll}
+      </View>
     </View>
   )
 }
 
-type ConfirmRemoveAllProps = { onRemove: () => void }
+/** Where a screen sets the groups: one column on a phone, two on a tablet. */
+const LAYOUTS = {
+  [FORM_FACTORS.phone]: OneColumn,
+  [FORM_FACTORS.tablet]: TwoColumns,
+} as const satisfies Record<FormFactor, ComponentType<SettingsLayoutProps>>
 
-/** Asks before every download goes, with Cancel first and Remove as the destructive choice. */
-const confirmRemoveAll = ({ onRemove }: ConfirmRemoveAllProps) =>
-  Alert.alert(SETTINGS_COPY.removeAllTitle, SETTINGS_COPY.removeAllMessage, [
-    { text: SETTINGS_COPY.cancel, style: 'cancel' },
-    { text: SETTINGS_COPY.remove, style: 'destructive', onPress: onRemove },
-  ])
-
-/** The quality downloads and the cellular stream take, how much downloads may use and do, and a way to remove them all. */
-function DownloadSettings() {
-  const downloadKbps = useWrenPrefs((state) => state.downloadKbps)
-  const cellularKbps = useWrenPrefs((state) => state.cellularKbps)
-  const storageLimitGb = useWrenPrefs((state) => state.storageLimitGb)
-  const change = useWrenPrefs((state) => state.change)
-  const used = useDownloads((state) => usedBytesOf(state.entries))
-  const hasDownloads = useDownloads((state) => Object.keys(state.entries).length > 0)
-  const removeAll = useDownloads((state) => state.removeAll)
-  return (
-    <Section title={SETTINGS_COPY.downloads}>
-      <ChoiceRow
-        choices={BITRATE_CHOICES}
-        label={SETTINGS_COPY.downloadQuality}
-        onSelect={(kbps) => change({ downloadKbps: kbps })}
-        selected={downloadKbps}
-      />
-      <ChoiceRow
-        choices={CELLULAR_CHOICES}
-        label={SETTINGS_COPY.cellularQuality}
-        onSelect={(kbps) => change({ cellularKbps: kbps })}
-        selected={cellularKbps}
-      />
-      <ChoiceRow
-        choices={STORAGE_CHOICES}
-        label={SETTINGS_COPY.storageLimit}
-        onSelect={(gigabytes) => change({ storageLimitGb: gigabytes })}
-        selected={storageLimitGb}
-      />
-      <Text style={styles.muted}>{SETTINGS_COPY.used(formatBytes(used))}</Text>
-      <FormButton
-        isDisabled={!hasDownloads}
-        label={SETTINGS_COPY.removeAll}
-        onPress={() =>
-          confirmRemoveAll({
-            onRemove: () => {
-              removeAll().catch(IGNORED)
-            },
-          })
-        }
-        tone={BUTTON_TONES.quiet}
-      />
-    </Section>
-  )
-}
-
-/** Who is signed in and to which server, the downloads, a way to sign out, and which Wren this is. */
+/**
+ * The account and Sign out, the server and whether it answers, the appearance, the downloads'
+ * quality, limit and use, Remove all downloads, and which Wren this is.
+ */
 export function Settings() {
-  const email = useWrenAccount((state) => state.session?.email ?? null)
-  const signOut = useWrenAccount((state) => state.signOut)
-  const server = useWren()?.server ?? null
+  const styles = useStyles()
+  const insets = usePageInsets()
+  const session = useWren()
+  const Layout = LAYOUTS[useFormFactor()]
+  const groups = {
+    account: <AccountCard />,
+    server: session !== null && <ServerGroup session={session} />,
+    appearance: <AppearanceGroup />,
+    downloads: <DownloadsGroup />,
+    removeAll: <RemoveAllDownloads serverName={session?.server.name ?? null} />,
+    about: <AboutGroup />,
+  }
   return (
-    <TabPage title={SETTINGS_COPY.title}>
-      <Section title={SETTINGS_COPY.account}>
-        {email !== null && <Text style={styles.line}>{SETTINGS_COPY.signedInAs(email)}</Text>}
-        <FormButton label={SETTINGS_COPY.signOut} onPress={signOut} tone={BUTTON_TONES.quiet} />
-      </Section>
-      {server !== null && (
-        <Section title={SETTINGS_COPY.server}>
-          <Text style={styles.line}>{server.name}</Text>
-          <Text style={styles.muted}>{server.origin}</Text>
-        </Section>
-      )}
-      <DownloadSettings />
-      <Section title={SETTINGS_COPY.about}>
-        <Text style={styles.muted}>{SETTINGS_COPY.version(packageJson.version)}</Text>
-      </Section>
-    </TabPage>
+    <ScrollView contentContainerStyle={[styles.page, insets]}>
+      <PageHeader title={SETTINGS_COPY.title} />
+      <Layout groups={groups} />
+    </ScrollView>
   )
 }
-
-const styles = StyleSheet.create({
-  section: {
-    gap: SIZES.space2,
-    padding: SIZES.space3,
-    borderRadius: SIZES.radius,
-    backgroundColor: PALETTE.raised,
-  },
-  choice: { gap: SIZES.space1 },
-  heading: { color: PALETTE.muted, fontSize: SIZES.textSm, fontWeight: 'bold' },
-  line: { color: PALETTE.text, fontSize: SIZES.text },
-  muted: { color: PALETTE.muted, fontSize: SIZES.text },
-})

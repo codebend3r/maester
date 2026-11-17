@@ -50,6 +50,8 @@ type QueryKeysRecentAlbumsProps = { libraryId: number; limit: number }
 
 type QueryKeysSongsProps = { libraryIds: readonly number[]; search: string; sort: string }
 
+type QueryKeysSongCountProps = { libraryId: number; search: string }
+
 type QueryKeysAlbumMatchSearchProps = { albumId: number; query: string }
 
 type QueryKeysEveryonesHistoryProps = { accountId: string | null; show: PlayHistoryShow }
@@ -238,6 +240,13 @@ export const queryKeys = {
     'music',
     'songs',
     { libraryIds, search, sort },
+  ],
+  /** How many tracks a music library holds that `search` finds, under the music like the songs. */
+  songCount: ({ libraryId, search }: QueryKeysSongCountProps) => [
+    'music',
+    'songs',
+    'count',
+    { libraryId, search },
   ],
   /** The account's mixes for today, and each one's tracks, under the music so a scan reads them again. */
   mixes: ['music', 'mixes'],

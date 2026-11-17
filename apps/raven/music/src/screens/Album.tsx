@@ -1,126 +1,166 @@
 import {
   type AlbumDetails,
-  QUEUE_SOURCE_KINDS,
-  routeIdOf,
   type AlbumTrack,
+  QUEUE_SOURCE_KINDS,
   albumDiscsOf,
-  albumFactsOf,
+  artistNames,
+  routeIdOf,
 } from '@raven/core'
 import { playingTrackOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, SectionList, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
+import { SectionList, Text } from 'react-native'
 
-import { AlbumArt } from '@/components/AlbumTile'
-import { FavouriteToggle, PlayButtons } from '@/components/Controls'
-import { BackButton, DetailRoute } from '@/components/DetailPage'
+import { DetailAction } from '@/components/DetailAction'
 import { DownloadButton } from '@/components/DownloadButton'
-import { Notice } from '@/components/Notice'
-import { pageStyles, useListContent } from '@/components/TabPage'
+import { FavouriteAction } from '@/components/FavouriteAction'
+import { MENU_VIEWS, type MenuView, TracksMenu } from '@/components/TrackMenu'
 import { TrackRow } from '@/components/TrackRow'
 import { DOWNLOAD_SOURCES } from '@/downloads/downloadStore'
 import { useCovers } from '@/music/useCovers'
+import { WREN_ROUTE_PARAMS } from '@/routes'
 import { ALBUM_COPY } from '@/screens/copy'
-import { WREN_PAGES, WREN_ROUTE_PARAMS, pageHref } from '@/routes'
-import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
+import { ArtistLinks } from '@/screens/detail/ArtistLinks'
+import { CollectionHead } from '@/screens/detail/CollectionHead'
+import { albumMetaOf } from '@/screens/detail/detailFacts'
+import { DetailRoute } from '@/screens/detail/DetailRoute'
+import { DetailSplit } from '@/screens/detail/DetailSplit'
+import { useToast } from '@/stores/toast'
+import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
+import { SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { PLAYER_COPY } from '@/ui/copy'
+import { SONG_LEADS } from '@/ui/songLead'
+import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
+
+// A tablet's tracklist marks the playing row with a soft fill as well as the equalizer.
+const IS_ROW_HIGHLIGHTED = {
+  [FORM_FACTORS.phone]: false,
+  [FORM_FACTORS.tablet]: true,
+} as const satisfies Record<FormFactor, boolean>
+
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  disc: { ...TYPE.overline, color: colors.text3, paddingBottom: SPACE.s2, paddingTop: SPACE.s5 },
+}))
 
 type AlbumPageProps = { session: WrenSession; details: AlbumDetails }
 
+type AlbumDisc = { key: string; title: string | null; data: AlbumTrack[] }
+
 type RenderRowProps = { item: AlbumTrack }
 
+type RenderDiscProps = { section: AlbumDisc }
+
 function AlbumPage({ session, details }: AlbumPageProps) {
-  const router = useRouter()
-  const { width } = useWindowDimensions()
-  const content = useListContent()
-  const coverOf = useCovers(session)
+  const styles = useStyles()
+  const { colors } = useWrenTheme()
+  const formFactor = useFormFactor()
+  const { coverOf } = useCovers(session)
   const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
   const playTracks = useAudioQueue((store) => store.playTracks)
+  const addToQueue = useAudioQueue((store) => store.addToQueue)
+  const toast = useToast((state) => state.show)
   const { album, tracks, discCount, isFavourite } = details
   const favourite = useServerAlbumFavourite({ api: session.api, albumId: album.id })
-  const [refusal, setRefusal] = useState<string | null>(null)
+  const [menu, setMenu] = useState<MenuView | null>(null)
   const source = { kind: QUEUE_SOURCE_KINDS.album, id: album.id } as const
-  const coverSize = Math.min(width - 2 * SIZES.space4, SIZES.measure / 2)
-  const discs = albumDiscsOf({ tracks, discCount }).map((disc) => ({ ...disc, data: disc.tracks }))
+  const cover = coverOf({ albumId: album.id, coverVersion: album.coverVersion })
+  const discs = albumDiscsOf({ tracks, discCount }).map(({ key, title, tracks: data }) => ({
+    key,
+    title,
+    data,
+  }))
+  const [artist] = album.artists
+  const toggleFavourite = () =>
+    favourite.attempt({
+      variables: !isFavourite,
+      onRefused: (error) => toast(error.message),
+    })
+  const queueAlbum = () => {
+    addToQueue(tracks)
+    toast(ALBUM_COPY.queued(album.title))
+  }
   const renderRow = ({ item }: RenderRowProps) => {
     const track = tracks[item.index]
     return (
       track !== undefined && (
         <TrackRow
-          isPlaying={item.id === playingId}
+          isCurrent={item.id === playingId}
+          isHighlighted={IS_ROW_HIGHLIGHTED[formFactor]}
           label={item.label}
-          lead={item.number}
           length={item.length}
-          line={null}
+          lead={{ kind: SONG_LEADS.number, number: item.number }}
           onPress={() => playTracks({ tracks, startAt: item.index, source })}
           track={track}
         />
       )
     )
   }
+  const renderDisc = ({ section }: RenderDiscProps) =>
+    section.title !== null && (
+      <Text accessibilityRole="header" style={styles.disc}>
+        {section.title}
+      </Text>
+    )
   return (
-    <SectionList
-      ListHeaderComponent={
-        <View style={pageStyles.header}>
-          <BackButton />
-          <View style={styles.head}>
-            <AlbumArt
-              cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
-              size={coverSize}
-              initial={album.title.slice(0, 1)}
-            />
-            <Text accessibilityRole="header" style={styles.title}>
-              {album.title}
-            </Text>
-            <View style={styles.artists}>
-              {album.artists.map((artist) => (
-                <Pressable
-                  accessibilityLabel={ALBUM_COPY.openArtist(artist.name)}
-                  accessibilityRole="link"
-                  key={artist.id}
-                  onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: artist.id }))}
-                  style={({ pressed }) => pressed && styles.pressed}
-                >
-                  <Text style={styles.artist}>{artist.name}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.facts}>{albumFactsOf({ album })}</Text>
-          </View>
-          <View style={styles.actions}>
-            <PlayButtons
-              onPlay={() => playTracks({ tracks, source })}
-              onShuffle={() => playTracks({ tracks, source, isShuffled: true })}
-            />
-            <FavouriteToggle isOn={isFavourite} onToggle={() => favourite.mutate(!isFavourite)} />
-          </View>
-          <View style={styles.actions}>
-            <DownloadButton
-              collection={{ kind: DOWNLOAD_SOURCES.album, album }}
-              onRefusal={setRefusal}
-              serverId={session.server.id}
-              tracks={tracks}
-            />
-          </View>
-          {favourite.failure !== null && <Notice text={favourite.failure.message} />}
-          {refusal !== null && <Notice text={refusal} />}
-        </View>
-      }
-      contentContainerStyle={content}
-      keyExtractor={(row) => row.key}
-      renderItem={renderRow}
-      renderSectionHeader={({ section }) =>
-        section.title !== null && (
-          <Text accessibilityRole="header" style={styles.disc}>
-            {section.title}
-          </Text>
-        )
-      }
-      sections={discs}
-      stickySectionHeadersEnabled={false}
-      style={pageStyles.ground}
-    />
+    <>
+      <DetailSplit
+        head={
+          <CollectionHead
+            actions={
+              <>
+                <DownloadButton
+                  collection={{ kind: DOWNLOAD_SOURCES.album, album }}
+                  cover={cover}
+                  serverId={session.server.id}
+                  title={album.title}
+                  tracks={tracks}
+                />
+                <FavouriteAction
+                  isOn={isFavourite}
+                  label={PLAYER_COPY.like}
+                  onToggle={toggleFavourite}
+                />
+                <DetailAction
+                  glyph={<WrenIcon color={colors.text2} name={ICONS.queueAdd} />}
+                  label={PLAYER_COPY.queue}
+                  onPress={queueAlbum}
+                />
+              </>
+            }
+            byline={<ArtistLinks artists={album.artists} />}
+            cover={cover}
+            meta={albumMetaOf({ details })}
+            onMore={() => setMenu(MENU_VIEWS.actions)}
+            onPlay={() => playTracks({ tracks, source })}
+            onShuffle={() => playTracks({ tracks, source, isShuffled: true })}
+            title={album.title}
+          />
+        }
+        renderList={(frame) => (
+          <SectionList
+            {...frame}
+            keyExtractor={(row) => row.key}
+            renderItem={renderRow}
+            renderSectionHeader={renderDisc}
+            sections={discs}
+            stickySectionHeadersEnabled={false}
+          />
+        )}
+      />
+      {menu !== null && (
+        <TracksMenu
+          canAddToPlaylist
+          head={{ title: album.title, subtitle: artistNames(album), cover }}
+          onView={setMenu}
+          places={{ artist }}
+          session={session}
+          tracksOf={async () => tracks}
+          view={menu}
+        />
+      )}
+    </>
   )
 }
 
@@ -135,31 +175,13 @@ function ServerAlbum({ session, id }: ServerAlbumProps) {
   )
 }
 
-/** `/album/[id]`: the cover, the artists and the facts, Play and Shuffle, and the tracks by disc. */
+/**
+ * `/album/[id]`: the cover, the artists and the facts, Play and Shuffle, Download, Like and
+ * Queue, and the tracks by disc; on a tablet the head and the tracklist side by side.
+ */
 export function Album() {
   const session = useWren()
   const params = useLocalSearchParams()
   const id = routeIdOf(params[WREN_ROUTE_PARAMS.id])
   return session !== null && <ServerAlbum id={id} session={session} />
 }
-
-const styles = StyleSheet.create({
-  head: { alignItems: 'center', gap: SIZES.space2 },
-  title: { color: PALETTE.text, fontSize: SIZES.textXl, fontWeight: 'bold', textAlign: 'center' },
-  artists: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space2, justifyContent: 'center' },
-  artist: { color: PALETTE.accent, fontSize: SIZES.text, fontWeight: 'bold' },
-  facts: { color: PALETTE.muted, fontSize: SIZES.textSm },
-  actions: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: SIZES.space2,
-    justifyContent: 'center',
-  },
-  disc: {
-    color: PALETTE.text,
-    fontSize: SIZES.textLg,
-    fontWeight: 'bold',
-    paddingVertical: SIZES.space2,
-  },
-  pressed: { opacity: OPACITIES.pressed },
-})

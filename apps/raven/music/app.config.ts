@@ -1,6 +1,4 @@
-import { DEFAULT_THEME } from '@raven/core'
 import { BUILD_ENV, buildNumberOf, isDevelopmentVariant } from '@raven/native/headless'
-import { themeTokens } from '@raven/ui/designTokens'
 import type { ConfigContext, ExpoConfig } from 'expo/config'
 
 import packageJson from '#package'
@@ -9,7 +7,7 @@ import packageJson from '#package'
  * `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
  * the app come in by their relative path and extension.
  */
-import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
+import { BRAND, COLORS, FONT_FILES } from './src/theme/wrenTokens.ts'
 import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
 import { CARPLAY_FLAG, withCarPlay } from './plugins/withCarPlay.ts'
 import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
@@ -29,19 +27,7 @@ const isCarPlay = process.env[CARPLAY_FLAG.name] === CARPLAY_FLAG.on
 
 const LOCAL_NETWORK_USE = 'Wren reaches your raven server on your local network.'
 
-/**
- * The default theme's ground, from themes.scss through the built tokens, for what the system
- * draws before Wren's first frame: the splash, and the window behind the app. The system cannot
- * know the theme picked, so it is the default's dark, never a white flash.
- */
-const launchGround = (): string => {
-  const ground = themeTokens[DEFAULT_THEME]?.[PALETTE_TOKENS.ground] ?? null
-  if (ground === null) throw new Error(`themes.scss gives ${DEFAULT_THEME} no ground`)
-  return ground
-}
-
 export default ({ config }: ConfigContext): ExpoConfig => {
-  const ground = launchGround()
   const base: ExpoConfig = {
     ...config,
     // What the home screen writes under the icon, and the name of the Xcode project.
@@ -50,6 +36,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     scheme: 'wren',
     version: packageJson.version,
     orientation: 'default',
+    /*
+     * Wren follows the system's light or dark unless Settings' Appearance keeps one. Android
+     * reads this through expo-system-ui.
+     */
+    userInterfaceStyle: 'automatic',
     // The brand's files and when each is used: assets/brand/README.md.
     icon: WREN_ICONS.app,
     ios: {
@@ -82,15 +73,29 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       adaptiveIcon: {
         foregroundImage: WREN_ICONS.adaptive,
         monochromeImage: WREN_ICONS.monochrome,
-        backgroundColor: ground,
+        // The icon's ground is the brand's Night, the colour its foreground was drawn on.
+        backgroundColor: BRAND.night,
       },
       /*
        * The window's own colour, under the app. iOS reads its counterpart only through
        * expo-system-ui; there the splash covers the window until Wren draws.
        */
-      backgroundColor: ground,
+      backgroundColor: COLORS.dark.bg,
     },
-    plugins: ['expo-router', ['expo-splash-screen', { backgroundColor: ground }]],
+    plugins: [
+      'expo-router',
+      // What the system draws before Wren's first frame, in the system's own light or dark.
+      [
+        'expo-splash-screen',
+        { backgroundColor: COLORS.light.bg, dark: { backgroundColor: COLORS.dark.bg } },
+      ],
+      /*
+       * Young Serif and Instrument Sans, embedded in both native projects, so they are there at
+       * the first frame. Each file is named by its face's PostScript name, which is the family
+       * on iOS and Android alike.
+       */
+      ['expo-font', { fonts: FONT_FILES }],
+    ],
   }
   /*
    * CarPlay and Android Auto browse and play through `@raven/audio`'s browse bridge. CarPlay's

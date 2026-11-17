@@ -1,12 +1,30 @@
 import { jest } from '@jest/globals'
 import type * as Audio from '@raven/audio'
 import { configure } from '@testing-library/react-native'
+import { Dimensions } from 'react-native'
+import { setUpTests } from 'react-native-reanimated'
+import 'react-native-gesture-handler/jestSetup'
 
 /*
  * A loaded CI runner can spend seconds on a file's first render while jest compiles what
  * the screen imports, past the library's one second wait.
  */
 configure({ asyncUtilTimeout: 10_000 })
+
+/*
+ * Reanimated's and Worklets' documented jest setup: worklets run on the JS thread, from
+ * Worklets' own mock, and animations on jest's timers.
+ */
+jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'))
+setUpTests()
+
+/*
+ * React Native's jest window is 750 by 1334, wide enough for Wren's tablet layout. The screens
+ * are tested on a phone, an iPhone 16's window, unless a test sets a tablet's itself.
+ */
+export const PHONE_WINDOW = { width: 393, height: 852, scale: 3, fontScale: 1 } as const
+
+Dimensions.set({ window: PHONE_WINDOW, screen: PHONE_WINDOW })
 
 /*
  * `WrenRoot` mounts the audio host on every screen, and jest has no native player: each call

@@ -1,40 +1,99 @@
-import { artistNames, playlistFactsOf } from '@raven/core'
-import { BROWSE_KINDS, type BrowseTarget, browseIdOf, queueSourceOf } from '@raven/native/headless'
+import { formatBytes } from '@raven/core'
+import { queueSourceOf } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
-import type { ReactElement } from 'react'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { FlatList, Pressable, Text, View } from 'react-native'
 
-import { AlbumArt } from '@/components/AlbumTile'
-import { Notice } from '@/components/Notice'
-import { pageStyles, useListContent } from '@/components/TabPage'
+import { PlayButtons } from '@/components/PlayButtons'
 import { useDownloads } from '@/downloads/downloadStore'
-import { downloadedLibraryOf } from '@/downloads/downloadViews'
 import { deviceDisk } from '@/downloads/downloader'
+import { useStorageMeter } from '@/downloads/storageMeter'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
+import { CollectionHeader } from '@/screens/library/CollectionHeader'
+import { type DownloadedRow, allTracksOf, downloadRowsOf } from '@/screens/library/downloadRows'
+import { WREN_ROUTES } from '@/routes'
+import { usePageInsets } from '@/shell/useShell'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
+import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
+import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { AlbumArt } from '@/ui/AlbumArt'
+import { Card } from '@/ui/Card'
+import { EmptyState } from '@/ui/EmptyState'
+import { MeterBar } from '@/ui/MeterBar'
+import { pressedStyleOf } from '@/ui/press'
+import { TextLink } from '@/ui/TextLink'
+import { ICONS } from '@/ui/WrenIcon'
 
-/** One downloaded album or playlist as its row shows it, and what it plays. */
-type DownloadedRow = {
-  title: string
-  line: string
-  target: BrowseTarget
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  ground: { backgroundColor: colors.bg, flex: 1 },
+  header: { paddingBottom: SPACE.s2 },
+  card: { gap: SPACE.s3, padding: SPACE.s4 },
+  cardRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: SPACE.s3,
+    justifyContent: 'space-between',
+  },
+  cardTitle: { ...TYPE.rowStrong, color: colors.text },
+  cardValue: { ...TYPE.meta, color: colors.text2 },
+  actions: { flexDirection: 'row', gap: SPACE.s3 },
+  row: {
+    alignItems: 'center',
+    borderBottomColor: colors.line,
+    borderBottomWidth: SIZE.hairline,
+    flexDirection: 'row',
+    gap: SIZE.rowGap,
+    minHeight: SIZE.row,
+    paddingVertical: SPACE.s2,
+  },
+  text: { flex: 1 },
+  title: { ...TYPE.rowTitle, color: colors.text },
+  line: { ...TYPE.meta, color: colors.text2 },
+  size: { ...TYPE.time, color: colors.text3 },
+}))
+
+/** What the downloads take of the limit, their quality, and the way to Settings to change them. */
+function StorageCard() {
+  const styles = useStyles()
+  const router = useRouter()
+  const kbps = useWrenPrefs((state) => state.downloadKbps)
+  const { value, fraction } = useStorageMeter()
+  return (
+    <Card style={styles.card}>
+      <View style={styles.cardRow}>
+        <Text style={styles.cardTitle}>{LIBRARY_PAGE_COPY.onThisDevice}</Text>
+        <Text style={styles.cardValue}>{value}</Text>
+      </View>
+      {fraction !== null && <MeterBar fraction={fraction} />}
+      <View style={styles.cardRow}>
+        <Text style={styles.cardValue}>{LIBRARY_PAGE_COPY.quality(kbps)}</Text>
+        <TextLink
+          label={LIBRARY_PAGE_COPY.manage}
+          onPress={() => router.navigate(WREN_ROUTES.settings)}
+          isLink
+          spoken={LIBRARY_PAGE_COPY.manageLabel}
+        />
+      </View>
+    </Card>
+  )
 }
 
-type DownloadRowProps = { row: DownloadedRow; artworkUri: string | null; onPress: () => void }
+type DownloadRowProps = { row: DownloadedRow; onPress: () => void }
 
-/** A downloaded album or playlist: the cover saved with it, its name and what it holds. */
-function DownloadRow({ row, artworkUri, onPress }: DownloadRowProps) {
+/** A downloaded album or playlist: the cover saved with it, its name, what it holds and takes. */
+function DownloadRow({ row, onPress }: DownloadRowProps) {
+  const styles = useStyles()
   return (
     <Pressable
       accessibilityLabel={row.title}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={pressedStyleOf({ style: styles.row })}
     >
       <AlbumArt
-        cover={artworkUri === null ? null : { uri: artworkUri, headers: {} }}
-        size={SIZES.fieldHeight}
-        initial={row.title.slice(0, 1)}
+        cover={row.artworkUri === null ? null : { uri: row.artworkUri, headers: {} }}
+        radius={RADIUS.thumb}
+        size={SIZE.buttonLarge}
       />
       <View style={styles.text}>
         <Text numberOfLines={1} style={styles.title}>
@@ -44,70 +103,63 @@ function DownloadRow({ row, artworkUri, onPress }: DownloadRowProps) {
           {row.line}
         </Text>
       </View>
+      <Text style={styles.size}>{formatBytes(row.bytes)}</Text>
     </Pressable>
   )
 }
 
-type DownloadsListProps = { serverId: string; header: ReactElement }
-
-/**
- * Library's Downloads: the albums, then the playlists, downloaded from this server, read from
- * the device alone, so the list plays with the server out of reach. A row wears the cover saved
- * with it and plays its tracks from their files.
- */
-export function DownloadsList({ serverId, header }: DownloadsListProps) {
-  const content = useListContent()
-  const entries = useDownloads((state) => state.entries)
-  const playlists = useDownloads((state) => state.playlists)
-  const playTracks = useAudioQueue((store) => store.playTracks)
-  const library = downloadedLibraryOf({ entries, playlists, serverId, uriOf: deviceDisk.uriOf })
-  const rows: DownloadedRow[] = [
-    ...library.albums().map((album) => ({
-      title: album.title,
-      line: artistNames(album),
-      target: { kind: BROWSE_KINDS.album, albumId: album.id } as const,
-    })),
-    ...library.playlists().map((playlist) => ({
-      title: playlist.name,
-      line: playlistFactsOf({ playlist }),
-      target: { kind: BROWSE_KINDS.playlist, playlistId: playlist.id } as const,
-    })),
-  ]
+function NothingDownloaded() {
   return (
-    <FlatList
-      ListEmptyComponent={<Notice text={LIBRARY_PAGE_COPY.noDownloads} />}
-      ListHeaderComponent={header}
-      contentContainerStyle={content}
-      data={rows}
-      keyExtractor={(row) => browseIdOf(row.target)}
-      renderItem={({ item }) => (
-        <DownloadRow
-          artworkUri={library.artworkOf(item.target)}
-          onPress={() =>
-            playTracks({
-              tracks: library.tracksOf(item.target),
-              source: queueSourceOf(item.target),
-            })
-          }
-          row={item}
-        />
-      )}
-      style={pageStyles.ground}
+    <EmptyState
+      body={LIBRARY_PAGE_COPY.noDownloadsHint}
+      icon={ICONS.downloads}
+      title={LIBRARY_PAGE_COPY.noDownloads}
     />
   )
 }
 
-const styles = StyleSheet.create({
-  row: {
-    alignItems: 'center',
-    borderBottomColor: PALETTE.line,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: SIZES.space3,
-    paddingVertical: SIZES.space2,
-  },
-  text: { flex: 1, gap: SIZES.space1 },
-  title: { color: PALETTE.text, fontSize: SIZES.text, fontWeight: 'bold' },
-  line: { color: PALETTE.muted, fontSize: SIZES.textSm },
-  pressed: { opacity: OPACITIES.pressed },
-})
+type DownloadsListProps = { serverId: string; onBack: () => void }
+
+/**
+ * Library's Downloads: what the downloads take, then the albums and the playlists downloaded
+ * from this server, read from the device alone, so the list plays with the server out of reach.
+ * A row wears the cover saved with it and plays its tracks from their files.
+ */
+export function DownloadsList({ serverId, onBack }: DownloadsListProps) {
+  const styles = useStyles()
+  const insets = usePageInsets()
+  const entries = useDownloads((state) => state.entries)
+  const playlists = useDownloads((state) => state.playlists)
+  const playTracks = useAudioQueue((store) => store.playTracks)
+  const rows = downloadRowsOf({ entries, playlists, serverId, uriOf: deviceDisk.uriOf })
+  const tracks = allTracksOf(rows)
+  return (
+    <FlatList
+      ListEmptyComponent={<NothingDownloaded />}
+      ListHeaderComponent={
+        <CollectionHeader onBack={onBack} title={LIBRARY_PAGE_COPY.downloads}>
+          {rows.length > 0 && <StorageCard />}
+          {rows.length > 0 && (
+            <View style={styles.actions}>
+              <PlayButtons
+                onPlay={() => playTracks({ tracks })}
+                onShuffle={() => playTracks({ tracks, isShuffled: true })}
+              />
+            </View>
+          )}
+        </CollectionHeader>
+      }
+      ListHeaderComponentStyle={styles.header}
+      contentContainerStyle={insets}
+      data={rows}
+      keyExtractor={(row) => row.key}
+      renderItem={({ item }) => (
+        <DownloadRow
+          onPress={() => playTracks({ tracks: item.tracks, source: queueSourceOf(item.target) })}
+          row={item}
+        />
+      )}
+      style={styles.ground}
+    />
+  )
+}

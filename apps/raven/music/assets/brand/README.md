@@ -6,17 +6,17 @@ The design canvas with every lockup, size and mockup: https://claude.ai/artifact
 
 ## Which file to use
 
-| Where                                                                                | File                                                                                                                                               |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The mark on a dark ground (Night, a dark theme, a photo's dark end)                  | `wren-mark-on-dark.svg`                                                                                                                            |
-| The mark on a light ground                                                           | `wren-mark-on-light.svg`                                                                                                                           |
-| One colour: print, engraving, a tint, anything that recolours the mark               | `wren-mark-mono.svg` (recolour its fill; the eye is a hole)                                                                                        |
-| The mark drawn 48 px or smaller: tab bars, list rows, a favicon, a notification      | `wren-mark-small-on-dark.svg`, `wren-mark-small-on-light.svg`, `wren-mark-small-mono.svg`                                                          |
-| A header, a sign-in screen, anywhere the name sits beside the mark                   | `wren-lockup-on-dark.svg`, `wren-lockup-on-light.svg`, `wren-lockup-mono.svg`                                                                      |
-| A launch screen, an about page, anywhere the logo stands centred alone with its name | `wren-stacked-on-dark.svg`, `wren-stacked-on-light.svg`, `wren-stacked-mono.svg`                                                                   |
-| The name alone, where the mark already shows nearby                                  | `wren-wordmark-on-dark.svg`, `wren-wordmark-on-light.svg`, `wren-wordmark-mono.svg`                                                                |
-| The iPhone and iPad app icon                                                         | `../images/icon.png`, rendered from `wren-icon.svg`                                                                                                |
-| The Android launcher icon and its themed layer                                       | `../images/adaptive-icon.png` and `../images/adaptive-icon-monochrome.png`, from `wren-adaptive-foreground.svg` and `wren-adaptive-monochrome.svg` |
+| Where                                                                                | File                                                                                                                                                |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The mark on a dark ground (Night, a dark theme, a photo's dark end)                  | `wren-mark-on-dark.svg`                                                                                                                             |
+| The mark on a light ground                                                           | `wren-mark-on-light.svg`                                                                                                                            |
+| One colour: print, engraving, a tint, anything that recolours the mark               | `wren-mark-mono.svg` (recolour its fill; the eye is a hole)                                                                                         |
+| The mark drawn 48 px or smaller: tab bars, list rows, a favicon, a notification      | `wren-mark-small-on-dark.svg`, `wren-mark-small-on-light.svg`, `wren-mark-small-mono.svg`                                                           |
+| A header, a sign-in screen, anywhere the name sits beside the mark                   | `wren-lockup-on-dark.svg`, `wren-lockup-on-light.svg`, `wren-lockup-mono.svg`; in the app, `WrenLockup` (`src/theme/wrenBrand.ts` holds its shapes) |
+| A launch screen, an about page, anywhere the logo stands centred alone with its name | `wren-stacked-on-dark.svg`, `wren-stacked-on-light.svg`, `wren-stacked-mono.svg`                                                                    |
+| The name alone, where the mark already shows nearby                                  | `wren-wordmark-on-dark.svg`, `wren-wordmark-on-light.svg`, `wren-wordmark-mono.svg`                                                                 |
+| The iPhone and iPad app icon                                                         | `../images/icon.png`, rendered from `wren-icon.svg`                                                                                                 |
+| The Android launcher icon and its themed layer                                       | `../images/adaptive-icon.png` and `../images/adaptive-icon-monochrome.png`, from `wren-adaptive-foreground.svg` and `wren-adaptive-monochrome.svg`  |
 
 `app.config.ts` names the three PNG files in `WREN_ICONS`, and `src/config/appConfig.test.ts` checks that they exist.
 
@@ -32,4 +32,4 @@ The design canvas with every lockup, size and mockup: https://claude.ai/artifact
 
 ## Changing the mark
 
-These SVGs are the source. A change to the mark is a change to every file here, and the PNG files are rendered again from their SVGs at 1024 px, for example with `magick -background none -density 72 wren-icon.svg -resize 1024x1024 ../images/icon.png`. A new icon needs a fresh prebuild before a build shows it.
+These SVGs are the source. A change to the mark is a change to every file here, and the PNG files are rendered again from their SVGs at 1024 px, for example with `magick -background none -density 72 wren-adaptive-foreground.svg -resize 1024x1024 ../images/adaptive-icon.png`. The iOS icon is opaque, as the App Store asks, so its alpha goes: `magick -density 72 wren-icon.svg -resize 1024x1024 -alpha off ../images/icon.png`. A new icon needs a fresh prebuild before a build shows it.

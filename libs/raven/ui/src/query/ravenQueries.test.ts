@@ -155,6 +155,66 @@ const QUERIES = [
     call: (api) => api.listLibraryFavourites(2),
   }),
   asking({
+    name: 'libraryCountsQuery',
+    key: queryKeys.libraryCounts(2),
+    pick: (queries) => queries.libraryCountsQuery(2),
+    call: (api) => api.getLibraryCounts(2),
+  }),
+  asking({
+    name: 'libraryFavouriteTitlesQuery',
+    key: queryKeys.libraryFavouriteTitles(2),
+    pick: (queries) => queries.libraryFavouriteTitlesQuery(2),
+    call: (api) => api.listLibraryFavouriteTitles(2),
+  }),
+  asking({
+    name: 'heroQuery',
+    key: queryKeys.hero,
+    pick: (queries) => queries.heroQuery,
+    call: (api) => api.getHero(),
+  }),
+  asking({
+    name: 'upcomingQuery',
+    key: queryKeys.upcoming,
+    pick: (queries) => queries.upcomingQuery,
+    call: (api) => api.getUpcoming(),
+  }),
+  asking({
+    name: 'upcomingSearchQuery',
+    key: queryKeys.upcomingSearch('dune'),
+    pick: (queries) => queries.upcomingSearchQuery('dune'),
+    call: (api) => api.searchUpcoming('dune'),
+  }),
+  asking({
+    name: 'requestsQuery',
+    key: queryKeys.requests,
+    pick: (queries) => queries.requestsQuery,
+    call: (api) => api.listRequests(),
+  }),
+  asking({
+    name: 'everyonesRequestsQuery',
+    key: queryKeys.everyonesRequests,
+    pick: (queries) => queries.everyonesRequestsQuery,
+    call: (api) => api.listEveryonesRequests(),
+  }),
+  asking({
+    name: 'albumQuery',
+    key: queryKeys.album(4),
+    pick: (queries) => queries.albumQuery(4),
+    call: (api) => api.getAlbum(4),
+  }),
+  asking({
+    name: 'artistQuery',
+    key: queryKeys.artist(5),
+    pick: (queries) => queries.artistQuery(5),
+    call: (api) => api.getArtist(5),
+  }),
+  asking({
+    name: 'notificationsQuery',
+    key: queryKeys.notifications,
+    pick: (queries) => queries.notificationsQuery,
+    call: (api) => api.listNotifications(),
+  }),
+  asking({
     name: 'sagasQuery',
     key: queryKeys.sagas(2),
     pick: (queries) => queries.sagasQuery(2),
@@ -509,6 +569,20 @@ describe('ravenQueriesFor', () => {
     const cache = new QueryClient()
     const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
     await waitFor(() => expect((result.current.data ?? []).map(({ id }) => id)).toEqual([1]))
+    cache.clear()
+  })
+
+  it("counts a library's songs from a page of one, under the music's key", async () => {
+    const { api, calls } = recordingApi({ body: { tracks: [track()], total: 42 } })
+    const query = ravenQueriesFor(api).songCountQuery({ libraryId: 2, search: 'dawn' })
+    expect(queryKeys.songCount({ libraryId: 2, search: 'dawn' })).toEqual(query.queryKey)
+    expect(query.queryKey.slice(0, 1)).toEqual(queryKeys.music)
+    const cache = new QueryClient()
+    const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
+    await waitFor(() => expect(result.current.data).toBe(42))
+    expect(calls.map(({ url }) => url)).toEqual([
+      '/api/libraries/2/tracks?sort=title&limit=1&q=dawn',
+    ])
     cache.clear()
   })
 

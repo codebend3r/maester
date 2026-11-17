@@ -8,18 +8,11 @@ import {
   type SignInStep,
   finishSignIn,
 } from '@/account/signInSteps'
+import { AUTH_ERROR_CODES, SIGN_IN_ERRORS } from '@/account/signInErrors'
 import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { useSubmit } from '@/account/useSubmit'
 import type { ActiveServerStore } from '@/servers/activeServerStore'
 import type { AppServer } from '@/servers/serverList'
-
-/** The words a sign-in says, each app its own. */
-type SignInCopy = {
-  unreachable: string
-  badAccount: string
-  full: string
-  notAdded: string
-}
 
 type SignInFlowForProps = {
   account: Pick<AccountSessionStore, 'getState'>
@@ -30,7 +23,6 @@ type SignInFlowForProps = {
 }
 
 type UseSignInFlowProps = {
-  copy: SignInCopy
   initial: { email: string; password: string }
   /** Where a finished sign-in goes, and the tickets-off Continue. */
   onDone: () => void
@@ -40,7 +32,8 @@ type SubmitAccountProps = { password?: string }
 
 /**
  * The hook that runs sign-in's steps, as both apps do: the account's email and password, and
- * nothing more; no client ever asks for a PIN. Each screen keeps its fields, its layout and its copy.
+ * nothing more; no client ever asks for a PIN. Each screen keeps its fields, its layout and its copy,
+ * and says the flow's `error`, a `SignInError`, in its own words (`signInErrorTextOf`).
  * Made per app at module scope, since a store handed to a hook at render reads to the hooks
  * rule as a hook used as a value.
  */
@@ -50,11 +43,11 @@ export const signInFlowFor = ({
   apiOf,
   server: ravenServer,
 }: SignInFlowForProps) => {
-  const useSignInFlow = ({ copy, initial, onDone }: UseSignInFlowProps) => {
+  const useSignInFlow = ({ initial, onDone }: UseSignInFlowProps) => {
     const [step, setStep] = useState<SignInStep>({ kind: SIGN_IN_STEPS.account })
     const [email, setEmail] = useState(initial.email)
     const [password, setPassword] = useState(initial.password)
-    const { isBusy, error, setError, run } = useSubmit({ unreachable: copy.unreachable })
+    const { isBusy, error, setError, run } = useSubmit()
 
     const finish = async (server: AppServer) => {
       const outcome = await finishSignIn({ servers, server, api: apiOf(server) })
@@ -66,10 +59,10 @@ export const signInFlowFor = ({
           setStep({ kind: SIGN_IN_STEPS.ticketsOff })
           return
         case FINISH_OUTCOMES.full:
-          setError(copy.full)
+          setError({ kind: SIGN_IN_ERRORS.full })
           return
         case FINISH_OUTCOMES.notAdded:
-          setError(copy.notAdded)
+          setError({ kind: SIGN_IN_ERRORS.notAdded })
           return
         default: {
           const unknown: never = outcome
@@ -82,17 +75,21 @@ export const signInFlowFor = ({
     const submitAccount = ({ password: typed = password }: SubmitAccountProps = {}) => {
       const trimmed = email.trim()
       if (trimmed === '' || typed === '') {
-        setError(copy.badAccount)
+        setError({ kind: SIGN_IN_ERRORS.missing })
         return
       }
       run(async () => {
         const outcome = await account.getState().signIn({ email: trimmed, password: typed })
         if (outcome.kind === AUTH_OUTCOMES.unreachable) {
-          setError(copy.unreachable)
+          setError({ kind: SIGN_IN_ERRORS.unreachable })
           return
         }
         if (outcome.kind === AUTH_OUTCOMES.refused) {
-          setError(outcome.message)
+          setError(
+            outcome.code === AUTH_ERROR_CODES.invalidCredentials
+              ? { kind: SIGN_IN_ERRORS.badCredentials }
+              : { kind: SIGN_IN_ERRORS.refused, message: outcome.message },
+          )
           return
         }
         setPassword('')

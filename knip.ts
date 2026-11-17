@@ -37,6 +37,8 @@ export default {
        * over-the-air updates.
        */
       entry: ['app/**/*.tsx'],
+      // The design handoff's theme.ts is a reference the app's own theme is built from.
+      ignore: ['design/**'],
       ignoreBinaries: ['watchman', 'maestro'],
       ignoreDependencies: ['expo-updates'],
     },

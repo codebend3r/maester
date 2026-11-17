@@ -133,6 +133,7 @@ export const SIGN_IN_COPY = {
   email: 'Email',
   password: 'Password',
   badAccount: 'Enter your email and password.',
+  wrongAccount: 'Email or password is incorrect.',
   unreachable: "Couldn't reach raven. Check your connection and try again.",
   notAdded: "This server couldn't be added. Try its address again.",
   full: 'This device already keeps as many servers as it can.',
