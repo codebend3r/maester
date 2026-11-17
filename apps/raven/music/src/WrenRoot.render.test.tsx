@@ -13,6 +13,7 @@ import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { AIRBAG, LISTENER, MIXTAPE, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
+import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 
 const mockApi = musicApi()
 
@@ -45,7 +46,7 @@ describe('WrenRoot', () => {
 
   it("forgets what one account read once another signs in, so it never shows the last one's playlists", async () => {
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.settings })
-    await screen.findByText(`Signed in as ${LISTENER.email}`)
+    await screen.findByText(LISTENER.email)
     queryClient.setQueryData(queryKeys.playlistList, [MIXTAPE])
 
     await act(async () =>
@@ -64,7 +65,7 @@ describe('WrenRoot', () => {
 
   it("keeps the music through a renewed token and stops the last account's when it signs out, so nothing plays or counts for the next", async () => {
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await screen.findByRole('header', { name: 'Home' })
+    await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })
     await act(async () => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID] }))
     await waitFor(() => expect(audioPlayer.setWindow).toHaveBeenCalled())
     expect(await screen.findByRole('button', { name: /^Now Playing: Airbag/ })).toBeTruthy()
@@ -82,14 +83,14 @@ describe('WrenRoot', () => {
 
     await act(async () => useWrenAccount.setState({ session: LISTENER }))
     await act(async () => router.replace(WREN_ROUTES.home))
-    expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy()
+    expect(await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })).toBeTruthy()
     expect(useAudioQueue.getState().queue.at).toBeNull()
     expect(screen.queryByRole('button', { name: /^Now Playing: Airbag/ })).toBeNull()
   })
 
   it("forgets the car's lists once another account signs in, though the first downloaded nothing", async () => {
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await screen.findByRole('header', { name: 'Home' })
+    await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })
     expect(useDownloads.getState().ownerId).toBe(LISTENER.userId)
 
     await act(async () => useWrenAccount.setState({ session: null }))
@@ -137,7 +138,7 @@ describe('WrenRoot', () => {
   it('keeps the downloads as Wren opens, and through a refused refresh until the same account signs in again', async () => {
     const { files } = downloaded()
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await screen.findByRole('header', { name: 'Home' })
+    await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })
     expect(Object.keys(useDownloads.getState().entries)).toHaveLength(1)
 
     // A refresh the server refused signs the account out.
@@ -150,7 +151,7 @@ describe('WrenRoot', () => {
 
   it("removes the last account's downloads, files and all, once another account signs in", async () => {
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    await screen.findByRole('header', { name: 'Home' })
+    await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })
     const { files } = downloaded()
 
     await act(async () => useWrenAccount.setState({ session: null }))

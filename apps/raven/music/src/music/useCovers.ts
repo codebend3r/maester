@@ -1,4 +1,4 @@
-import type { AlbumSummary } from '@raven/core'
+import type { AlbumSummary, Artist, Track } from '@raven/core'
 import { cookieJar } from '@raven/native'
 import { serverHeadersFor } from '@raven/native/headless'
 
@@ -14,17 +14,32 @@ const useServerHeaders = serverHeadersFor({ session: useWrenAccount, jar: cookie
 
 type UseCoversProps = Pick<WrenSession, 'server' | 'api'>
 
+type TrackCoverOfProps = Pick<Track, 'albumId' | 'album'>
+
+type ArtistPhotoOfProps = Pick<Artist, 'id' | 'photoVersion'>
+
 /**
- * The album covers of the active server, each with the server's cookies and the account's
- * token on its request. No album has one until the jar has first answered, so no cover is
- * asked for twice.
+ * The active server's pictures, each with the server's cookies and the account's token on its
+ * request: an album's cover, a track's (its album's), and an artist's photo. None has one until
+ * the jar has first answered, so no picture is asked for twice, and an artist with no photo
+ * yet never builds an address.
  */
 export const useCovers = ({ server, api }: UseCoversProps) => {
   const headersFor = useServerHeaders({ server })
-  return ({ albumId, coverVersion }: CoverOfProps): Cover | null => {
-    const uri = api.albumCoverUrl({ albumId, coverVersion })
-    return uri === null || headersFor === null ? null : { uri, headers: headersFor(uri) }
+  const pictureAt = (uri: string | null): Cover | null =>
+    uri === null || headersFor === null ? null : { uri, headers: headersFor(uri) }
+  const coverOf = ({ albumId, coverVersion }: CoverOfProps): Cover | null =>
+    pictureAt(api.albumCoverUrl({ albumId, coverVersion }))
+  return {
+    coverOf,
+    trackCoverOf: (track: TrackCoverOfProps): Cover | null =>
+      coverOf({ albumId: track.albumId, coverVersion: track.album.coverVersion }),
+    artistPhotoOf: ({ id, photoVersion }: ArtistPhotoOfProps): Cover | null =>
+      photoVersion === null ? null : pictureAt(api.artistPhotoUrl({ artistId: id, photoVersion })),
   }
 }
 
-export type CoverOf = ReturnType<typeof useCovers>
+/** The active server's pictures, as `useCovers` hands them out. */
+export type Covers = ReturnType<typeof useCovers>
+
+export type CoverOf = Covers['coverOf']

@@ -6,6 +6,12 @@ export { accountIdOf, forgetOnAccountChange } from '@/account/accountChange'
 export { SIGN_IN_STEPS, type SignInStep } from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
 export { signInFlowFor } from '@/account/signInFlow'
+export {
+  SIGN_IN_ERRORS,
+  type SignInError,
+  type SignInErrorCopy,
+  signInErrorTextOf,
+} from '@/account/signInErrors'
 export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'

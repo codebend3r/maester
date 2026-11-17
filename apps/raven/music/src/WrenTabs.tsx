@@ -1,66 +1,75 @@
-import { Icon } from '@raven/native'
-import type { IconName } from '@raven/ui/iconDrawings'
-import { BottomTabBar, type BottomTabBarProps, Tabs } from 'expo-router/js-tabs'
-import { StyleSheet, View } from 'react-native'
+import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs'
+import { View } from 'react-native'
 
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
+import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { WREN_TABS } from '@/routes'
 import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@/screens/copy'
-import { WREN_ICONS } from '@/theme/icons'
-import { PALETTE, SIZES } from '@/theme/wrenTheme'
+import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
+import { TabBar } from '@/ui/TabBar'
+import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 type WrenTab = (typeof WREN_TABS)[keyof typeof WREN_TABS]
 
-type TabIconProps = { focused: boolean; size: number }
+/** The tab navigator's event for a press on a tab, which a listener may stop. */
+const TAB_EVENTS = { press: 'tabPress' } as const
 
-/** A tab's drawing on the bar, bright while its tab is the one showing. */
-const tabIconOf =
-  (icon: IconName) =>
-  ({ focused, size }: TabIconProps) => (
-    <Icon colour={focused ? PALETTE.text : PALETTE.muted} name={icon} size={size} />
-  )
+type TabLook = { title: string; icon: WrenIconName }
 
 /** Each tab's name and drawing on the bar, in the bar's order. */
 const TABS = {
-  [WREN_TABS.home]: { title: HOME_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.home) },
-  [WREN_TABS.library]: {
-    title: LIBRARY_PAGE_COPY.title,
-    tabBarIcon: tabIconOf(WREN_ICONS.library),
-  },
-  [WREN_TABS.search]: { title: SEARCH_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.search) },
-  [WREN_TABS.settings]: { title: SETTINGS_COPY.title, tabBarIcon: tabIconOf(WREN_ICONS.settings) },
-} as const satisfies Record<WrenTab, { title: string; tabBarIcon: ReturnType<typeof tabIconOf> }>
+  [WREN_TABS.home]: { title: HOME_COPY.title, icon: ICONS.home },
+  [WREN_TABS.library]: { title: LIBRARY_PAGE_COPY.title, icon: ICONS.library },
+  [WREN_TABS.search]: { title: SEARCH_COPY.title, icon: ICONS.search },
+  [WREN_TABS.settings]: { title: SETTINGS_COPY.title, icon: ICONS.settings },
+} as const satisfies Record<WrenTab, TabLook>
 
-/** The tab bar with the now-playing bar sitting on it. */
-const tabBarOf = (props: BottomTabBarProps) => (
-  <View>
-    <NowPlayingBar place={BAR_PLACES.tabs} />
-    <BottomTabBar {...props} />
-  </View>
-)
+const isWrenTab = (name: string): name is WrenTab => Object.hasOwn(TABS, name)
 
-/** Wren's four tabs along the bottom, each named and drawn with raven's line icons, the bar above them. */
-export function WrenTabs() {
+const useStyles = themedStyles(({ colors }) => ({ scene: { backgroundColor: colors.bg } }))
+
+const HAS_TAB_BAR = {
+  [FORM_FACTORS.phone]: true,
+  [FORM_FACTORS.tablet]: false,
+} as const satisfies Record<FormFactor, boolean>
+
+/** The phone's tab bar with the mini player floating on it; a tablet has its sidebar instead. */
+function PhoneTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
+  const formFactor = useFormFactor()
+  const items = state.routes.flatMap((route, at) => {
+    if (!isWrenTab(route.name)) return []
+    const isActive = at === state.index
+    const onPress = () => {
+      const event = emitter.emit({
+        type: TAB_EVENTS.press,
+        target: route.key,
+        canPreventDefault: true,
+      })
+      if (!isActive && !event.defaultPrevented) navigateToTab(route.key)
+    }
+    const { title, icon } = TABS[route.name]
+    return [{ key: route.key, label: title, icon, isActive, onPress }]
+  })
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        sceneStyle: { backgroundColor: PALETTE.ground },
-        tabBarActiveTintColor: PALETTE.text,
-        tabBarInactiveTintColor: PALETTE.muted,
-        tabBarLabelStyle: styles.label,
-        tabBarStyle: styles.bar,
-      }}
-      tabBar={tabBarOf}
-    >
-      {Object.entries(TABS).map(([name, options]) => (
-        <Tabs.Screen key={name} name={name} options={options} />
+    HAS_TAB_BAR[formFactor] && (
+      <View>
+        <NowPlayingBar place={BAR_PLACES.tabs} />
+        <TabBar items={items} />
+      </View>
+    )
+  )
+}
+
+const tabBarOf = (props: BottomTabBarProps) => <PhoneTabBar {...props} />
+
+/** Wren's four tabs, Home, Library, Search and Settings, each named and drawn on the bar. */
+export function WrenTabs() {
+  const styles = useStyles()
+  return (
+    <Tabs screenOptions={{ headerShown: false, sceneStyle: styles.scene }} tabBar={tabBarOf}>
+      {Object.entries(TABS).map(([name, { title }]) => (
+        <Tabs.Screen key={name} name={name} options={{ title }} />
       ))}
     </Tabs>
   )
 }
-
-const styles = StyleSheet.create({
-  bar: { backgroundColor: PALETTE.raised, borderTopColor: PALETTE.line },
-  label: { fontSize: SIZES.textSm, fontWeight: 'bold' },
-})

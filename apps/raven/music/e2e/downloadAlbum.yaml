@@ -6,7 +6,8 @@ name: An album downloads from its page and is listed under Library's Downloads
     visible: Recently added
     timeout: 30000
 - tapOn: Library.*
-- tapOn: Albums
+# Library lists its categories, each read out with what it holds: "Albums, 1".
+- tapOn: Albums.*
 - extendedWaitUntil:
     visible: Morning Chorus.*
     timeout: 30000
@@ -19,17 +20,21 @@ name: An album downloads from its page and is listed under Library's Downloads
           visible: Download
           timeout: 30000
 - tapOn: Download
-# The server transcodes each track on first ask, two at a time.
+# The server transcodes each track on first ask, two at a time, while the button says
+# "Downloading n of m"; a server that kept its transcodes may finish before the flow looks. A
+# downloaded track's row says Downloaded too, so the album is whole only once the button no
+# longer says Downloading, and none of it failed.
 - extendedWaitUntil:
-    visible: Remove download
+    notVisible: Downloading.*
     timeout: 120000
-- tapOn: Back
-# Library's segments scroll sideways on a phone, so Downloads waits past the right edge.
-- swipe:
-    start: 85%, 20%
-    end: 15%, 20%
-- tapOn: Downloads
+- assertNotVisible: Retry download
+- assertVisible: Downloaded
+# Back from the album to Albums, then back from Albums to Library.
+- tapOn: Back.*
+- tapOn: Back to Library
+- tapOn: Downloads.*
 - extendedWaitUntil:
-    visible: Morning Chorus
+    visible: On this device
     timeout: 30000
+- assertVisible: Morning Chorus
 # Each flow signs in with `clearState`, which empties the downloads with the rest.

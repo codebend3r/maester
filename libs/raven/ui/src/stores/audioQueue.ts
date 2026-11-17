@@ -259,6 +259,12 @@ export const playingTrackOf = (state: AudioQueueState): Track | null => {
   return id === null ? null : (state.tracks[id] ?? null)
 }
 
+type IsPlayingOfProps = Pick<AudioQueueState, 'state'>
+
+/** Whether the queue is playing or about to, which every transport shows as Pause. */
+export const isPlayingOf = ({ state }: IsPlayingOfProps): boolean =>
+  state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
+
 /** The track after the playing one in play order, for preloading; null for none. */
 export const nextTrackOf = (state: AudioQueueState): Track | null => {
   const id = currentOf(afterEnd(state.queue))

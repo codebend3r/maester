@@ -1,119 +1,90 @@
-import { type Track, artistNames } from '@raven/core'
-import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { useRouter, useSegments } from 'expo-router'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import type { Track } from '@raven/core'
+import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { useRouter } from 'expo-router'
+import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AlbumArt } from '@/components/AlbumTile'
-import { IconButton } from '@/components/Controls'
-import { BAR_COPY } from '@/components/copy'
-import { useCovers } from '@/music/useCovers'
-import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
-import { WREN_ICONS } from '@/theme/icons'
-import { OPACITIES, PALETTE, SIZES } from '@/theme/wrenTheme'
+import { progressOf } from '@/player/playerModel'
+import { useNowPlaying } from '@/player/useNowPlaying'
+import { WREN_ROUTES } from '@/routes'
+import { CHROMES } from '@/shell/chrome'
+import { useChrome } from '@/shell/useShell'
+import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
+import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { MiniPlayer } from '@/ui/MiniPlayer'
 import { type WrenSession, useWren } from '@/useWren'
 
 /** Where a bar is drawn: above the tab bar on a tab, at the foot of a page the stack opened. */
-export const BAR_PLACES = { tabs: 'tabs', page: 'page' } as const
+export const BAR_PLACES = { tabs: CHROMES.tabs, page: CHROMES.page } as const
 
 type BarPlace = (typeof BAR_PLACES)[keyof typeof BAR_PLACES]
 
-/** The screens with no bar: sign-in, and Now Playing, which is the bar opened up. */
-const BARLESS_SCREENS: ReadonlySet<string> = new Set([WREN_SCREENS.signIn, WREN_SCREENS.nowPlaying])
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  // The card floats on the ground, 10 in from the edges and 8 above what is under it.
+  place: {
+    backgroundColor: colors.bg,
+    paddingBottom: SPACE.s2,
+    paddingHorizontal: SIZE.floatInset,
+  },
+}))
 
-/** Whether the bar in `place` shows: while a track is queued, in the place the screen has. */
+// A tablet has its player bar instead.
+const HAS_MINI_PLAYER = {
+  [FORM_FACTORS.phone]: true,
+  [FORM_FACTORS.tablet]: false,
+} as const satisfies Record<FormFactor, boolean>
+
+/**
+ * Whether the bar in `place` shows: on a phone, in the place the screen has; never on sign-in
+ * or Now Playing, nor on a tablet, which has its player bar.
+ */
 const useIsBarShown = (place: BarPlace): boolean => {
-  const [screen = ''] = useSegments()
-  const hasTrack = useAudioQueue((store) => playingTrackOf(store) !== null)
-  const here = screen === WREN_SCREENS.tabs ? BAR_PLACES.tabs : BAR_PLACES.page
-  return hasTrack && here === place && !BARLESS_SCREENS.has(screen)
+  const chrome = useChrome()
+  return HAS_MINI_PLAYER[useFormFactor()] && chrome === place
 }
 
-type BarSession = Pick<WrenSession, 'server' | 'api'>
-
-type BarProps = { session: BarSession; place: BarPlace }
-
-type TrackBarProps = BarProps & { track: Track }
+type TrackBarProps = { session: WrenSession; place: BarPlace; track: Track }
 
 function TrackBar({ session, place, track }: TrackBarProps) {
+  const styles = useStyles()
   const router = useRouter()
-  const coverOf = useCovers(session)
   const bottom = useSafeAreaInsets().bottom
-  const state = useAudioQueue((store) => store.state)
-  const error = useAudioQueue((store) => store.error)
+  const { cover, artists, length, error } = useNowPlaying({ session, track })
+  const isPlaying = useAudioQueue(isPlayingOf)
+  const position = useAudioQueue((store) => store.position)
   const toggle = useAudioQueue((store) => store.toggle)
   const next = useAudioQueue((store) => store.next)
-  const artists = artistNames(track)
-  const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   return (
-    <View style={[styles.bar, place === BAR_PLACES.page && { paddingBottom: bottom }]}>
-      <Pressable
-        accessibilityLabel={BAR_COPY.open({ title: track.title, artists })}
-        accessibilityRole="button"
-        onPress={() => router.push(WREN_ROUTES.nowPlaying)}
-        style={({ pressed }) => [styles.open, pressed && styles.pressed]}
-      >
-        <AlbumArt
-          cover={coverOf({ albumId: track.albumId, coverVersion: track.album.coverVersion })}
-          size={SIZES.fieldHeight}
-          initial={track.album.title.slice(0, 1)}
-        />
-        <View style={styles.text}>
-          <Text numberOfLines={1} style={styles.title}>
-            {track.title}
-          </Text>
-          <Text numberOfLines={1} style={error === null ? styles.line : styles.error}>
-            {error ?? artists}
-          </Text>
-        </View>
-      </Pressable>
-      <IconButton
-        icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
-        label={isPlaying ? BAR_COPY.pause : BAR_COPY.play}
-        onPress={toggle}
+    <View style={[styles.place, place === BAR_PLACES.page && { paddingBottom: bottom + SPACE.s2 }]}>
+      <MiniPlayer
+        artists={artists}
+        cover={cover}
+        error={error}
+        isPlaying={isPlaying}
+        onNext={next}
+        onOpen={() => router.push(WREN_ROUTES.nowPlaying)}
+        onToggle={toggle}
+        progress={progressOf({ position, length })}
+        title={track.title}
       />
-      <IconButton icon={WREN_ICONS.next} label={BAR_COPY.next} onPress={next} />
     </View>
   )
-}
-
-function Bar({ session, place }: BarProps) {
-  const track = useAudioQueue(playingTrackOf)
-  return track !== null && <TrackBar place={place} session={session} track={track} />
 }
 
 type NowPlayingBarProps = { place: BarPlace }
 
 /**
- * The strip under a screen while a track is queued: its cover, title and artists, play or
- * pause and next; pressed, it opens Now Playing. One sits above the tab bar and one at the foot
- * of the stack's pages, and only the one for the screen showing draws.
+ * The phone's mini player while a track is queued: its cover, title and artists, play or
+ * pause and next; tapped or swiped up, it opens Now Playing. One sits above the tab bar and
+ * one at the foot of the stack's pages, and only the one for the screen showing draws.
  */
 export function NowPlayingBar({ place }: NowPlayingBarProps) {
   const session = useWren()
   const isShown = useIsBarShown(place)
-  return session !== null && isShown && <Bar place={place} session={session} />
+  const track = useAudioQueue(playingTrackOf)
+  return (
+    session !== null &&
+    isShown &&
+    track !== null && <TrackBar place={place} session={session} track={track} />
+  )
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    alignItems: 'center',
-    backgroundColor: PALETTE.raised,
-    borderTopColor: PALETTE.line,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    paddingHorizontal: SIZES.space2,
-  },
-  open: {
-    alignItems: 'center',
-    flex: 1,
-    flexDirection: 'row',
-    gap: SIZES.space2,
-    paddingVertical: SIZES.space1,
-  },
-  text: { flex: 1 },
-  title: { color: PALETTE.text, fontSize: SIZES.textSm, fontWeight: 'bold' },
-  line: { color: PALETTE.muted, fontSize: SIZES.textSm },
-  error: { color: PALETTE.error, fontSize: SIZES.textSm },
-  pressed: { opacity: OPACITIES.pressed },
-})

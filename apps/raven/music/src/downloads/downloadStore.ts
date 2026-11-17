@@ -67,7 +67,8 @@ const DOWNLOADS_AT_ONCE = 2
 
 const BYTES_PER_KBPS_SECOND = 125
 
-const BYTES_PER_GB = 1_000_000_000
+/** A storage limit counts decimal gigabytes, as `formatBytes` does. */
+export const BYTES_PER_GB = 1_000_000_000
 
 /** What Wren says when a download cannot start. */
 export const DOWNLOAD_COPY = {

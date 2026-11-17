@@ -92,6 +92,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
     search: string
     sort: MusicSort
   }
+  type RavenQueriesForSongCountQueryProps = { libraryId: number; search: string }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
   type RavenQueriesForEveryonesHistoryQueryProps = {
     accountId: string | null
@@ -429,6 +430,15 @@ export const ravenQueriesFor = (api: ApiClient) => {
           if (last.tracks.length > 0 && next < last.total) return { at: last.at, offset: next }
           return last.at + 1 < libraryIds.length ? { at: last.at + 1, offset: 0 } : null
         },
+        gcTime: LISTING_GC_MS,
+      }),
+
+    /** How many tracks a music library holds that `search` finds: the listing's total, from a page of one. */
+    songCountQuery: ({ libraryId, search }: RavenQueriesForSongCountQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.songCount({ libraryId, search }),
+        queryFn: () => api.listTracks({ libraryId, search, limit: 1 }),
+        select: (page) => page.total,
         gcTime: LISTING_GC_MS,
       }),
 

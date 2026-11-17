@@ -1,0 +1,82 @@
+import { Pressable, type StyleProp, Text, type TextStyle, View } from 'react-native'
+
+import type { Playing } from '@/screens/nowPlaying/usePlaying'
+import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
+import { PLAYER_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { AlbumArt } from '@/ui/AlbumArt'
+import { pressedStyleOf } from '@/ui/press'
+
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  title: { gap: SPACE.s1 / 2 },
+  name: { ...TYPE.albumTitle, color: colors.text },
+  artist: { ...TYPE.playerArtist, color: colors.text2 },
+  compact: { alignItems: 'center', flexDirection: 'row', gap: SIZE.rowGap },
+  compactText: { flex: 1, gap: SPACE.s1 / 2 },
+  compactName: { ...TYPE.compactTitle, color: colors.text },
+  compactArtist: { ...TYPE.body, color: colors.text2 },
+  error: { ...TYPE.meta, color: colors.accentText },
+}))
+
+type SongProps = { playing: Playing }
+
+type ArtistLinkProps = SongProps & { style: StyleProp<TextStyle> }
+
+/** The song's artists, a link to the first one's page when it is known. */
+function ArtistLink({ playing, style }: ArtistLinkProps) {
+  const { openArtist } = playing
+  return (
+    <Pressable
+      accessibilityRole={openArtist === null ? 'text' : 'link'}
+      disabled={openArtist === null}
+      onPress={() => openArtist?.()}
+      style={pressedStyleOf({ style: null })}
+    >
+      <Text numberOfLines={1} style={style}>
+        {playing.artists}
+      </Text>
+    </Pressable>
+  )
+}
+
+/** What went wrong playing, said under the song while it stands. */
+function PlayError({ playing }: SongProps) {
+  const styles = useStyles()
+  return (
+    playing.error !== null && (
+      <Text accessibilityLiveRegion="polite" style={styles.error}>
+        {playing.error}
+      </Text>
+    )
+  )
+}
+
+/** The player's song: its title large in Young Serif, and its artists as a link. */
+export function SongTitle({ playing }: SongProps) {
+  const styles = useStyles()
+  return (
+    <View style={styles.title}>
+      <Text accessibilityRole="header" numberOfLines={2} style={styles.name}>
+        {playing.track.title}
+      </Text>
+      <ArtistLink playing={playing} style={styles.artist} />
+      <PlayError playing={playing} />
+    </View>
+  )
+}
+
+/** Lyrics' and Up next's head: a small cover beside the song's title and artists. */
+export function CompactSong({ playing }: SongProps) {
+  const styles = useStyles()
+  return (
+    <View style={styles.compact}>
+      <AlbumArt cover={playing.cover} radius={RADIUS.sm} size={PLAYER_SIZES.compactArt} />
+      <View style={styles.compactText}>
+        <Text accessibilityRole="header" numberOfLines={1} style={styles.compactName}>
+          {playing.track.title}
+        </Text>
+        <ArtistLink playing={playing} style={styles.compactArtist} />
+        <PlayError playing={playing} />
+      </View>
+    </View>
+  )
+}

@@ -28,3 +28,5 @@ udid = "udid"
 fo = "fo"
 # The Google TV Streamer's Dolby Vision decoder `c2.mtk.dvav.ser.decoder`, named in the player patch.
 ser = "ser"
+# "PNGs", which typos reads as `PN` and `Gs`, in the Wren redesign handoff.
+pn = "pn"

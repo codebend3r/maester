@@ -11,6 +11,16 @@ type MusicLibraries = ReturnType<typeof useMusicLibraries>
 /** Where a list over every music library stands: why it failed, whether it is read, and whether raven holds no music. */
 export type ListState = { failure: Error | null; isRead: boolean; hasNoMusic: boolean }
 
+/** Where one query stands, as TanStack Query reports it. */
+type QueryState = Pick<Listing<unknown>, 'error' | 'isSuccess'>
+
+/** A list one query reads that no music library holds, such as the account's playlists. */
+export const queryListStateOf = ({ error, isSuccess }: QueryState): ListState => ({
+  failure: error,
+  isRead: isSuccess,
+  hasNoMusic: false,
+})
+
 type ListStateOfProps = { music: MusicLibraries } & Pick<ListState, 'failure' | 'isRead'>
 
 /** A list over every music library with nothing of its own to merge, such as the songs' one query. */
@@ -47,9 +57,9 @@ export const mergedOf = <T>({ music, listings, order }: MergedOfProps<T>) => {
   }
 }
 
-/** Albums of several libraries, by title as each library sorts its own. */
-export const byTitle = (albums: readonly AlbumSummary[]): AlbumSummary[] =>
-  albums.toSorted((a, b) => a.sortTitle.localeCompare(b.sortTitle))
+/** Two albums by title, as each library sorts its own. */
+export const byTitle = (a: AlbumSummary, b: AlbumSummary): number =>
+  a.sortTitle.localeCompare(b.sortTitle)
 
 /** Artists of several libraries, each once, by name as each library sorts its own. */
 export const byName = (artists: readonly Artist[]): Artist[] =>

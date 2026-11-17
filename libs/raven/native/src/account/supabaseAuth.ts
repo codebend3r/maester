@@ -8,6 +8,7 @@ import {
   isNumber,
   isString,
   object,
+  optional,
 } from '@raven/core'
 import { CONTENT_TYPES, HEADERS } from '@shared/http'
 
@@ -26,7 +27,8 @@ const isTokenAnswer = object({
   user: object({ id: isString }),
 })
 
-const isErrorAnswer = object({ msg: isString })
+// Supabase Auth's refusal: its words, and the code naming what was refused.
+const isErrorAnswer = object({ msg: isString, error_code: optional(isString) })
 
 export const isAccountSession = object({
   accessToken: isString,
@@ -47,7 +49,7 @@ export const AUTH_OUTCOMES = {
 
 export type AuthOutcome =
   | { kind: typeof AUTH_OUTCOMES.ok; session: AccountSession }
-  | { kind: typeof AUTH_OUTCOMES.refused; message: string }
+  | { kind: typeof AUTH_OUTCOMES.refused; message: string; code: string | null }
   | { kind: typeof AUTH_OUTCOMES.unreachable }
 
 type SupabaseConfig = { supabaseUrl: string; publishableKey: string }
@@ -108,10 +110,10 @@ const requestToken = async ({
     }
     // A 5xx is Supabase being down, not a refusal of this account.
     if (response.status >= 500) return { kind: AUTH_OUTCOMES.unreachable }
-    return {
-      kind: AUTH_OUTCOMES.refused,
-      message: isErrorAnswer(answer) ? answer.msg : response.statusText,
+    if (!isErrorAnswer(answer)) {
+      return { kind: AUTH_OUTCOMES.refused, message: response.statusText, code: null }
     }
+    return { kind: AUTH_OUTCOMES.refused, message: answer.msg, code: answer.error_code ?? null }
   } catch {
     return { kind: AUTH_OUTCOMES.unreachable }
   }

@@ -6,7 +6,8 @@ name: An album plays from its page, and the bar follows Next to the second track
     visible: Recently added
     timeout: 30000
 - tapOn: Library.*
-- tapOn: Albums
+# Library lists its categories, each read out with what it holds: "Albums, 1".
+- tapOn: Albums.*
 - extendedWaitUntil:
     visible: Morning Chorus.*
     timeout: 30000

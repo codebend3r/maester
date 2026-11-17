@@ -9,5 +9,5 @@
   "bracketSpacing": true,
   "endOfLine": "lf",
   "insertFinalNewline": true,
-  "ignorePatterns": ["ios", "android", "build", ".expo", "bun.lock"]
+  "ignorePatterns": ["ios", "android", "build", ".expo", "bun.lock", "design"]
 }

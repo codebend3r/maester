@@ -1,41 +1,43 @@
-type TitledProps = { title: string; artists: string }
+import { KIT_COPY } from '@/ui/copy'
 
-export const DETAIL_COPY = {
-  back: 'Back',
+/** The brand's name, as the lockup is read out. */
+export const WREN_LOCKUP_COPY = {
+  name: 'Wren',
 } as const
 
-export const CONTROLS_COPY = {
-  play: 'Play',
-  shuffle: 'Shuffle',
-  favourite: 'Favourite',
-} as const
+type PlaylistRowLabelProps = { name: string; count: string }
 
-export const ALBUM_TILE_COPY = {
-  /** An album as it is read out: "OK Computer, Radiohead". */
-  label: ({ title, artists }: TitledProps) => `${title}, ${artists}`,
-} as const
-
-export const TRACK_ROW_COPY = {
-  more: (title: string) => `More for ${title}`,
-} as const
-
+/** What a track's sheet and the Add to playlist sheet say. */
 export const TRACK_MENU_COPY = {
   playNext: 'Play next',
   addToQueue: 'Add to queue',
-  addToPlaylist: 'Add to playlist',
+  addToPlaylist: 'Add to playlist…',
+  goToAlbum: 'Go to album',
+  goToArtist: 'Go to artist',
+  /** The Add to playlist sheet's title. */
+  addToPlaylistTitle: 'Add to playlist',
+  /** What the list of playlists is called aloud: "Add Airbag to a playlist". */
   pickPlaylist: (title: string) => `Add ${title} to a playlist`,
-  added: (name: string) => `Added to ${name}.`,
-  noPlaylists: 'You have no playlists yet.',
+  added: (name: string) => `Added to ${name}`,
+  noPlaylists: "You don't have any playlists",
+  noPlaylistsHint: (title: string) => `Create one and ${title} goes straight in.`,
   loading: 'Loading your playlists',
-  cancel: 'Cancel',
-  done: 'Done',
-  close: 'Close the menu',
+  /** A playlist row as it is read out: "Mixtape, 2 songs". */
+  playlistRow: ({ name, count }: PlaylistRowLabelProps) =>
+    count === '' ? name : KIT_COPY.labelled({ label: name, value: count }),
 } as const
 
-export const BAR_COPY = {
-  play: 'Play',
-  pause: 'Pause',
-  next: 'Next',
-  /** What the bar is called aloud: what it opens, and the track it shows. */
-  open: ({ title, artists }: TitledProps) => `Now Playing: ${title}, ${artists}`,
+type DownloadingProps = { done: number; total: number }
+
+/** What an album's or a playlist's download button says in each state. */
+export const DOWNLOAD_BUTTON_COPY = {
+  download: 'Download',
+  downloading: ({ done, total }: DownloadingProps) => `Downloading ${done} of ${total}`,
+  /** The short label under the progress ring: "2 of 3". */
+  progress: ({ done, total }: DownloadingProps) => `${done} of ${total}`,
+  downloaded: 'Downloaded',
+  remove: 'Remove download',
+  retry: 'Retry download',
+  /** The short label under the icon while a download failed. */
+  retryShort: 'Retry',
 } as const

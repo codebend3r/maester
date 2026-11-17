@@ -83,7 +83,11 @@ describe('SignIn', () => {
   })
 
   it("shows the account service's words when it refuses", async () => {
-    mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.refused, message: 'Wrong password.' })
+    mockSignIn.mockResolvedValue({
+      kind: AUTH_OUTCOMES.refused,
+      message: 'Wrong password.',
+      code: null,
+    })
     await render(<SignIn />)
     await signInAsViewer()
     expect(await screen.findByText('Wrong password.')).toBeTruthy()

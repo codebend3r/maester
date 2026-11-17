@@ -131,7 +131,13 @@ export { useServerActiveWork } from '@/query/useServerActiveWork'
 export { useServerRemoteAccess } from '@/query/useServerRemoteAccess'
 export { useServerLibraryActions } from '@/query/useServerLibraryActions'
 export { useServerSettingsSaves } from '@/query/useServerSettingsSaves'
-export { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
+export {
+  AUDIO_STATES,
+  isPlayingOf,
+  nextTrackOf,
+  playingTrackOf,
+  useAudioQueue,
+} from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
 export { useTrackListening } from '@/components/AudioHost/useTrackListening'
 export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'

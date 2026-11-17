@@ -1,18 +1,18 @@
 import { ApiError } from '@raven/core'
 import { useRef, useState } from 'react'
 
+import { SIGN_IN_ERRORS, type SignInError } from '@/account/signInErrors'
+
 const SERVER_ERROR = 500
 
-type UseSubmitProps = { unreachable: string }
-
 /**
- * A form's submit: one at a time, busy while it runs, and a failure said in the server's own
- * words when it refused, else as `unreachable`. A ref, not the state, refuses a second submit
- * in the same moment, since the state is a render behind.
+ * A form's submit: one at a time, busy while it runs, and a failure kept as a refusal in the
+ * server's own words when it refused, else as out of reach. A ref, not the state, refuses a
+ * second submit in the same moment, since the state is a render behind.
  */
-export const useSubmit = ({ unreachable }: UseSubmitProps) => {
+export const useSubmit = () => {
   const [isBusy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<SignInError | null>(null)
   const isRunning = useRef(false)
 
   const run = (work: () => Promise<void>): void => {
@@ -26,7 +26,11 @@ export const useSubmit = ({ unreachable }: UseSubmitProps) => {
     }
     work().then(settle, (failure: unknown) => {
       const isRefusal = failure instanceof ApiError && failure.status < SERVER_ERROR
-      setError(isRefusal ? failure.message : unreachable)
+      setError(
+        isRefusal
+          ? { kind: SIGN_IN_ERRORS.refused, message: failure.message }
+          : { kind: SIGN_IN_ERRORS.unreachable },
+      )
       settle()
     })
   }

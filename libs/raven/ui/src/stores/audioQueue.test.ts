@@ -6,7 +6,13 @@ import {
   type Track,
 } from '@raven/core'
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { AUDIO_STATES, nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
+import {
+  AUDIO_STATES,
+  isPlayingOf,
+  nextTrackOf,
+  playingTrackOf,
+  useAudioQueue,
+} from '@/stores/audioQueue'
 
 type TrackProps = { id: number; title?: string }
 
@@ -217,5 +223,18 @@ describe('useAudioQueue', () => {
       id: 2,
       seed: RADIO_SEED_KINDS.track,
     })
+  })
+})
+
+describe('isPlayingOf', () => {
+  it('says a queue playing or loading is playing', () => {
+    expect(isPlayingOf({ state: AUDIO_STATES.playing })).toBe(true)
+    expect(isPlayingOf({ state: AUDIO_STATES.loading })).toBe(true)
+  })
+
+  it('says a paused, failed or empty queue is not', () => {
+    expect(isPlayingOf({ state: AUDIO_STATES.paused })).toBe(false)
+    expect(isPlayingOf({ state: AUDIO_STATES.failed })).toBe(false)
+    expect(isPlayingOf({ state: AUDIO_STATES.empty })).toBe(false)
   })
 })

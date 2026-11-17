@@ -1,0 +1,71 @@
+/* Wren interface tokens. Brand colours come from the Wren logo handoff. */
+
+@font-face { font-family: 'Young Serif'; src: url('../brand/fonts/YoungSerif-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Instrument Sans'; src: url('../brand/fonts/InstrumentSans-Regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Instrument Sans'; src: url('../brand/fonts/InstrumentSans-Medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Instrument Sans'; src: url('../brand/fonts/InstrumentSans-SemiBold.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+
+:root {
+  /* brand (fixed) */
+  --wren-night: #15201e;
+  --wren-bark: #e6e1d6;
+  --wren-ink: #131416;
+  --wren-eye-red: #c41725; /* logo eye only */
+  --wren-leaf: #a8262f;
+  --wren-paper: #f1ece2;
+
+  --font-display: 'Young Serif', Georgia, serif;
+  --font-body: 'Instrument Sans', system-ui, sans-serif;
+
+  --radius-xs: 6px;   /* small art, 40-44px */
+  --radius-sm: 10px;  /* album tiles */
+  --radius-md: 14px;  /* fields, large art */
+  --radius-lg: 16px;  /* cards, grouped lists, mini player */
+  --radius-xl: 26px;  /* dialogs */
+  --radius-sheet: 28px; /* bottom sheet top corners */
+  --radius-pill: 999px;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --gutter-phone: 20px;
+  --gutter-tablet: 40px;
+}
+
+/* Dark is the default theme. Respect the OS setting, allow a manual override via data-theme. */
+:root, [data-theme="dark"] {
+  --bg: #101816;
+  --surface: #17211e;
+  --surface2: #1f2b27;
+  --raised: #1b2622;
+  --field: #17211e;
+  --line: rgba(230, 225, 214, 0.08);
+  --line2: rgba(230, 225, 214, 0.15);
+  --text: #efebe3;
+  --text2: #b3b8b1;
+  --text3: #89928d;
+  --accent: #b8323b;
+  --accent-ink: #ffffff;
+  --accent-text: #f2858a;
+  --accent-soft: rgba(242, 133, 138, 0.13);
+  --ok: #7fc4a4;
+  --scrim: rgba(4, 8, 7, 0.66);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f4efe6; --surface: #fbf8f2; --surface2: #e9e3d7; --raised: #ffffff; --field: #ffffff;
+    --line: rgba(19, 20, 22, 0.08); --line2: rgba(19, 20, 22, 0.14);
+    --text: #131416; --text2: #474a47; --text3: #5f615c;
+    --accent: #a8262f; --accent-ink: #ffffff; --accent-text: #a8262f; --accent-soft: rgba(168, 38, 47, 0.08);
+    --ok: #2f7a57; --scrim: rgba(19, 20, 22, 0.36); --shadow: 0 10px 30px rgba(40, 30, 20, 0.14);
+  }
+}
+
+[data-theme="light"] {
+  --bg: #f4efe6; --surface: #fbf8f2; --surface2: #e9e3d7; --raised: #ffffff; --field: #ffffff;
+  --line: rgba(19, 20, 22, 0.08); --line2: rgba(19, 20, 22, 0.14);
+  --text: #131416; --text2: #474a47; --text3: #5f615c;
+  --accent: #a8262f; --accent-ink: #ffffff; --accent-text: #a8262f; --accent-soft: rgba(168, 38, 47, 0.08);
+  --ok: #2f7a57; --scrim: rgba(19, 20, 22, 0.36); --shadow: 0 10px 30px rgba(40, 30, 20, 0.14);
+}

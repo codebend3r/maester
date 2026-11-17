@@ -1,233 +1,164 @@
-import { MUSIC_SORTS, playlistFactsOf } from '@raven/core'
-import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import type { ComponentType, ReactElement } from 'react'
-import { FlatList, StyleSheet, View } from 'react-native'
+import { formatBytes } from '@raven/core'
+import { useRouter } from 'expo-router'
+import { ScrollView, View } from 'react-native'
 
-import { useTileWidth } from '@/components/AlbumGrid'
-import { AlbumTile } from '@/components/AlbumTile'
-import { ListRow } from '@/components/ListRow'
-import { Notice } from '@/components/Notice'
-import { Segments } from '@/components/Segments'
-import { SongList } from '@/components/SongList'
-import { PageTitle, pageStyles, useListContent } from '@/components/TabPage'
-import { artistFactsOf } from '@/music/artistFacts'
-import { type ListState, byName, byTitle, listStateOf, mergedOf } from '@/music/merged'
-import { LIBRARY_COPY, useMusicLibraries } from '@/music/musicLibraries'
-import { nextPageOf } from '@/music/nextPage'
 import { useCovers } from '@/music/useCovers'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { DownloadsList } from '@/screens/Downloads'
+import { countText } from '@/screens/library/counts'
 import {
-  LIBRARY_SEGMENTS,
-  type LibrarySegment,
-  WREN_PAGES,
-  WREN_ROUTE_PARAMS,
-  librarySegmentOf,
-  pageHref,
-} from '@/routes'
-import { SIZES } from '@/theme/wrenTheme'
+  useDownloadsSummary,
+  usePlaylists,
+  useRecentAlbums,
+  useSongCount,
+} from '@/screens/library/listings'
+import { ListNotice } from '@/screens/library/ListNotice'
+import { LIBRARY_SEGMENTS, type LibrarySegment, WREN_ROUTES, libraryHref } from '@/routes'
+import { usePageInsets } from '@/shell/useShell'
+import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
+import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { AlbumTileOf } from '@/ui/AlbumTile'
+import { countsLineOf, factsLineOf } from '@/ui/counts'
+import { IconButton } from '@/ui/IconButton'
+import { NavigationRow } from '@/ui/NavigationRow'
+import { PageHeader } from '@/ui/PageHeader'
+import { SectionHeader } from '@/ui/SectionHeader'
+import { TileGrid } from '@/ui/TileGrid'
+import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
 
-/** The Library tab's lists, each named on its tab. */
-const SEGMENT_TABS = [
-  { key: LIBRARY_SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums },
-  { key: LIBRARY_SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists },
-  { key: LIBRARY_SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs },
-  { key: LIBRARY_SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists },
-  { key: LIBRARY_SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads },
-] as const
+/** How many of the newest albums Library's grid shows: three rows on a phone, two on a tablet. */
+const RECENT_SHOWN = {
+  [FORM_FACTORS.phone]: 6,
+  [FORM_FACTORS.tablet]: 10,
+} as const satisfies Record<FormFactor, number>
 
-type ListNoticeOfProps = { listing: ListState; empty: string }
+const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+  ground: { backgroundColor: colors.bg, flex: 1 },
+  content: { gap: SPACE.s6 },
+  rows: { gap: 0 },
+  row: { borderBottomColor: colors.line, borderBottomWidth: SIZE.hairline },
+  section: { gap: SPACE.s3 },
+}))
+
+type Category = { kind: LibrarySegment; label: string; icon: WrenIconName }
+
+/** Each category's row: its icon and its name, in the order Library lists them. */
+const CATEGORIES = [
+  { kind: LIBRARY_SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists, icon: ICONS.playlist },
+  { kind: LIBRARY_SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists, icon: ICONS.artist },
+  { kind: LIBRARY_SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums, icon: ICONS.album },
+  { kind: LIBRARY_SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs, icon: ICONS.song },
+  { kind: LIBRARY_SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads, icon: ICONS.downloads },
+] as const satisfies readonly Category[]
+
+type ValueOfProps = {
+  /** The count, or null while it is on its way or could not be read. */
+  n: number | null
+  /** What none reads as, when it is worth saying; left out otherwise. */
+  none?: string
+}
+
+/** A category's value: its count, "None yet" where that says something, or nothing at all. */
+const valueOf = ({ n, none }: ValueOfProps): string | undefined => {
+  if (n === null) return undefined
+  if (n === 0) return none
+  return countText(n)
+}
+
+type CategoryValuesProps = { session: WrenSession }
 
 /**
- * What a list says in place of its entries: why it could not be read, that it is, that raven
- * holds no music, or that it is empty.
+ * What each category holds, beside its row, where it costs next to nothing to know: the
+ * playlists, the songs (each library's total, from a page of one track) and the downloads. The
+ * server counts no albums or artists short of listing them all, so those rows hold no count, and
+ * a count still on its way, or one that failed, is left out rather than guessed.
  */
-const listNoticeOf = ({ listing: { failure, isRead, hasNoMusic }, empty }: ListNoticeOfProps) => {
-  if (failure !== null) return failure.message
-  if (!isRead) return LIBRARY_COPY.loading
-  return hasNoMusic ? LIBRARY_COPY.noMusic : empty
-}
-
-type ListNoticeProps = ListNoticeOfProps
-
-/** A list's notice, standing where its entries would. */
-function ListNotice(props: ListNoticeProps) {
-  return <Notice text={listNoticeOf(props)} />
-}
-
-type SegmentListProps = { session: WrenSession; header: ReactElement }
-
-type AlbumsListProps = SegmentListProps
-
-function AlbumsList({ session, header }: AlbumsListProps) {
-  const listContent = useListContent()
-  const { columns, tileWidth } = useTileWidth()
-  const coverOf = useCovers(session)
-  const music = useMusicLibraries(session)
-  const listings = useQueries({
-    queries: music.libraries.map((library) =>
-      session.queries.albumsQuery({ libraryId: library.id, search: '', sort: MUSIC_SORTS.title }),
-    ),
-  })
-  const { entries: albums, ...listing } = mergedOf({ music, listings, order: byTitle })
-  return (
-    <FlatList
-      ListEmptyComponent={<ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
-      ListHeaderComponent={header}
-      columnWrapperStyle={styles.columns}
-      contentContainerStyle={listContent}
-      data={albums}
-      key={columns}
-      keyExtractor={(album) => String(album.id)}
-      numColumns={columns}
-      renderItem={({ item }) => (
-        <AlbumTile
-          album={item}
-          cover={coverOf({ albumId: item.id, coverVersion: item.coverVersion })}
-          width={tileWidth}
-        />
-      )}
-      style={pageStyles.ground}
-    />
-  )
-}
-
-type ArtistsListProps = SegmentListProps
-
-function ArtistsList({ session, header }: ArtistsListProps) {
-  const router = useRouter()
-  const listContent = useListContent()
-  const music = useMusicLibraries(session)
-  const listings = useQueries({
-    queries: music.libraries.map((library) =>
-      session.queries.artistsQuery({ libraryId: library.id, search: '' }),
-    ),
-  })
-  const { entries: artists, ...listing } = mergedOf({ music, listings, order: byName })
-  return (
-    <FlatList
-      ListEmptyComponent={<ListNotice empty={LIBRARY_PAGE_COPY.noArtists} listing={listing} />}
-      ListHeaderComponent={header}
-      contentContainerStyle={listContent}
-      data={artists}
-      keyExtractor={(artist) => String(artist.id)}
-      renderItem={({ item }) => (
-        <ListRow
-          line={artistFactsOf({ artist: item })}
-          onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: item.id }))}
-          title={item.name}
-        />
-      )}
-      style={pageStyles.ground}
-    />
-  )
-}
-
-type SongsListProps = SegmentListProps
-
-function SongsList({ session, header }: SongsListProps) {
-  const music = useMusicLibraries(session)
-  const songs = useInfiniteQuery(
-    session.queries.songsQuery({
-      libraryIds: music.libraries.map(({ id }) => id),
-      search: '',
-      sort: MUSIC_SORTS.title,
+const useCategoryValues = ({
+  session,
+}: CategoryValuesProps): Record<LibrarySegment, string | undefined> => {
+  const songs = useSongCount({ session, search: '' })
+  const playlists = usePlaylists(session)
+  const downloads = useDownloadsSummary(session.server.id)
+  const downloaded = countsLineOf({ albums: downloads.albums, playlists: downloads.playlists })
+  return {
+    [LIBRARY_SEGMENTS.playlists]: valueOf({
+      n: playlists.data?.length ?? null,
+      none: LIBRARY_PAGE_COPY.noneYet,
     }),
-  )
-  const tracks = songs.data?.pages.flatMap((page) => page.tracks) ?? []
+    [LIBRARY_SEGMENTS.artists]: undefined,
+    [LIBRARY_SEGMENTS.albums]: undefined,
+    [LIBRARY_SEGMENTS.songs]: valueOf({ n: songs }),
+    [LIBRARY_SEGMENTS.downloads]:
+      downloaded === ''
+        ? LIBRARY_PAGE_COPY.noneYet
+        : factsLineOf([downloaded, formatBytes(downloads.bytes)]),
+  }
+}
+
+type LibraryPageProps = { session: WrenSession }
+
+/** The newest albums of every music library, as a grid. */
+function RecentGrid({ session }: LibraryPageProps) {
+  const styles = useStyles()
+  const { coverOf } = useCovers(session)
+  const { albums, listing } = useRecentAlbums(session)
+  const count = RECENT_SHOWN[useFormFactor()]
   return (
-    <SongList
-      empty={
-        <ListNotice
-          empty={LIBRARY_PAGE_COPY.noSongs}
-          listing={listStateOf({ music, failure: songs.error, isRead: songs.isSuccess })}
-        />
-      }
-      header={header}
-      onEnd={nextPageOf(songs)}
-      tracks={tracks}
-    />
-  )
-}
-
-type PlaylistsListProps = SegmentListProps
-
-function PlaylistsList({ session, header }: PlaylistsListProps) {
-  const router = useRouter()
-  const listContent = useListContent()
-  const playlists = useQuery(session.queries.playlistsQuery)
-  return (
-    <FlatList
-      ListEmptyComponent={
-        <ListNotice
-          empty={LIBRARY_PAGE_COPY.noPlaylists}
-          listing={{ failure: playlists.error, isRead: playlists.isSuccess, hasNoMusic: false }}
-        />
-      }
-      ListHeaderComponent={header}
-      contentContainerStyle={listContent}
-      data={playlists.data}
-      keyExtractor={(playlist) => String(playlist.id)}
-      renderItem={({ item }) => (
-        <ListRow
-          line={playlistFactsOf({ playlist: item })}
-          onPress={() => router.push(pageHref({ page: WREN_PAGES.playlist, id: item.id }))}
-          title={item.name}
-        />
-      )}
-      style={pageStyles.ground}
-    />
-  )
-}
-
-type DownloadsSegmentProps = SegmentListProps
-
-/** What is on the device, which plays with the server out of reach. */
-function DownloadsSegment({ session, header }: DownloadsSegmentProps) {
-  return <DownloadsList header={header} serverId={session.server.id} />
-}
-
-/** The list each of the Library tab's segments shows. */
-const SEGMENT_LISTS = {
-  [LIBRARY_SEGMENTS.albums]: AlbumsList,
-  [LIBRARY_SEGMENTS.artists]: ArtistsList,
-  [LIBRARY_SEGMENTS.songs]: SongsList,
-  [LIBRARY_SEGMENTS.playlists]: PlaylistsList,
-  [LIBRARY_SEGMENTS.downloads]: DownloadsSegment,
-} as const satisfies Record<LibrarySegment, ComponentType<SegmentListProps>>
-
-type ServerLibraryProps = { session: WrenSession }
-
-function ServerLibrary({ session }: ServerLibraryProps) {
-  const router = useRouter()
-  const params = useLocalSearchParams()
-  // The list rides in the address, so Home's way to the downloads opens on them.
-  const segment = librarySegmentOf(params[WREN_ROUTE_PARAMS.segment])
-  const header = (
-    <View style={pageStyles.header}>
-      <PageTitle title={LIBRARY_PAGE_COPY.title} />
-      <Segments
-        onSelect={(key) => router.setParams({ [WREN_ROUTE_PARAMS.segment]: key })}
-        segments={SEGMENT_TABS}
-        selected={segment}
+    <View style={styles.section}>
+      <SectionHeader title={LIBRARY_PAGE_COPY.recent} />
+      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      <TileGrid
+        items={albums.slice(0, count)}
+        keyOf={(album) => album.id}
+        renderTile={({ item, width }) => (
+          <AlbumTileOf album={item} coverOf={coverOf} width={width} />
+        )}
       />
     </View>
   )
-  const List = SEGMENT_LISTS[segment]
-  return <List header={header} session={session} />
+}
+
+function LibraryPage({ session }: LibraryPageProps) {
+  const styles = useStyles()
+  const router = useRouter()
+  const { colors } = useWrenTheme()
+  const insets = usePageInsets()
+  const values = useCategoryValues({ session })
+  return (
+    <ScrollView contentContainerStyle={[insets, styles.content]} style={styles.ground}>
+      <PageHeader
+        actions={
+          <IconButton
+            color={colors.text}
+            icon={ICONS.search}
+            label={LIBRARY_PAGE_COPY.search}
+            onPress={() => router.navigate(WREN_ROUTES.search)}
+          />
+        }
+        title={LIBRARY_PAGE_COPY.title}
+      />
+      <View style={styles.rows}>
+        {CATEGORIES.map((category) => (
+          <View key={category.kind} style={styles.row}>
+            <NavigationRow
+              icon={category.icon}
+              label={category.label}
+              onPress={() => router.push(libraryHref(category.kind))}
+              value={values[category.kind]}
+            />
+          </View>
+        ))}
+      </View>
+      <RecentGrid session={session} />
+    </ScrollView>
+  )
 }
 
 /**
- * The albums, artists, songs and playlists raven holds, one list at a time: each list holds
- * every music library's, the songs a page at a time. Downloads lists what is on the device.
+ * Library: its categories, each a page of its own with what it holds beside it, and the newest
+ * albums of every music library under them.
  */
 export function Library() {
   const session = useWren()
-  return session !== null && <ServerLibrary session={session} />
+  return session !== null && <LibraryPage session={session} />
 }
-
-const styles = StyleSheet.create({
-  columns: { gap: SIZES.space3, paddingBottom: SIZES.space3 },
-})
