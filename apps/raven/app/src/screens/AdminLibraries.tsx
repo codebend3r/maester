@@ -72,7 +72,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
     cancelRatings,
     rematch,
     mergeAlbums,
-    isScanRunning,
+    isBusy,
     isQuickScanning,
     isFullScanning,
     isUpdatingRatings,
@@ -93,7 +93,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
     <SettingsSection note={null} title={library.name}>
       <LongAction
         isCancelling={cancelQuickScan.isPending}
-        isDisabled={isScanRunning || quickScan.isPending}
+        isDisabled={isBusy}
         isRunning={isQuickScanning}
         label={LIBRARY_ACTIONS_COPY.quickScan}
         library={library}
@@ -102,7 +102,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
       />
       <LongAction
         isCancelling={cancelFullScan.isPending}
-        isDisabled={isScanRunning || fullScan.isPending}
+        isDisabled={isBusy}
         isRunning={isFullScanning}
         label={LIBRARY_ACTIONS_COPY.fullScan}
         library={library}
@@ -111,7 +111,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
       />
       {matchType !== null && (
         <SettingsButton
-          isDisabled={scanMarkers.isPending}
+          isDisabled={isBusy}
           name={LIBRARY_ACTIONS_COPY.named({
             label: LIBRARY_ACTIONS_COPY.scanMarkers,
             library: library.name,
@@ -137,7 +137,7 @@ const LibraryAdmin = ({ api, library }: LibraryAdminProps) => {
       )}
       <LongAction
         isCancelling={cancelRatings.isPending}
-        isDisabled={updateRatings.isPending}
+        isDisabled={isBusy}
         isRunning={isUpdatingRatings}
         label={LIBRARY_ACTIONS_COPY.updateRatings}
         library={library}

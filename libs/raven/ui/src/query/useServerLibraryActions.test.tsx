@@ -49,16 +49,15 @@ describe('useServerLibraryActions', () => {
   it('runs nothing for an idle library', () => {
     const { result } = setUp()
     expect(result.current).toMatchObject({
-      isScanRunning: false,
       isQuickScanning: false,
       isFullScanning: false,
       isUpdatingRatings: false,
+      isBusy: false,
     })
   })
 
   it('reads a running scan off the library, by its kind', () => {
     expect(setUp({ shown: running(SCAN_KINDS.quick) }).result.current).toMatchObject({
-      isScanRunning: true,
       isQuickScanning: true,
       isFullScanning: false,
     })
@@ -75,6 +74,27 @@ describe('useServerLibraryActions', () => {
       },
     })
     expect(setUp({ shown: refreshing }).result.current.isUpdatingRatings).toBe(true)
+  })
+
+  it('is busy while any scan or ratings update runs, so no other may start', () => {
+    expect(setUp({ shown: running(SCAN_KINDS.quick) }).result.current.isBusy).toBe(true)
+    expect(setUp({ shown: running(SCAN_KINDS.full) }).result.current.isBusy).toBe(true)
+    const refreshing = library({
+      ratingsRefresh: {
+        state: RATINGS_REFRESH_STATES.running,
+        done: 0,
+        total: 1,
+        startedAt: '2026-11-01T00:00:00.000Z',
+      },
+    })
+    expect(setUp({ shown: refreshing }).result.current.isBusy).toBe(true)
+  })
+
+  it('is busy from the press of Scan intros and credits until the server answers', async () => {
+    spies.scanMarkers.mockImplementation(() => new Promise(() => undefined))
+    const { result } = setUp()
+    act(() => result.current.scanMarkers.mutate())
+    await waitFor(() => expect(result.current.isBusy).toBe(true))
   })
 
   it('shows a quick scan as running from the press, and caches the library it answers', async () => {

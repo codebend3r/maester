@@ -141,12 +141,27 @@ const untilAborted = ({ signal, until }: UntilAbortedProps): Promise<void> =>
     until.then(resolve, resolve)
   })
 
-/** A library's scan running now, and what waits for it to finish. */
-type Slot = { running: Promise<void>; next: Scope | null; abort: AbortController }
+/** A library's scan running now, what it covers, and what waits for it to finish. */
+type Slot = { running: Promise<void>; scope: Scope; next: Scope | null; abort: AbortController }
+
+/**
+ * Why a quick scan, a check or a refresh stopped early: a full scan was asked
+ * for, which covers everything it would have done. The scan it gave way to
+ * already holds the status, so the one stopped leaves the status alone.
+ */
+class ScanPreempted extends Error {
+  constructor() {
+    super('A full scan took over')
+  }
+}
+
+const isPreempted = (signal: AbortSignal): boolean => signal.reason instanceof ScanPreempted
 
 type ScannerServiceRefreshProps = { libraryId: number; places: readonly string[] }
 
-type ScannerServiceUpdateProps = { libraryId: number; patch: Partial<ScanStatus> }
+type ScanPatch = Partial<ScanStatus>
+
+type ScannerServiceUpdateProps = { libraryId: number; patch: ScanPatch }
 
 type ScannerServiceRequestProps = { libraryId: number; scope: Scope }
 
@@ -161,11 +176,6 @@ type ScannerServiceRunProps = {
 type ScannerServiceScanLibraryProps = {
   library: LibraryRecord
   signal: AbortSignal
-}
-
-type ScannerServiceCancelFullScanProps = {
-  library: LibraryRecord
-  before: ScanStatus
 }
 
 type ScannerServiceFinishFullScanProps = {
@@ -274,7 +284,7 @@ export class ScannerService implements OnApplicationBootstrap {
     return remembered
   }
 
-  /** Starts a full scan, or queues one behind the scan under way, and returns the status. */
+  /** Starts a full scan, taking over from any other kind under way (see `request`), and returns the status. */
   scan(libraryId: number): ScanStatus {
     this.request({ libraryId, scope: { kind: SCOPE_KINDS.library } })
     return this.status(libraryId)
@@ -332,16 +342,36 @@ export class ScannerService implements OnApplicationBootstrap {
   /**
    * A library scans one thing at a time. An idle one starts at once, so its
    * status says scanning straight away; a busy one keeps the request for
-   * after, merged with whatever else waits.
+   * after, merged with whatever else waits. A full scan does not wait behind
+   * a quick scan, a check or a refresh: it covers all they would do, so the
+   * one under way stops at its next step, and the status says a full scan
+   * from the moment it is asked for.
    */
   private request({ libraryId, scope }: ScannerServiceRequestProps): void {
     if (this.scans.isStopped) return
     const slot = this.slots.get(libraryId)
-    if (slot) {
-      slot.next = mergeScopes({ waiting: slot.next, scope })
-      return
+    if (!slot) return this.start({ libraryId, scope })
+    slot.next = mergeScopes({ waiting: slot.next, scope })
+    if (scope.kind === SCOPE_KINDS.library && slot.scope.kind !== SCOPE_KINDS.library) {
+      slot.abort.abort(new ScanPreempted())
+      this.beginFullScan(libraryId)
     }
-    this.start({ libraryId, scope })
+  }
+
+  /** A full scan's status as it begins: walking, nothing found yet. */
+  private beginFullScan(libraryId: number): void {
+    this.update({
+      libraryId,
+      patch: {
+        state: SCAN_STATES.walking,
+        kind: SCAN_KINDS.full,
+        found: 0,
+        processed: 0,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        error: null,
+      },
+    })
   }
 
   private start({ libraryId, scope }: ScannerServiceStartProps): void {
@@ -353,19 +383,23 @@ export class ScannerService implements OnApplicationBootstrap {
     })
       .catch((error: unknown) => this.logger.error(`Scan failed: ${errorMessage(error)}`))
       .then(() => this.startNext(libraryId))
-    this.slots.set(libraryId, { running, next: null, abort })
+    this.slots.set(libraryId, { running, scope, next: null, abort })
   }
 
   /**
    * Stops the scan running now and drops the one waiting behind it. The walk
    * and the probes end at their next step, so the status says scanning until
-   * they have; a full scan leaves its last finished time as it was.
+   * they have; a full scan leaves its last finished time as it was. A full
+   * scan that took over and has yet to begin has no run of its own to say it
+   * stopped, so its status goes back at once to what the library's record
+   * remembers; the scan it took over from no longer reports.
    */
   cancel(libraryId: number): ScanStatus {
     const slot = this.slots.get(libraryId)
     if (slot) {
       slot.next = null
       slot.abort.abort()
+      if (isPreempted(slot.abort.signal)) this.statuses.delete(libraryId)
     }
     return this.status(libraryId)
   }
@@ -401,20 +435,8 @@ export class ScannerService implements OnApplicationBootstrap {
 
   /** A full scan: everything under the library's paths, its progress and outcome in the status. */
   private async scanLibrary({ library, signal }: ScannerServiceScanLibraryProps): Promise<void> {
-    const before = this.status(library.id)
     this.music.resetFolderCovers()
-    this.update({
-      libraryId: library.id,
-      patch: {
-        state: SCAN_STATES.walking,
-        kind: SCAN_KINDS.full,
-        found: 0,
-        processed: 0,
-        startedAt: new Date().toISOString(),
-        finishedAt: null,
-        error: null,
-      },
-    })
+    this.beginFullScan(library.id)
     try {
       const { walk, changes, toProbe, media } = await this.reindex({
         library,
@@ -445,7 +467,7 @@ export class ScannerService implements OnApplicationBootstrap {
             patch: { processed: this.status(library.id).processed + 1 },
           }),
       })
-      if (signal.aborted) return this.cancelFullScan({ library, before })
+      if (signal.aborted) return this.cancelFullScan(library)
       // Thumbnails that timed out on an earlier pass get another go.
       this.thumbnails.retryPending()
 
@@ -456,17 +478,21 @@ export class ScannerService implements OnApplicationBootstrap {
       })
       this.logger.log(`Scanned "${library.name}": ${summary({ walk, changes, toProbe })}`)
     } catch (error) {
-      if (signal.aborted) return this.cancelFullScan({ library, before })
+      if (signal.aborted) return this.cancelFullScan(library)
       this.finishFullScan({ library, error: errorMessage(error) })
       this.logger.error(`Scan of "${library.name}" failed: ${errorMessage(error)}`)
     }
   }
 
   /** A full scan the admin stopped: idle again, with the last finished scan's time and no error. */
-  private cancelFullScan({ library, before }: ScannerServiceCancelFullScanProps): void {
+  private cancelFullScan(library: LibraryRecord): void {
     this.update({
       libraryId: library.id,
-      patch: { state: SCAN_STATES.idle, finishedAt: before.finishedAt, error: null },
+      patch: {
+        state: SCAN_STATES.idle,
+        finishedAt: this.libraries.scanTimes(library.id).fullScannedAt,
+        error: null,
+      },
     })
     this.logger.log(`Scan of "${library.name}" cancelled`)
   }
@@ -494,17 +520,18 @@ export class ScannerService implements OnApplicationBootstrap {
     signal,
   }: ScannerServiceQuickScanLibraryProps): Promise<void> {
     const isQuiet = reason === QUICK_SCAN_REASONS.check
+    // Once a full scan has taken over, the status is its own.
+    const report = (patch: ScanPatch) => {
+      if (!isPreempted(signal)) this.update({ libraryId: library.id, patch })
+    }
     const begin = () =>
-      this.update({
-        libraryId: library.id,
-        patch: {
-          state: SCAN_STATES.walking,
-          kind: SCAN_KINDS.quick,
-          found: 0,
-          processed: 0,
-          startedAt: new Date().toISOString(),
-          error: null,
-        },
+      report({
+        state: SCAN_STATES.walking,
+        kind: SCAN_KINDS.quick,
+        found: 0,
+        processed: 0,
+        startedAt: new Date().toISOString(),
+        error: null,
       })
     if (!isQuiet) begin()
     try {
@@ -514,10 +541,7 @@ export class ScannerService implements OnApplicationBootstrap {
         signal,
         onFound: (count) => {
           if (isQuiet) return
-          this.update({
-            libraryId: library.id,
-            patch: { found: this.status(library.id).found + count },
-          })
+          report({ found: this.status(library.id).found + count })
         },
       })
       const { walk, changes, media } = reindexed
@@ -531,13 +555,10 @@ export class ScannerService implements OnApplicationBootstrap {
         if (!isNew) return
         begin()
       }
-      this.update({
-        libraryId: library.id,
-        patch: {
-          state: SCAN_STATES.indexing,
-          found: walk.files.length,
-          processed: walk.files.length - toProbe.length,
-        },
+      report({
+        state: SCAN_STATES.indexing,
+        found: walk.files.length,
+        processed: walk.files.length - toProbe.length,
       })
       if (isNew) {
         await this.probeAndMatch({
@@ -545,11 +566,7 @@ export class ScannerService implements OnApplicationBootstrap {
           media,
           toProbe,
           signal,
-          onProbed: () =>
-            this.update({
-              libraryId: library.id,
-              patch: { processed: this.status(library.id).processed + 1 },
-            }),
+          onProbed: () => report({ processed: this.status(library.id).processed + 1 }),
         })
       }
       // A cancelled scan did not finish, so its time stands.
@@ -562,7 +579,7 @@ export class ScannerService implements OnApplicationBootstrap {
         return
       }
       if (isNew && reason === QUICK_SCAN_REASONS.asked) {
-        this.update({ libraryId: library.id, patch: { state: SCAN_STATES.matching } })
+        report({ state: SCAN_STATES.matching })
         await untilAborted({ signal, until: this.metadata.whenIdle() })
         if (signal.aborted) return
       }
@@ -574,7 +591,7 @@ export class ScannerService implements OnApplicationBootstrap {
       if (signal.aborted) return
       this.logger.warn(`Quick scan of "${library.name}" failed: ${errorMessage(error)}`)
     } finally {
-      this.update({ libraryId: library.id, patch: { state: SCAN_STATES.idle } })
+      report({ state: SCAN_STATES.idle })
     }
   }
 

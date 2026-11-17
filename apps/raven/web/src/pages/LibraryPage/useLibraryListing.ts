@@ -15,6 +15,7 @@ import type { Listing } from '@/pages/LibraryPage/libraryShape'
 import { seasonsOf } from '@/pages/LibraryPage/seasons'
 import { SHOW_LEVELS, type ShowLevel } from '@/lib/showLevels'
 import { POLL_MS, anyPending, useMatchingPassDone } from '@/pages/LibraryPage/useMatchingPassDone'
+import { useScanDone } from '@/pages/LibraryPage/useScanDone'
 
 type ReadProps = { shows: ShowListing | undefined; files: MediaItem[] | undefined }
 
@@ -48,8 +49,8 @@ type UseLibraryListingProps = {
 /**
  * What a library lists, one shape whatever its type: a TV library's shows
  * and the files no show was found for, its seasons or its episodes, or every
- * file of any other. While a scan runs, or thumbnails are made or files
- * matched, it keeps filling in.
+ * file of any other. While thumbnails are made or files matched it keeps
+ * filling in; a scan's changes come by the server's event and its end.
  */
 export const useLibraryListing = ({
   libraryId,
@@ -72,13 +73,12 @@ export const useLibraryListing = ({
     ...showListQuery(listing),
     enabled: readsShows,
     refetchInterval: (current) =>
-      isScanning || (canMatch && anyPending(current.state.data?.unmatched ?? [])) ? POLL_MS : false,
+      canMatch && anyPending(current.state.data?.unmatched ?? []) ? POLL_MS : false,
   })
   const files = useQuery({
     ...mediaListQuery(fileListing),
     enabled: readsFiles,
     refetchInterval: (current) =>
-      isScanning ||
       (current.state.data ?? []).some(
         (item) =>
           item.thumbnail === THUMBNAIL_STATES.pending ||
@@ -91,6 +91,7 @@ export const useLibraryListing = ({
   const listed = LISTINGS[level]({ shows: shows.data, files: files.data })
 
   useMatchingPassDone({ libraryId, files: listed?.files ?? [] })
+  useScanDone({ libraryId, isScanning })
 
   // A failed read again keeps what was read before.
   if (listed) return { isError: false, isPending: false, data: listed }
