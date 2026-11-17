@@ -40,7 +40,7 @@ import { useLeaveSignal } from '@/desktop/player/useLeaveSignal'
 import { useMenuNext } from '@/desktop/player/useMenuNext'
 import { CONNECTION_STATUSES } from '@/desktop/playerConnection'
 import { api } from '@/lib/api'
-import { mediaQuery } from '@/lib/queries'
+import { markersQuery, mediaQuery } from '@/lib/queries'
 import { useTitleLogo } from '@/lib/useTitleLogo'
 import { useAuthSession } from '@/stores/authSession'
 import { useDesktop } from '@/stores/desktop'
@@ -127,23 +127,30 @@ const savedLogoOf = ({ logo, pictureUrl }: SavedLogoOfProps): TitleLogo | null =
   return logo === null || url === null ? null : { url, name: logo.name }
 }
 
-type DownloadMedia = { logo: TitleLogo | null; playback: PlaybackFile | null }
+type DownloadMedia = {
+  logo: TitleLogo | null
+  playback: PlaybackFile | null
+  markers: PlayerServices['title']['markers']
+}
 
 /*
- * A download's media on the server and its art, so the header heads it as the server's player
- * does. The art is the one saved with the download whenever there is one, so it is there with
- * no server; without one the server's is asked for. Offline, signed out or for a plain local
- * file nothing is asked, and with no saved art the header spells the title out.
+ * A download's media on the server, its art and its intro and credits markers, so the header
+ * heads it and Skip intro offers itself as the server's player does: a download is the library
+ * file byte for byte, so the server's markers fit it. The art is the one saved with the download
+ * whenever there is one, so it is there with no server; without one the server's is asked for.
+ * Offline, signed out or for a plain local file nothing is asked, and with no saved art the
+ * header spells the title out.
  */
 const useDownloadMedia = ({ mediaId, logo }: UseDownloadMediaProps): DownloadMedia => {
   const isOffline = useServerReach((state) => state.isOffline)
   const isSignedIn = useAuthSession((state) => state.session !== null)
   const asked = !isOffline && isSignedIn ? mediaId : null
   const media = useQuery(mediaQuery(asked)).data ?? null
+  const markers = useQuery(markersQuery(asked)).data ?? null
   const served = useTitleLogo({ media })
   const { pictureUrl } = useDownloadsHost()
   const saved = useMemo(() => savedLogoOf({ logo, pictureUrl }), [logo, pictureUrl])
-  return { logo: saved ?? served, playback: media === null ? null : { media, api } }
+  return { logo: saved ?? served, playback: media === null ? null : { media, api }, markers }
 }
 
 type PlayingProps = {
@@ -176,19 +183,19 @@ const Playing = ({ file, chosen, isOutputFixed, downloadsPage }: PlayingProps) =
     () => fileServicesFor({ file: played, client, menu, engine, downloadsPage }),
     [played, client, menu, engine, downloadsPage],
   )
-  const { logo, playback } = useDownloadMedia({ mediaId: file.mediaId, logo: file.logo })
+  const { logo, playback, markers } = useDownloadMedia({ mediaId: file.mediaId, logo: file.logo })
   /*
-   * The output and the art arrive on their own time; folding them in keeps the progress sink,
-   * so the player neither remounts nor forgets the length it reported.
+   * The output, the art and the markers arrive on their own time; folding them in keeps the
+   * progress sink, so the player neither remounts nor forgets the length it reported.
    * Chromium mixes the html engine's sound itself, so only mpv's bitstream fixes the volume.
    */
   const services = useMemo(
     () => ({
       ...base,
-      title: { ...base.title, logo },
+      title: { ...base.title, logo, markers },
       isVolumeFixed: isOutputFixed && engine === ENGINE_USES.native,
     }),
-    [base, logo, isOutputFixed, engine],
+    [base, logo, markers, isOutputFixed, engine],
   )
 
   useMenuNext({

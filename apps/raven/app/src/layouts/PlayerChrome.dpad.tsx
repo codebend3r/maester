@@ -25,6 +25,8 @@ import { CaptionText } from '@/layouts/PlayerCaption'
 import { PictureCaptions } from '@/layouts/PlayerPictureCaption'
 import { OpeningMark, PlayerNotice } from '@/layouts/PlayerNotice.focus'
 import { ChaptersBand } from '@/layouts/PlayerChapters.dpad'
+import { IntroCard } from '@/layouts/PlayerIntro.dpad'
+import { type IntroOffer, useIntroOffer } from '@/layouts/introOffer'
 import { UpNextCard, useUpNextOffer } from '@/layouts/PlayerUpNext.dpad'
 import {
   PLAYER_COPY,
@@ -94,6 +96,8 @@ type ControlsProps = Pick<
 > & {
   /** Whether the remote is the controls': each time it comes to them the line asks for the focus. */
   hasRemote: boolean
+  /** Skip intro, after its card has prompted, while the video is still inside the intro; null otherwise. */
+  intro: IntroOffer | null
   /** A skip either way, by the chrome's one ladder. */
   onSkip: (direction: SkipStep['direction']) => void
   onScrubbing: (isScrubbing: boolean) => void
@@ -138,6 +142,7 @@ const Controls = ({
   previous,
   mode,
   chapters,
+  intro,
   onBack,
   onScrubbing,
   onPicking,
@@ -232,6 +237,14 @@ const Controls = ({
                   onPress={next.onPlay}
                 />
               )}
+              {intro !== null && (
+                <PlateButton
+                  isOverPicture
+                  label={intro.label}
+                  onPress={intro.onPress}
+                  text={intro.label}
+                />
+              )}
             </View>
             <View style={styles.buttonGroup}>
               {audio !== null && (
@@ -316,7 +329,9 @@ type CountedFlash = Flash & { count: number }
  * ten seconds, and the remote's play, rewind and fast forward keys work wherever the focus is.
  * The subtitles stand over the video whether or not the controls are, clear of them while they
  * show: raven's own cues on Apple TV, the player's on Android TV. From the credits on, the up
- * next card stands at the bottom right, hidden controls or not, with the remote on its Play now.
+ * next card stands at the bottom right, hidden controls or not, with the remote on its Play now;
+ * over an intro's first seconds Skip intro stands there the same way, and the controls carry it
+ * for the rest of the intro.
  */
 const DpadPlayer = ({
   heading,
@@ -333,6 +348,7 @@ const DpadPlayer = ({
   next,
   previous,
   mode,
+  intro,
   credits,
   chapters,
   onBack,
@@ -366,8 +382,10 @@ const DpadPlayer = ({
     isHeld: isPicking || held.isHolding,
   })
   const offer = useUpNextOffer({ next, transport, credits })
-  // On the card's buttons, as on the controls', left and right move the focus rather than seek.
-  const holder = remoteHolderOf({ isVisible, isUpNextOffered: offer !== null })
+  const introOffer = useIntroOffer({ intro, transport })
+  const isIntroPrompting = !!introOffer?.isPrompting
+  // On a card's buttons, as on the controls', left and right move the focus rather than seek.
+  const holder = remoteHolderOf({ isVisible, isUpNextOffered: offer !== null, isIntroPrompting })
   const isOnButtons = holder !== REMOTE_HOLDERS.catcher
 
   // The line goes with the controls, and its blur may not be heard as it does.
@@ -470,11 +488,15 @@ const DpadPlayer = ({
             subtitles={subtitles}
             transport={controlled}
             chapters={chapters}
+            intro={isIntroPrompting ? null : introOffer}
           />
         </Animated.View>
       )}
       {shown !== null && shownKey !== null && <Centre key={shownKey} {...shown} />}
       {offer !== null && <UpNextCard lift={lift} offer={offer} />}
+      {holder === REMOTE_HOLDERS.intro && introOffer !== null && (
+        <IntroCard lift={lift} offer={introOffer} />
+      )}
       {caption !== null && (
         <View
           pointerEvents="none"

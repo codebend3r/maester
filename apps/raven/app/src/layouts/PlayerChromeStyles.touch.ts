@@ -148,6 +148,16 @@ export const useTouchChromeStyles = pictureStyles((colours) =>
     },
     // The web's pills and back: dark glass, the same in every theme.
     glass: { backgroundColor: colours.quiet },
+    // Skip intro stands at the right over the time, as the web player's does.
+    introSlot: { alignItems: 'flex-end' },
+    intro: {
+      minHeight: SIZES.controlLarge,
+      justifyContent: 'center',
+      paddingHorizontal: SIZES.space4,
+      borderRadius: SIZES.controlLarge,
+      backgroundColor: colours.quiet,
+    },
+    introText: { color: colours.text, fontSize: SIZES.textSm, fontWeight: 'bold' },
     pressed: { opacity: OPACITIES.pressed },
     captionSlot: {
       ...StyleSheet.absoluteFill,

@@ -45,6 +45,7 @@ export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
 export { usePictureCues } from '@/lib/usePictureCues'
 export { useClock } from '@/lib/useClock'
+export { useSkipIntro } from '@/components/Player/useSkipIntro'
 export {
   CAPTION_COLOUR_NAMES,
   CAPTION_SIZE_NAMES,

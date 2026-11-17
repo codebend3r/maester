@@ -127,6 +127,17 @@ export const ravenQueriesFor = (api: ApiClient) => {
     return songsFrom({ libraryIds, search, sort, from: { at: at + 1, offset: 0 } })
   }
 
+  /**
+   * A file's markers change only when its file does or a detector or an admin finds new ones, so
+   * they are read once a session. An audiobook's chapters read the same entry.
+   */
+  const markersQuery = (id: number | null) =>
+    queryOptions({
+      queryKey: queryKeys.markers(id),
+      queryFn: id == null ? skipToken : () => api.getMarkers(id),
+      staleTime: Infinity,
+    })
+
   return {
     librariesQuery: queryOptions({
       queryKey: queryKeys.libraries,
@@ -325,13 +336,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
         queryFn: asksServerForNext(session) ? () => api.nextInSession({ id, session }) : skipToken,
       }),
 
-    /** A file's markers change only when its file does or a detector or an admin finds new ones, so they are read once a session. */
-    markersQuery: (id: number) =>
-      queryOptions({
-        queryKey: queryKeys.markers(id),
-        queryFn: () => api.getMarkers(id),
-        staleTime: Infinity,
-      }),
+    markersQuery,
 
     /** A file's tracks only change when the file does, and the scan stores them. */
     tracksQuery: playerQueries.tracks,
@@ -547,12 +552,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
      * opening is still a chapter of the book.
      */
     chaptersQuery: (id: number | null) =>
-      queryOptions({
-        queryKey: queryKeys.markers(id),
-        queryFn: id == null ? skipToken : () => api.getMarkers(id),
-        staleTime: Infinity,
-        select: (markers) => markers.chapters,
-      }),
+      queryOptions({ ...markersQuery(id), select: (markers) => markers.chapters }),
 
     /** MusicBrainz's releases for an album's Fix match; `query` '' searches by the album's own name. */
     albumMatchSearchQuery: ({ albumId, query }: RavenQueriesForAlbumMatchSearchQueryProps) =>

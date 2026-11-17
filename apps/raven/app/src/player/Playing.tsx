@@ -528,6 +528,7 @@ export const Playing = ({
         }
         mode={mode}
         chapters={markers.data?.chapters ?? NO_CHAPTERS}
+        intro={markers.data?.intro ?? null}
         credits={markers.data?.credits ?? null}
         next={
           nextMedia === null

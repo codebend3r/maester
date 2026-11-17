@@ -110,16 +110,35 @@ describe('heldSeekOf', () => {
 
 describe('remoteHolderOf', () => {
   it('gives the remote to the controls while they show, and to the catcher once they go', () => {
-    expect(remoteHolderOf({ isVisible: true, isUpNextOffered: false })).toBe(
-      REMOTE_HOLDERS.controls,
-    )
-    expect(remoteHolderOf({ isVisible: false, isUpNextOffered: false })).toBe(
-      REMOTE_HOLDERS.catcher,
-    )
+    expect(
+      remoteHolderOf({ isVisible: true, isUpNextOffered: false, isIntroPrompting: false }),
+    ).toBe(REMOTE_HOLDERS.controls)
+    expect(
+      remoteHolderOf({ isVisible: false, isUpNextOffered: false, isIntroPrompting: false }),
+    ).toBe(REMOTE_HOLDERS.catcher)
   })
 
   it('leaves it with the up next card while that is offered, controls or none', () => {
-    expect(remoteHolderOf({ isVisible: true, isUpNextOffered: true })).toBe(REMOTE_HOLDERS.upNext)
-    expect(remoteHolderOf({ isVisible: false, isUpNextOffered: true })).toBe(REMOTE_HOLDERS.upNext)
+    expect(
+      remoteHolderOf({ isVisible: true, isUpNextOffered: true, isIntroPrompting: false }),
+    ).toBe(REMOTE_HOLDERS.upNext)
+    expect(
+      remoteHolderOf({ isVisible: false, isUpNextOffered: true, isIntroPrompting: false }),
+    ).toBe(REMOTE_HOLDERS.upNext)
+  })
+
+  it("gives it to Skip intro's card while it prompts, controls or none", () => {
+    expect(
+      remoteHolderOf({ isVisible: true, isUpNextOffered: false, isIntroPrompting: true }),
+    ).toBe(REMOTE_HOLDERS.intro)
+    expect(
+      remoteHolderOf({ isVisible: false, isUpNextOffered: false, isIntroPrompting: true }),
+    ).toBe(REMOTE_HOLDERS.intro)
+  })
+
+  it('puts the up next card before Skip intro', () => {
+    expect(
+      remoteHolderOf({ isVisible: false, isUpNextOffered: true, isIntroPrompting: true }),
+    ).toBe(REMOTE_HOLDERS.upNext)
   })
 })

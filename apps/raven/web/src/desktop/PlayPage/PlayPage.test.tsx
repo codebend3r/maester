@@ -10,6 +10,8 @@ import {
   ENGINE_STOPPED,
   fileUrlFor,
   type LocalFile,
+  MARKER_KINDS,
+  MARKER_SOURCES,
   MENU_PLAYER_ACTIONS,
   type OutputSettings,
   PLAYER_COMMANDS,
@@ -315,8 +317,19 @@ describe('PlayPage title art', () => {
     const getItem = spyOn(api, 'getItem').mockImplementation(async () =>
       itemDetails({ id: 40, title: 'Busboys', logoVersion: 'l1' }),
     )
-    spies.push(getMedia, getItem)
-    return { getMedia, getItem }
+    const getMarkers = spyOn(api, 'getMarkers').mockImplementation(async () => ({
+      intro: {
+        kind: MARKER_KINDS.intro,
+        start: 0,
+        end: 60,
+        source: MARKER_SOURCES.chapter,
+        confidence: 1,
+      },
+      credits: null,
+      chapters: [],
+    }))
+    spies.push(getMedia, getItem, getMarkers)
+    return { getMedia, getItem, getMarkers }
   }
 
   const signIn = () =>
@@ -337,8 +350,19 @@ describe('PlayPage title art', () => {
     await settled()
   })
 
+  it("offers Skip intro on a download, from its media's markers", async () => {
+    const { getMarkers } = stubServer()
+    signIn()
+    renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
+    const video = await videoOf(A)
+    fireEvent.click(await screen.findByRole('button', { name: 'Skip intro' }))
+    expect(video.currentTime).toBe(60)
+    expect(getMarkers).toHaveBeenCalledWith(7)
+    await settled()
+  })
+
   it('spells a download out, asking nothing, while the server is out of reach', async () => {
-    const { getMedia } = stubServer()
+    const { getMedia, getMarkers } = stubServer()
     signIn()
     useServerReach.setState({ isOffline: true })
     renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
@@ -346,6 +370,7 @@ describe('PlayPage title art', () => {
     await videoOf(A)
     expect(screen.queryByRole('img', { name: 'Busboys' })).toBeNull()
     expect(getMedia).not.toHaveBeenCalled()
+    expect(getMarkers).not.toHaveBeenCalled()
   })
 
   it('heads a download with the title art saved with it, with no server to ask', async () => {
@@ -365,21 +390,24 @@ describe('PlayPage title art', () => {
   })
 
   it('spells a download out, asking nothing, while signed out', async () => {
-    const { getMedia } = stubServer()
+    const { getMedia, getMarkers } = stubServer()
     renderPlayers({ client: playMain({ describeFile: describeDownload }), route: playPathOf(A) })
     await screen.findByRole('heading', { level: 1, name: 'Busboys' })
     await videoOf(A)
     expect(getMedia).not.toHaveBeenCalled()
+    expect(getMarkers).not.toHaveBeenCalled()
   })
 
   it('spells a local file out, asking the server nothing', async () => {
-    const { getMedia } = stubServer()
+    const { getMedia, getMarkers } = stubServer()
     signIn()
     renderPlayers({ client: playMain(), route: playPathOf(A) })
     await screen.findByRole('heading', { level: 1, name: 'Clip 01' })
     await videoOf(A)
     expect(screen.queryByRole('img')).toBeNull()
     expect(getMedia).not.toHaveBeenCalled()
+    expect(getMarkers).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Skip intro' })).toBeNull()
   })
 })
 

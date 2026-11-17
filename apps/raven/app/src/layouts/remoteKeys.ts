@@ -108,18 +108,29 @@ export const REMOTE_HOLDERS = {
   controls: 'controls',
   /** The up next card's buttons, which keep the remote whether or not the controls show. */
   upNext: 'upNext',
+  /** Skip intro's card over the intro's first seconds, and Undo skip's after it skipped itself. */
+  intro: 'intro',
 } as const
 
 export type RemoteHolder = (typeof REMOTE_HOLDERS)[keyof typeof REMOTE_HOLDERS]
 
-type RemoteHolderOfProps = { isVisible: boolean; isUpNextOffered: boolean }
+type RemoteHolderOfProps = {
+  isVisible: boolean
+  isUpNextOffered: boolean
+  isIntroPrompting: boolean
+}
 
-/** Who has the remote: the up next card while it is offered, else the controls while they show. */
+/**
+ * Who has the remote: the up next card while it is offered, else Skip intro's card while it
+ * prompts, else the controls while they show.
+ */
 export const remoteHolderOf = ({
   isVisible,
   isUpNextOffered,
+  isIntroPrompting,
 }: RemoteHolderOfProps): RemoteHolder => {
   if (isUpNextOffered) return REMOTE_HOLDERS.upNext
+  if (isIntroPrompting) return REMOTE_HOLDERS.intro
   return isVisible ? REMOTE_HOLDERS.controls : REMOTE_HOLDERS.catcher
 }
 

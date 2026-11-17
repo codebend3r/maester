@@ -44,6 +44,7 @@ import {
   BUSBOYS_UNSUBTITLED,
   CUE_TEXT,
   DUAL_COMMENTARY,
+  GOOD_NEWS_INTRO,
   GOOD_NEWS_MP4,
   HALF_LOOP_MP4,
   PICTURE_LANGUAGE,
@@ -682,5 +683,29 @@ describe('Player on Android TV', () => {
     if (picture === undefined) throw new Error('The picture track is not offered')
     await fireEvent.press(picture)
     expect(videoProps().selectedTextTrack).toEqual({ type: SelectedTrackType.INDEX, value: 1 })
+  })
+
+  it('offers Skip intro on a card that takes the remote as the intro starts, and skips past it', async () => {
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.start + 2 })
+    const skip = await screen.findByRole('button', { name: PLAYER_COPY.skipIntro })
+    expect(askedFor()).toContain(PLAYER_COPY.skipIntro)
+    await fireEvent.press(skip)
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(GOOD_NEWS_INTRO.end)
+  })
+
+  it('keeps Skip intro with the controls once the prompt is over, and drops it past the intro', async () => {
+    const props = await playing({ id: GOOD_NEWS_MP4.id })
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.start + 20 })
+    expect(await screen.findByRole('button', { name: PLAYER_COPY.skipIntro })).toBeTruthy()
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.end + 5 })
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.skipIntro })).toBeNull()
+  })
+
+  it('offers no Skip intro for a file with no intro', async () => {
+    const props = await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.start + 2 })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.skipIntro })).toBeNull()
   })
 })

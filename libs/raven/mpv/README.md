@@ -152,7 +152,7 @@ Generated files are ignored, never checked in:
 - `resources/darwin-arm64/`: addon, two dylibs and provenance/license notices.
 - `native-build/prefix/`: build-only headers, static archives and ffmpeg fixture
   generator. Its CLI is not a desktop runtime resource.
-- `native-build/source-bundle/`: every verified upstream source archive, both
+- `native-build/source-bundle/`: every verified upstream source archive, the
   patches, build scripts, node-addon-api source, the Bun lockfile and an archive of
   the exact Git revision CI built. CI uploads this alongside the native resources.
 
@@ -166,6 +166,13 @@ and node-addon-api accompany resources; original archives preserve complete sour
 and licenses. P7 must distribute the matching source bundle/source offer with its
 application artifacts, not substitute Homebrew binaries or omit notices. Final app
 signing and notarization remain P7 responsibilities.
+
+`0003-coreaudio-unregister-hotplug-on-init-failure.patch` removes the CoreAudio
+output's device-change listener when its init fails. Raven falls back from
+`coreaudio` to `avfoundation` when macOS refuses the channel layout, and the
+listener left behind pointed at the freed output, so the next device change
+(headphones, AirPlay, sleep and wake) crashed the app on CoreAudio's
+notification queue.
 
 ## Tests and acceptance boundary
 

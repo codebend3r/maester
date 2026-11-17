@@ -69,6 +69,7 @@ const Waiting = ({ notice, onBack }: WaitingProps) => (
     heading={NO_HEADING}
     isOpening={false}
     mode={null}
+    intro={null}
     credits={null}
     chapters={NO_CHAPTERS}
     next={null}
