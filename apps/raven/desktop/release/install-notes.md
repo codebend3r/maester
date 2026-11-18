@@ -2,6 +2,16 @@
 
 Raven runs on Macs with Apple Silicon and on 64-bit Windows.
 
+### macOS with Homebrew
+
+```sh
+brew tap maester-tv/tap
+brew trust maester-tv/tap
+brew install --cask raven
+```
+
+`brew upgrade --cask raven` moves to the next release. The first launch asks for Open Anyway, as in step 4 below, until Raven is signed with a Developer ID.
+
 ### macOS
 
 1. Download `raven-player-<version>-arm64.dmg` (or the zip, `raven-player-<version>-arm64.zip`) and `SHA256SUMS` from the assets below.

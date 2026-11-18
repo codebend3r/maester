@@ -4,7 +4,8 @@ name: 🖥️ Desktop release
 # pushed vX.Y.Z tag (scripts/bump_version.sh --push): the dmg and the setup exe, the two
 # zips, the libmpv sources tarball and one SHA256SUMS over all of them. release.yml still creates that release from the commit log;
 # this workflow waits for it, uploads the assets with --clobber (a re-run replaces
-# them) and appends the install notes once. Only three-number tags run it, so a
+# them) and appends the install notes once, then `homebrew` points the Raven cask in
+# maester-tv/homebrew-tap at the new dmg. Only three-number tags run it, so a
 # vX.Y.Z.N build tag never builds the app.
 #
 # A run from the Actions tab is the dry run: it builds and uploads the assets as
@@ -61,7 +62,20 @@ jobs:
       - name: 🔎 Audit native resources and run the real headless libmpv tests
         run: bunx nx run-many -p @raven/mpv -t audit:native test:native
 
-      - name: 📦 Make the unsigned app
+      # Sets RAVEN_SIGN_IDENTITY and RAVEN_NOTARIZE_PROFILE when the Developer ID secrets
+      # exist: make then signs and notarizes, and audit:bundle asks Gatekeeper for its
+      # verdict. Without them (until the certificate exists, or on a fork), the app stays
+      # signed ad hoc.
+      - name: 🔏 Set up Developer ID signing and notarization
+        uses: ./.github/actions/raven-desktop-signing
+        with:
+          developer-id-p12: ${{ secrets.RAVEN_DEVELOPER_ID_P12 }}
+          developer-id-p12-password: ${{ secrets.RAVEN_DEVELOPER_ID_P12_PASSWORD }}
+          notary-key: ${{ secrets.RAVEN_NOTARY_KEY }}
+          notary-key-id: ${{ secrets.RAVEN_NOTARY_KEY_ID }}
+          notary-issuer-id: ${{ secrets.RAVEN_NOTARY_ISSUER_ID }}
+
+      - name: 📦 Make the app
         run: bunx nx run @raven/desktop:make
 
       - name: 🔎 Audit the packaged bundle
@@ -174,6 +188,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ github.ref_name }}
+    outputs:
+      dmg-sha256: ${{ steps.checksums.outputs.dmg-sha256 }}
     steps:
       # For the install notes file.
       - name: 📥 Checkout
@@ -192,13 +208,21 @@ jobs:
           path: release
 
       # One file for the whole release, so it is written here over every asset and never
-      # by a build, whose own SHA256SUMS would collide with the other's.
+      # by a build, whose own SHA256SUMS would collide with the other's. The dmg's line is
+      # also the digest the Homebrew cask pins, so the cask and the release never disagree.
       - name: 🔐 Checksum the assets
+        id: checksums
         run: |
           set -euo pipefail
           (cd release && LC_ALL=C sha256sum -- * > "$RUNNER_TEMP/SHA256SUMS")
           mv "$RUNNER_TEMP/SHA256SUMS" release/SHA256SUMS
           cat release/SHA256SUMS
+          dmg_sha256=$(awk -v dmg="raven-player-${TAG#v}-arm64.dmg" '$2 == dmg { print $1 }' release/SHA256SUMS)
+          if [ -z "$dmg_sha256" ]; then
+            echo "::error::SHA256SUMS has no line for the dmg."
+            exit 1
+          fi
+          echo "dmg-sha256=$dmg_sha256" >> "$GITHUB_OUTPUT"
 
       # release.yml makes the release from the same tag push, and may not be done yet.
       - name: ⏳ Wait for the release
@@ -224,3 +248,44 @@ jobs:
             sed "s/<version>/${TAG#v}/g" apps/raven/desktop/release/install-notes.md
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
+
+  homebrew:
+    name: 🍺 Bump the Homebrew cask
+    needs: publish
+    # A prerelease tag (vX.Y.Z-rc.1) stays out of the cask, which every brew upgrade reads.
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TAG: ${{ github.ref_name }}
+      DMG_SHA256: ${{ needs.publish.outputs.dmg-sha256 }}
+    steps:
+      # The deploy key writes to maester-tv/homebrew-tap alone; GITHUB_TOKEN reaches only this repo.
+      - name: 📥 Checkout the tap
+        uses: actions/checkout@v7
+        with:
+          repository: maester-tv/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: tap
+
+      # A re-run on the same tag finds the cask already there and pushes nothing.
+      - name: 🍺 Point the cask at this release
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          cask=tap/Casks/raven.rb
+          sed -i -E \
+            -e "s/^  version \"[^\"]+\"$/  version \"$version\"/" \
+            -e "s/^  sha256 \"[0-9a-f]+\"$/  sha256 \"$DMG_SHA256\"/" \
+            "$cask"
+          grep -qx "  version \"$version\"" "$cask"
+          grep -qx "  sha256 \"$DMG_SHA256\"" "$cask"
+          cd tap
+          if git diff --quiet; then
+            echo "The cask is already at $version."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "Raven $version"
+          git push

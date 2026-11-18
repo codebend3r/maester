@@ -9,6 +9,7 @@ import {
   type AuditedPe,
   bundleProblems,
   fileProblems,
+  gatekeeperProblems,
   isPeFile,
   MACH_O_READS,
   MPV_IN_APP,
@@ -379,6 +380,30 @@ describe('auditMachO', () => {
       `${RELATIVE} is not signed: code object is not signed at all`,
     ])
     expect(audited.file).not.toBeNull()
+  })
+})
+
+describe('gatekeeperProblems', () => {
+  const APP = '/o/Raven.app'
+  const NAME = 'Raven.app'
+
+  it('asks spctl to assess the app and has no problem when it is accepted', async () => {
+    const asked: string[] = []
+    const run: ToolRun = async ({ command, args }) => {
+      asked.push([command, ...args].join(' '))
+      return ''
+    }
+    expect(await gatekeeperProblems({ run, app: APP, name: NAME })).toEqual([])
+    expect(asked).toEqual([`spctl --assess --type execute --verbose=4 ${APP}`])
+  })
+
+  it('says the app is not accepted with what spctl said', async () => {
+    const run: ToolRun = async () => {
+      throw Object.assign(new Error('Command failed'), { stderr: `${APP}: rejected\n` })
+    }
+    expect(await gatekeeperProblems({ run, app: APP, name: NAME })).toEqual([
+      `${NAME} is not accepted by Gatekeeper: ${APP}: rejected`,
+    ])
   })
 })
 

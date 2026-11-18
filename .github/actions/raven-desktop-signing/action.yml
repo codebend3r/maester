@@ -1,0 +1,78 @@
+name: 🔏 raven desktop signing
+description: >-
+  Imports a Developer ID Application certificate into a throwaway keychain and stores an
+  App Store Connect API key as a notarytool profile, then sets RAVEN_SIGN_IDENTITY and
+  RAVEN_NOTARIZE_PROFILE, which forge.config.ts reads. With no certificate it does nothing,
+  and the app is signed ad hoc.
+
+# A composite action reads no secrets itself, so the calling workflow passes them in.
+inputs:
+  developer-id-p12:
+    description: The Developer ID Application certificate and its key, a base64 .p12
+    required: false
+    default: ''
+  developer-id-p12-password:
+    description: The .p12's password
+    required: false
+    default: ''
+  notary-key:
+    description: The App Store Connect API key, the .p8's text
+    required: false
+    default: ''
+  notary-key-id:
+    description: The API key's id
+    required: false
+    default: ''
+  notary-issuer-id:
+    description: The API key's issuer id
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: 🔏 Import the identity and the notary key
+      shell: bash
+      env:
+        DEVELOPER_ID_P12: ${{ inputs.developer-id-p12 }}
+        DEVELOPER_ID_P12_PASSWORD: ${{ inputs.developer-id-p12-password }}
+        NOTARY_KEY: ${{ inputs.notary-key }}
+        NOTARY_KEY_ID: ${{ inputs.notary-key-id }}
+        NOTARY_ISSUER_ID: ${{ inputs.notary-issuer-id }}
+      run: |
+        set -euo pipefail
+        if [ -z "$DEVELOPER_ID_P12" ]; then
+          echo "No Developer ID secrets: Raven is signed ad hoc."
+          exit 0
+        fi
+        # A certificate with no notary key would sign an app Gatekeeper still refuses.
+        if [ -z "$NOTARY_KEY" ] || [ -z "$NOTARY_KEY_ID" ] || [ -z "$NOTARY_ISSUER_ID" ]; then
+          echo "::error::RAVEN_DEVELOPER_ID_P12 is set without the three RAVEN_NOTARY secrets."
+          exit 1
+        fi
+        keychain="$RUNNER_TEMP/raven-signing.keychain-db"
+        keychain_password=$(openssl rand -hex 24)
+        security create-keychain -p "$keychain_password" "$keychain"
+        security set-keychain-settings -lut 21600 "$keychain"
+        security unlock-keychain -p "$keychain_password" "$keychain"
+        base64 --decode <<< "$DEVELOPER_ID_P12" > "$RUNNER_TEMP/developer-id.p12"
+        security import "$RUNNER_TEMP/developer-id.p12" -k "$keychain" \
+          -P "$DEVELOPER_ID_P12_PASSWORD" -T /usr/bin/codesign
+        rm "$RUNNER_TEMP/developer-id.p12"
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+          -k "$keychain_password" "$keychain"
+        # osx-sign finds the identity, and notarytool the profile, through the search list.
+        security list-keychains -d user -s "$keychain"
+        security default-keychain -d user -s "$keychain"
+        identity=$(security find-identity -v -p codesigning "$keychain" \
+          | sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -n 1)
+        if [ -z "$identity" ]; then
+          echo "::error::RAVEN_DEVELOPER_ID_P12 holds no Developer ID Application identity."
+          exit 1
+        fi
+        printf '%s\n' "$NOTARY_KEY" > "$RUNNER_TEMP/notary-key.p8"
+        xcrun notarytool store-credentials raven-notary --key "$RUNNER_TEMP/notary-key.p8" \
+          --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --keychain "$keychain"
+        rm "$RUNNER_TEMP/notary-key.p8"
+        echo "RAVEN_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+        echo "RAVEN_NOTARIZE_PROFILE=raven-notary" >> "$GITHUB_ENV"
