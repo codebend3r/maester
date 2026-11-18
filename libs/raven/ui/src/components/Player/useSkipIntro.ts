@@ -45,8 +45,8 @@ export const useSkipIntro = ({ time, intro, seek }: UseSkipIntroProps) => {
   const isUndoShown = undoTo != null
   useEffect(() => {
     if (!isUndoShown) return
-    const timer = window.setTimeout(() => setUndoTo(null), UNDO_SKIP_MS)
-    return () => window.clearTimeout(timer)
+    const timer = setTimeout(() => setUndoTo(null), UNDO_SKIP_MS)
+    return () => clearTimeout(timer)
   }, [isUndoShown])
 
   return {

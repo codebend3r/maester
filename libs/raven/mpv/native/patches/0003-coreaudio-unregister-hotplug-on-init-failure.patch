@@ -1,0 +1,38 @@
+--- a/audio/out/ao_coreaudio.c
++++ b/audio/out/ao_coreaudio.c
+@@ -174,7 +174,7 @@
+         init_physical_format(ao);
+ 
+     if (!ca_init_chmap(ao, p->device))
+-        goto coreaudio_error;
++        goto coreaudio_error_hotplug;
+ 
+     AudioStreamBasicDescription asbd;
+     ca_fill_asbd(ao, &asbd);
+@@ -185,7 +185,7 @@
+     talloc_free(layout);
+ 
+     if (!r)
+-        goto coreaudio_error;
++        goto coreaudio_error_hotplug;
+ 
+     reinit_latency(ao);
+     ao->device_buffer = av_rescale(p->hw_latency_ns, ao->samplerate, 1000000000) * 2;
+@@ -195,6 +195,9 @@
+ 
+     return CONTROL_OK;
+ 
++coreaudio_error_hotplug:
++    // The listener holds this ao, which is freed when init fails.
++    unregister_hotplug_cb(ao);
+ coreaudio_error:
+     return CONTROL_ERROR;
+ }
+@@ -517,6 +520,7 @@
+     return true;
+ 
+ coreaudio_error:
++    unregister_hotplug_cb(ao);
+     return false;
+ }
+ 

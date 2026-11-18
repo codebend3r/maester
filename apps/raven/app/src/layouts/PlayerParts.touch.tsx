@@ -26,6 +26,7 @@ import {
   type Transport,
   cornerFactsOf,
 } from '@/layouts/playerKit'
+import type { IntroOffer } from '@/layouts/introOffer'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useScrub } from '@/layouts/useScrub'
@@ -257,8 +258,30 @@ type TransportControlsProps = Pick<
 > & {
   transport: Transport
   isShown: boolean
+  /** Skip intro, or Undo skip, while the intro offers one; null otherwise. */
+  intro: IntroOffer | null
   /** A skip either way, by the chrome's one ladder. */
   onSkip: (direction: SkipStep['direction']) => void
+}
+
+type IntroButtonProps = { offer: IntroOffer }
+
+/** Skip intro (or Undo skip) on the player's glass, its words said as they read. */
+const IntroButton = ({ offer }: IntroButtonProps) => {
+  const styles = useTouchChromeStyles()
+  return (
+    <View style={styles.introSlot}>
+      <Pressable
+        accessibilityLabel={offer.label}
+        accessibilityRole="button"
+        hitSlop={SIZES.space1}
+        onPress={offer.onPress}
+        style={({ pressed }) => [styles.intro, pressed && styles.pressed]}
+      >
+        <Text style={styles.introText}>{offer.label}</Text>
+      </Pressable>
+    </View>
+  )
 }
 
 /**
@@ -276,6 +299,7 @@ export const TransportControls = ({
   next,
   previous,
   isShown,
+  intro,
   onSkip,
 }: TransportControlsProps) => {
   const { isPaused, position, duration, onTogglePlay, onSeek } = transport
@@ -283,6 +307,7 @@ export const TransportControls = ({
   const styles = useTouchChromeStyles()
   return (
     <View style={styles.bottom}>
+      {intro !== null && <IntroButton offer={intro} />}
       <View style={styles.timeline}>
         <Text style={styles.time}>{formatDuration(position)}</Text>
         <View style={styles.scrubberSlot}>

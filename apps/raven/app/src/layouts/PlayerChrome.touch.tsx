@@ -7,6 +7,7 @@ import Video from 'react-native-video'
 
 import { LoadingMark } from '@/layouts/LoadingMark'
 import { CaptionText } from '@/layouts/PlayerCaption'
+import { useIntroOffer } from '@/layouts/introOffer'
 import { PictureCaptions } from '@/layouts/PlayerPictureCaption'
 import { HoldMark, SkipMark, TapAreaFlash } from '@/layouts/PlayerMark.touch'
 import { PLAYER_COPY, type PlayerChromeKit, type PlayerChromeProps } from '@/layouts/playerKit'
@@ -31,7 +32,8 @@ import { Corner, IconButton, TransportControls, PlayerLogo } from '@/layouts/Pla
  * plays on at twice the speed or runs back at it. Every skip, a button's, a key's or a tap's,
  * climbs one ladder: 10 seconds, then 20 and 30 when they come quickly. A hardware
  * keyboard drives it as it drives the web's player, each key bringing the controls back as a tap
- * does. The video plays in Picture in Picture when the app is left, and on AirPlay; the silent
+ * does. Inside a file's intro Skip intro stands over the time, holding the controls up for the
+ * intro's first seconds, as the web player's does. The video plays in Picture in Picture when the app is left, and on AirPlay; the silent
  * switch never mutes it, and leaving the app without Picture in Picture pauses it.
  */
 const PlayerChrome = ({
@@ -50,6 +52,7 @@ const PlayerChrome = ({
   next,
   previous,
   mode,
+  intro,
   onBack,
 }: PlayerChromeProps) => {
   const insets = useSafeAreaInsets()
@@ -57,7 +60,12 @@ const PlayerChrome = ({
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
   const styles = useTouchChromeStyles()
   const isPlaying = transport !== null && !transport.isPaused
-  const { isVisible, opacity, stir, show, toggle } = useControlsLinger({ isPlaying })
+  const introOffer = useIntroOffer({ intro, transport })
+  // The intro's first seconds and Undo hold the controls up, so Skip intro is seen, as on the web.
+  const { isVisible, opacity, stir, show, toggle } = useControlsLinger({
+    isPlaying,
+    isHeld: !!introOffer?.isPrompting,
+  })
   const { width } = useWindowDimensions()
   const { skipped, skipBy } = useSkipMark({ transport })
   // The last double tap's side, counted so the same side twice washes afresh.
@@ -150,6 +158,7 @@ const PlayerChrome = ({
           {gestures.transport !== null && (
             <TransportControls
               audio={audio}
+              intro={introOffer}
               isShown={isVisible}
               next={next}
               onSkip={skipBy}

@@ -35,7 +35,7 @@ const useFade = ({ isVisible, isReduced }: UseFadeProps) => {
 type UseControlsLingerProps = {
   /** Whether the video plays: only then do the controls go; paused, opening or ended they stay up. */
   isPlaying: boolean
-  /** Whether something holds them up while it plays, as a picker's open list does. */
+  /** Whether something holds them up while it plays, as a picker's open list or Skip intro's first seconds do; a hold brings them back. */
   isHeld?: boolean
 }
 
@@ -52,7 +52,7 @@ export const useControlsLinger = ({ isPlaying, isHeld = false }: UseControlsLing
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isShown, setShown] = useState(true)
   const [stirredAt, setStirredAt] = useState(() => Date.now())
-  const isVisible = isShown || !isPlaying
+  const isVisible = isShown || !isPlaying || isHeld
   const { opacity, isDrawn } = useFade({ isVisible, isReduced })
 
   useEffect(() => {

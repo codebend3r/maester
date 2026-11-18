@@ -101,6 +101,8 @@ export type PlayerChromeProps = {
   previous: PlayerNext | null
   /** How the video plays, for the corner that says so; null while no way has been picked. */
   mode: PlaybackMode | null
+  /** The file's intro, which Skip intro jumps past while the video is inside it; null while none is known. */
+  intro: Marker | null
   /** The file's credits, where the countdown to what plays next starts; null while none are known. */
   credits: Marker | null
   /** The file's chapters, in order, for a platform that offers them to jump to; empty while none are known. */
@@ -158,6 +160,8 @@ export const PLAYER_COPY = {
   quality: 'Quality',
   showControls: 'Show the controls',
   hideControls: 'Hide the controls',
+  skipIntro: 'Skip intro',
+  undoSkip: 'Undo skip',
   upNext: 'Up next',
   playNow: 'Play now',
   watchCredits: 'Watch credits',

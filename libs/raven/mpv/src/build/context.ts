@@ -10,6 +10,7 @@ import type { NativeTarget } from '@/target'
 export const PATCHES = [
   '0001-player-add-moltenvk-context.patch',
   '0002-moltenvk-resize.patch',
+  '0003-coreaudio-unregister-hotplug-on-init-failure.patch',
 ] as const
 
 /** The libraries shipped under `resources/lib`, each finding the other by `@rpath`. */

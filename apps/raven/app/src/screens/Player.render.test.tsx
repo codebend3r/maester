@@ -36,6 +36,8 @@ import {
   BUSBOYS_PICTURES,
   BUSBOYS_UNSUBTITLED,
   CUE_TEXT,
+  GOOD_NEWS_INTRO,
+  GOOD_NEWS_MP4,
   PICTURE_LANGUAGE,
   playerApi,
 } from '@/test/playerServer'
@@ -559,5 +561,25 @@ describe('Player on a phone or tablet', () => {
       `${HLS_PARAMS.mode}=${PLAYBACK_MODES.transcode}`,
     )
     expect(videoProps().selectedTextTrack).toEqual({ type: SelectedTrackType.DISABLED })
+  })
+
+  it('offers Skip intro over the time while the video is inside the intro, and skips past it', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(GOOD_NEWS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.start + 2 })
+    await fireEvent.press(await screen.findByRole('button', { name: PLAYER_COPY.skipIntro }))
+    expect(drawnVideo.seek).toHaveBeenLastCalledWith(GOOD_NEWS_INTRO.end)
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.end })
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.skipIntro })).toBeNull()
+  })
+
+  it('offers no Skip intro for a file with no intro', async () => {
+    await renderPlayer({ [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_MP4.id) })
+    const props = await loadedVideo()
+    await start(props)
+    await moveVideoTo({ props, seconds: GOOD_NEWS_INTRO.start + 2 })
+    await untilIdle(shown.client)
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.skipIntro })).toBeNull()
   })
 })

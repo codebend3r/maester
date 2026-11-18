@@ -8,7 +8,10 @@ import {
   DIRECT_PLAYS,
   ENCODER_KINDS,
   HLS_COPY_AUDIO_CODECS,
+  MARKER_KINDS,
+  MARKER_SOURCES,
   MATCH_STATES,
+  type MediaMarkers,
   type MediaTracks,
   type PlaybackSettings,
   SUBTITLE_SOURCES,
@@ -176,6 +179,7 @@ const {
   getMediaTicket,
   getTracks,
   getPlaybackSettings,
+  getMarkers,
   getMediaOrigins,
   listLibraries,
   nextInSession,
@@ -190,6 +194,17 @@ type FilePathsProps = { path: string }
 const filePaths = ({ path }: FilePathsProps): string[] =>
   FILES.map(({ media }) => pathWithId({ path, id: media.id }))
 
+/** Good News About Hell's intro, which Skip intro jumps past: from 0:30 to 1:30. */
+export const GOOD_NEWS_INTRO = {
+  kind: MARKER_KINDS.intro,
+  start: 30,
+  end: 90,
+  source: MARKER_SOURCES.chapter,
+  confidence: 1,
+} as const satisfies MediaMarkers['intro']
+
+const GOOD_NEWS_MARKERS: MediaMarkers = { intro: GOOD_NEWS_INTRO, credits: null, chapters: [] }
+
 const READS: Record<string, unknown> = {
   ...Object.fromEntries(
     FILES.flatMap(({ media, tracks }) => [
@@ -202,6 +217,7 @@ const READS: Record<string, unknown> = {
   [pathWithId({ path: getItem.path, id: HALF_LOOP.id })]: HALF_LOOP,
   [pathWithId({ path: getItem.path, id: SEVERANCE.id })]: SEVERANCE,
   [pathWithId({ path: nextInSession.path, id: GOOD_NEWS_MP4.id })]: HALF_LOOP_MP4,
+  [pathWithId({ path: getMarkers.path, id: GOOD_NEWS_MP4.id })]: GOOD_NEWS_MARKERS,
   [pathWithId({ path: nextInSession.path, id: HALF_LOOP_MP4.id })]: null,
   [getMediaOrigins.path]: { origins: [] },
   [getCaptionStyle.path]: DEFAULT_CAPTION_STYLE,
