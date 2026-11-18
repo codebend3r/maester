@@ -26,6 +26,13 @@ export type Appearance = (typeof APPEARANCES)[keyof typeof APPEARANCES]
 
 const isAppearance = oneOf(Object.values(APPEARANCES))
 
+/** What makes an album recent on Home: when it was added, or when it came out. */
+export const RECENT_SORTS = { added: 'added', release: 'release' } as const
+
+export type RecentSort = (typeof RECENT_SORTS)[keyof typeof RECENT_SORTS]
+
+const isRecentSort = oneOf(Object.values(RECENT_SORTS))
+
 const isStorageLimitGb = (value: unknown): value is StorageLimitGb =>
   STORAGE_LIMITS_GB.some((limit) => limit === value)
 
@@ -42,6 +49,8 @@ type WrenPrefsValues = {
   storageLimitGb: StorageLimitGb
   /** Whether Wren follows the system's light or dark, or keeps one. */
   appearance: Appearance
+  /** The order of Home's albums. */
+  homeSort: RecentSort
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -50,14 +59,16 @@ type WrenPrefs = WrenPrefsValues & {
 }
 
 /**
- * A fresh install: downloads and the cellular stream at 256 kbps, no storage limit, and the
- * system's appearance.
+ * A fresh install: downloads at 256 kbps, the file itself on cellular as on Wi-Fi (the server's
+ * remote limit, not the radio, decides a transcode away from home, as it does for raven's
+ * videos), no storage limit, and the system's appearance.
  */
 export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   downloadKbps: AUDIO_BITRATES.standard,
-  cellularKbps: AUDIO_BITRATES.standard,
+  cellularKbps: null,
   storageLimitGb: null,
   appearance: APPEARANCES.system,
+  homeSort: RECENT_SORTS.added,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -74,8 +85,22 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
       ? kept.storageLimitGb
       : DEFAULT_WREN_PREFS.storageLimitGb,
     appearance: isAppearance(kept.appearance) ? kept.appearance : DEFAULT_WREN_PREFS.appearance,
+    homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
   }
 }
+
+/**
+ * The version the prefs are kept at. Version 0 defaulted the cellular stream to a 256 kbps
+ * transcode, which the server makes whole before it answers, so away from home every track
+ * waited on it; 1 moves those installs to the file itself.
+ */
+const WREN_PREFS_VERSION = 1
+
+/** Prefs read back from an older version, brought to this one. */
+const migratedPrefsOf = (saved: unknown, version: number): WrenPrefsValues =>
+  version < WREN_PREFS_VERSION
+    ? { ...prefsOf(saved), cellularKbps: DEFAULT_WREN_PREFS.cellularKbps }
+    : prefsOf(saved)
 
 /** Settings' appearance, download and streaming choices, persisted to AsyncStorage and guarded when read. */
 export const useWrenPrefs = create<WrenPrefs>()(
@@ -88,11 +113,14 @@ export const useWrenPrefs = create<WrenPrefs>()(
       name: WREN_PREFS_KEY,
       storage: createJSONStorage(() => UNCONFIGURED_STORAGE),
       skipHydration: true,
-      partialize: ({ downloadKbps, cellularKbps, storageLimitGb, appearance }) => ({
+      version: WREN_PREFS_VERSION,
+      migrate: migratedPrefsOf,
+      partialize: ({ downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort }) => ({
         downloadKbps,
         cellularKbps,
         storageLimitGb,
         appearance,
+        homeSort,
       }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },

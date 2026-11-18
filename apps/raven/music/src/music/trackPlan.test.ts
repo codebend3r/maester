@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES, AUDIO_CODECS, type Track } from '@raven/core'
-
+import { TRACK_STREAM_KINDS } from '@raven/native/headless'
 import {
   DOWNLOAD_STATUSES,
   type DownloadEntry,
@@ -8,6 +8,7 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { trackPlanFor } from '@/music/trackPlan'
+import { usePlayedStreams } from '@/stores/playedStreams'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 
 const SERVER_ID = 'raven'
@@ -68,6 +69,7 @@ describe('trackPlanFor', () => {
     expect(planOn({ isCellular: false }).downloadedOf(FIRST_LIGHT)).toEqual({
       uri: `file:///documents/downloads/${SERVER_ID}/${FIRST_LIGHT.id}/media.m4a`,
       artworkUri: `file:///documents/downloads/${SERVER_ID}/${FIRST_LIGHT.id}/cover.jpg`,
+      kbps: ENTRY.kbps,
     })
   })
 
@@ -83,11 +85,30 @@ describe('trackPlanFor', () => {
     expect(planOn({ isCellular: false }).downloadedOf(FIRST_LIGHT)).toBeNull()
   })
 
-  it('streams at the cellular quality on a mobile network, and the file on Wi-Fi', async () => {
-    expect(await planOn({ isCellular: true }).streamKbps()).toBe(AUDIO_BITRATES.standard)
-    useWrenPrefs.setState({ cellularKbps: null })
+  it('streams the file on a mobile network unless a cellular quality is chosen, and the file on Wi-Fi', async () => {
     expect(await planOn({ isCellular: true }).streamKbps()).toBeNull()
+    useWrenPrefs.setState({ cellularKbps: AUDIO_BITRATES.standard })
+    expect(await planOn({ isCellular: true }).streamKbps()).toBe(AUDIO_BITRATES.standard)
     useWrenPrefs.setState({ cellularKbps: AUDIO_BITRATES.low })
     expect(await planOn({ isCellular: false }).streamKbps()).toBeNull()
+  })
+
+  it('keeps what each track plays from, a download with the bitrate it was made at', () => {
+    usePlayedStreams.setState({ streams: {} })
+    useDownloads.setState({ entries: { [KEY]: ENTRY } })
+    const plan = planOn({ isCellular: false })
+    const downloaded = plan.downloadedOf(FIRST_LIGHT)
+    plan.onStream?.({
+      track: FIRST_LIGHT,
+      stream: { kind: TRACK_STREAM_KINDS.download, kbps: downloaded?.kbps ?? null },
+    })
+    expect(usePlayedStreams.getState().streams[FIRST_LIGHT.id]).toEqual({
+      kind: TRACK_STREAM_KINDS.download,
+      kbps: ENTRY.kbps,
+    })
+    plan.onStream?.({ track: FIRST_LIGHT, stream: { kind: TRACK_STREAM_KINDS.file } })
+    expect(usePlayedStreams.getState().streams[FIRST_LIGHT.id]).toEqual({
+      kind: TRACK_STREAM_KINDS.file,
+    })
   })
 })

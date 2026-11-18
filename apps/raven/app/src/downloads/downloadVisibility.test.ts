@@ -79,6 +79,7 @@ describe('the downloads as the players read them', () => {
     expect(plan.downloadedOf(AIRBAG)).toEqual({
       uri: `file:///downloads/raven/${AIRBAG.id}/media.flac`,
       artworkUri: `file:///downloads/raven/${AIRBAG.id}/art.jpg`,
+      kbps: null,
     })
     expect(plan.downloadedOf(PARANOID)).toBeNull()
   })

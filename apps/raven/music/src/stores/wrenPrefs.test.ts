@@ -5,6 +5,7 @@ import type { StateStorage } from 'zustand/middleware'
 import {
   APPEARANCES,
   DEFAULT_WREN_PREFS,
+  RECENT_SORTS,
   WREN_PREFS_KEY,
   configureWrenPrefs,
   useWrenPrefs,
@@ -27,19 +28,21 @@ const memoryStorage = ({ entries = [] }: MemoryStorageProps = {}) => {
 }
 
 const prefsOf = () => {
-  const { downloadKbps, cellularKbps, storageLimitGb, appearance } = useWrenPrefs.getState()
-  return { downloadKbps, cellularKbps, storageLimitGb, appearance }
+  const { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort } =
+    useWrenPrefs.getState()
+  return { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort }
 }
 
 describe('useWrenPrefs', () => {
   beforeEach(() => useWrenPrefs.setState(DEFAULT_WREN_PREFS))
 
-  it('starts at 256 kbps, with no storage limit, following the system appearance', () => {
+  it('starts downloads at 256 kbps and cellular on the file itself, with no storage limit, following the system appearance', () => {
     expect(prefsOf()).toEqual({
       downloadKbps: AUDIO_BITRATES.standard,
-      cellularKbps: AUDIO_BITRATES.standard,
+      cellularKbps: null,
       storageLimitGb: null,
       appearance: APPEARANCES.system,
+      homeSort: RECENT_SORTS.added,
     })
   })
 
@@ -48,6 +51,7 @@ describe('useWrenPrefs', () => {
     await configureWrenPrefs({ storage })
     useWrenPrefs.getState().change({ downloadKbps: AUDIO_BITRATES.high, cellularKbps: null })
     useWrenPrefs.getState().change({ storageLimitGb: 5, appearance: APPEARANCES.light })
+    useWrenPrefs.getState().change({ homeSort: RECENT_SORTS.release })
 
     const relaunch = memoryStorage({ entries: [...items] })
     useWrenPrefs.setState(DEFAULT_WREN_PREFS)
@@ -57,6 +61,7 @@ describe('useWrenPrefs', () => {
       cellularKbps: null,
       storageLimitGb: 5,
       appearance: APPEARANCES.light,
+      homeSort: RECENT_SORTS.release,
     })
   })
 
@@ -67,5 +72,37 @@ describe('useWrenPrefs', () => {
     const { storage } = memoryStorage({ entries: [[WREN_PREFS_KEY, JSON.stringify(saved)]] })
     await configureWrenPrefs({ storage })
     expect(prefsOf()).toEqual({ ...DEFAULT_WREN_PREFS, storageLimitGb: 10 })
+  })
+
+  it("moves an older install's cellular transcode to the file itself, keeping its other choices", async () => {
+    const saved = {
+      state: {
+        downloadKbps: AUDIO_BITRATES.high,
+        cellularKbps: AUDIO_BITRATES.standard,
+        storageLimitGb: 5,
+        appearance: APPEARANCES.dark,
+      },
+      version: 0,
+    }
+    const { storage } = memoryStorage({ entries: [[WREN_PREFS_KEY, JSON.stringify(saved)]] })
+    await configureWrenPrefs({ storage })
+    expect(prefsOf()).toEqual({
+      downloadKbps: AUDIO_BITRATES.high,
+      cellularKbps: null,
+      storageLimitGb: 5,
+      appearance: APPEARANCES.dark,
+      homeSort: RECENT_SORTS.added,
+    })
+  })
+
+  it('keeps a cellular quality chosen since', async () => {
+    const { storage, items } = memoryStorage()
+    await configureWrenPrefs({ storage })
+    useWrenPrefs.getState().change({ cellularKbps: AUDIO_BITRATES.low })
+
+    const relaunch = memoryStorage({ entries: [...items] })
+    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
+    await configureWrenPrefs({ storage: relaunch.storage })
+    expect(prefsOf().cellularKbps).toBe(AUDIO_BITRATES.low)
   })
 })

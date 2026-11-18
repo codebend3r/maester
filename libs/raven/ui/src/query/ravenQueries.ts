@@ -86,7 +86,12 @@ export const ravenQueriesFor = (api: ApiClient) => {
     sort: MusicSort
   } & Pick<MusicListOptions, 'order' | 'seed'>
   type RavenQueriesForArtistsQueryProps = { libraryId: number; search: string }
-  type RavenQueriesForRecentAlbumsQueryProps = { libraryId: number; limit: number }
+  type RavenQueriesForRecentAlbumsQueryProps = {
+    libraryId: number
+    limit: number
+    /** The order that makes an album recent: by when it was added, or by when it came out. */
+    sort: typeof MUSIC_SORTS.added | typeof MUSIC_SORTS.release
+  }
   type RavenQueriesForSongsQueryProps = {
     libraryIds: readonly number[]
     search: string
@@ -410,10 +415,10 @@ export const ravenQueriesFor = (api: ApiClient) => {
       }),
 
     /** A music library's newest albums, newest first. */
-    recentAlbumsQuery: ({ libraryId, limit }: RavenQueriesForRecentAlbumsQueryProps) =>
+    recentAlbumsQuery: ({ libraryId, limit, sort }: RavenQueriesForRecentAlbumsQueryProps) =>
       queryOptions({
-        queryKey: queryKeys.recentAlbums({ libraryId, limit }),
-        queryFn: () => api.listAlbums({ libraryId, sort: MUSIC_SORTS.added, limit }),
+        queryKey: queryKeys.recentAlbums({ libraryId, limit, sort }),
+        queryFn: () => api.listAlbums({ libraryId, sort, limit }),
         // The server lists a library's every album whatever the limit, so the newest are kept here.
         select: (albums) => albums.slice(0, limit),
       }),

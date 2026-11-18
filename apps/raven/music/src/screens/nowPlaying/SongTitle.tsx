@@ -1,9 +1,11 @@
 import { Pressable, type StyleProp, Text, type TextStyle, View } from 'react-native'
 
+import { NOW_PLAYING_COPY } from '@/screens/copy'
 import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
+import { KIT_COPY } from '@/ui/copy'
 import { pressedStyleOf } from '@/ui/press'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -15,6 +17,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   compactName: { ...TYPE.compactTitle, color: colors.text },
   compactArtist: { ...TYPE.body, color: colors.text2 },
   error: { ...TYPE.meta, color: colors.accentText },
+  quality: { ...TYPE.meta, color: colors.text3 },
 }))
 
 type SongProps = { playing: Playing }
@@ -50,6 +53,25 @@ function PlayError({ playing }: SongProps) {
   )
 }
 
+/** The format and quality of what is playing, under the song once its source is made. */
+function Quality({ playing }: SongProps) {
+  const styles = useStyles()
+  return (
+    playing.quality !== null && (
+      <Text
+        accessibilityLabel={KIT_COPY.labelled({
+          label: NOW_PLAYING_COPY.quality,
+          value: playing.quality,
+        })}
+        numberOfLines={1}
+        style={styles.quality}
+      >
+        {playing.quality}
+      </Text>
+    )
+  )
+}
+
 /** The player's song: its title large in Young Serif, and its artists as a link. */
 export function SongTitle({ playing }: SongProps) {
   const styles = useStyles()
@@ -59,6 +81,7 @@ export function SongTitle({ playing }: SongProps) {
         {playing.track.title}
       </Text>
       <ArtistLink playing={playing} style={styles.artist} />
+      <Quality playing={playing} />
       <PlayError playing={playing} />
     </View>
   )
@@ -75,6 +98,7 @@ export function CompactSong({ playing }: SongProps) {
           {playing.track.title}
         </Text>
         <ArtistLink playing={playing} style={styles.compactArtist} />
+        <Quality playing={playing} />
         <PlayError playing={playing} />
       </View>
     </View>

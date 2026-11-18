@@ -5,10 +5,12 @@ import {
   LIST_SORTS,
   LIST_SORT_ORDER,
   SERVER_SORTS,
+  RECENT_SERVER_SORTS,
   matchingAlbums,
-  newestAlbums,
+  recentAlbums,
   sortedAlbums,
 } from '@/screens/library/sorts'
+import { RECENT_SORTS } from '@/stores/wrenPrefs'
 
 type AlbumForProps = {
   id: number
@@ -92,9 +94,28 @@ describe('matchingAlbums', () => {
   })
 })
 
-describe('newestAlbums', () => {
+describe('recentAlbums', () => {
   it('keeps the newest added, newest first', () => {
-    expect(idsOf(newestAlbums({ albums: ALBUMS, limit: 2 }))).toEqual([2, 3])
+    expect(idsOf(recentAlbums({ albums: ALBUMS, sort: RECENT_SORTS.added, limit: 2 }))).toEqual([
+      2, 3,
+    ])
+  })
+
+  it('keeps the latest releases, by date over year, an undated one last', () => {
+    const undated = { ...BLUE, id: 9, year: null }
+    const dated = { ...KID_A, id: 8, releaseDate: '2000-10-02' }
+    const albums = [undated, KID_A, BLUE, dated, AMNESIAC]
+    const latest = recentAlbums({ albums, sort: RECENT_SORTS.release, limit: 10 })
+    expect(idsOf(latest).at(-1)).toBe(undated.id)
+    expect(idsOf(latest).indexOf(dated.id)).toBeLessThan(idsOf(latest).indexOf(KID_A.id))
+    expect(idsOf(latest).indexOf(KID_A.id)).toBeLessThan(idsOf(latest).indexOf(BLUE.id))
+  })
+
+  it('asks the server for the order it shows', () => {
+    expect(RECENT_SERVER_SORTS).toEqual({
+      [RECENT_SORTS.added]: MUSIC_SORTS.added,
+      [RECENT_SORTS.release]: MUSIC_SORTS.release,
+    })
   })
 })
 

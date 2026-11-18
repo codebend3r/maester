@@ -7,7 +7,9 @@ import { Platform } from 'react-native'
 import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
 import { NOW_PLAYING_COPY } from '@/screens/copy'
 import { type SourceTitle, deviceOf, sourceTitleOf } from '@/screens/nowPlaying/nowPlayingModel'
+import { qualityLineOf } from '@/screens/nowPlaying/quality'
 import { WREN_PAGES, pageHref } from '@/routes'
+import { usePlayedStreams } from '@/stores/playedStreams'
 import { useFormFactor } from '@/theme/wrenTheme'
 import type { WrenSession } from '@/useWren'
 
@@ -24,6 +26,8 @@ export type Playing = NowPlayingTrack & {
   /** "Playing on this iPad". */
   playingOn: string
   close: () => void
+  /** The format and quality of what is playing, "FLAC · 16-bit / 44.1 kHz · 912 kbps"; null until its source is made. */
+  quality: string | null
   /** Opens the song's first artist's page, or nothing when it credits none. */
   openArtist: (() => void) | null
 }
@@ -63,6 +67,7 @@ export const usePlaying = ({ session, track }: UsePlayingProps): Playing => {
       sourceKind === QUEUE_SOURCE_KINDS.artist && typeof sourceId === 'number' ? sourceId : null,
     ),
   )
+  const stream = usePlayedStreams((store) => store.streams[track.id])
   const device = deviceOf({ os: Platform.OS, formFactor })
   const [firstArtist] = track.artists
   const close = () => router.back()
@@ -80,6 +85,7 @@ export const usePlaying = ({ session, track }: UsePlayingProps): Playing => {
     output: NOW_PLAYING_COPY.output({ server: session.server.name, device }),
     playingOn: NOW_PLAYING_COPY.playingOn(device),
     close,
+    quality: stream === undefined ? null : qualityLineOf({ track, stream }),
     openArtist:
       firstArtist === undefined
         ? null

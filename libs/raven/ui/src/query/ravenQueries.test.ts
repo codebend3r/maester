@@ -540,12 +540,27 @@ describe('ravenQueriesFor', () => {
   it("keeps a library's newest albums, asking for them newest first", async () => {
     const albums = [1, 2, 3].map((id) => ({ ...ALBUM, id }))
     const { api, calls } = recordingApi({ body: albums })
-    const query = ravenQueriesFor(api).recentAlbumsQuery({ libraryId: 2, limit: 2 })
-    expect(queryKeys.recentAlbums({ libraryId: 2, limit: 2 })).toEqual(query.queryKey)
+    const recent = { libraryId: 2, limit: 2, sort: MUSIC_SORTS.added }
+    const query = ravenQueriesFor(api).recentAlbumsQuery(recent)
+    expect(queryKeys.recentAlbums(recent)).toEqual(query.queryKey)
     const cache = new QueryClient()
     const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
     await waitFor(() => expect((result.current.data ?? []).map(({ id }) => id)).toEqual([1, 2]))
     expect(calls.map(({ url }) => url)).toEqual(['/api/libraries/2/albums?sort=added&limit=2'])
+    cache.clear()
+  })
+
+  it("asks for a library's latest releases by when they came out, under a key of their own", async () => {
+    const { api, calls } = recordingApi({ body: [ALBUM] })
+    const latest = { libraryId: 2, limit: 2, sort: MUSIC_SORTS.release }
+    const query = ravenQueriesFor(api).recentAlbumsQuery(latest)
+    expect(query.queryKey).not.toEqual(
+      queryKeys.recentAlbums({ ...latest, sort: MUSIC_SORTS.added }),
+    )
+    const cache = new QueryClient()
+    const { result } = renderQueryHook({ client: cache, hook: () => useQuery(query) })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(calls.map(({ url }) => url)).toEqual(['/api/libraries/2/albums?sort=release&limit=2'])
     cache.clear()
   })
 

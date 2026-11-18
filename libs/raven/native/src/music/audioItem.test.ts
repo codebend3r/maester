@@ -8,13 +8,19 @@ import {
   AUDIO_PLATFORMS,
   MAX_HEIGHTS,
   MEDIA_TICKET_PARAM,
+  type RemotePlayback,
   type Track,
   appClientCallOf,
   createApiClient,
   toQueryString,
 } from '@raven/core'
 
-import { type TrackPlan, audioItemOf } from '@/music/audioItem'
+import {
+  TRACK_STREAM_KINDS,
+  type TrackPlan,
+  type TrackStream,
+  audioItemOf,
+} from '@/music/audioItem'
 import { mediaAccessFor } from '@/servers/mediaAccess'
 
 const ORIGIN = 'https://raven.example'
@@ -47,11 +53,14 @@ const ALAC_AIRBAG: Track = { ...AIRBAG, container: 'm4a', codec: AUDIO_CODECS.al
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
 
+type RavenServerProps = { remote?: RemotePlayback | null }
+
 /**
  * raven as Wren's player reaches it, with no other origin to play from and a signed-in
- * account, so a track plays from raven's own address by its ticket. `heard` is every call.
+ * account, so a track plays from raven's own address by its ticket, and `remote` what it says
+ * of remote play. `heard` is every call.
  */
-const ravenServer = () => {
+const ravenServer = ({ remote = null }: RavenServerProps = {}) => {
   const heard: string[] = []
   const api = createApiClient({
     baseUrl: ORIGIN,
@@ -63,7 +72,7 @@ const ravenServer = () => {
       if (APP_CLIENT_CALLS[call] === APP_CLIENT_CALLS.getMediaTicket) {
         return json({ ticket: TICKET, expiresAt: 0 })
       }
-      return json({ origins: [] })
+      return json({ origins: [], remote })
     },
   })
   const sources = mediaAccessFor({
@@ -122,7 +131,11 @@ describe('audioItemOf', () => {
       platform: AUDIO_PLATFORMS.android,
       plan: {
         ...ON_CELLULAR,
-        downloadedOf: () => ({ uri: DOWNLOADED_URI, artworkUri: SAVED_COVER }),
+        downloadedOf: () => ({
+          uri: DOWNLOADED_URI,
+          artworkUri: SAVED_COVER,
+          kbps: AUDIO_BITRATES.standard,
+        }),
       },
     })
     expect(item.uri).toBe(DOWNLOADED_URI)
@@ -142,6 +155,39 @@ describe('audioItemOf', () => {
     expect(item.uri).toBe(transcodeUri(AUDIO_BITRATES.standard))
   })
 
+  it('plays the file away from home when it fits under the remote limit, as a video does', async () => {
+    const { server } = ravenServer({ remote: { limit: 'low720', isOutside: true } })
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_WIFI,
+    })
+    expect(item.uri).toBe(`${ORIGIN}/api/media/${AIRBAG.id}/file?${MEDIA_TICKET_PARAM}=${TICKET}`)
+  })
+
+  it('streams the transcode away from home when the file is over the remote limit', async () => {
+    const { server } = ravenServer({ remote: { limit: 'mobile328', isOutside: true } })
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_WIFI,
+    })
+    expect(item.uri).toBe(transcodeUri(AUDIO_BITRATES.high))
+  })
+
+  it('plays the file at home whatever the remote limit', async () => {
+    const { server } = ravenServer({ remote: { limit: 'mobile328', isOutside: false } })
+    const item = await audioItemOf({
+      server,
+      track: AIRBAG,
+      platform: AUDIO_PLATFORMS.apple,
+      plan: ON_WIFI,
+    })
+    expect(item.uri).toBe(`${ORIGIN}/api/media/${AIRBAG.id}/file?${MEDIA_TICKET_PARAM}=${TICKET}`)
+  })
+
   it('plays ALAC on Android from the transcode, since its player plays the file silent', async () => {
     const { server } = ravenServer()
     const item = await audioItemOf({
@@ -151,6 +197,28 @@ describe('audioItemOf', () => {
       plan: ON_WIFI,
     })
     expect(item.uri).toBe(transcodeUri(AUDIO_BITRATES.standard))
+  })
+
+  it('tells the plan what each track plays from', async () => {
+    const { server } = ravenServer()
+    const heard: TrackStream[] = []
+    const telling: Pick<TrackPlan, 'onStream'> = { onStream: ({ stream }) => heard.push(stream) }
+    const playing = { server, track: AIRBAG, platform: AUDIO_PLATFORMS.apple }
+    await audioItemOf({ ...playing, plan: { ...ON_WIFI, ...telling } })
+    await audioItemOf({ ...playing, plan: { ...ON_CELLULAR, ...telling } })
+    await audioItemOf({
+      ...playing,
+      plan: {
+        ...ON_WIFI,
+        ...telling,
+        downloadedOf: () => ({ uri: DOWNLOADED_URI, artworkUri: null, kbps: AUDIO_BITRATES.low }),
+      },
+    })
+    expect(heard).toEqual([
+      { kind: TRACK_STREAM_KINDS.file },
+      { kind: TRACK_STREAM_KINDS.transcode, kbps: AUDIO_BITRATES.standard },
+      { kind: TRACK_STREAM_KINDS.download, kbps: AUDIO_BITRATES.low },
+    ])
   })
 
   it('plays ALAC on an iPhone from the file, which it decodes', async () => {

@@ -80,6 +80,7 @@ export const trackPlanFor = ({ serverId, read }: TrackPlanForProps): TrackPlan =
     return {
       uri: uriOf(entry.path),
       artworkUri: entry.artPath === null ? null : uriOf(entry.artPath),
+      kbps: entry.kbps,
     }
   },
   streamKbps: async () => null,

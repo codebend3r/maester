@@ -2,6 +2,7 @@ import { type AlbumSummary, MUSIC_SORTS, type MusicSort, artistNames } from '@ra
 
 import { byTitle } from '@/music/merged'
 import { LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { RECENT_SORTS, type RecentSort } from '@/stores/wrenPrefs'
 
 /** The orders Albums and Songs offer. */
 export const LIST_SORTS = {
@@ -61,8 +62,24 @@ export const matchingAlbums = ({ albums, query }: MatchingAlbumsProps): readonly
   )
 }
 
-type NewestAlbumsProps = { albums: readonly AlbumSummary[]; limit: number }
+/** The server's sort for each, which lists a library's albums in that order. */
+export const RECENT_SERVER_SORTS = {
+  [RECENT_SORTS.added]: MUSIC_SORTS.added,
+  [RECENT_SORTS.release]: MUSIC_SORTS.release,
+} as const satisfies Record<RecentSort, MusicSort>
 
-/** The newest `limit` of several libraries' newest albums, newest first. */
-export const newestAlbums = ({ albums, limit }: NewestAlbumsProps): AlbumSummary[] =>
-  sortedAlbums({ albums, sort: LIST_SORTS.added }).slice(0, limit)
+/** When an album came out, as the server orders by it: its date, else its year, else nothing. */
+const releasedOf = ({ releaseDate, year }: AlbumSummary): string =>
+  releaseDate ?? (year === null ? '' : String(year))
+
+/** How each puts several libraries' albums in one order, newest first, an undated release last. */
+const RECENT_ORDERS = {
+  [RECENT_SORTS.added]: ALBUM_ORDERS[LIST_SORTS.added],
+  [RECENT_SORTS.release]: (a, b) => releasedOf(b).localeCompare(releasedOf(a)) || byTitle(a, b),
+} as const satisfies Record<RecentSort, AlbumOrder>
+
+type RecentAlbumsProps = { albums: readonly AlbumSummary[]; sort: RecentSort; limit: number }
+
+/** The newest `limit` of several libraries' newest albums by `sort`, newest first. */
+export const recentAlbums = ({ albums, sort, limit }: RecentAlbumsProps): AlbumSummary[] =>
+  albums.toSorted(RECENT_ORDERS[sort]).slice(0, limit)

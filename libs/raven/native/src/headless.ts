@@ -47,7 +47,8 @@ export {
   queueSourceOf,
   tracksForBrowse,
 } from '@/music/browseTree'
-export type { TrackPlan } from '@/music/audioItem'
+export { TRACK_STREAM_KINDS } from '@/music/audioItem'
+export type { TrackPlan, TrackStream } from '@/music/audioItem'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'
