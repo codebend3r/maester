@@ -8,6 +8,7 @@ import { queryClient } from '@/queryClient'
 import { LIBRARY_SEGMENTS, WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
 import { HOME_COPY, LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
+import { DEFAULT_WREN_PREFS, RECENT_SORTS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   AIRBAG,
   LISTENER,
@@ -49,6 +50,7 @@ describe('Home', () => {
     queryClient.clear()
     useAudioQueue.getState().clear()
     useWrenAccount.setState({ session: LISTENER })
+    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
   })
 
   it("greets the listener and shows every music library's newest albums, and opens one", async () => {
@@ -61,12 +63,24 @@ describe('Home', () => {
     expect(mockApi.listAlbums).toHaveBeenCalledWith({
       libraryId: MUSIC.id,
       sort: MUSIC_SORTS.added,
-      limit: 20,
+      limit: 12,
     })
 
     await fireEvent.press(tile)
     expect(await screen.findByRole('header', { name: OK_COMPUTER.title })).toBeTruthy()
     expect(router.getPathname()).toBe(pagePathOf({ page: WREN_PAGES.album, id: OK_COMPUTER.id }))
+  })
+
+  it('lists the albums by their latest release once asked, and keeps the choice', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await fireEvent.press(await screen.findByRole('radio', { name: HOME_COPY.sorts.release }))
+    expect(await screen.findByRole('header', { name: HOME_COPY.latestReleases })).toBeTruthy()
+    expect(mockApi.listAlbums).toHaveBeenCalledWith({
+      libraryId: MUSIC.id,
+      sort: MUSIC_SORTS.release,
+      limit: 12,
+    })
+    expect(useWrenPrefs.getState().homeSort).toBe(RECENT_SORTS.release)
   })
 
   it('opens Albums from See all', async () => {

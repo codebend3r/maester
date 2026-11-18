@@ -5,11 +5,9 @@ import { useDownloads } from '@/downloads/downloadStore'
 import { byName, byTitle, mergedOf } from '@/music/merged'
 import { useMusicLibraries } from '@/music/musicLibraries'
 import { downloadsSummaryOf } from '@/screens/library/downloadRows'
-import { newestAlbums } from '@/screens/library/sorts'
+import { RECENT_SERVER_SORTS, recentAlbums } from '@/screens/library/sorts'
+import type { RecentSort } from '@/stores/wrenPrefs'
 import type { WrenSession } from '@/useWren'
-
-/** How many of a library's newest albums Home and Library ask for. */
-const RECENT_ALBUMS = 20
 
 type ListingsProps = {
   session: WrenSession
@@ -49,20 +47,32 @@ export const useAllArtists = ({ session, search, isEnabled = true }: ListingsPro
   return { artists: entries, listing, music }
 }
 
-/** The newest albums of every music library together, newest first, and where they stand. */
-export const useRecentAlbums = (session: WrenSession) => {
+type UseRecentAlbumsProps = {
+  session: WrenSession
+  /** What makes an album recent. */
+  sort: RecentSort
+  /** How many to show, and to ask each library for. */
+  limit: number
+}
+
+/** The newest albums of every music library together by `sort`, newest first, and where they stand. */
+export const useRecentAlbums = ({ session, sort, limit }: UseRecentAlbumsProps) => {
   const music = useMusicLibraries(session)
   const listings = useQueries({
     queries: music.libraries.map((library) =>
-      session.queries.recentAlbumsQuery({ libraryId: library.id, limit: RECENT_ALBUMS }),
+      session.queries.recentAlbumsQuery({
+        libraryId: library.id,
+        limit,
+        sort: RECENT_SERVER_SORTS[sort],
+      }),
     ),
   })
   const { entries, ...listing } = mergedOf({
     music,
     listings,
-    order: (albums) => newestAlbums({ albums, limit: RECENT_ALBUMS }),
+    order: (albums) => recentAlbums({ albums, sort, limit }),
   })
-  return { albums: entries, listing, music }
+  return { albums: entries, listing }
 }
 
 type UseSongCountProps = { session: WrenSession; search: string }

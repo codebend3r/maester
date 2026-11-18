@@ -4,6 +4,7 @@ import {
   type MatchSubject,
   type MediaSort,
   type MusicListOptions,
+  type MusicSort,
   type MixKind,
   type PlayHistoryShow,
   type TitleRequestAsk,
@@ -46,7 +47,7 @@ type QueryKeysMusicListProps = { libraryId: number; search: string; sort: string
 
 type QueryKeysArtistsProps = { libraryId: number; search: string }
 
-type QueryKeysRecentAlbumsProps = { libraryId: number; limit: number }
+type QueryKeysRecentAlbumsProps = { libraryId: number; limit: number; sort: MusicSort }
 
 type QueryKeysSongsProps = { libraryIds: readonly number[]; search: string; sort: string }
 
@@ -225,13 +226,13 @@ export const queryKeys = {
     'artists',
     { search },
   ],
-  /** A music library's newest albums, `limit` of them. */
-  recentAlbums: ({ libraryId, limit }: QueryKeysRecentAlbumsProps) => [
+  /** A music library's newest albums by `sort`, `limit` of them. */
+  recentAlbums: ({ libraryId, limit, sort }: QueryKeysRecentAlbumsProps) => [
     'libraries',
     libraryId,
     'albums',
     'recent',
-    limit,
+    { limit, sort },
   ],
   /** Every album's and artist's page: one prefix a match or a scan reads again. */
   music: ['music'],

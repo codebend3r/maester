@@ -1,4 +1,4 @@
-import { type AlbumSummary, MUSIC_PAGE, MUSIC_SORTS } from '@raven/core'
+import { MUSIC_PAGE, MUSIC_SORTS } from '@raven/core'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { type ComponentType, useState } from 'react'
@@ -22,6 +22,7 @@ import { ListNotice } from '@/screens/library/ListNotice'
 import { LIBRARY_SEGMENTS, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { toastFailure } from '@/stores/toast'
+import { RECENT_SORTS, type RecentSort, useWrenPrefs } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { AlbumTileOf } from '@/ui/AlbumTile'
@@ -29,20 +30,32 @@ import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { Card } from '@/ui/Card'
 import { countsLineOf } from '@/ui/counts'
 import { SectionHeader } from '@/ui/SectionHeader'
+import { type Choice, SegmentedControl } from '@/ui/SegmentedControl'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
-import { Shelf } from '@/ui/Shelf'
 import { GRID_COLUMNS, type GridColumns, TileGrid } from '@/ui/TileGrid'
 import { ICONS } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
 
-/** How many of the newest albums the tablet's grid shows: two rows of six. */
-const TABLET_SHOWN = 12
+/** How many rows of albums Home's grid shows. */
+const RECENT_ROWS = 6
 
 /** Home's grid holds six to a tablet's row, one more than a list's. */
 const RECENT_COLUMNS = {
   [FORM_FACTORS.phone]: GRID_COLUMNS[FORM_FACTORS.phone],
   [FORM_FACTORS.tablet]: 6,
 } as const satisfies GridColumns
+
+/** The two orders of Home's albums, as its control offers them. */
+const RECENT_CHOICES = [
+  { key: RECENT_SORTS.release, label: HOME_COPY.sorts.release },
+  { key: RECENT_SORTS.added, label: HOME_COPY.sorts.added },
+] as const satisfies readonly Choice<RecentSort>[]
+
+/** What the section is called under each order. */
+const RECENT_TITLES = {
+  [RECENT_SORTS.added]: LIBRARY_PAGE_COPY.recent,
+  [RECENT_SORTS.release]: HOME_COPY.latestReleases,
+} as const satisfies Record<RecentSort, string>
 
 type ValueOfProps = {
   /** What it holds as a line, or null while that is on its way or could not be read. */
@@ -206,46 +219,40 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
   )
 }
 
-type RecentViewProps = { albums: readonly AlbumSummary[]; coverOf: CoverOf }
-
-/** The phone's newest albums: a shelf that scrolls sideways. */
-function RecentShelf({ albums, coverOf }: RecentViewProps) {
-  return <Shelf albums={albums} coverOf={coverOf} />
-}
-
-/** The tablet's: a grid of six to a row. */
-function RecentGrid({ albums, coverOf }: RecentViewProps) {
-  return (
-    <TileGrid
-      columns={RECENT_COLUMNS}
-      items={albums.slice(0, TABLET_SHOWN)}
-      keyOf={(album) => album.id}
-      renderTile={({ item, width }) => <AlbumTileOf album={item} coverOf={coverOf} width={width} />}
-    />
-  )
-}
-
-const RECENT_VIEWS = {
-  [FORM_FACTORS.phone]: RecentShelf,
-  [FORM_FACTORS.tablet]: RecentGrid,
-} as const satisfies Record<FormFactor, ComponentType<RecentViewProps>>
-
 type RecentlyAddedProps = { session: WrenSession; coverOf: CoverOf }
 
-/** Every music library's newest albums, and See all, which opens Albums. */
+/**
+ * Every music library's newest albums, six rows of them, by when they were added or when they
+ * came out, as the control under the title sets; See all opens Albums.
+ */
 function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
   const styles = useStyles()
   const router = useRouter()
-  const { albums, listing } = useRecentAlbums(session)
-  const Albums = RECENT_VIEWS[useFormFactor()]
+  const sort = useWrenPrefs((state) => state.homeSort)
+  const change = useWrenPrefs((state) => state.change)
+  const limit = RECENT_ROWS * RECENT_COLUMNS[useFormFactor()]
+  const { albums, listing } = useRecentAlbums({ session, sort, limit })
   return (
     <View style={styles.section}>
       <SectionHeader
         onSeeAll={() => router.push(libraryHref(LIBRARY_SEGMENTS.albums))}
-        title={LIBRARY_PAGE_COPY.recent}
+        title={RECENT_TITLES[sort]}
+      />
+      <SegmentedControl
+        choices={RECENT_CHOICES}
+        label={HOME_COPY.sortAlbums}
+        onSelect={(homeSort) => change({ homeSort })}
+        selected={sort}
       />
       {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
-      {albums.length > 0 && <Albums albums={albums} coverOf={coverOf} />}
+      <TileGrid
+        columns={RECENT_COLUMNS}
+        items={albums}
+        keyOf={(album) => album.id}
+        renderTile={({ item, width }) => (
+          <AlbumTileOf album={item} coverOf={coverOf} width={width} />
+        )}
+      />
     </View>
   )
 }
@@ -257,7 +264,7 @@ function HomePage({ session }: HomePageProps) {
   const insets = usePageInsets()
   const formFactor = useFormFactor()
   const covers = useCovers(session)
-  const { music } = useRecentAlbums(session)
+  const music = useMusicLibraries(session)
   const greetingStyles = useGreetingStyles()
   const Header = HEADERS[formFactor]
   // Read once as Home opens, so a scroll never changes the greeting under the listener.

@@ -2,6 +2,7 @@ import type { TrackPlan } from '@raven/native/headless'
 
 import { useDownloads } from '@/downloads/downloadStore'
 import { downloadedOf } from '@/downloads/downloadViews'
+import { usePlayedStreams } from '@/stores/playedStreams'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 
 type TrackPlanForProps = {
@@ -15,7 +16,8 @@ type TrackPlanForProps = {
 /**
  * What Wren plays a track from before the server's file: its download from this server, with
  * the cover saved beside it, then on a mobile network the transcode at "Cellular quality". A
- * network that cannot be read is taken for Wi-Fi.
+ * network that cannot be read is taken for Wi-Fi. What each track ends up playing from is kept
+ * for Now Playing's quality line.
  */
 export const trackPlanFor = ({ serverId, isOnCellular, uriOf }: TrackPlanForProps): TrackPlan => ({
   downloadedOf: (track) => {
@@ -28,10 +30,12 @@ export const trackPlanFor = ({ serverId, isOnCellular, uriOf }: TrackPlanForProp
     return {
       uri: uriOf(entry.path),
       artworkUri: entry.coverPath === null ? null : uriOf(entry.coverPath),
+      kbps: entry.kbps,
     }
   },
   streamKbps: async () => {
     const isCellular = await isOnCellular().catch(() => false)
     return isCellular ? useWrenPrefs.getState().cellularKbps : null
   },
+  onStream: ({ track, stream }) => usePlayedStreams.getState().heard({ trackId: track.id, stream }),
 })

@@ -14,6 +14,7 @@ import {
 import { ListNotice } from '@/screens/library/ListNotice'
 import { LIBRARY_SEGMENTS, type LibrarySegment, WREN_ROUTES, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
+import { RECENT_SORTS } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { AlbumTileOf } from '@/ui/AlbumTile'
@@ -101,14 +102,17 @@ type LibraryPageProps = { session: WrenSession }
 function RecentGrid({ session }: LibraryPageProps) {
   const styles = useStyles()
   const { coverOf } = useCovers(session)
-  const { albums, listing } = useRecentAlbums(session)
-  const count = RECENT_SHOWN[useFormFactor()]
+  const { albums, listing } = useRecentAlbums({
+    session,
+    sort: RECENT_SORTS.added,
+    limit: RECENT_SHOWN[useFormFactor()],
+  })
   return (
     <View style={styles.section}>
       <SectionHeader title={LIBRARY_PAGE_COPY.recent} />
       {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
       <TileGrid
-        items={albums.slice(0, count)}
+        items={albums}
         keyOf={(album) => album.id}
         renderTile={({ item, width }) => (
           <AlbumTileOf album={item} coverOf={coverOf} width={width} />

@@ -86,6 +86,8 @@ export const STORAGE_COPY = {
 
 type TrackOfProps = { at: number; count: number }
 
+type ResolutionProps = { bits: number; kilohertz: number }
+
 type ContinueLineProps = { artists: string; track: string }
 
 type ContinueLabelProps = { album: string; line: string }
@@ -99,6 +101,11 @@ export const HOME_COPY = {
     evening: 'Good evening',
   },
   continueListening: 'Continue listening',
+  /** Home's albums by when they came out, beside Recently added. */
+  latestReleases: 'Latest releases',
+  /** What the two orders of Home's albums are chosen under. */
+  sortAlbums: 'Sort albums by',
+  sorts: { added: 'Date added', release: 'Latest release' },
   /** Where the queue stands: "Track 11 of 20". */
   trackOf: ({ at, count }: TrackOfProps) => `Track ${at} of ${count}`,
   /** The card's line under the album: "Sia · Track 11 of 20". */
@@ -247,6 +254,14 @@ const fromName = (name: string) => `From ${name}`
 
 export const NOW_PLAYING_COPY = {
   close: 'Close Now Playing',
+  /** The format a transcode and a download play in. */
+  aac: 'AAC',
+  kbps: (kbps: number) => `${kbps} kbps`,
+  /** A lossless file's resolution: "16-bit / 44.1 kHz". */
+  resolution: ({ bits, kilohertz }: ResolutionProps) => `${bits}-bit / ${kilohertz} kHz`,
+  downloaded: 'Downloaded',
+  /** What the quality line is read out as: "Quality, FLAC · 912 kbps". */
+  quality: 'Quality',
   more: 'More options',
   nothing: 'Nothing is playing.',
   clear: 'Clear',
