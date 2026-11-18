@@ -1,4 +1,4 @@
-/*
+/**
  * The Dolby Vision profile, so profile 7, a 4K Blu-ray's, wears a chip of its own. Only an HDR
  * file can be Dolby Vision, so those alone are probed again by the next scan someone starts.
  */

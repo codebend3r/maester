@@ -18,7 +18,7 @@ configure({ asyncUtilTimeout: 10_000 })
 jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'))
 setUpTests()
 
-/*
+/**
  * React Native's jest window is 750 by 1334, wide enough for Wren's tablet layout. The screens
  * are tested on a phone, an iPhone 16's window, unless a test sets a tablet's itself.
  */

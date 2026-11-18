@@ -227,8 +227,10 @@ class RavenAudioService : MediaLibraryService() {
       .setUsage(C.USAGE_MEDIA)
       .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
       .build()
-    // ExoPlayer takes audio focus and pauses for a call or when headphones come out; the
-    // module reports that pause through its state events.
+    /*
+     * ExoPlayer takes audio focus and pauses for a call or when headphones come out; the
+     * module reports that pause through its state events.
+     */
     val made = ExoPlayer.Builder(this)
       .setAudioAttributes(attributes, true)
       .setHandleAudioBecomingNoisy(true)

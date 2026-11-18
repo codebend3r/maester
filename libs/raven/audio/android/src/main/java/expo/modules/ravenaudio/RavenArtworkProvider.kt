@@ -107,8 +107,10 @@ class RavenArtworkProvider : ContentProvider() {
     }
     val connection = URL(source.uri).openConnection() as? HttpURLConnection
       ?: throw FileNotFoundException(source.uri)
-    // Each fetch writes a part of its own and moves it into place once whole, so a cut fetch is
-    // never served and two fetches of one cover never write into one file.
+    /*
+     * Each fetch writes a part of its own and moves it into place once whole, so a cut fetch is
+     * never served and two fetches of one cover never write into one file.
+     */
     val part = File.createTempFile(key, PART_SUFFIX, folder)
     try {
       connection.connectTimeout = TIMEOUT_MS

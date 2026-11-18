@@ -1,4 +1,4 @@
-/**
+/*
  * The API contract between the media server and every client. Anything a
  * client renders, or the server returns, is one of these shapes, so the web
  * app and a future native app agree on the wire format by construction.

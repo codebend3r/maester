@@ -59,7 +59,7 @@ import { fakeTmdb } from '@/test/fakeTmdb'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-/** As a browser with the admin lock off, the one place the PIN opens anything. */
+// As a browser with the admin lock off, the one place the PIN opens anything.
 describe('a library locked behind the PIN', () => {
   const state: {
     root: string
@@ -512,7 +512,7 @@ describe('a library locked behind the PIN', () => {
   })
 })
 
-/** A title only a locked library holds is on raven for a person's page only once the PIN opens it. */
+// A title only a locked library holds is on raven for a person's page only once the PIN opens it.
 describe("a person's filmography beside a locked library", () => {
   const tmdb = fakeTmdb({ movies: [{ id: 603, title: 'The Matrix', released: '1999-03-31' }] })
   const state: {

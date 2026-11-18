@@ -251,10 +251,7 @@
   background: var(--color-canopy-haze);
 }
 
-/*
- * Pin as a toggle: outlined with an empty pin while off, the moss fill and a
- * filled pin while on.
- */
+// Pin as a toggle: outlined with an empty pin while off, the moss fill and a filled pin while on.
 .pin[aria-pressed] {
   border-color: var(--color-line-strong);
 }

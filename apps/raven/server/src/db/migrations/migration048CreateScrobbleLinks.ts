@@ -1,4 +1,4 @@
-/*
+/**
  * Scrobbling: each account's link to ListenBrainz or Last.fm, its token
  * or session key sealed with the server's key, and the listens waiting to
  * go out, numbered per account and service. `listened_at` is in Unix

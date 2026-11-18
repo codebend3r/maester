@@ -55,7 +55,7 @@ const firstPacketTimes = async (path: string): Promise<{ video: number; audio: n
 /** Rounded to the millisecond, as WebVTT is. */
 const ms = (seconds: number): number => Math.round(seconds * 1000) / 1000
 
-/** As a browser with the admin lock off, so the library can be added and the settings changed. */
+// As a browser with the admin lock off, so the library can be added and the settings changed.
 describe('playback', () => {
   const state: {
     root: string

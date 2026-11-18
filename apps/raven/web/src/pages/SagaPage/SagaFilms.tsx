@@ -145,10 +145,7 @@ type SagaFilmsProps = {
   sagaId: string
 }
 
-/**
- * A saga's movies in release order, numbered, each on a row of its own with
- * every score it has.
- */
+/** A saga's movies in release order, numbered, each on a row of its own with every score it has. */
 export const SagaFilms = ({ media, sagaId }: SagaFilmsProps) => {
   const standing = standings(media)
   const session = { kind: SESSION_KINDS.saga, sagaId }

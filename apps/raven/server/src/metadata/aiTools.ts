@@ -15,10 +15,7 @@ import {
 import { isAiConfidence } from '@/metadata/aiDecisions'
 import type { SearchResult } from '@/metadata/tmdbShapes'
 
-/**
- * What the AI lookup is told of a group left unmatched: never a path
- * outside the library.
- */
+/** What the AI lookup is told of a group left unmatched: never a path outside the library. */
 export type AiGroup = {
   kind: LibraryKind
   type: MatchItemType

@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { type EmptyConfig, MakerBase, type MakerOptions } from '@electron-forge/maker-base'
 import type { ForgePlatform } from '@electron-forge/shared-types'
 
-/**
+/*
  * Makes the dmg with macOS's own `ditto` and `hdiutil` rather than
  * `@electron-forge/maker-dmg`, whose `appdmg` backend needs node-gyp addons that Bun never
  * builds. forge.config.ts imports this file through jiti, which does not read tsconfig

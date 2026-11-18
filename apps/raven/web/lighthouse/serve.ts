@@ -14,7 +14,7 @@ import {
 import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { HEADERS } from '@shared/http'
 
-/**
+/*
  * The production build as Netlify serves it, for Lighthouse CI: over HTTP/2, Brotli for every
  * text file, hashed assets cached for good, and the single-page fallback to index.html. HTTP/2
  * matters: over HTTP/1.1 Lighthouse queues the app's chunks six at a time, which Netlify never

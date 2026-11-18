@@ -1,4 +1,4 @@
-/**
+/*
  * What a chat turn's stream says, checked at the boundary. The server's names
  * (`sparrow/web/chat.py`) are snake case; past the guards everything is the
  * shapes below.

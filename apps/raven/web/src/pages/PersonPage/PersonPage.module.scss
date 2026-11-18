@@ -98,10 +98,7 @@
   text-wrap: pretty;
 }
 
-/*
- * The biography as a lead, its paragraphs kept, and More or Less on its
- * left edge under it.
- */
+// The biography as a lead, its paragraphs kept, and More or Less on its left edge under it.
 .bio {
   display: grid;
   justify-items: start;

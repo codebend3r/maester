@@ -1,4 +1,4 @@
-/*
+/**
  * The artists ListenBrainz finds similar to each of ours, shared by every
  * account and asked again after 30 days. A similar artist is kept by its
  * MusicBrainz id, held in a library or not, so one added later is found

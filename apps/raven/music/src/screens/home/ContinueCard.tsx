@@ -54,7 +54,7 @@ const ALBUM_LINES = {
   [FORM_FACTORS.tablet]: 2,
 } as const satisfies Record<FormFactor, number>
 
-/*
+/**
  * The card only ever resumes: pausing is the mini player's and the player bar's, so the two
  * never offer the same control under the same name.
  */

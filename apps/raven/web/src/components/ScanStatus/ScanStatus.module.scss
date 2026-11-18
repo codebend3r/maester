@@ -7,10 +7,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * The bar first, what the scan is doing beside it; on a narrow screen the
- * words go under the bar.
- */
+// The bar first, what the scan is doing beside it; on a narrow screen the words go under the bar.
 .scanning {
   display: grid;
   grid-template-columns: 12rem minmax(0, max-content);

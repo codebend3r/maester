@@ -1,4 +1,4 @@
-/*
+/**
  * shown_items reads each edit by its key rather than joining them. SQLite
  * cannot fold a view holding a LEFT JOIN into a query that LEFT JOINs it,
  * which every listing does, so it copied every item on each read; a view

@@ -1,4 +1,4 @@
-/**
+/*
  * Server-sent events read from a fetch body. The chat routes are POSTs, which
  * `EventSource` can't send, so the stream is parsed here: blocks split on a
  * blank line, each with an `event:` name and `data:` lines.

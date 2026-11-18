@@ -2,7 +2,7 @@ import { mkdir, open, readFile, rename, rm, stat, writeFile } from 'node:fs/prom
 import type { PartFile } from '@/main/downloads/fetchFile'
 import { isMissingFile, type StateFs } from '@/main/stateStore'
 
-/** Node's file system as main's services take it: each call shaped for the seam it fills. */
+// Node's file system as main's services take it: each call shaped for the seam it fills.
 
 /** Makes the folder and every missing parent; nothing when it is there already. */
 export const makeDir = (path: string): Promise<void> =>

@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-/**
+/*
  * The tested half of forge.config.ts. Forge loads its config with jiti, which does not read
  * tsconfig `paths`, so this file imports nothing from the project.
  */

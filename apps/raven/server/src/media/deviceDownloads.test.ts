@@ -131,7 +131,7 @@ const ownAddress = (ticket: string): MediaAccess => ({
 
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Three videos and a track, on a server that keeps at most one byte of device copies. */
+// Three videos and a track, on a server that keeps at most one byte of device copies.
 describe('device downloads', () => {
   const state: {
     root: string

@@ -54,7 +54,7 @@ const ownAddress = (ticket: string) => ({ origin: { url: '' }, ticket })
 
 const pause = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** A FLAC track and a video, on a server that keeps at most one byte of transcodes. */
+// A FLAC track and a video, on a server that keeps at most one byte of transcodes.
 describe('the transcode cache', () => {
   const state: {
     root: string

@@ -1,6 +1,6 @@
 import { isString, object, type Infer } from '@raven/core'
 
-/**
+/*
  * What a Windows build of raven may load and where its libmpv comes from. The native build
  * audits the resources with it, and the desktop audits the packaged app with it.
  */

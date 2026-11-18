@@ -88,10 +88,7 @@
   filter: drop-shadow(0 1px 4px var(--color-shade));
 }
 
-/*
- * The link that resumes the video reaches across the whole card, under the
- * title's own link.
- */
+// The link that resumes the video reaches across the whole card, under the title's own link.
 .play {
   position: absolute;
   inset: 0;

@@ -1,4 +1,4 @@
-/*
+/**
  * Every sitting with a video or a track, however short, by account, for the play history.
  * `id` counts up across every account in the order the sittings started, so it is both the
  * history's order and its page cursor. `kind` says how the entry is kept: a 'video' follows

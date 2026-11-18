@@ -132,7 +132,7 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
   }
 
-  /*
+  /**
    * The server's own API, addressed by path under `baseUrl`, or a media address on
    * whatever origin it names, read as text.
    */

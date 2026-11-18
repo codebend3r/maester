@@ -1,4 +1,4 @@
-/**
+/*
  * What the conversation on the page is made of, and the check that a saved
  * one read back from the browser's storage still has that shape. A reply and
  * a decision keep the server's events as they came, so reading one back goes

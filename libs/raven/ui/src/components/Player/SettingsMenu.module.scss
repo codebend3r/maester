@@ -173,10 +173,7 @@
   font-size: var(--font-size-xs);
 }
 
-/*
- * How the file reaches the browser, and the way to the detail, ruled off
- * from the speed under them.
- */
+// How the file reaches the browser, and the way to the detail, ruled off from the speed under them.
 .playing {
   display: grid;
   gap: var(--space-0);

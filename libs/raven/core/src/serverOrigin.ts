@@ -1,7 +1,7 @@
 import { isString } from '@/schema'
 import { URL_PROTOCOLS } from '@/urls'
 
-/**
+/*
  * A server's address as a person types it, read without `URL`: React Native's
  * is a handful of regular expressions with no `canParse`, and this library
  * leans on no web API. The rules are WHATWG URL's host parser (IPv4 in all its

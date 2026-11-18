@@ -108,10 +108,7 @@
   background: var(--color-canopy);
 }
 
-/*
- * Turned over: bark for the ground, night for the word, and the mark drawn
- * for the other tone.
- */
+// Turned over: bark for the ground, night for the word, and the mark drawn for the other tone.
 .lockupInverse {
   grid-template-columns: auto auto;
   align-items: center;

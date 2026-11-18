@@ -1,4 +1,4 @@
-/**
+/*
  * A reply as the page shows it, rebuilt from the events its entry keeps: each
  * one read through the stream's guards, then applied in order.
  */

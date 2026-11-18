@@ -1,4 +1,4 @@
-/*
+/**
  * What each library's saga pages show behind their titles, a `SagaBackdrop`
  * as JSON; a saga with no row shows the default slideshow.
  */

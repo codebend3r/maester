@@ -334,10 +334,7 @@ const transcodeVideo = ({
   const squeeze = QUALITY[quality]
   const trim = trimFrom == null ? [] : [`trim=start=${secondsArg(trimFrom)}`]
   const cpuAfter = [`scale=${scale}`, ...(tonemap ? [TONEMAP_FILTER] : [])]
-  /*
-   * A keyframe every two seconds keeps fragments small, so playback starts
-   * and seeks quickly.
-   */
+  // A keyframe every two seconds keeps fragments small, so playback starts and seeks quickly.
   const shared = ['-profile:v', 'high', '-g', '48']
 
   if (encoder.kind === ENCODER_KINDS.videotoolbox) {

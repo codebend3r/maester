@@ -7,7 +7,7 @@ import { BLANK_ITEM } from '@/metadata/tmdbShapes'
 import { testDatabase } from '@/test/database'
 import { TEST_ACCOUNTS, repositories } from '@/test/repositories'
 
-/** One movie, a file of it in each of two libraries, as a 4K and a 1080p library hold the same title. */
+// One movie, a file of it in each of two libraries, as a 4K and a 1080p library hold the same title.
 describe("a title's pictures in each library holding it", () => {
   const database = testDatabase('raven-library-pictures-')
   const state = { uhd: 0, hd: 0, itemId: 0 }

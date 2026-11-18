@@ -38,7 +38,7 @@ const LRC = {
   found: '[00:01.00]Sung from LRCLIB',
 } as const
 
-/** A music library whose tracks each find their lyrics in another place, and an audiobook with chapters. */
+// A music library whose tracks each find their lyrics in another place, and an audiobook with chapters.
 describe('playlists, favourites, lyrics and chapters', () => {
   const lrclib = fakeLrclib({ records: [{ title: TITLES.found, synced: LRC.found }] })
   const musicBrainz = fakeMusicBrainz({ releases: [] })

@@ -1,4 +1,4 @@
-/**
+/*
  * sparrow's own API, on the same origin in every setup: in development Vite
  * proxies to it, whether the real server or the sandbox is listening. Writes
  * are JSON, which the server requires.

@@ -85,10 +85,7 @@
   gap: var(--space-6);
 }
 
-/*
- * A section's title in the large serif and a line of help, ruled off from
- * its settings.
- */
+// A section's title in the large serif and a line of help, ruled off from its settings.
 .sectionHead {
   display: grid;
   gap: var(--space-1);
@@ -146,10 +143,7 @@
   font-size: var(--font-size-sm);
 }
 
-/*
- * What is known about a thing, one fact a row: its label in the muted
- * colour, its value beside it.
- */
+// What is known about a thing, one fact a row: its label in the muted colour, its value beside it.
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
@@ -286,10 +280,7 @@
   outline: none;
 }
 
-/*
- * Checked, a radio is a ring around a dot in the accent, and a checkbox a
- * ring around a tick.
- */
+// Checked, a radio is a ring around a dot in the accent, and a checkbox a ring around a tick.
 .choice input[type='radio']::before {
   width: 0.625rem;
   height: 0.625rem;

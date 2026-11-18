@@ -42,7 +42,7 @@ const accessOf = ({ ended = new Subject<void>() }: AccessOfProps = {}) => ({
   },
 })
 
-/**
+/*
  * The sessions an account's ticket opens, and the pass each holds. Nothing
  * here reads a segment, so one short clip does, though a run may start on
  * it as the clock moves past the init's grace.

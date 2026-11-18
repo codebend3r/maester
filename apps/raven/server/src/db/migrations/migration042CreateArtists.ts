@@ -1,4 +1,4 @@
-/*
+/**
  * Music: artists shared across libraries, each library's albums, and its
  * tracks keyed by the file's media row, so plays, favourites, progress,
  * tickets and downloads work on a track as they do on any file. An album

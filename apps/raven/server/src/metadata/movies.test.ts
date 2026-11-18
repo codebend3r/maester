@@ -56,7 +56,7 @@ const shape = <T>({ response, guard }: ShapeProps<T>): T => {
 /** Two of the films in one collection, as TMDB has none that fits them both. */
 const CRIME_SAGA = { id: 9001, name: 'Crime Classics Collection' }
 
-/** As a browser with the admin lock off, so files can be matched and items edited. */
+// As a browser with the admin lock off, so files can be matched and items edited.
 describe('movie metadata', () => {
   const tmdb = fakeTmdb({
     movies: [

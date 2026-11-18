@@ -6,8 +6,10 @@ plugins {
 group = 'expo.modules.ravenaudio'
 version = '1.0.0'
 
-// react-native-video 6.19.3's (`RNVideo_media3Version`), so the workspace builds against one
-// Media3; a bump of either moves both together.
+/*
+ * react-native-video 6.19.3's (`RNVideo_media3Version`), so the workspace builds against one
+ * Media3; a bump of either moves both together.
+ */
 def media3Version = '1.8.0'
 
 android {

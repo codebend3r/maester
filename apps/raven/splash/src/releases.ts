@@ -37,7 +37,7 @@ type Download = { platform: Platform; label: string }
 /** How one workflow names its files, `<prefix>-<version>-<download>`, and the downloads it ships. */
 export type Catalog = { fileName: RegExp; downloads: Readonly<Record<string, Download>> }
 
-/*
+/**
  * The files each release workflow ships, one row per download. desktop-release.yml names
  * Raven's raven-player-<version>-<download>; Intel Macs are not built, so x64 is always
  * Windows. device-release.yml names the device app's raven-app-<version>-<download>.

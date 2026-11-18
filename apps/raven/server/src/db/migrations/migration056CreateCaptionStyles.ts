@@ -1,4 +1,4 @@
-/*
+/**
  * How each account's subtitles look, one size and one colour, kept here so
  * every device an account signs in on draws them the same. The values the
  * two may take are the contract's, not the table's, so a size or colour

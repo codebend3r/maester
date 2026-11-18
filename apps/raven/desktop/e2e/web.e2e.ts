@@ -17,7 +17,7 @@ import {
 } from '@/e2e/harness'
 import { expectPlayingNatively, wake } from '@/e2e/playerView'
 
-/** The web's own sign-in, Home and title pages, and a title they play, all in the app's window. */
+// The web's own sign-in, Home and title pages, and a title they play, all in the app's window.
 test.describe.serial('the raven web app in Raven', () => {
   let userData = ''
   let folders: string[] = []

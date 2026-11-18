@@ -199,10 +199,7 @@
   }
 }
 
-/*
- * The still across the row, what the episode is under it, the buttons
- * beside the title.
- */
+// The still across the row, what the episode is under it, the buttons beside the title.
 @media (max-width: 48rem) {
   .episode {
     grid-template-columns: minmax(0, 1fr) auto;

@@ -207,10 +207,7 @@
   }
 }
 
-/*
- * The facts read as one line of words, wrapping between facts rather than
- * inside one, a dot apart.
- */
+// The facts read as one line of words, wrapping between facts rather than inside one, a dot apart.
 .facts {
   color: var(--color-lichen);
   font-size: var(--font-size-xs);

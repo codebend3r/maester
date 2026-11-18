@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
-// The system's Now Playing and transport controls, one per platform: MediaPlayer.framework
-// on macOS (nowplaying_mac.mm), nothing yet on Windows (nowplaying_win.cpp). addon.cpp
-// only sees this interface.
+/*
+ * The system's Now Playing and transport controls, one per platform: MediaPlayer.framework
+ * on macOS (nowplaying_mac.mm), nothing yet on Windows (nowplaying_win.cpp). addon.cpp
+ * only sees this interface.
+ */
 struct RavenNowPlayingInfo {
     std::string title;
     std::string artist;
@@ -35,8 +37,10 @@ struct RavenNowPlaying {
     RavenNowPlaying(const RavenNowPlaying &) = delete;
     RavenNowPlaying &operator=(const RavenNowPlaying &) = delete;
 
-    // Takes the system's transport controls; each reaches `onCommand` on the platform's
-    // main thread. A second call changes nothing.
+    /*
+     * Takes the system's transport controls; each reaches `onCommand` on the platform's
+     * main thread. A second call changes nothing.
+     */
     void listen(std::function<void(const RavenRemoteCommand &)> onCommand);
     void set(const RavenNowPlayingInfo &info);
     void clear();

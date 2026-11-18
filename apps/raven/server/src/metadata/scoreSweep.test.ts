@@ -1090,7 +1090,7 @@ describe('the score sweep', () => {
   })
 })
 
-/** As a browser with the admin lock off, so the library can be added and scanned. */
+// As a browser with the admin lock off, so the library can be added and scanned.
 describe('the score sweep beside matching', () => {
   const tmdb = fakeTmdb({
     movies: [
@@ -1202,7 +1202,7 @@ describe('the score sweep beside matching', () => {
   })
 })
 
-/** As a browser with the admin lock off, so the library can be added. */
+// As a browser with the admin lock off, so the library can be added.
 describe('the score sweep after a matching pass', () => {
   const tmdb = fakeTmdb({
     movies: [

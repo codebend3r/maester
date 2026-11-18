@@ -48,7 +48,7 @@ const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   return body
 }
 
-/** As a browser with the admin lock off, so libraries can be added and edited. */
+// As a browser with the admin lock off, so libraries can be added and edited.
 describe('matching by library type', () => {
   // The live-action series is listed first, as TMDB lists the more popular one.
   const tmdb = fakeTmdb({

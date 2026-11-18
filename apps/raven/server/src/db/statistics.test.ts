@@ -14,7 +14,7 @@ import { encodeClip } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-/**
+/*
  * A Movies library whose probes wait until let go, and its search for Heat
  * after them, so what the scan's index leaves, while probing can still take
  * hours, can be told apart from what its matching pass leaves.

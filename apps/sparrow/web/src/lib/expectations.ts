@@ -1,4 +1,4 @@
-/**
+/*
  * An eval case's expectations checked against what sparrow did, the way
  * `sparrow/evals/__init__.py`'s `run_case` checks them: each expected tool was
  * called, no forbidden one was, and the reply matches (or doesn't match) a

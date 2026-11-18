@@ -58,8 +58,10 @@ public final class RavenAudioModule: Module {
     Name("RavenAudio")
     Events(audioEvent)
 
-    // The remote commands are taken on the first window, not here: a film playing in the app's
-    // own player must not hear the lock screen's Play.
+    /*
+     * The remote commands are taken on the first window, not here: a film playing in the app's
+     * own player must not hear the lock screen's Play.
+     */
     OnCreate {
       self.player.actionAtItemEnd = .advance
       self.observePlayer()

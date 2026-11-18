@@ -1,4 +1,4 @@
-/*
+/**
  * A playlist its owner shares, which every account on the server may
  * read, play and copy; every playlist kept so far stays its owner's. The
  * shared ones are few, so a partial index finds them without the rest.

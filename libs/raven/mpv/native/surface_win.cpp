@@ -8,9 +8,11 @@
 #include <windows.h>
 #include <stdexcept>
 
-// Electron's handle on Windows is the BrowserWindow's HWND. mpv's Windows output makes
-// its own child window inside it and draws there; Chromium's transparent output
-// composites above it, so the page's controls show over the video.
+/*
+ * Electron's handle on Windows is the BrowserWindow's HWND. mpv's Windows output makes
+ * its own child window inside it and draws there; Chromium's transparent output
+ * composites above it, so the page's controls show over the video.
+ */
 struct RavenSurfaceState {
     HWND window = nullptr;
 };

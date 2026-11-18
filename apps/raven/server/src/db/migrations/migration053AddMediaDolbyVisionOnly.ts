@@ -1,4 +1,4 @@
-/*
+/**
  * Dolby Vision profile 5, which only Dolby Vision can show: a browser plays it purple and
  * green. Only an HDR file can be Dolby Vision, so those alone are probed again by the next
  * scan someone starts, to read it.

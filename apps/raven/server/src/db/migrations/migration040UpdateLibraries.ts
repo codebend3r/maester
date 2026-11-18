@@ -1,4 +1,4 @@
-/*
+/**
  * Cards show the critics' Metascore by default; a library still on the
  * old default of TMDB's moves over. A title with no Metascore shows TMDB's.
  */

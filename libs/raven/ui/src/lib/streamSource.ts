@@ -1,6 +1,6 @@
 import { STREAM_TIME_SHIFT } from '@raven/core'
 
-/**
+/*
  * Feeds a converted stream to a <video> through Media Source Extensions.
  *
  * The server stamps every fragment with the file's own time plus

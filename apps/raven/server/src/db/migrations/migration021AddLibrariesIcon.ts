@@ -1,4 +1,4 @@
-/*
+/**
  * The icon a library picked, NULL wearing its type's. Sporting events are
  * matched as movies now, so their files wait to be matched: the start-up
  * pass reads their names again, extras going back to off, and matches them.

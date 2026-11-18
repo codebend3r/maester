@@ -1,4 +1,4 @@
-/*
+/**
  * Where each album stands with MusicBrainz: `pending` until a pass looks,
  * `matched` by a tag's release id or a sure search, `manual` by Fix match,
  * `unmatched` when no release was found, with how sure the search was.
