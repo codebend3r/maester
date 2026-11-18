@@ -50,7 +50,7 @@ const RELEASES = [
   { mbid: MBIDS.live, title: 'Live 1994', artist: 'Someone Else', date: '1994' },
 ]
 
-/** A music library of two tagged albums and one untagged folder, scanned by the real tag reader. */
+// A music library of two tagged albums and one untagged folder, scanned by the real tag reader.
 describe('a music library', () => {
   const state: {
     root: string

@@ -55,8 +55,10 @@ static char surfaceKey;
 }
 @end
 
-// Chromium's content-view sort can promote foreign views without a frame change.
-// Hook only this instance, preserve its original class, and repair after its sort.
+/*
+ * Chromium's content-view sort can promote foreign views without a frame change.
+ * Hook only this instance, preserve its original class, and repair after its sort.
+ */
 static void repairSort(NSView *content) {
     RavenVideoView *view = objc_getAssociatedObject(content, &surfaceKey);
     if (!view || view.isRepairingSort || content.subviews.firstObject == view) return;
@@ -125,9 +127,11 @@ void RavenSurface::detach() {
 
 bool RavenSurface::isAttached() const { return state->content != nil; }
 
-// AppKit views are released on the main thread; a GC finalizer runs elsewhere. The block
-// holds the views and classes themselves, never this surface, which its Player may free
-// before the main queue gets to it.
+/*
+ * AppKit views are released on the main thread; a GC finalizer runs elsewhere. The block
+ * holds the views and classes themselves, never this surface, which its Player may free
+ * before the main queue gets to it.
+ */
 void RavenSurface::detachFromAnyThread() {
     if (!state->content) return;
     NSView *content = state->content;

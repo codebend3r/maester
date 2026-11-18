@@ -1,4 +1,4 @@
-/*
+/**
  * Each account's playlists, its favourite albums and artists, and what
  * LRCLIB said of a track's lyrics, asked once per track. A playlist's
  * tracks are kept by position, so the same track may come twice; the

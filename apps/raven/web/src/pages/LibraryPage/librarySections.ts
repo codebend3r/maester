@@ -44,10 +44,7 @@ const matchedFiles = (kind: LibraryKind): boolean =>
 /** Every library but music lists its files or shows; music lists albums, with its artists on a tab of their own. */
 const listsFiles = (kind: LibraryKind): boolean => !listsAlbums(kind)
 
-/**
- * Every count a tab can show: those the library carries, and the account's
- * own from its counts.
- */
+/** Every count a tab can show: those the library carries, and the account's own from its counts. */
 export type Tallies = Pick<Library, 'itemCount' | 'unmatchedCount'> & LibraryCounts
 
 /** How many finished videos Recently finished lists; the History page has the rest. */

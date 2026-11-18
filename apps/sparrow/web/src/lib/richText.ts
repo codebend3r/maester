@@ -1,4 +1,4 @@
-/**
+/*
  * The little Markdown sparrow's replies use: links, bold and italics. Everything else
  * stays text, and nothing is ever read as HTML. A link opens only an http or
  * https address; a bare address becomes a link too, so a reply never shows

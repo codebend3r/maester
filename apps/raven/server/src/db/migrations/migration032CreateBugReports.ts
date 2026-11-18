@@ -1,4 +1,4 @@
-/*
+/**
  * What a viewer's player sends with Report this error, for the admin to
  * work through. A report outlives its video, so media_id is no foreign
  * key; diagnostics is the JSON the player gathered. Reports are found by

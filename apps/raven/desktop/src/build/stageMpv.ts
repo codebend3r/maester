@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { cp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
-/**
+/*
  * Copies the CI-built addon and libmpv beside the desktop project, where Forge's
  * `extraResource` picks them up. forge.config.ts imports this file through jiti, which does
  * not read tsconfig `paths`, so it imports nothing from the project.

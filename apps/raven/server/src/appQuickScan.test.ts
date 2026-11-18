@@ -12,7 +12,7 @@ import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-/** As a browser with the admin lock off, so the library can be added and rescanned. */
+// As a browser with the admin lock off, so the library can be added and rescanned.
 describe('a quick scan', () => {
   const state: {
     root: string

@@ -220,10 +220,7 @@
   white-space: nowrap;
 }
 
-/*
- * The title's art stands where its name would, as on a Continue watching
- * tile, on a row of its own.
- */
+// The title's art stands where its name would, as on a Continue watching tile, on a row of its own.
 .titleArt {
   display: grid;
   justify-items: start;

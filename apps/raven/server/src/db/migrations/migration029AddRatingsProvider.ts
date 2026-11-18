@@ -1,4 +1,4 @@
-/*
+/**
  * Which provider wrote each score, so MDBList's and OMDb's never wipe each
  * other's, and when MDBList last answered for an item. Every score that is
  * not TMDB's came from OMDb until now.

@@ -1,4 +1,4 @@
-/*
+/**
  * A file's chapters, a JSON array read with its probe and cleared when the
  * file changes; null until read, so a file probed before is read on its
  * first play. And where its intro and credits are, one of each at most,

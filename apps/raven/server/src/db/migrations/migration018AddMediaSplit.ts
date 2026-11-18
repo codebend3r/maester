@@ -1,4 +1,4 @@
-/*
+/**
  * A movie's files in one library share its card unless split apart:
  * NULL keeps a file on the movie's own card, 'file:<id>' gives it a card
  * of its own, named by its media id, and 'cut:<label>' one it shares with

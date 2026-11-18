@@ -1,4 +1,4 @@
-/*
+/**
  * A tag like \`6\` was kept as an album's year and sorted it first by release
  * date. Years no release can have (before 1877, the phonograph's, or past next
  * year: \`EARLIEST_RELEASE_YEAR\` in \`@raven/core\`) go, and MusicBrainz is asked

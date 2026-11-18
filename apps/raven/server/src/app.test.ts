@@ -33,7 +33,7 @@ import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
-/** As a browser with the admin lock off, so every route answers; `the admin lock` covers it on. */
+// As a browser with the admin lock off, so every route answers; `the admin lock` covers it on.
 describe('the media server', () => {
   const state: {
     root: string

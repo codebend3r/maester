@@ -1,4 +1,4 @@
-/**
+/*
  * What a file's name says it is, read the way Radarr, Sonarr, Plex and scene
  * releases write names. Pure string work, so the server's matcher and any
  * client agree on what a name means.

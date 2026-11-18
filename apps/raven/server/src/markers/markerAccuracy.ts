@@ -1,4 +1,4 @@
-/**
+/*
  * Scores marker detection against the spike's hand labels, on the real
  * files: `bun run markers:accuracy <labels.json> <media root> [cache.json]`.
  * Each show of the fixture is one season; its episodes are fingerprinted,

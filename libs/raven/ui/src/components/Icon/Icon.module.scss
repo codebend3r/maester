@@ -33,10 +33,7 @@ $through: '#{$hovered} > span';
   }
 }
 
-/*
- * It squashes and springs past full size, or an arrow nudges its way, and
- * solid marks spin in last.
- */
+// It squashes and springs past full size, or an arrow nudges its way, and solid marks spin in last.
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   #{$hovered} > .pop,
   #{$through} > .pop {

@@ -99,10 +99,7 @@
   filter: brightness(1.12);
 }
 
-/*
- * The number left, or a check, in the poster's top corner, over the picture
- * and its hover filter.
- */
+// The number left, or a check, in the poster's top corner, over the picture and its hover filter.
 .marks {
   position: relative;
   z-index: 1;
@@ -143,10 +140,7 @@
   }
 }
 
-/*
- * The facts read as one line of words, wrapping between facts rather than
- * inside one, a dot apart.
- */
+// The facts read as one line of words, wrapping between facts rather than inside one, a dot apart.
 .facts {
   color: var(--color-lichen);
   font-size: var(--font-size-xs);
@@ -207,10 +201,7 @@
   }
 }
 
-/*
- * The poster again, blurred into a colour: as strong as the theme's glow,
- * so none in high contrast.
- */
+// The poster again, blurred into a colour: as strong as the theme's glow, so none in high contrast.
 .wash {
   position: absolute;
   inset: 0;

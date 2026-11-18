@@ -5,9 +5,11 @@
 #include <mutex>
 #include <utility>
 
-// Only the main thread may touch MediaPlayer's centers, and a handler the system holds can
-// fire after the addon let go: the state is shared with every block, and `stop` empties it
-// under its lock before the blocks see it.
+/*
+ * Only the main thread may touch MediaPlayer's centers, and a handler the system holds can
+ * fire after the addon let go: the state is shared with every block, and `stop` empties it
+ * under its lock before the blocks see it.
+ */
 struct RavenNowPlayingState {
     std::mutex mutex;
     std::function<void(const RavenRemoteCommand &)> onCommand;

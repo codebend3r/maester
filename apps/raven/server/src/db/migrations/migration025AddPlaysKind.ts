@@ -1,4 +1,4 @@
-/*
+/**
  * A play is a real one ('played'), one Mark as watched wrote ('marked',
  * which always counts), or a real one Mark as unwatched set aside
  * ('cleared', which stays in the history and never counts). Watched at is

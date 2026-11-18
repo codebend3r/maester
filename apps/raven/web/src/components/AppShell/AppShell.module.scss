@@ -82,10 +82,7 @@
   text-decoration: none;
 }
 
-/*
- * Its padding leaves room for a row's focus ring, which the scrolling would
- * otherwise clip.
- */
+// Its padding leaves room for a row's focus ring, which the scrolling would otherwise clip.
 .links {
   grid-area: links;
   display: grid;

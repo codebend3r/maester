@@ -1,4 +1,4 @@
-/*
+/**
  * What each file in a Movies or TV shows library is, from TMDB. Items are
  * shared by every file and library that holds them; overrides keep a Fix
  * match by folder, so renames and re-downloads keep it; and media gains

@@ -38,7 +38,7 @@ const READS = {
 /** A step that reads the files, `m`. */
 const readsFiles = (step: PlanStep): boolean => /^[A-Z-]+ m\b/.test(step.detail)
 
-/**
+/*
  * How SQLite counts each library's files for the side menu, the Libraries
  * page and Home: all of them, those no match was found for, and how many of
  * the probed ones are 4K. Reading the files themselves to count them costs

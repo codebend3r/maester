@@ -4,10 +4,7 @@
  */
 .hero {
   --backdrop-height: 45rem;
-  /*
-   * How far the picture and title drop below the way back, so the backdrop
-   * shows between them.
-   */
+  // How far the picture and title drop below the way back, so the backdrop shows between them.
   --hero-drop: calc(var(--space-9) + var(--space-8));
   // The poster's width, and a still's.
   --poster-width: 17.5rem;
@@ -107,10 +104,7 @@
   scale: 1.2;
 }
 
-/*
- * As strong as the theme's colour wash: faint on a light theme, gone in
- * high contrast.
- */
+// As strong as the theme's colour wash: faint on a light theme, gone in high contrast.
 .backdropPicture {
   grid-area: backdrop;
   width: 100%;
@@ -417,10 +411,7 @@
   white-space: nowrap;
 }
 
-/*
- * Play and its neighbours, then the editors on a row of their own. Every
- * button in it stands tall.
- */
+// Play and its neighbours, then the editors on a row of their own. Every button in it stands tall.
 .actions {
   --control-size: var(--control-size-tall);
   --menu-trigger-size: var(--control-size);

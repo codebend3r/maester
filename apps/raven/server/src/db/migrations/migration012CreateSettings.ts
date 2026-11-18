@@ -1,4 +1,4 @@
-/*
+/**
  * Server-wide settings, one JSON value per key: 'playback' holds how
  * video is played for every viewer.
  */

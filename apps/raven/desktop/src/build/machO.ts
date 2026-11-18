@@ -2,7 +2,7 @@ import type { Dirent } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 
-/**
+/*
  * Ad hoc signing from the inside out. `codesign --deep` signs nested code in an order of its
  * own and skips Mach-O files outside the places it treats as code, such as the addon and
  * libmpv under Contents/Resources, so every file and bundle is signed one by one, deepest

@@ -2,9 +2,11 @@
 #include <cstdint>
 #include <memory>
 
-// The video surface mpv draws into, one per platform: a CAMetalLayer view under
-// Chromium's content view on macOS (surface_mac.mm), the BrowserWindow's own HWND
-// on Windows (surface_win.cpp). addon.cpp only sees this interface.
+/*
+ * The video surface mpv draws into, one per platform: a CAMetalLayer view under
+ * Chromium's content view on macOS (surface_mac.mm), the BrowserWindow's own HWND
+ * on Windows (surface_win.cpp). addon.cpp only sees this interface.
+ */
 struct RavenSurfaceState;
 
 struct RavenSurface {

@@ -1,4 +1,4 @@
-/*
+/**
  * When each library's last full scan and last quick scan finished, so the
  * Libraries page still says after a restart. Null until each has run.
  */

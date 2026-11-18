@@ -1,4 +1,4 @@
-/*
+/**
  * Each library's counts read these rather than every file: the files no
  * match was found for, and the probed files' sizes, for how many are 4K.
  * Both are partial so a read of a library's files by library alone never

@@ -128,7 +128,7 @@ export class ImageCache {
   private readonly root: string
   private readonly working = createOnce<string | null>()
   private readonly downloads: Gate = createGate({ limit: 4 })
-  /*
+  /**
    * Scaling takes CPU the server shares with transcodes, and matching a
    * library of pictures beside its media asks for three widths of each.
    */

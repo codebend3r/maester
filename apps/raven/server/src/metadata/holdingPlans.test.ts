@@ -24,7 +24,7 @@ const READS = {
 /** A step that reads every file, `m`, or every file's items, `mi`, rather than an item's own. */
 const readsEveryFile = (step: PlanStep): boolean => /^SCAN (m|mi)\b/.test(step.detail)
 
-/**
+/*
  * How SQLite finds the libraries holding an item, which the PIN lock asks
  * of every movie and show a page names while a library is locked. Reading
  * every file to answer it cost a tenth of a second a title on a real

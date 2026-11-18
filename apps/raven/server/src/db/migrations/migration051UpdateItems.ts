@@ -1,4 +1,4 @@
-/*
+/**
  * Cached anime movies can still carry regional re-release dates. The boot
  * sweep fetches their original dates again; failures stay stale for retry.
  */

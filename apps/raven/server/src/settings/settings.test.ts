@@ -8,7 +8,7 @@ import { createApp } from '@/app'
 import { adminCookie, injectAs, testConfig } from '@/test/app'
 import { apiFor } from '@/test/server'
 
-/** As a browser with the admin lock off, the only one that can change them. */
+// As a browser with the admin lock off, the only one that can change them.
 describe('playback settings', () => {
   const state: { root: string; admin: string; app: NestFastifyApplication | null } = {
     root: '',

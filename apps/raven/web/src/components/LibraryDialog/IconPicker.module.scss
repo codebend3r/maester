@@ -33,10 +33,7 @@
     color: var(--color-bark);
   }
 
-  /*
-   * Chosen, as a choice is everywhere: bark around it, the moss fill and
-   * the icon's tint doubled.
-   */
+  // Chosen, as a choice is everywhere: bark around it, the moss fill and the icon's tint doubled.
   input:checked + label {
     --icon-tint: 0.4;
 

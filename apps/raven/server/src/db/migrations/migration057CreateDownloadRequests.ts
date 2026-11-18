@@ -1,4 +1,4 @@
-/*
+/**
  * Coming soon's requests: one row a title, since one request downloads it
  * for everyone. `account_id` is who asked, which counts their budget;
  * `arr_id` and `command_id` are the title and the search in its Sonarr or

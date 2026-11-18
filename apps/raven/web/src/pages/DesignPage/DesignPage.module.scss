@@ -62,10 +62,7 @@
   }
 }
 
-/*
- * One row of pills on glass, scrolling sideways where the page is too narrow
- * for all of them.
- */
+// One row of pills on glass, scrolling sideways where the page is too narrow for all of them.
 .contents {
   position: sticky;
   top: var(--space-2);
@@ -135,10 +132,7 @@
   display: grid;
 }
 
-/*
- * Between a section heading and a page title, as befits a chapter of a page
- * that is all sections.
- */
+// Between a section heading and a page title, as befits a chapter of a page that is all sections.
 .sectionTitle {
   display: grid;
   grid-auto-flow: column;
@@ -468,10 +462,7 @@
   max-width: 23.75rem;
 }
 
-/*
- * Black, with a made-up picture inset as a letterboxed film would be, and
- * the bar over its foot.
- */
+// Black, with a made-up picture inset as a letterboxed film would be, and the bar over its foot.
 .stage {
   display: grid;
   grid-template-areas: 'stack';

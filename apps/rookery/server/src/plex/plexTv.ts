@@ -8,7 +8,7 @@ import {
   isSuccessStatus,
 } from '@shared/server'
 
-/**
+/*
  * Plex's PIN sign-in, as plex.tv documents it for third-party apps: create a
  * strong PIN, send the browser to Plex's auth app with the PIN's code, and
  * check the PIN for a token once Plex sends the browser back. The token

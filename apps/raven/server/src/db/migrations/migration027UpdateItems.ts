@@ -1,4 +1,4 @@
-/*
+/**
  * A show's logo sits in item_images as a movie's does; shows stored before
  * learn theirs from TMDB once, in the daily sweep. Shows and seasons can
  * be favourites as videos can, one row each, by item.

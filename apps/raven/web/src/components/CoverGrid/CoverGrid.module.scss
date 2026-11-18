@@ -45,10 +45,7 @@
   }
 }
 
-/*
- * Raised while pointed at or focused, so a grown cover lies over its
- * neighbours.
- */
+// Raised while pointed at or focused, so a grown cover lies over its neighbours.
 .cover {
   position: relative;
   display: grid;

@@ -1,4 +1,4 @@
-/*
+/**
  * Edit metadata: what the viewer wrote over TMDB's, a column per field,
  * NULL where TMDB's stands. The rows in items stay TMDB's own, so a
  * refresh never loses an edit and the original can always be shown.

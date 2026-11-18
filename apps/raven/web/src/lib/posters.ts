@@ -36,10 +36,7 @@ export const POSTER_SIZES = {
   download: '3rem',
   /** Now Playing's cover: most of a phone's width, 24rem past it. */
   nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 24rem',
-  /**
-   * Home's rows: two, four, then eight across the page, which stops growing
-   * at 120rem.
-   */
+  /** Home's rows: two, four, then eight across the page, which stops growing at 120rem. */
   row: 'auto, (max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), 13rem',
   /** A saga's deck: 55% of its card, in a grid of `minmax(min(15rem, 100%), 1fr)`. */
   deck: 'auto, (max-width: 40rem) calc(55vw - 1.75rem), (max-width: 48rem) 12rem, (max-width: 64rem) 16.5rem, 12rem',

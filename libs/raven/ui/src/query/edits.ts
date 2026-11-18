@@ -36,7 +36,7 @@ import {
 import { type Edit, editAll, editKey } from '@/query/optimistic'
 import { queryKeys } from '@/query/queryClient'
 
-/**
+/*
  * What each change looks like in the cache before the server answers, named
  * for the change, as `invalidate.ts` names what is read again after it. Each
  * update hands back the very same data where it changes nothing, so a query

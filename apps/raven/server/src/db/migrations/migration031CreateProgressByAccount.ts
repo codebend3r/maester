@@ -1,6 +1,6 @@
 import { VIEWING_ACCOUNTS } from '@/media/viewingAccountKeys'
 
-/*
+/**
  * Each account keeps its own resume spots, plays, watched marks and
  * favourites, so every row names its account. A migration cannot know who
  * owns the server, so what was recorded before goes to the local account,

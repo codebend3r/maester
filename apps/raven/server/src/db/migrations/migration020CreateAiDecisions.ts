@@ -1,4 +1,4 @@
-/*
+/**
  * What the AI lookup decided for each group it was asked about, by place
  * as a Fix match is kept: the TMDB id it chose (NULL when it chose nothing
  * or ended without a choice), that result's title, year and poster for the

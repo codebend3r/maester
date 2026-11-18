@@ -1,4 +1,4 @@
-/*
+/**
  * The loudness scan: where each track stands in it, by which scan, and
  * whether a track's or an album's gain came from its tags or the scan. A
  * gain already kept was read from the tags.

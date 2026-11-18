@@ -45,8 +45,10 @@ final class RemoteFlowTests: XCTestCase {
     press(.select)
     XCTAssertTrue(waitForFocus(timeout: 30) { $0 == Copy.play }, "The film's page opens on Play")
 
-    // The film is an MKV, which plays through the server's HLS remux under the system's
-    // transport. Twenty seconds in, more than one ten-second save has landed.
+    /*
+     * The film is an MKV, which plays through the server's HLS remux under the system's
+     * transport. Twenty seconds in, more than one ten-second save has landed.
+     */
     press(.select)
     sleep(20)
     attachScreenshot(named: "playing")
@@ -58,8 +60,10 @@ final class RemoteFlowTests: XCTestCase {
       "Menu leaves the player for the film's page, with the spot saved"
     )
 
-    // Menu again goes back to Home, now with the film under Continue watching, and the focus
-    // on the card the page was opened from, not on the new first card.
+    /*
+     * Menu again goes back to Home, now with the film under Continue watching, and the focus
+     * on the card the page was opened from, not on the new first card.
+     */
     press(.menu)
     XCTAssertTrue(app.staticTexts[Copy.continueWatching].waitForExistence(timeout: 30))
     let cards = app.buttons.matching(NSPredicate(format: "label == %@", Fixture.film))

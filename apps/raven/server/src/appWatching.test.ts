@@ -38,7 +38,7 @@ const checked = (app: NestFastifyApplication): number[] => {
   return ids
 }
 
-/** As a browser with the admin lock off, so the library can be added and edited. */
+// As a browser with the admin lock off, so the library can be added and edited.
 describe('refreshing a library as its folders change', () => {
   const state: {
     root: string
@@ -152,7 +152,7 @@ describe('refreshing a library as its folders change', () => {
   })
 })
 
-/** As a browser with the admin lock off, so the library can be added and edited. */
+// As a browser with the admin lock off, so the library can be added and edited.
 describe('a library whose folders cannot be watched', () => {
   const state: {
     root: string
@@ -225,7 +225,7 @@ describe('a library whose folders cannot be watched', () => {
   })
 })
 
-/** As a browser with the admin lock off, so the library can be added. */
+// As a browser with the admin lock off, so the library can be added.
 describe('a library on a share mounted from another machine', () => {
   const state: { root: string; libraryId: number; app: NestFastifyApplication | null } = {
     root: '',

@@ -1,4 +1,4 @@
-/** SQL the media queries share, written once. Fragments assume `media m` and `libraries l`, `under` aside. */
+// SQL the media queries share, written once. Fragments assume `media m` and `libraries l`, `under` aside.
 
 /** `%`, `_` and `\` escaped, for a LIKE with `ESCAPE '\'`. */
 export const escapeLike = (text: string): string => text.replace(/[\\%_]/g, (char) => `\\${char}`)

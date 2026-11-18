@@ -1,4 +1,4 @@
-/*
+/**
  * How a library's folders are read: 'auto' reads letter folders (A/, #/)
  * and group folders (Requests/) as holding the titles, 'flat' reads every
  * top folder as a title. Each path keeps what its last full scan found:

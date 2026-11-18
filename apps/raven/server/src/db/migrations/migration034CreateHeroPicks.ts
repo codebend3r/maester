@@ -1,4 +1,4 @@
-/*
+/**
  * The movies and shows the admin picked for home's hero, one row each, in
  * the order they were picked. With none, the hero shows each pinned
  * library's newest release.

@@ -46,7 +46,7 @@ const shape = <T>({ response, guard }: ShapeProps<T>): T => {
   return body
 }
 
-/** As a browser with the admin lock off, so files can be matched. */
+// As a browser with the admin lock off, so files can be matched.
 describe('TV show metadata', () => {
   const tmdb = fakeTmdb({
     movies: [],
@@ -646,7 +646,7 @@ describe('TV show metadata', () => {
   })
 })
 
-/** OMDb has no critics' scores for a show, so MDBList, when it has a key, is asked instead. */
+// OMDb has no critics' scores for a show, so MDBList, when it has a key, is asked instead.
 describe('TV show scores from MDBList', () => {
   const tmdb = fakeTmdb({
     movies: [],

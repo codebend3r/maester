@@ -1,4 +1,4 @@
-/*
+/**
  * The shows each account is binging, kept here so every device an account
  * signs in on sees the same list, and whether it has dismissed the binge
  * tip. The limit on how many is the service's, not the table's.

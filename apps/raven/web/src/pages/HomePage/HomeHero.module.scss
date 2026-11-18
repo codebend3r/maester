@@ -95,10 +95,7 @@
   }
 }
 
-/*
- * A long name breaks between syllables, else anywhere, before it would
- * run off a phone.
- */
+// A long name breaks between syllables, else anywhere, before it would run off a phone.
 .title {
   font-size: var(--font-size-display);
   line-height: var(--line-display);

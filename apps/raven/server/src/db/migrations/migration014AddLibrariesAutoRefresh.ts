@@ -1,4 +1,4 @@
-/*
+/**
  * A library refreshes itself as its folders change, unless turned off; and
  * each file keeps when it was last found, renamed, moved or replaced, for
  * the Recently changed sort. Files already indexed changed when they came.

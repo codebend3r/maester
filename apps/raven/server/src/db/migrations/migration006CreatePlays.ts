@@ -1,4 +1,4 @@
-/*
+/**
  * One row per sitting with a video: when it was last playing and the
  * furthest it got, so a library's history can say what was watched, by
  * the library's own measure of watched.

@@ -1,4 +1,4 @@
-/*
+/**
  * A movie's saga: the TMDB collection it belongs to, for a library's Sagas.
  * Movies stored before this learn theirs from TMDB once, in the daily
  * sweep; saga_checked marks the ones that have, every item stored after.

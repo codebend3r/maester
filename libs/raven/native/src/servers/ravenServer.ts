@@ -2,12 +2,11 @@ import { DEFAULT_SERVER_ORIGIN } from '@raven/core'
 
 import type { AppServer } from '@/servers/serverList'
 
-/**
+/*
  * A test build names a server that takes no sign-in (a local raven with accounts off) in
  * `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN`, which Expo writes into the bundle, and goes straight to
  * Home on it. Unset, as in every real build, the app asks for the account.
- */
-/*
+ *
  * Written out, not read through a constant: babel-preset-expo inlines only a literal
  * `process.env.EXPO_PUBLIC_*`, and `process.env[name]` is undefined in the bundle.
  */

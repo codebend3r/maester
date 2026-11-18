@@ -107,7 +107,7 @@ const readsEveryFilesItems = (detail: string): boolean =>
   /^(SCAN|MATERIALIZE|CO-ROUTINE) (media_items|mi)\b/.test(detail) ||
   (/^[A-Z-]+ z\b/.test(detail) && !FIRST_ITEM_BY_KEY.test(detail))
 
-/**
+/*
  * How SQLite runs a library's reads, checked on the statements the
  * repositories send. The faults these catch cost nothing in a small test
  * library and seconds in a real one, so they are caught by their plan. The

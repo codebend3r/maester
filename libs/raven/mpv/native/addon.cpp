@@ -72,8 +72,10 @@ struct Player {
         auto player = static_cast<Player *>(data);
         std::lock_guard<std::mutex> lock(player->callbackMutex);
         if (!player->isAlive || !player->hasCallbackReference || player->isQueued.exchange(true)) return;
-        // No per-call allocation: Node also invokes receive with a null environment
-        // when discarding queued work. The TSFN finalizer owns the context instead.
+        /*
+         * No per-call allocation: Node also invokes receive with a null environment
+         * when discarding queued work. The TSFN finalizer owns the context instead.
+         */
         napi_status status = napi_call_threadsafe_function(player->callback, nullptr, napi_tsfn_nonblocking);
         // napi_closing consumes this producer's reference during environment exit.
         if (status == napi_closing) player->hasCallbackReference = false;
@@ -85,8 +87,10 @@ struct Player {
         try {
             player->drain(Napi::Env(env), Napi::Function(env, callback));
         } catch (const Napi::Error &error) {
-            // Node calls this from C++ built without exceptions, so nothing may escape. While an
-            // environment terminates, even rethrowing to JavaScript fails by throwing.
+            /*
+             * Node calls this from C++ built without exceptions, so nothing may escape. While an
+             * environment terminates, even rethrowing to JavaScript fails by throwing.
+             */
             try { error.ThrowAsJavaScriptException(); } catch (...) {}
         } catch (...) {}
     }
@@ -186,8 +190,10 @@ struct Player {
         wake(this);
     }
 
-    // Under the callback lock, so once this returns no wake() is between its isAlive check
-    // and its call into the TSFN.
+    /*
+     * Under the callback lock, so once this returns no wake() is between its isAlive check
+     * and its call into the TSFN.
+     */
     void disconnect() {
         std::lock_guard<std::mutex> lock(callbackMutex);
         isAlive = false;
@@ -203,8 +209,10 @@ struct Player {
             // Before mpv goes: a remote command landing after would wake nothing.
             nowPlaying.stop();
             if (handle) {
-                // mpv unregistration takes its wakeup lock and joins any producer
-                // already inside wake(). Keep the TSFN reference until then.
+                /*
+                 * mpv unregistration takes its wakeup lock and joins any producer
+                 * already inside wake(). Keep the TSFN reference until then.
+                 */
                 mpv_set_wakeup_callback(handle, nullptr, nullptr);
                 mpv_terminate_destroy(handle);
                 handle = nullptr;
@@ -224,13 +232,17 @@ struct Player {
         auto owner = static_cast<std::shared_ptr<Player> *>(data);
         auto player = *owner;
         player->disconnect();
-        // Let go of the TSFN here, on the loop thread, while the environment still owns it.
-        // Node's own cleanup hook frees the TSFN while the engine terminates on its thread,
-        // so a release from there would touch freed memory: an access violation on Windows.
+        /*
+         * Let go of the TSFN here, on the loop thread, while the environment still owns it.
+         * Node's own cleanup hook frees the TSFN while the engine terminates on its thread,
+         * so a release from there would touch freed memory: an access violation on Windows.
+         */
         player->releaseCallback();
-        // Removing the hook updates Node's exit counters and immediate queue, which only the
-        // loop thread may touch: from the terminating thread it can hang or abort exit. The
-        // engine terminates off the loop, then this handle wakes the loop to finish there.
+        /*
+         * Removing the hook updates Node's exit counters and immediate queue, which only the
+         * loop thread may touch: from the terminating thread it can hang or abort exit. The
+         * engine terminates off the loop, then this handle wakes the loop to finish there.
+         */
         auto signal = new CleanupSignal{{}, hook, owner};
         if (uv_async_init(player->loop, &signal->async, signalCleanup) != 0) {
             delete signal;
@@ -344,16 +356,20 @@ public:
                 option("vo", "null");
                 option("ao", "null");
             } else if (kind == "audio") {
-                // Sound alone: no window, no video decoding, and the tracks run together. Replaygain
-                // is off: the host levels each track with its own af, and picks the audio output.
+                /*
+                 * Sound alone: no window, no video decoding, and the tracks run together. Replaygain
+                 * is off: the host levels each track with its own af, and picks the audio output.
+                 */
                 option("vo", "null");
                 option("vid", "no");
                 option("force-window", "no");
                 option("audio-display", "no");
                 option("gapless-audio", "yes");
                 option("replaygain", "no");
-                // Raven owns the media keys through Now Playing; the option exists on macOS alone,
-                // so a build without it is left as it is.
+                /*
+                 * Raven owns the media keys through Now Playing; the option exists on macOS alone,
+                 * so a build without it is left as it is.
+                 */
                 mpv_set_option_string(player->handle, "input-media-keys", "no");
             } else {
                 option("vo", "gpu-next");
@@ -404,9 +420,11 @@ public:
     ~NativePlayer() {
         if (!player || !player->isAlive) return;
         player->disconnect();
-        // A GC finalizer must not create JS promises or AsyncWorker objects. Keep
-        // the async environment hook as the owner until exit, so exit also waits
-        // for an abandoned engine's termination. call_once joins concurrent cleanup.
+        /*
+         * A GC finalizer must not create JS promises or AsyncWorker objects. Keep
+         * the async environment hook as the owner until exit, so exit also waits
+         * for an abandoned engine's termination. call_once joins concurrent cleanup.
+         */
         auto owner = player;
         std::thread([owner] {
             owner->terminate();

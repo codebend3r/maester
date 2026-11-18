@@ -1,4 +1,4 @@
-/*
+/**
  * A Movies library opens on its matched and not matched buckets; one
  * still on the old defaults moves over, a chosen view stays. A TV library
  * is always split that way, so it keeps its grid.

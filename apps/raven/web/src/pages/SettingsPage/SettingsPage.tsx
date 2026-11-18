@@ -191,9 +191,7 @@ const SETTINGS_VIEWS = {
   [REACH_STATES.online]: ViewerSettings,
 } as const satisfies Record<ReachState, ComponentType>
 
-/**
- * Personal preferences and account settings, never server administration.
- */
+/** Personal preferences and account settings, never server administration. */
 export const SettingsPage = () => {
   const isOffline = useServerReach((state) => state.isOffline)
   const View = SETTINGS_VIEWS[isOffline ? REACH_STATES.offline : REACH_STATES.online]

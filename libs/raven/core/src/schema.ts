@@ -1,4 +1,4 @@
-/**
+/*
  * Guards built from smaller guards. Each API shape is written once, as a
  * guard, and its type is read off it with `Infer`, so a field added to one
  * cannot be missing from the other.
@@ -33,10 +33,7 @@ export type ObjectOf<S extends Shape> = Flatten<
   }
 >
 
-/**
- * A guard for an object, with its shape kept so another can extend it:
- * `{ ...isA.shape, b }`.
- */
+/** A guard for an object, with its shape kept so another can extend it: `{ ...isA.shape, b }`. */
 export type ObjectGuard<S extends Shape> = Guard<ObjectOf<S>> & {
   readonly shape: S
 }

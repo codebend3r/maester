@@ -17,8 +17,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>Raven Media Player</title>
     <script>
-      // The saved theme goes on before first paint, so it never flashes the
-      // default; stores/theme.ts takes over once the app loads.
+      /*
+       * The saved theme goes on before first paint, so it never flashes the
+       * default; stores/theme.ts takes over once the app loads.
+       */
       try {
         const theme = localStorage.getItem('raven-theme')
         if (theme) document.documentElement.dataset.theme = theme

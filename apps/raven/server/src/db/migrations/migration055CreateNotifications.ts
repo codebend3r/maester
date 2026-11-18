@@ -1,4 +1,4 @@
-/*
+/**
  * Each account's notifications: every toast its screens showed, logged as
  * it appears. The id grows as they come, so it is the log's order.
  */

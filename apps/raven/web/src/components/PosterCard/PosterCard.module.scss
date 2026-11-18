@@ -44,10 +44,7 @@
   text-decoration: none;
 }
 
-/*
- * The picture, the resume line over its foot and the marks over its corner
- * share one cell.
- */
+// The picture, the resume line over its foot and the marks over its corner share one cell.
 .frame {
   display: grid;
   grid-template-areas: 'frame';
@@ -139,10 +136,7 @@
   }
 }
 
-/*
- * The facts read as one line of words, wrapping between facts rather than
- * inside one, a dot apart.
- */
+// The facts read as one line of words, wrapping between facts rather than inside one, a dot apart.
 .facts {
   color: var(--color-lichen);
   font-size: var(--font-size-xs);

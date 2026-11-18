@@ -1,4 +1,4 @@
-/*
+/**
  * What TMDB says of a person and everything they appear in, for the person
  * page. `filmography_fetched_at` is null until the credits were fetched, and
  * `department` is TMDB's own, with `Acting` for a cast credit. One person

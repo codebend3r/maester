@@ -1,4 +1,4 @@
-/*
+/**
  * Edit images chooses a picture for one library's card of a title, not
  * for every library holding it. A choice made before goes to each library
  * that held the title, so nothing looks different until one is changed.

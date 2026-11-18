@@ -1,4 +1,4 @@
-/*
+/**
  * Where each file stands in intro detection, and by which version of the
  * detector, so an improved one runs again; and the audio fingerprint of
  * each file's head, kept so a new episode is matched against its season
