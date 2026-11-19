@@ -279,8 +279,6 @@ export const NOW_PLAYING_COPY = {
     artist: 'Playing from artist',
     other: 'Now playing',
   },
-  /** The tablet header's one line: "From 1000 Forms Of Fear". */
-  fromShort: (name: string) => fromName(name),
   /** Up next's line: "From 1000 Forms Of Fear · 9 songs", or "9 songs" with no source. */
   sourceLine: ({ source, songs }: SourceLineProps) =>
     factsLineOf([source === null ? null : fromName(source), songs]),

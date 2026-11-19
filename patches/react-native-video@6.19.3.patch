@@ -50,6 +50,7 @@ index 1ac0fd03ac0197bf10e54dddb6bb2538a876fd1b..4cb2edeb031c4f77a1d7f30c6757e0df
      }
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
 new file mode 100644
+index 0000000000000000000000000000000000000000..9229df078f53bffbcb622d07d9790b7cbe221670
 --- /dev/null
 +++ b/android/src/main/java/com/brentvatne/exoplayer/BaseLayerVideoRenderer.java
 @@ -0,0 +1,154 @@
@@ -208,7 +209,7 @@ new file mode 100644
 +    }
 +}
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
-index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56fc2d8168d 100644
+index 75e2307fc6616aff7f0f9d884c907b4bdad14899..2448889b3a68aa4d323d13db35c9ab9d269002e4 100644
 --- a/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
 +++ b/android/src/main/java/com/brentvatne/exoplayer/ExoPlayerView.kt
 @@ -2,6 +2,7 @@ package com.brentvatne.exoplayer
@@ -219,7 +220,12 @@ index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56f
  import android.graphics.drawable.GradientDrawable
  import android.util.AttributeSet
  import android.view.View
-@@ -13,10 +14,12 @@ import androidx.media3.common.Timeline
+@@ -10,13 +11,17 @@ import android.widget.FrameLayout
+ import android.widget.TextView
+ import androidx.media3.common.Player
+ import androidx.media3.common.Timeline
++import androidx.media3.common.text.Cue
++import androidx.media3.common.text.CueGroup
  import androidx.media3.common.util.UnstableApi
  import androidx.media3.exoplayer.ExoPlayer
  import androidx.media3.ui.AspectRatioFrameLayout
@@ -232,7 +238,7 @@ index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56f
  
  @UnstableApi
  class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) :
-@@ -113,6 +116,29 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+@@ -113,6 +118,29 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
              // Reset to defaults
              subtitleView.setUserDefaultStyle()
              subtitleView.setUserDefaultTextSize()
@@ -262,6 +268,47 @@ index 75e2307fc6616aff7f0f9d884c907b4bdad14899..84fea8be6ba76a2fa536c58a6407a56f
  
              // Apply custom styling
              if (style.fontSize > 0) {
+@@ -229,7 +257,32 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+         timeBar?.isEnabled = !isLive || seekable
+     }
+ 
++    /* raven: a cue its file places itself (an ASS line's \pos, a Blu-ray's picture, a WebVTT
++     * line number) can sit on the frame's last rows, where a TV's edge cuts it. Such a cue is
++     * raised until SUBTITLE_FLOOR of the view's height is clear under it; a cue with no place
++     * of its own already keeps the subtitle view's bottom padding. */
++    private fun raisedCue(cue: Cue): Cue {
++        if (cue.line == Cue.DIMEN_UNSET) return cue
++        if (cue.lineType != Cue.LINE_TYPE_FRACTION) {
++            return if (cue.line < 0) cue.buildUpon().setLine(Cue.DIMEN_UNSET, Cue.LINE_TYPE_NUMBER).build() else cue
++        }
++        val isPicture = cue.bitmap != null && cue.bitmapHeight != Cue.DIMEN_UNSET
++        val lowest = when {
++            cue.lineAnchor == Cue.ANCHOR_TYPE_END -> 1f - SUBTITLE_FLOOR
++            isPicture && cue.lineAnchor != Cue.ANCHOR_TYPE_MIDDLE -> 1f - SUBTITLE_FLOOR - cue.bitmapHeight
++            else -> return cue
++        }
++        if (cue.line <= lowest) return cue
++        return cue.buildUpon().setLine(maxOf(0f, lowest), Cue.LINE_TYPE_FRACTION).build()
++    }
++
+     private val playerListener = object : Player.Listener {
++        /* raven: this listener is added after the player view's own, so it runs after the view
++         * has shown the cues and shows them again, raised. */
++        override fun onCues(cueGroup: CueGroup) {
++            playerView.subtitleView?.setCues(cueGroup.cues.map(::raisedCue))
++        }
++
+         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+             playerView.post {
+                 playerView.requestLayout()
+@@ -261,6 +314,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
+ 
+     companion object {
+         private const val TAG = "ExoPlayerView"
++        private const val SUBTITLE_FLOOR = 0.05f
+     }
+ 
+     /**
 diff --git a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java b/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java
 index 623d90c8b3ea080edd16a14fa0a494b1547d9dd7..24d689af4bae0acaff3776f45c7b5fd621a3a000 100644
 --- a/android/src/main/java/com/brentvatne/exoplayer/ReactExoplayerView.java

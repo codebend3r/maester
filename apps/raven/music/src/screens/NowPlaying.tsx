@@ -29,8 +29,8 @@ const LAYOUT_VIEWS = {
 } as const satisfies Record<FormFactor, ComponentType<LayoutProps>>
 
 /**
- * The layout for the screen: the three columns on a tablet held sideways, the phone's panes
- * otherwise, since an upright tablet has too little width for three.
+ * The layout for the screen: the tablet's two rows on a tablet held sideways, the phone's panes
+ * otherwise, since an upright tablet's player column would be too narrow for the transport.
  */
 const usePlayerFormFactor = (): FormFactor => {
   const formFactor = useFormFactor()
@@ -96,7 +96,7 @@ function NowPlayingSheet({ session }: NowPlayingSheetProps) {
  * `/now-playing`, the player opened up. On a phone: the cover large, the song, the scrubber and
  * the transport, with a bar at the foot for the lyrics (a synced line plays from where it is
  * sung) and Up next (each song playable, dragged to another place or swiped away). On a tablet
- * held sideways, the player, the lyrics and Up next side by side.
+ * held sideways, the cover and the controls beside the lyrics, over Up next across the foot.
  */
 export function NowPlaying() {
   const session = useWren()

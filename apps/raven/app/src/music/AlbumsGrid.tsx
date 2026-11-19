@@ -14,6 +14,7 @@ import {
   libraryIconOf,
   plural,
   reversedDirection,
+  randomMusicSeed,
 } from '@raven/core'
 import { useAudioQueue, useSearch } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
@@ -41,21 +42,16 @@ type AlbumsGridProps = {
   frame: MusicFrame
 }
 
-/** How many seeds a shuffle picks among: the server reads at most a million. */
-const SHUFFLE_SEEDS = 1_000_000
-
 /** The order the albums are listed in: the web's, Release Date newest first, until changed. */
 type AlbumOrder = { sort: MusicSort; order: SortDirection; seed: number }
 
 const STARTING_SORT = MUSIC_SORTS.release
 
-const randomSeed = (): number => Math.floor(Math.random() * SHUFFLE_SEEDS)
-
 /** A sort as the web's picker starts it: its own direction, and a fresh seed for Randomly. */
 const orderFor = (sort: MusicSort): AlbumOrder => ({
   sort,
   order: MUSIC_DEFAULT_ORDERS[sort],
-  seed: sort === MUSIC_SORTS.random ? randomSeed() : 0,
+  seed: sort === MUSIC_SORTS.random ? randomMusicSeed() : 0,
 })
 
 type UseAlbumOrderProps = { serverId: string; libraryId: number }
@@ -153,7 +149,7 @@ export const AlbumsGrid = ({
         libraryId: library.id,
         search: search.query,
         sort: MUSIC_SORTS.random,
-        seed: randomSeed(),
+        seed: randomMusicSeed(),
         limit: MUSIC_PAGE.most,
       })
       .then(

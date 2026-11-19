@@ -57,6 +57,12 @@ export const MUSIC_ORDER_LABELS = {
 /** The most tracks one page of a listing holds, and what a page holds when none is asked for. */
 export const MUSIC_PAGE = { most: 500, fallback: 200 } as const
 
+/** How many seeds a random listing is dealt by: the server reads none past the last. */
+export const MUSIC_SEEDS = 1_000_000
+
+/** A seed for a random listing, new each time: the same seed deals the same order. */
+export const randomMusicSeed = (): number => Math.floor(Math.random() * MUSIC_SEEDS)
+
 /** What a client asks a music listing for; anything left out takes its default. */
 export type MusicListOptions = {
   search?: string
@@ -120,7 +126,7 @@ export const musicListQuery = {
     return {
       ...(params[MUSIC_LIST_PARAMS.byAlbum] === '1' ? { byAlbum: true } : {}),
       ...(isSortDirection(order) ? { order } : {}),
-      ...(seed === null ? {} : { seed: Math.min(seed, 1_000_000) }),
+      ...(seed === null ? {} : { seed: Math.min(seed, MUSIC_SEEDS) }),
       search: isString(params.q) ? params.q : '',
       sort: isMusicSort(params.sort) ? params.sort : MUSIC_SORTS.title,
       limit: limit === null || limit === 0 ? MUSIC_PAGE.fallback : Math.min(limit, MUSIC_PAGE.most),

@@ -32,7 +32,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   sheetEmpty: { paddingHorizontal: PLAYER_SIZES.gutter },
 }))
 
-/** Where Up next sits: under the phone's player, or in the tablet's side panel. */
+/** Where Up next sits: under the phone's player, or along the foot of the tablet's. */
 export const UP_NEXT_PLACES = { sheet: 'sheet', panel: 'panel' } as const
 
 type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]

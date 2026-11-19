@@ -20,8 +20,11 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   time: { ...TYPE.small, color: colors.text3 },
 }))
 
-/** Where the scrubber is drawn: Now Playing's, its times under it, or the tablet bar's, beside it. */
-export const SCRUBBERS = { player: 'player', bar: 'bar' } as const
+/**
+ * Where the scrubber is drawn: Now Playing's, its times under it, the tablet bar's, beside it, or
+ * the tablet's Now Playing, the line alone.
+ */
+export const SCRUBBERS = { player: 'player', bar: 'bar', bare: 'bare' } as const
 
 type ScrubberKind = (typeof SCRUBBERS)[keyof typeof SCRUBBERS]
 
@@ -65,9 +68,15 @@ function InlineScrub({ line, position, length }: ScrubLayoutProps) {
   )
 }
 
+/** The tablet's Now Playing: the line alone, since its column holds no words. */
+function BareScrub({ line }: ScrubLayoutProps) {
+  return line
+}
+
 const SCRUB_LAYOUTS = {
   [SCRUBBERS.player]: StackedScrub,
   [SCRUBBERS.bar]: InlineScrub,
+  [SCRUBBERS.bare]: BareScrub,
 } as const satisfies Record<ScrubberKind, ComponentType<ScrubLayoutProps>>
 
 type ScrubberProps = {

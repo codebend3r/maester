@@ -103,12 +103,16 @@ export function RepeatToggle({ size = SIZE.touchTarget, isFilled = false }: Togg
   )
 }
 
-/** Where the transport is drawn: the player's, the lyrics', Up next's and the tablet bar's. */
+/**
+ * Where the transport is drawn: the player's, the lyrics', Up next's, the tablet bar's and the
+ * narrow column of the tablet's Now Playing.
+ */
 export const TRANSPORTS = {
   player: 'player',
   lyrics: 'lyrics',
   queue: 'queue',
   bar: 'bar',
+  column: 'column',
 } as const
 
 type TransportKind = (typeof TRANSPORTS)[keyof typeof TRANSPORTS]
@@ -139,6 +143,11 @@ const TRANSPORT_SPECS = {
     hasToggles: false,
   },
   [TRANSPORTS.bar]: { play: SIZE.playButton, step: SIZE.touchTarget, hasToggles: true },
+  [TRANSPORTS.column]: {
+    play: PLAYER_SIZES.playQueue,
+    step: PLAYER_SIZES.transportSmall,
+    hasToggles: true,
+  },
 } as const satisfies Record<TransportKind, TransportSpec>
 
 const spread = {
@@ -158,6 +167,7 @@ const TRANSPORT_ROWS = StyleSheet.create({
     justifyContent: 'center',
   },
   [TRANSPORTS.bar]: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s4 },
+  [TRANSPORTS.column]: spread,
 })
 
 type TransportProps = { kind: TransportKind }

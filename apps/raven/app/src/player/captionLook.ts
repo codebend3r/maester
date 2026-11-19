@@ -10,6 +10,9 @@ import { TV_SIZES } from '@/theme/tvSizes'
  */
 export const TV_CAPTION_BASE = TV_SIZES.textXl
 
+/** How wide a TV's caption runs before it wraps: the picture's width inside the gutter, as ExoPlayer's. */
+export const TV_CAPTION_WIDTH = '100%'
+
 type CaptionSizeOfProps = {
   /** The size a medium caption stands at on this screen. */
   base: number

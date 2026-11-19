@@ -29,7 +29,7 @@ test('the unpackaged fonts folder holds Young Serif', () => {
   expect(existsSync(join(fontsDir, 'YoungSerif.ttf'))).toBe(true)
 })
 
-test('subtitleLookOptions sets Young Serif from the folder, over ASS styles, outlined with no box', () => {
+test('subtitleLookOptions sets Young Serif from the folder, over ASS styles, outlined with no box, raised off the bottom edge', () => {
   expect(subtitleLookOptions({ fontsDir: '/app/fonts' })).toEqual([
     { name: 'sub-fonts-dir', value: '/app/fonts' },
     { name: 'sub-font', value: 'Young Serif' },
@@ -38,6 +38,7 @@ test('subtitleLookOptions sets Young Serif from the folder, over ASS styles, out
     { name: 'sub-outline-color', value: '#000000' },
     { name: 'sub-outline-size', value: 2 },
     { name: 'sub-shadow-offset', value: 0 },
+    { name: 'sub-pos', value: 95 },
   ])
 })
 

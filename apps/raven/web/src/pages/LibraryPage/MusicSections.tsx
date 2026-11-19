@@ -12,6 +12,7 @@ import {
   SORT_DIRECTIONS,
   type SortDirection,
   musicListQuery,
+  randomMusicSeed,
 } from '@raven/core'
 import { BUTTON_TONES, Button, useToasts } from '@raven/ui'
 import { type Search, isNone, keptRead, useAudioQueue } from '@raven/ui/headless'
@@ -149,8 +150,7 @@ export const AlbumsSection = ({ library }: AlbumsSectionProps) => {
       const params = new URLSearchParams(previous)
       params.set(MUSIC_LIST_PARAMS.sort, next)
       params.set(MUSIC_LIST_PARAMS.order, MUSIC_DEFAULT_ORDERS[next])
-      if (next === MUSIC_SORTS.random)
-        params.set(MUSIC_LIST_PARAMS.seed, String(Date.now() % 1_000_000))
+      if (next === MUSIC_SORTS.random) params.set(MUSIC_LIST_PARAMS.seed, String(randomMusicSeed()))
       return params
     })
   const reverse = () =>

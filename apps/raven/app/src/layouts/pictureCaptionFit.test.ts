@@ -26,6 +26,27 @@ describe('placedPictureOf', () => {
     ).toEqual({ left: 360, top: 450, width: 480, height: 60 })
   })
 
+  it('raises a picture the disc puts on the last rows clear of the bottom edge', () => {
+    // The disc ends the line 10 rows over its frame's foot; the view keeps 5% of 540 under it.
+    expect(
+      placedPictureOf({
+        frame: { width: 960, height: 540 },
+        canvas: CANVAS,
+        picture: { ...LINE, y: 950 },
+      }),
+    ).toEqual({ left: 240, top: 453, width: 480, height: 60 })
+  })
+
+  it('never raises a picture past the top of the view', () => {
+    expect(
+      placedPictureOf({
+        frame: { width: 960, height: 540 },
+        canvas: CANVAS,
+        picture: { ...LINE, y: 0, height: 1080 },
+      }),
+    ).toEqual({ left: 240, top: 0, width: 480, height: 540 })
+  })
+
   it('places nothing on a canvas or in a frame with no size', () => {
     expect(
       placedPictureOf({ frame: { width: 0, height: 0 }, canvas: CANVAS, picture: LINE }),

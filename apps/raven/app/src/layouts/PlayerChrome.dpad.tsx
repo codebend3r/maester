@@ -50,7 +50,7 @@ import {
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'
-import { TV_CAPTION_BASE } from '@/player/captionLook'
+import { TV_CAPTION_BASE, TV_CAPTION_WIDTH } from '@/player/captionLook'
 import { useHeldSeek } from '@/layouts/useHeldSeek'
 import { useSkipLadder } from '@/layouts/useSkipLadder'
 import { TV_GUTTER, TV_SIZES } from '@/theme/tvSizes'
@@ -502,7 +502,12 @@ const DpadPlayer = ({
           pointerEvents="none"
           style={[styles.captionSlot, { paddingBottom: TV_GUTTER + lift }]}
         >
-          <CaptionText baseSize={TV_CAPTION_BASE} caption={caption} look={captionStyle} />
+          <CaptionText
+            baseSize={TV_CAPTION_BASE}
+            caption={caption}
+            look={captionStyle}
+            maxWidth={TV_CAPTION_WIDTH}
+          />
         </View>
       )}
     </View>
