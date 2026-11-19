@@ -249,8 +249,6 @@ export const PLAYER_SIZES = {
   transportButton: 56,
   transportSmall: 48,
   toggleCircle: 40,
-  tabletColumn: 430,
-  tabletQueuePanel: 340,
   upNextHeadTop: 6,
   upNextHeadBottom: 10,
 } as const

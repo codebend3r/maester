@@ -20,6 +20,13 @@ export const CAPTION_COLOURS = {
 
 export type CaptionColour = (typeof CAPTION_COLOURS)[keyof typeof CAPTION_COLOURS]
 
+/**
+ * The least room every player keeps under a subtitle its file places itself (a Blu-ray's picture,
+ * an ASS line's own position), as a share of the picture's height: a file may put one on the last
+ * rows, where a TV's edge cuts it. Android TV's patched player holds the same share in Kotlin.
+ */
+export const CAPTION_FLOOR_SHARE = 0.05
+
 /** Where an account's subtitle look is read and kept. */
 export const CAPTION_PATHS = { style: '/api/caption-style' } as const
 

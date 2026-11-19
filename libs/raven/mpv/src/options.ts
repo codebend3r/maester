@@ -13,6 +13,7 @@ export const MPV_OPTIONS = {
   subOutlineColor: 'sub-outline-color',
   subOutlineSize: 'sub-outline-size',
   subShadowOffset: 'sub-shadow-offset',
+  subPos: 'sub-pos',
   audioDevice: 'audio-device',
   audioSpdif: 'audio-spdif',
   audioChannels: 'audio-channels',

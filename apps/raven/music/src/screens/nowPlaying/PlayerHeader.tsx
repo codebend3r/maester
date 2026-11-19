@@ -13,11 +13,10 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   middle: { alignItems: 'center', flex: 1 },
   overline: { ...TYPE.overline, color: colors.text3 },
   name: { ...TYPE.tileTitle, color: colors.text, textAlign: 'center' },
-  short: { ...TYPE.metaStrong, color: colors.text3, textAlign: 'center' },
 }))
 
-/** How the header names the source: an overline over the name, or the tablet's one line. */
-export const HEADER_TITLES = { full: 'full', short: 'short' } as const
+/** How the header names the source: an overline over the name, or not at all on the tablet. */
+export const HEADER_TITLES = { full: 'full', none: 'none' } as const
 
 type HeaderTitle = (typeof HEADER_TITLES)[keyof typeof HEADER_TITLES]
 
@@ -38,21 +37,15 @@ function FullTitle({ title }: TitleProps) {
   )
 }
 
-/** "From 1000 Forms Of Fear". */
-function ShortTitle({ title }: TitleProps) {
+/** The tablet's: the room between the two buttons, since Up next's line names the source. */
+function NoTitle() {
   const styles = useStyles()
-  return (
-    <View style={styles.middle}>
-      <Text numberOfLines={1} style={styles.short}>
-        {NOW_PLAYING_COPY.fromShort(title.name)}
-      </Text>
-    </View>
-  )
+  return <View style={styles.middle} />
 }
 
 const TITLES = {
   [HEADER_TITLES.full]: FullTitle,
-  [HEADER_TITLES.short]: ShortTitle,
+  [HEADER_TITLES.none]: NoTitle,
 } as const satisfies Record<HeaderTitle, ComponentType<TitleProps>>
 
 type CloseButtonProps = { onClose: () => void }

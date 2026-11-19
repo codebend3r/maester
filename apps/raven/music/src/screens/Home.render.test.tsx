@@ -91,7 +91,8 @@ describe('Home', () => {
     expect(router.getPathname()).toBe(collectionPathOf(LIBRARY_SEGMENTS.albums))
   })
 
-  it('shuffles a random page of every song', async () => {
+  it('shuffles a random page of every song, dealt by a new seed each press', async () => {
+    const roll = jest.spyOn(Math, 'random').mockReturnValue(0.25)
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
     const shuffle = await screen.findByRole('button', {
       name: KIT_COPY.labelled({
@@ -100,9 +101,11 @@ describe('Home', () => {
       }),
     })
     await fireEvent.press(shuffle)
+    roll.mockRestore()
     expect(mockApi.listTracks).toHaveBeenCalledWith({
       libraryId: MUSIC.id,
       sort: MUSIC_SORTS.random,
+      seed: 250_000,
       limit: MUSIC_PAGE.most,
       offset: 0,
     })

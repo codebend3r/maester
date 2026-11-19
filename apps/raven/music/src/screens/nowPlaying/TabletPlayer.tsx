@@ -1,39 +1,45 @@
 import { ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
+import { TRANSPORTS, Transport } from '@/player/Transport'
 import { LyricsView } from '@/screens/nowPlaying/LyricsView'
 import { HEADER_TITLES, PlayerHeader } from '@/screens/nowPlaying/PlayerHeader'
-import { PlayerStack } from '@/screens/nowPlaying/PlayerStack'
+import { PlayerExtras } from '@/screens/nowPlaying/PlayerExtras'
+import { SongTitle } from '@/screens/nowPlaying/SongTitle'
+import { TABLET_COLUMN_GAP, tabletFitOf } from '@/screens/nowPlaying/tabletFit'
 import { UP_NEXT_PLACES, UpNext } from '@/screens/nowPlaying/UpNext'
 import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { AlbumArt } from '@/ui/AlbumArt'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
-import { PLAYER_COPY } from '@/ui/copy'
-
-/*
- * The player's and the panel's shares of the window, at most their designed widths, so a
- * smaller tablet keeps room for the lyrics between them.
- */
-const COLUMN_SHARES = { player: 0.36, panel: 0.285 } as const
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
-  screen: { backgroundColor: colors.bg, flex: 1, flexDirection: 'row' },
-  player: { borderRightColor: colors.line, borderRightWidth: SIZE.hairline },
+  screen: { backgroundColor: colors.bg, flex: 1 },
+  top: { flexDirection: 'row' },
+  player: { borderRightColor: colors.line, borderRightWidth: SIZE.hairline, flexGrow: 0 },
   playerContent: {
-    gap: SPACE.s5,
-    paddingBottom: SHELL_SIZES.tabletPadTop,
-    paddingHorizontal: SHELL_SIZES.tabletPadSide,
-  },
-  header: { marginHorizontal: -SPACE.s3 },
-  lyrics: { flex: 1, gap: SPACE.s5, paddingHorizontal: SHELL_SIZES.tabletPadSide + SPACE.s2 },
-  overline: { ...TYPE.overline, color: colors.text3 },
-  panel: {
-    backgroundColor: colors.surface,
-    borderLeftColor: colors.line,
-    borderLeftWidth: SIZE.hairline,
-    gap: SPACE.s4,
+    gap: TABLET_COLUMN_GAP,
     paddingHorizontal: PLAYER_SIZES.gutter,
+    paddingVertical: TABLET_COLUMN_GAP,
+  },
+  art: { alignSelf: 'center' },
+  lyrics: {
+    flex: 1,
+    gap: SPACE.s5,
+    paddingHorizontal: SHELL_SIZES.tabletPadSide,
+    paddingVertical: TABLET_COLUMN_GAP,
+  },
+  lyricsHead: { alignItems: 'flex-start', flexDirection: 'row', gap: SPACE.s4 },
+  song: { flex: 1 },
+  upNext: {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.line,
+    borderTopWidth: SIZE.hairline,
+    flex: 1,
+    paddingHorizontal: SHELL_SIZES.tabletPadSide,
+    paddingTop: SPACE.s4,
   },
   output: {
     alignItems: 'center',
@@ -41,63 +47,66 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     borderRadius: RADIUS.md,
     borderWidth: SIZE.hairline,
     flexDirection: 'row',
+    flexShrink: 1,
     gap: SPACE.s3,
-    minHeight: SIZE.field,
+    minHeight: SIZE.touchTarget,
     paddingHorizontal: SPACE.s4,
   },
-  outputText: { ...TYPE.body, color: colors.text2, flex: 1 },
+  outputText: { ...TYPE.body, color: colors.text2, flexShrink: 1 },
 }))
 
 type TabletPlayerProps = { playing: Playing; onMore: () => void }
 
 /**
- * The tablet's Now Playing, the whole screen in three columns: the player (the cover, the song
- * and the transport), the lyrics in the middle, and Up next on a panel at the right with where
- * the music plays at its foot.
+ * The tablet's Now Playing, the whole screen in two rows. The first is two columns: the cover
+ * over the controls, icons and lines with no words, in under a third of the width, and beside
+ * them the song, where the music plays and the lyrics. The second, the screen's whole width, is
+ * Up next: what the album, the playlist or the shuffle plays after this song.
  */
 export function TabletPlayer({ playing, onMore }: TabletPlayerProps) {
   const styles = useStyles()
   const { colors } = useWrenTheme()
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
   const { top, bottom } = useSafeAreaInsets()
   const { session, title } = playing
-  const playerWidth = Math.min(PLAYER_SIZES.tabletColumn, width * COLUMN_SHARES.player)
-  const panelWidth = Math.min(PLAYER_SIZES.tabletQueuePanel, width * COLUMN_SHARES.panel)
-  const art = Math.min(PLAYER_SIZES.tabletArt, playerWidth - 2 * SHELL_SIZES.tabletPadSide)
-  const edges = {
-    paddingTop: top + SHELL_SIZES.tabletPadTop,
-    paddingBottom: bottom + SHELL_SIZES.tabletPadTop,
-  }
+  const { topHeight, playerWidth, art } = tabletFitOf({ width, height: height - top - bottom })
   return (
-    <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={[styles.playerContent, { paddingTop: top + SPACE.s6 }]}
-        style={[styles.player, { width: playerWidth }]}
-      >
-        <View style={styles.header}>
+    <View style={[styles.screen, { paddingTop: top }]}>
+      <View style={[styles.top, { height: topHeight }]}>
+        <ScrollView
+          contentContainerStyle={styles.playerContent}
+          style={[styles.player, { width: playerWidth }]}
+        >
           <PlayerHeader
             onClose={playing.close}
             onMore={onMore}
             title={title}
-            variant={HEADER_TITLES.short}
+            variant={HEADER_TITLES.none}
           />
+          <View style={styles.art}>
+            <AlbumArt cover={playing.cover} isRaised radius={RADIUS.art} size={art} />
+          </View>
+          <Scrubber kind={SCRUBBERS.bare} length={playing.length} />
+          <Transport kind={TRANSPORTS.column} />
+          <PlayerExtras isAudiobook={playing.isAudiobook} />
+        </ScrollView>
+        <View style={styles.lyrics}>
+          <View style={styles.lyricsHead}>
+            <View style={styles.song}>
+              <SongTitle playing={playing} />
+            </View>
+            <View accessible style={styles.output}>
+              <WrenIcon color={colors.text2} name={ICONS.output} size={SIZE.smallIcon} />
+              <Text numberOfLines={1} style={styles.outputText}>
+                {playing.playingOn}
+              </Text>
+            </View>
+          </View>
+          <LyricsView lyrics={playing.lyrics} />
         </View>
-        <PlayerStack artSize={art} playing={playing} />
-      </ScrollView>
-      <View style={[styles.lyrics, edges]}>
-        <Text accessibilityRole="header" style={styles.overline}>
-          {PLAYER_COPY.lyrics}
-        </Text>
-        <LyricsView lyrics={playing.lyrics} />
       </View>
-      <View style={[styles.panel, edges, { width: panelWidth }]}>
+      <View style={[styles.upNext, { paddingBottom: bottom }]}>
         <UpNext place={UP_NEXT_PLACES.panel} session={session} sourceName={title.sourceName} />
-        <View accessible style={styles.output}>
-          <WrenIcon color={colors.text2} name={ICONS.output} size={SIZE.smallIcon} />
-          <Text numberOfLines={1} style={styles.outputText}>
-            {playing.playingOn}
-          </Text>
-        </View>
       </View>
     </View>
   )

@@ -133,7 +133,7 @@ describe('Now Playing', () => {
     expect(remove).toHaveBeenCalledWith(1)
   })
 
-  it('lays the player, the lyrics and Up next side by side on a tablet', async () => {
+  it('lays the player beside the lyrics, over Up next, on a tablet', async () => {
     await holdAs(TABLET_WINDOW)
     await openNowPlaying()
     expect(await screen.findByRole('header', { name: 'Airbag' })).toBeTruthy()

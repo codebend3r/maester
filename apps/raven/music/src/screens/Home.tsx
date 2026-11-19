@@ -1,4 +1,4 @@
-import { MUSIC_PAGE, MUSIC_SORTS } from '@raven/core'
+import { MUSIC_PAGE, MUSIC_SORTS, randomMusicSeed } from '@raven/core'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { type ComponentType, useState } from 'react'
@@ -176,13 +176,18 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
   const playTracks = useAudioQueue((store) => store.playTracks)
   const isBesideContinue = useAudioQueue((store) => playingTrackOf(store) !== null)
   const MoreShortcut = MORE_SHORTCUTS[formFactor]
-  // A random page of each library, shuffled: every song at once would be too many to queue.
+  /*
+   * A random page of each library, shuffled: every song at once would be too many to queue. The
+   * seed is new each press, so each press deals other songs; with none the server's is always 0.
+   */
   const shuffleAll = async () => {
+    const seed = randomMusicSeed()
     const pages = await Promise.all(
       music.libraries.map((library) =>
         session.api.listTracks({
           libraryId: library.id,
           sort: MUSIC_SORTS.random,
+          seed,
           limit: MUSIC_PAGE.most,
           offset: 0,
         }),
