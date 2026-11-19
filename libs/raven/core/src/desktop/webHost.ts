@@ -53,10 +53,12 @@ export const DESKTOP_PATHS = {
 export const DEFAULT_SERVER_ORIGIN = 'https://raven-player.synology.me:8443'
 
 /**
- * The web app's Netlify site, which proxies `/api` to the same server. Its watch pages build
- * `raven://` links naming it (`window.location.origin`), so it names the default server too.
+ * The origins whose `raven://` links name the default server besides its own, built in: the web
+ * app's Netlify site, which proxies `/api` to the same server, at its own domain and at the
+ * Netlify address that still serves it. Its watch pages build the links naming the one they are
+ * open on (`window.location.origin`).
  */
-const WEB_APP_ORIGIN = 'https://raven-player.netlify.app'
-
-/** The origins whose `raven://` links name the default server besides its own, built in. */
-export const DEFAULT_LINK_ORIGINS = [WEB_APP_ORIGIN] as const
+export const DEFAULT_LINK_ORIGINS = [
+  'https://raven.maester.tv',
+  'https://raven-player.netlify.app',
+] as const

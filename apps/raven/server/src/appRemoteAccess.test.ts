@@ -31,7 +31,7 @@ import { NOT_WATCHING, TRUSTED_PROXY, adminCookie, routePath, testConfig } from 
 import { encodeClip } from '@/test/clips'
 import { apiFor } from '@/test/server'
 
-const SITE = 'https://raven-player.netlify.app'
+const SITE = 'https://raven.maester.tv'
 const LAN = 'https://raven.home.example'
 const HOSTNAME = 'raven.example.synology.me'
 const PUBLIC_ORIGIN = `https://${HOSTNAME}:8443`

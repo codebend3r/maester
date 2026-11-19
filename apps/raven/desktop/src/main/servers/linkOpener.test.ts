@@ -146,9 +146,7 @@ describe('createLinkOpener', () => {
 
     it("opens a link the web app's site built, and one naming the public origin", async () => {
       const navigate = { type: DESKTOP_REPLIES.navigate, to: '/watch/7' }
-      expect(await opener.open({ link: playLinkFor('https://raven-player.netlify.app') })).toEqual(
-        navigate,
-      )
+      expect(await opener.open({ link: playLinkFor('https://raven.maester.tv') })).toEqual(navigate)
       expect(await opener.open({ link: playLinkFor(DEFAULT_SERVER_ORIGIN) })).toEqual(navigate)
     })
   })

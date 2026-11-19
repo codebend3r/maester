@@ -112,7 +112,10 @@ export type MediaSources = {
    * is as fresh as its. Never rejects: what cannot be addressed is left out.
    */
   sidecars: (request: SidecarsRequest) => Promise<readonly SidecarSource[]>
-  /** Where a track plays or downloads from, by the same origin, ticket and cookie as a video. */
+  /**
+   * Where a track plays or downloads from: the server's own address, by ticket or cookie as a
+   * video from there is, with no origin probed or picked, so it never waits on one.
+   */
   trackSource: (request: TrackRequest) => Promise<SourceOutcome>
   /**
    * Where the server's MP4 copy of a video downloads from, once it is ready, by the same origin
@@ -182,7 +185,7 @@ type TicketRead =
   | { kind: typeof TICKET_READS.off }
   | { kind: typeof TICKET_READS.refused; refusal: AccessRefusal }
 
-/** The ways one video is reached: `accessOf`'s answer, shared by its picture and its subtitles. */
+/** The ways one piece of media is reached: `accessFrom`'s answer, a video's shared by its picture and its subtitles. */
 const ACCESS_WAYS = {
   origin: 'origin',
   ownAddress: 'ownAddress',
@@ -278,18 +281,19 @@ type MediaAccessForProps = {
  * lists are probed on first use and again on each change of network, and the fastest by core's
  * `pickOrigin` plays by ticket. A probe that picks none is not kept: the next source probes
  * again, so an origin that comes back is used without waiting for the network to change. A
- * ticket is read per video and renewed `TICKET_RENEW_MS` after it was read, inside an account ticket's five minutes,, by `now`. A
- * server that lists no origin, has none answering, or hands out no ticket (the 503 of one
- * without `RAVEN_MEDIA_SECRET`) plays from its own address with its cookies as headers, which
- * `cookieHeadersFor` gives only to its own API. A transcode from the `public` origin, away
- * from home, asks for the size `awayMaxHeight` reads at the moment, Settings' cap, unless the
- * viewer picked a size (`SourceRequest['quality']`), which it asks wherever it plays; the server
- * holds every transcode away from home to its remote limit itself. `networkFor` tells the plan
- * where the play is. A signed-in
- * account (`readAccessToken`) that has no origin to play from plays from the server's own
- * address by its ticket, never by its Bearer, and a ticket the server refuses it (`401`, `403`)
- * is the account's refusal in core's words. Nothing here logs: a ticket is only ever in the
- * source's address.
+ * ticket is read per video and renewed `TICKET_RENEW_MS` after it was read, inside an account
+ * ticket's five minutes, by `now`. A server that lists no origin, has none answering, or hands
+ * out no ticket (the 503 of one without `RAVEN_MEDIA_SECRET`) plays from its own address with
+ * its cookies as headers, which `cookieHeadersFor` gives only to its own API. A transcode from
+ * the `public` origin, away from home, asks for the size `awayMaxHeight` reads at the moment,
+ * Settings' cap, unless the viewer picked a size (`SourceRequest['quality']`), which it asks
+ * wherever it plays; the server holds every transcode away from home to its remote limit itself.
+ * `networkFor` tells the plan where the play is. A track never goes through the pick:
+ * `trackSource` plays from the server's own address at home and away alike, so music never waits
+ * on a probe. A signed-in account (`readAccessToken`) that has no origin to play from plays from
+ * the server's own address by its ticket, never by its Bearer, and a ticket the server refuses
+ * it (`401`, `403`) is the account's refusal in core's words. Nothing here logs: a ticket is
+ * only ever in the source's address.
  */
 export const mediaAccessFor = ({
   api,
@@ -439,15 +443,16 @@ export const mediaAccessFor = ({
     return { ok: true, source: { uri, headers } }
   }
 
+  type AccessFromProps = { read: TicketRead; origin: MediaOrigin | null }
+
   /**
-   * How one video is reached, decided once for its picture and its subtitles alike: from the
-   * origin picked, by ticket; with none to play from, a signed-in account from the server's own
-   * address by its ticket, never by its Bearer (the native player sends that header as it was, and
-   * the token ends within the hour while a film runs longer); a server that hands out no ticket,
-   * or has no account signed in there, by its cookie; or refused.
+   * How one piece of media is reached with the ticket read for it: from `origin`, by ticket; with
+   * none, a signed-in account from the server's own address by its ticket, never by its Bearer
+   * (the native player sends that header as it was, and the token ends within the hour while a
+   * film runs longer); a server that hands out no ticket, or has no account signed in there, by
+   * its cookie; or refused.
    */
-  const accessOf = async (mediaId: number): Promise<Access> => {
-    const [{ origin }, read] = await Promise.all([pickOf(), ticketFor(mediaId)])
+  const accessFrom = ({ read, origin }: AccessFromProps): Access => {
     switch (read.kind) {
       case TICKET_READS.refused:
         return { kind: ACCESS_WAYS.refused, refusal: read.refusal }
@@ -466,10 +471,28 @@ export const mediaAccessFor = ({
     }
   }
 
-  type SourceForProps = { mediaId: number; uriOf: UriOf }
+  /** How one video is reached, decided once for its picture and its subtitles alike: from the origin picked. */
+  const accessOf = async (mediaId: number): Promise<Access> => {
+    const [{ origin }, read] = await Promise.all([pickOf(), ticketFor(mediaId)])
+    return accessFrom({ read, origin })
+  }
 
-  const sourceFor = async ({ mediaId, uriOf }: SourceForProps): Promise<SourceOutcome> => {
-    const access = await accessOf(mediaId)
+  /**
+   * How a track is reached: always the server's own address, the one the app's every other call
+   * goes to, at home and away alike. No origin is listed, probed or picked for it, so a track
+   * never waits on an origin that is out of reach.
+   */
+  const trackAccessOf = async (mediaId: number): Promise<Access> =>
+    accessFrom({ read: await ticketFor(mediaId), origin: null })
+
+  type SourceForProps = {
+    /** How the media is reached: `accessOf`'s answer for a video, `trackAccessOf`'s for a track. */
+    reach: Promise<Access>
+    uriOf: UriOf
+  }
+
+  const sourceFor = async ({ reach, uriOf }: SourceForProps): Promise<SourceOutcome> => {
+    const access = await reach
     switch (access.kind) {
       case ACCESS_WAYS.refused:
         return access.refusal
@@ -536,13 +559,17 @@ export const mediaAccessFor = ({
   return {
     source: (request) =>
       outcomeOf({
-        mediaId: request.media.id,
+        reach: accessOf(request.media.id),
         uriOf: (access) => uriFor({ request, access }),
       }),
     sidecars: (request) => sidecarsFor(request).catch(() => []),
-    trackSource: (request) => outcomeOf({ mediaId: request.mediaId, uriOf: trackUriOf(request) }),
+    trackSource: (request) =>
+      outcomeOf({ reach: trackAccessOf(request.mediaId), uriOf: trackUriOf(request) }),
     copySource: (mediaId) =>
-      outcomeOf({ mediaId, uriOf: (access) => api.deviceDownloadFileUrl({ id: mediaId, access }) }),
+      outcomeOf({
+        reach: accessOf(mediaId),
+        uriOf: (access) => api.deviceDownloadFileUrl({ id: mediaId, access }),
+      }),
     subtitleAccess: (mediaId) => subtitleAccess(mediaId).catch(() => null),
     networkFor: (mediaId) => networkFor(mediaId).catch(() => AT_HOME),
     close: stopWatching,

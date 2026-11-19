@@ -1,0 +1,70 @@
+/*
+ * Maester's home: the mark and the name, then one card for each app, raven
+ * and Wren, which lead to their own pages.
+ */
+
+.home-pitch {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-9);
+  padding-top: var(--space-11);
+  text-align: center;
+}
+
+.products {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-9);
+
+  @media (max-width: 48rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.product {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: var(--space-7);
+  height: 100%;
+  padding: clamp(2rem, 4.5vw, 3.5rem) clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: radial-gradient(
+    700px 400px at 75% 0%,
+    var(--color-canopy-hi),
+    var(--color-canopy) 70%
+  );
+  text-decoration: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: border-color 150ms var(--ease-out);
+  }
+
+  &:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-section);
+    font-weight: 400;
+    line-height: var(--line-tight);
+  }
+
+  p {
+    color: var(--color-birch);
+    font-size: var(--font-size-body-lg);
+    text-wrap: pretty;
+  }
+}
+
+.product-more {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-amber);
+  font-size: var(--font-size-ui);
+  font-weight: 600;
+}

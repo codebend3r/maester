@@ -12,7 +12,7 @@ const signatureOf = (secret: string) => createHmac('sha256', secret).update(NONC
 
 const SIGNATURE = signatureOf(SECRET)
 
-const CHECK = `https://raven-player.netlify.app/remote-access/check?host=${HOST}&port=8443&nonce=${NONCE}&signature=${SIGNATURE}`
+const CHECK = `https://raven.maester.tv/remote-access/check?host=${HOST}&port=8443&nonce=${NONCE}&signature=${SIGNATURE}`
 
 type ConnectTarget = Parameters<typeof checkReachability>[0]['connectTarget']
 
@@ -87,7 +87,7 @@ describe('checkReachability', () => {
       CHECK.replace(HOST, '10.0.0.1'),
       CHECK.replace('port=8443', 'port=0'),
       CHECK.replace(NONCE, 'short'),
-      'https://raven-player.netlify.app/remote-access/check',
+      'https://raven.maester.tv/remote-access/check',
     ]
     const results = await Promise.all(bad.map((url) => run({ url })))
     expect(results.map(({ response }) => response.status)).toEqual([400, 400, 400, 400])

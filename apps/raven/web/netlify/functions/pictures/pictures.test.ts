@@ -2,7 +2,7 @@ import { describe, expect, it, mock } from 'bun:test'
 import { proxyPicture } from '@/netlify/functions/pictures/pictures'
 
 const ORIGIN = 'https://raven.example.synology.me:8443'
-const PICTURE = 'https://raven-player.netlify.app/api/pictures/items/4/backdrop/abc'
+const PICTURE = 'https://raven.maester.tv/api/pictures/items/4/backdrop/abc'
 
 type UpstreamProps = { status?: number; type?: string }
 

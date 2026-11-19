@@ -139,6 +139,16 @@ ul {
   list-style: none;
 }
 
+// Every page's title is set the same way: the display face, large and tight.
+h1 {
+  font-family: var(--font-display);
+  font-size: var(--font-size-title);
+  font-weight: 400;
+  line-height: var(--line-display);
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
+}
+
 a {
   color: inherit;
 }

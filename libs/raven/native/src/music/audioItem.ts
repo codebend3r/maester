@@ -7,7 +7,6 @@ import {
   type Track,
   artistNames,
   canPlayAudio,
-  remoteTranscodeFor,
 } from '@raven/core'
 
 import type { MediaSources } from '@/servers/mediaAccess'
@@ -15,7 +14,7 @@ import type { MediaSources } from '@/servers/mediaAccess'
 /** What a track is played through: the server's client, for its cover, and where its media plays from. */
 type AudioServer = {
   api: Pick<ApiClient, 'albumCoverUrl'>
-  sources: Pick<MediaSources, 'trackSource' | 'networkFor'>
+  sources: Pick<MediaSources, 'trackSource'>
 }
 
 /**
@@ -62,38 +61,12 @@ type AudioItemOfProps = {
   plan: TrackPlan
 }
 
-/** The bitrate a track over the server's remote limit streams at away from home. */
-const AWAY_KBPS = AUDIO_BITRATES.high
-
-type StreamKbpsOfProps = Pick<AudioItemOfProps, 'server' | 'track' | 'plan'> & {
-  canDecode: boolean
-}
-
-/**
- * The transcode a track streams at, or null for the file itself. The listener's choice comes
- * first; then, as a video does away from home, a file over the server's remote limit (core's
- * `remoteTranscodeFor`, read from the origin the track plays from) streams at `AWAY_KBPS`; then
- * a file this player cannot decode at 256 kbps. Everything else plays the original, through
- * the public origin away from home, as Plex does.
- */
-const streamKbpsOf = async ({
-  server,
-  track,
-  plan,
-  canDecode,
-}: StreamKbpsOfProps): Promise<AudioBitrate | null> => {
-  const chosen = await plan.streamKbps()
-  if (chosen !== null) return chosen
-  const network = await server.sources.networkFor(track.id)
-  if (remoteTranscodeFor({ ...network, media: track }) !== null) return AWAY_KBPS
-  return canDecode ? null : AUDIO_BITRATES.standard
-}
-
 /**
  * A track as `@raven/audio` takes it, and what the lock screen shows. It plays, in order: the
  * downloaded file and the cover saved with it, with no headers and nothing asked of the server;
- * else from the picked origin by its ticket, the file itself or the transcode `streamKbpsOf`
- * names. A rejection says why the server would not play it.
+ * else from the server's own address by its ticket, the transcode at the listener's chosen bitrate,
+ * the transcode at 256 kbps for a file this player cannot decode, or the file itself. Where the
+ * device is, at home or away, is never asked. A rejection says why the server would not play it.
  */
 export const audioItemOf = async ({
   server,
@@ -129,7 +102,7 @@ export const audioItemOf = async ({
   const canDecode =
     track.codec === null ||
     canPlayAudio({ platform, codec: track.codec, container: track.container })
-  const kbps = await streamKbpsOf({ server, track, plan, canDecode })
+  const kbps = (await plan.streamKbps()) ?? (canDecode ? null : AUDIO_BITRATES.standard)
   const outcome = await server.sources.trackSource({ mediaId: track.id, kbps })
   if (!outcome.ok) throw new Error(outcome.message)
   plan.onStream?.({

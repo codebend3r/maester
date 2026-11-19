@@ -59,9 +59,9 @@ type WrenPrefs = WrenPrefsValues & {
 }
 
 /**
- * A fresh install: downloads at 256 kbps, the file itself on cellular as on Wi-Fi (the server's
- * remote limit, not the radio, decides a transcode away from home, as it does for raven's
- * videos), no storage limit, and the system's appearance.
+ * A fresh install: downloads at 256 kbps, the file itself on cellular as on Wi-Fi (only the
+ * listener's own choice streams a transcode; nothing asks whether the device is at home), no
+ * storage limit, and the system's appearance.
  */
 export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   downloadKbps: AUDIO_BITRATES.standard,

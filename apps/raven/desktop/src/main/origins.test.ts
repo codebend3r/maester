@@ -184,10 +184,10 @@ describe('linkOriginsFrom', () => {
 describe('fixedServerFrom', () => {
   const [WEB_APP = ''] = DEFAULT_LINK_ORIGINS
 
-  it("gives the default server the web app's site as an alias", () => {
+  it("gives the default server the web app's site, at each of its addresses, as aliases", () => {
     expect(fixedServerFrom({ origin: DEFAULT_SERVER_ORIGIN, linkOrigins: [] })).toEqual({
       origin: DEFAULT_SERVER_ORIGIN,
-      aliases: [WEB_APP],
+      aliases: [...DEFAULT_LINK_ORIGINS],
     })
   })
 
@@ -197,7 +197,7 @@ describe('fixedServerFrom', () => {
         origin: DEFAULT_SERVER_ORIGIN,
         linkOrigins: ['http://192.168.50.6:8484', WEB_APP, DEFAULT_SERVER_ORIGIN],
       }).aliases,
-    ).toEqual([WEB_APP, 'http://192.168.50.6:8484'])
+    ).toEqual([...DEFAULT_LINK_ORIGINS, 'http://192.168.50.6:8484'])
   })
 
   it('gives another server only the link origins the build names', () => {
