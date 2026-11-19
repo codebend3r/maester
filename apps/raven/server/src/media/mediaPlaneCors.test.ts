@@ -12,7 +12,7 @@ import {
   responseHeaders,
 } from '@/media/mediaPlaneCors'
 
-const ORIGIN = 'https://raven-player.netlify.app'
+const ORIGIN = 'https://raven.maester.tv'
 
 describe('pathMatcher', () => {
   const matches = pathMatcher(['/api/media/:id/stream', '/api/media-origins/ping'])

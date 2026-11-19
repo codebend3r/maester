@@ -40,8 +40,11 @@ describe('the web host', () => {
     expect(DEFAULT_SERVER_ORIGIN).toBe('https://raven-player.synology.me:8443')
   })
 
-  it("names the web app's site as the default server's built-in link origin", () => {
-    expect(DEFAULT_LINK_ORIGINS).toEqual(['https://raven-player.netlify.app'])
+  it("names the web app's site, at both its addresses, as the default server's built-in link origins", () => {
+    expect(DEFAULT_LINK_ORIGINS).toEqual([
+      'https://raven.maester.tv',
+      'https://raven-player.netlify.app',
+    ])
     expect(DEFAULT_LINK_ORIGINS).not.toContain(DEFAULT_SERVER_ORIGIN)
   })
 })

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { pathMatcher, registerMediaPlaneHook } from '@/media/mediaPlaneCors'
 import { proxiedMediaWarner, proxiedMediaWarning } from '@/media/mediaPlaneFallback'
 
-const WEB_ORIGIN = 'https://raven-player.netlify.app'
+const WEB_ORIGIN = 'https://raven.maester.tv'
 
 type ServerWithProps = { hasMediaOrigins?: boolean }
 

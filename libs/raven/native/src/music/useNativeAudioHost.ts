@@ -31,7 +31,7 @@ type UseNativeAudioHostProps = {
    * Where a server's tracks play from, made once per server (`lastPerServer`) and asked for only
    * as a track is, so nothing watches the network before music plays.
    */
-  sourcesFor: (server: AppServer) => Pick<MediaSources, 'trackSource' | 'networkFor'>
+  sourcesFor: (server: AppServer) => Pick<MediaSources, 'trackSource'>
   /** What a track plays from before the server's file; the file alone when the app downloads nothing. */
   plan?: TrackPlan
   /** Answers CarPlay and Android Auto; the device app, with no car, answers nothing. */

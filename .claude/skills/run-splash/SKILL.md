@@ -1,11 +1,11 @@
 ---
 name: run-splash
-description: Use when running raven's splash page (`@raven/splash`, maester.netlify.app) locally to try a change in the browser: "run the splash page", "start the splash dev server", "preview the splash build", "open the releases page locally", "run the front door", or http://localhost:5190 not answering.
+description: Use when running raven's splash page (`@raven/splash`, maester.tv) locally to try a change in the browser: "run the splash page", "start the splash dev server", "preview the splash build", "open the releases page locally", "run the front door", or http://localhost:5190 not answering.
 ---
 
 # Run the splash page
 
-`@raven/splash` is a static Vite page with no React and no backend: `index.html` (download Raven or open the web app) and `releases/index.html` (every release). Nothing else needs to run. Its only network call is the browser fetching the GitHub releases API (`src/releases.ts`), so the download buttons and the releases list need internet and are subject to GitHub's unauthenticated rate limit.
+`@raven/splash` is a static Vite page with no React and no backend: `index.html` (Maester's home, with a card for each app), `raven/index.html` (download Raven or open the web app), `wren/index.html` (Wren's page), `releases/index.html` (every release) and `dev-builds/index.html`. Nothing else needs to run. Its only network call is the browser fetching the GitHub releases API (`src/releases.ts`), so the download buttons and the releases list need internet and are subject to GitHub's unauthenticated rate limit.
 
 The dev server takes port **5190** with `strictPort`, so a second start fails instead of moving to another port.
 

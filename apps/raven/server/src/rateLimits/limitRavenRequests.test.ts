@@ -15,7 +15,7 @@ type SignedProps = { secret?: Uint8Array; expiresIn?: string; issuer?: string }
 
 /** A signature as Netlify's signed proxy makes one. */
 const signed = ({ secret = SECRET, expiresIn = '5m', issuer = 'netlify' }: SignedProps = {}) =>
-  new SignJWT({ site_url: 'https://raven-player.netlify.app' })
+  new SignJWT({ site_url: 'https://raven.maester.tv' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(issuer)
     .setExpirationTime(expiresIn)

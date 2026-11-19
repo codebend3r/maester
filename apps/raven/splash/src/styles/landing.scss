@@ -1,6 +1,7 @@
 /*
- * The landing page: a hero over a wall of posters, three features, the
- * screens raven plays on, then the colophon.
+ * An app's landing page, raven's and Wren's: a hero over a wall of posters or
+ * album covers, three features, for raven the screens it plays on, then the
+ * colophon.
  */
 
 .landing {
@@ -78,7 +79,7 @@
   rotate: -8deg;
 
   li {
-    aspect-ratio: 2 / 3;
+    aspect-ratio: var(--wall-tile, 2 / 3);
     border-radius: var(--radius-poster);
     box-shadow: var(--shadow-poster);
   }
@@ -87,6 +88,11 @@
   @media (max-width: 48rem) {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+}
+
+// Wren's wall is of album covers, which are square.
+.wall-albums {
+  --wall-tile: 1;
 }
 
 .hero-pitch {
@@ -100,12 +106,6 @@
 
   h1 {
     max-width: 53.75rem;
-    font-family: var(--font-display);
-    font-size: var(--font-size-title);
-    font-weight: 400;
-    line-height: var(--line-display);
-    letter-spacing: var(--tracking-display);
-    text-wrap: balance;
   }
 
   .actions {
@@ -128,14 +128,6 @@
     var(--shadow-lift);
   color: var(--color-on-leaf);
   font-size: var(--font-size-glyph);
-}
-
-.lede {
-  max-width: 40rem;
-  color: var(--color-birch);
-  font-size: var(--font-size-lede);
-  line-height: var(--line-relaxed);
-  text-wrap: pretty;
 }
 
 .landing-main {

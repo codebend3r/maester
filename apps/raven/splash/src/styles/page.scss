@@ -1,4 +1,7 @@
-// What both pages share: the icons, the masthead, the actions, the release files and the colophon.
+/*
+ * What the pages share: the icons, the plain document's frame, the masthead,
+ * the lede, the actions, the release files and the colophon.
+ */
 
 .icon {
   width: 1em;
@@ -8,6 +11,46 @@
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/*
+ * A plain document, Maester's home and the versions pages: the masthead, the
+ * page and the colophon in one column held to the web app's measure.
+ */
+.document {
+  display: grid;
+  grid-template-columns: minmax(0, var(--max-width));
+  grid-template-areas:
+    'masthead'
+    'page'
+    'colophon';
+  justify-content: center;
+  gap: var(--section-gap);
+  padding: var(--space-9) var(--gutter) var(--space-14);
+
+  > .masthead {
+    grid-area: masthead;
+  }
+
+  > .colophon {
+    padding-top: var(--space-11);
+    border-top: 1px solid var(--color-line);
+  }
+}
+
+.page {
+  grid-area: page;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
+}
+
+.lede {
+  max-width: 40rem;
+  color: var(--color-birch);
+  font-size: var(--font-size-lede);
+  line-height: var(--line-relaxed);
+  text-wrap: pretty;
 }
 
 .masthead {
@@ -216,6 +259,11 @@
   grid-auto-flow: column;
   align-items: center;
   gap: var(--space-4);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-bark);
+  }
 }
 
 .colophon-links {

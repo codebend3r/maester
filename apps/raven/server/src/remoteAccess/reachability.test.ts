@@ -12,7 +12,7 @@ import { testConfig } from '@/test/app'
 import { manualClock } from '@/test/clock'
 
 const SECRET = 'a-proxy-secret-of-at-least-32-characters'
-const CHECK_URL = 'https://raven-player.netlify.app/remote-access/check'
+const CHECK_URL = 'https://raven.maester.tv/remote-access/check'
 const HOSTNAME = 'raven.example.synology.me'
 
 const SETTINGS: RemoteAccessSettings = {

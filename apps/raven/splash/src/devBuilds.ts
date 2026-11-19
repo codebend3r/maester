@@ -1,7 +1,4 @@
-import '@fontsource/young-serif'
-import '@fontsource-variable/instrument-sans/wdth.css'
-import '@/styles/globals.scss'
-import '@/styles/page.scss'
+import '@/pageBase'
 import '@/styles/versions.scss'
 import '@/styles/devBuilds.scss'
 

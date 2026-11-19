@@ -69,7 +69,7 @@ FEATURES: list[Feature] = [
     },
     {
         "name": "Raven splash page",
-        "summary": "Raven's splash page on maester.netlify.app.",
+        "summary": "Raven's splash page on maester.tv.",
         "branches": ("raven-splash",),
         "stories": [],
     },

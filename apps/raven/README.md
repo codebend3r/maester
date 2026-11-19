@@ -512,7 +512,7 @@ From the repo root, on an Apple Silicon Mac, with the CI-built libmpv and addon 
 The app builds `@raven/web` first and serves that build, so there is one UI. The server it talks to is fixed at build time:
 
 - `RAVEN_DESKTOP_SERVER_ORIGIN` is the raven server's address. Unset, the app points at raven's public origin, `https://raven-player.synology.me:8443` ([Remote access](#remote-access)), so a viewer who signs in sees the same library and picks up where the web left off, at home or away. An install from before this, set up for the Netlify address, keeps its downloads and its last account. Set it to `http://localhost:8484` to build against a local `bunx nx run @raven/server:dev`.
-- `RAVEN_DESKTOP_LINK_ORIGINS` is an optional comma separated list of other origins whose `raven://` links name the same server, such as a LAN address. Links from the web app's Netlify site (`https://raven-player.netlify.app`) are accepted for the default server without it.
+- `RAVEN_DESKTOP_LINK_ORIGINS` is an optional comma separated list of other origins whose `raven://` links name the same server, such as a LAN address. Links from the web app's Netlify site (`https://raven.maester.tv`, and `https://raven-player.netlify.app`, which still serves it) are accepted for the default server without it.
 
 An unpackaged `dev` run reads both from the environment too, so a different server needs no rebuild.
 

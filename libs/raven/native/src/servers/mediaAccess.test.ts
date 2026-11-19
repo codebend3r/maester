@@ -145,10 +145,10 @@ describe('mediaAccessFor', () => {
     expect(sourceOf(await away.media.source(direct)).uri.startsWith(`${PUBLIC.url}/`)).toBe(true)
   })
 
-  it("plays a track's file, or the AAC transcode at a bitrate, from the picked origin by ticket", async () => {
-    const { media } = setUp()
+  it("plays a track's file, or the AAC transcode at a bitrate, from the server's own address by ticket, probing no origin", async () => {
+    const { media, probes, heard } = setUp({ accessToken: ACCOUNT_TOKEN })
     expect(sourceOf(await media.trackSource({ mediaId: BUSBOYS.id, kbps: null }))).toEqual({
-      uri: ticketed({ origin: LAN.url, path: filePath, ticket: TICKETS[0] }),
+      uri: ticketed({ origin: NAS.origin, path: filePath, ticket: TICKETS[0] }),
       headers: {},
     })
     const query = toQueryString({
@@ -157,7 +157,9 @@ describe('mediaAccessFor', () => {
     })
     expect(
       sourceOf(await media.trackSource({ mediaId: BUSBOYS.id, kbps: AUDIO_BITRATES.standard })),
-    ).toEqual({ uri: `${LAN.url}${transcodePath}?${query}`, headers: {} })
+    ).toEqual({ uri: `${NAS.origin}${transcodePath}?${query}`, headers: {} })
+    expect(probes.probed).toEqual([])
+    expect(heard.some((path) => path.startsWith(APP_CLIENT_CALLS.getMediaOrigins.path))).toBe(false)
   })
 
   it("downloads the server's MP4 copy of a video from the picked origin by ticket", async () => {

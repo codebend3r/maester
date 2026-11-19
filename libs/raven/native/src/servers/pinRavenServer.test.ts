@@ -49,7 +49,7 @@ describe('pinRavenServer', () => {
 
   it('moves raven stored under an older origin to the current one, keeping its cookies', () => {
     const { useServers, forgotten } = storeWithForgetLog()
-    useServers.getState().add({ ...RAVEN_SERVER, origin: 'https://raven-player.netlify.app' })
+    useServers.getState().add({ ...RAVEN_SERVER, origin: 'https://raven.maester.tv' })
 
     pinRavenServer({ servers: useServers })
 

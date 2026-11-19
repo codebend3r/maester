@@ -2,7 +2,7 @@ name: 📺 Device app release
 
 # Builds raven's device app for Android TV and attaches the APK to the release of each
 # pushed vX.Y.Z tag (scripts/bump_version.sh --push), as raven-app-<version>-android-tv.apk,
-# for the splash's dev builds page (maester.netlify.app/dev-builds/) to list. release.yml
+# for the splash's dev builds page (maester.tv/dev-builds/) to list. release.yml
 # creates that release; this workflow waits for it and uploads with --clobber, so a re-run
 # replaces the APK. Only three-number tags run it: a vX.Y.Z.N build tag never builds the app.
 #

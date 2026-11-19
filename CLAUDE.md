@@ -136,28 +136,28 @@ Shared tool config lives at the root, so every project lints and compiles by the
 - oxfmt has no `extends`, so each project keeps its own `.oxfmtrc.json`; keep their options identical.
 - `nx.json` lists `tsconfig.base.json` and `tooling/` as shared inputs, so a change there reruns every project's tasks.
 
-| Project           | Path                  | What                                                                                                           |
-| ----------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `@sparrow/api`    | `apps/sparrow/api`    | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                        |
-| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests                    |
-| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                          |
-| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                                  |
-| `@raven/splash`   | `apps/raven/splash`   | raven's front door at maester.netlify.app: a static Vite page, no React; its global SCSS is outside `dead-css` |
-| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                       |
-| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                          |
-| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                             |
-| `@raven/audio`    | `libs/raven/audio`    | Local Expo module for music on phones and tablets: `AVQueuePlayer` on iOS, Media3 on Android                   |
-| `@raven/native`   | `libs/raven/native`   | Sign-in and media access on React Native, shared by the device app and Wren: session, cookies, tickets         |
-| `@raven/desktop`  | `apps/raven/desktop`  | Raven: Electron 45 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e                |
-| `@raven/app`      | `apps/raven/app`      | raven on iPhone, iPad, Apple TV and Android TV: Expo 58 on react-native-tvos, expo-router, jest-expo           |
-| `@raven/music`    | `apps/raven/music`    | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router         |
-| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                                     |
-| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                       |
-| `@sparrow/web`    | `apps/sparrow/web`    | sparrow's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand        |
-| `@rookery/core`   | `libs/rookery/core`   | rookery's API contract: routes, pages, error codes, the wire types and their guards                            |
-| `@shared/http`    | `libs/shared/http`    | The suite's HTTP vocabulary and helpers, for every runtime: headers, statuses, cookies, bearer                 |
-| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                                       |
-| `scripts`         | `scripts`             | Repo tooling; its Python is linted with sparrow's pinned ruff and config                                       |
+| Project           | Path                  | What                                                                                                    |
+| ----------------- | --------------------- | ------------------------------------------------------------------------------------------------------- |
+| `@sparrow/api`    | `apps/sparrow/api`    | Python 3.12 package run through uv: agent, tools, chat, FastAPI, SQLite                                 |
+| `@raven/supabase` | `apps/raven/supabase` | Supabase Auth configuration, membership approval, migrations, local seed and database tests             |
+| `@raven/server`   | `apps/raven/server`   | NestJS 12 on Fastify, SQLite (better-sqlite3), ffprobe/ffmpeg, vitest                                   |
+| `@raven/web`      | `apps/raven/web`      | React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                           |
+| `@raven/splash`   | `apps/raven/splash`   | maester.tv: Maester's home, raven's page at `/raven/`, Wren's at `/wren/`; static Vite pages, no React  |
+| `@raven/core`     | `libs/raven/core`     | raven's shared core: API types and guards, API client, direct-play check                                |
+| `@raven/ui`       | `libs/raven/ui`       | Shared React player, engine/services contracts, primitives and styles                                   |
+| `@raven/mpv`      | `libs/raven/mpv`      | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                      |
+| `@raven/audio`    | `libs/raven/audio`    | Local Expo module for music on phones and tablets: `AVQueuePlayer` on iOS, Media3 on Android            |
+| `@raven/native`   | `libs/raven/native`   | Sign-in and media access on React Native, shared by the device app and Wren: session, cookies, tickets  |
+| `@raven/desktop`  | `apps/raven/desktop`  | Raven: Electron 45 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e         |
+| `@raven/app`      | `apps/raven/app`      | raven on iPhone, iPad, Apple TV and Android TV: Expo 58 on react-native-tvos, expo-router, jest-expo    |
+| `@raven/music`    | `apps/raven/music`    | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router  |
+| `@rookery/server` | `apps/rookery/server` | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                              |
+| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                |
+| `@sparrow/web`    | `apps/sparrow/web`    | sparrow's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand |
+| `@rookery/core`   | `libs/rookery/core`   | rookery's API contract: routes, pages, error codes, the wire types and their guards                     |
+| `@shared/http`    | `libs/shared/http`    | The suite's HTTP vocabulary and helpers, for every runtime: headers, statuses, cookies, bearer          |
+| `@shared/server`  | `libs/shared/server`  | The servers' shared scaffolding: web app serving, SQLite migrations, env                                |
+| `scripts`         | `scripts`             | Repo tooling; its Python is linted with sparrow's pinned ruff and config                                |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 

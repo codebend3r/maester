@@ -60,7 +60,7 @@ Run a product locally; each reads the .env beside its compose file.
 | `dev:raven:prod`       | raven's web app and UI against the live server on Vhagar, with no local server.                                                  |        |
 | `dev:raven:vhagar`     | raven's web app and UI against Vhagar over the home network, playing straight from it. The fastest way to load and play at home. | Vhagar |
 | `dev:raven:db`         | Replaces the local raven database with a copy of Vhagar's, paths rewritten to this Mac's mounts. Stop the dev server first.      | Vhagar |
-| `dev:raven:splash`     | raven's splash page (maester.netlify.app) with hot reload.                                                                       |        |
+| `dev:raven:splash`     | raven's splash page (maester.tv) with hot reload.                                                                                |        |
 | `web:build`            | Builds raven's web app, as Netlify and the desktop app ship it.                                                                  |        |
 | `build:raven:splash`   | Builds raven's splash page.                                                                                                      |        |
 | `preview:raven:splash` | Serves the built splash page, as Netlify would.                                                                                  |        |
