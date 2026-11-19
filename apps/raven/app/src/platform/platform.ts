@@ -1,5 +1,10 @@
 /** The builds the app ships, which differ in what they can play and how they are driven. */
-export const APP_PLATFORMS = { ios: 'ios', tvos: 'tvos', androidTv: 'androidTv' } as const
+export const APP_PLATFORMS = {
+  ios: 'ios',
+  tvos: 'tvos',
+  androidTv: 'androidTv',
+  androidPhone: 'androidPhone',
+} as const
 
 export type AppPlatform = (typeof APP_PLATFORMS)[keyof typeof APP_PLATFORMS]
 
@@ -11,11 +16,11 @@ type PlatformOfProps = { os: string; isTV: boolean }
 /**
  * The platform from React Native's `Platform.OS` and `Platform.isTV`, passed in so the
  * answer is testable without React Native. Apple TV reports `ios`, as iPhone and iPad do,
- * so only `isTV` tells them apart. The only Android build is the TV one.
+ * so only `isTV` tells them apart, and the same holds for an Android TV and an Android phone.
  */
 export const platformOf = ({ os, isTV }: PlatformOfProps): AppPlatform => {
   if (os === SYSTEMS.ios) return isTV ? APP_PLATFORMS.tvos : APP_PLATFORMS.ios
-  if (os === SYSTEMS.android) return APP_PLATFORMS.androidTv
+  if (os === SYSTEMS.android) return isTV ? APP_PLATFORMS.androidTv : APP_PLATFORMS.androidPhone
   throw new Error(`raven's app is not built for ${os}`)
 }
 
@@ -44,16 +49,20 @@ export const INPUT_KINDS = { focus: 'focus', touch: 'touch' } as const
 
 export type InputKind = (typeof INPUT_KINDS)[keyof typeof INPUT_KINDS]
 
-/** Whose fonts a platform names: Android's by file, Apple's by family. */
-export const FONT_SYSTEMS = { android: 'android', apple: 'apple' } as const
+/**
+ * Whose system a build runs on, which says what it hands raven: Android names a font by its file
+ * and Apple by its family, and only Apple has the system's action sheet and prompt
+ * (`ActionSheetIOS`, `Alert.prompt`), which raven draws for itself on Android.
+ */
+export const ECOSYSTEMS = { android: 'android', apple: 'apple' } as const
 
-export type FontSystem = (typeof FONT_SYSTEMS)[keyof typeof FONT_SYSTEMS]
+export type Ecosystem = (typeof ECOSYSTEMS)[keyof typeof ECOSYSTEMS]
 
 /** What sets one build apart from the others, read once wherever the platform matters. */
 type PlatformTraits = {
   /** How it is driven, which picks every layout kit. */
   input: InputKind
-  fonts: FontSystem
+  ecosystem: Ecosystem
   /**
    * Whether the player resumes by a seek of ours once loaded rather than by the library's
    * `startPosition`: AVPlayer, on iPhone, iPad and Apple TV alike (see `startUp.ts`). The library
@@ -72,27 +81,26 @@ type PlatformTraits = {
   shouldJudgeDroppedAudio: boolean
 }
 
-/** Each build's traits. */
+/** What AVPlayer's builds share, on iPhone, iPad and Apple TV alike. */
+const APPLE_TRAITS = {
+  ecosystem: ECOSYSTEMS.apple,
+  shouldSeekToResume: true,
+  shouldWatchMissingPicture: true,
+  shouldJudgeDroppedAudio: false,
+} as const satisfies Omit<PlatformTraits, 'input'>
+
+/** What ExoPlayer's builds share, on Android TV and Android phones alike. */
+const ANDROID_TRAITS = {
+  ecosystem: ECOSYSTEMS.android,
+  shouldSeekToResume: false,
+  shouldWatchMissingPicture: false,
+  shouldJudgeDroppedAudio: true,
+} as const satisfies Omit<PlatformTraits, 'input'>
+
+/** Each build's traits: its system's, and how it is driven. */
 export const PLATFORM_TRAITS = {
-  [APP_PLATFORMS.ios]: {
-    input: INPUT_KINDS.touch,
-    fonts: FONT_SYSTEMS.apple,
-    shouldSeekToResume: true,
-    shouldWatchMissingPicture: true,
-    shouldJudgeDroppedAudio: false,
-  },
-  [APP_PLATFORMS.tvos]: {
-    input: INPUT_KINDS.focus,
-    fonts: FONT_SYSTEMS.apple,
-    shouldSeekToResume: true,
-    shouldWatchMissingPicture: true,
-    shouldJudgeDroppedAudio: false,
-  },
-  [APP_PLATFORMS.androidTv]: {
-    input: INPUT_KINDS.focus,
-    fonts: FONT_SYSTEMS.android,
-    shouldSeekToResume: false,
-    shouldWatchMissingPicture: false,
-    shouldJudgeDroppedAudio: true,
-  },
+  [APP_PLATFORMS.ios]: { ...APPLE_TRAITS, input: INPUT_KINDS.touch },
+  [APP_PLATFORMS.tvos]: { ...APPLE_TRAITS, input: INPUT_KINDS.focus },
+  [APP_PLATFORMS.androidTv]: { ...ANDROID_TRAITS, input: INPUT_KINDS.focus },
+  [APP_PLATFORMS.androidPhone]: { ...ANDROID_TRAITS, input: INPUT_KINDS.touch },
 } as const satisfies Record<AppPlatform, PlatformTraits>

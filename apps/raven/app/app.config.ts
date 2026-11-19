@@ -15,6 +15,7 @@ import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidFonts } from './plugins/withAndroidFonts.ts'
 import { withTvBannerDensities } from './plugins/withTvBannerDensities.ts'
 import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
+import { withoutTvAudioService } from './plugins/withoutTvAudioService.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
 
@@ -132,10 +133,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         },
       ],
       /*
-       * Picture in Picture needs the audio background mode. The player still pauses when the
-       * app leaves the screen without it (`playInBackground` off): this is video.
+       * Picture in Picture needs the audio background mode on iOS, and on an Android phone the
+       * activity's `supportsPictureInPicture`, which a TV build leaves out. The player still
+       * pauses when the app leaves the screen without it (`playInBackground` off): this is video.
        */
-      ['react-native-video', { enableBackgroundAudio: true }],
+      ['react-native-video', { enableBackgroundAudio: true, enableAndroidPictureInPicture: !isTv }],
       // Held up by `AppRoot` until the stores are read, so the theme picked is the first frame.
       ['expo-splash-screen', { backgroundColor: ground }],
       /*
@@ -158,9 +160,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   }
   /*
    * The Apple TV's remote-driven end to end test joins only the TV's native project, and the
-   * Android TV's banner at each density only the TV's.
+   * Android TV's banner at each density and its manifest without the phone's music service
+   * only the TV's.
    */
-  const withTests = isTv ? withTvRemoteTests(withTvBannerDensities(app)) : app
+  const withTests = isTv
+    ? withoutTvAudioService(withTvRemoteTests(withTvBannerDensities(app)))
+    : app
   const withFonts = withAndroidFonts(withTests)
   return isDevelopment ? withCleartextTraffic(withFonts) : withFonts
 }

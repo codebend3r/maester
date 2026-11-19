@@ -349,6 +349,18 @@ describe('canPlaySurely, for a viewer who would rather not try a maybe', () => {
     expect(sureFirst(HLS_COPY_AUDIO_CODECS.eac3)).toBe(PLAYBACK_MODES.direct)
   })
 
+  it('plays on an Android phone what Android TV plays, through the same ExoPlayer', () => {
+    const media = mediaItemFor({
+      container: CONTAINERS.mkv,
+      videoCodec: VIDEO_CODECS.hevc,
+      videoBitDepth: 10,
+      audioCodec: AUDIO_CODECS.truehd,
+    })
+    expect(sureOn({ platform: APP_PLATFORMS.androidPhone, media })).toEqual(
+      sureOn({ platform: APP_PLATFORMS.androidTv, media }),
+    )
+  })
+
   it('answers every stream as canStream does, since a remux re-tags HEVC and carries AAC', () => {
     const { canPlaySurely, canStream } = canPlayFor(APP_PLATFORMS.ios)
     const media = mediaItemFor({

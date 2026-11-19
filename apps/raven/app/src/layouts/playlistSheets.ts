@@ -1,9 +1,10 @@
 import { isPlaylistName } from '@raven/core'
-import { ActionSheetIOS, Alert } from 'react-native'
+import { Alert } from 'react-native'
 
 import { CANCEL } from '@/layouts/gridKit'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { PLAYLIST_PICKS, type PlaylistChoice, type PlaylistPick } from '@/layouts/musicKit'
+import { askText, showChoice } from '@/layouts/touchSheets'
 import { themeNow } from '@/theme/useTheme'
 
 type AskPlaylistNameProps = {
@@ -15,29 +16,22 @@ type AskPlaylistNameProps = {
 }
 
 /**
- * Asks for a playlist's name in the system's prompt, light or dark as the theme is. A name of
+ * Asks for a playlist's name in this device's prompt, light or dark as the theme is. A name of
  * nothing but spaces, or one too long, is not sent.
  */
-export const askPlaylistName = ({ title, initial, submit, onName }: AskPlaylistNameProps) => {
-  Alert.prompt(
+export const askPlaylistName = ({ title, initial, submit, onName }: AskPlaylistNameProps) =>
+  askText({
     title,
-    undefined,
-    [
-      { text: CANCEL, style: 'cancel' },
-      {
-        text: submit,
-        onPress: (value) => {
-          const name = value?.trim() ?? ''
-          if (isPlaylistName(name)) onName(name)
-        },
-      },
-    ],
-    'plain-text',
     initial,
-    undefined,
-    { userInterfaceStyle: themeNow().tone },
-  )
-}
+    submit,
+    onSubmit: (value) => {
+      const name = value.trim()
+      if (isPlaylistName(name)) onName(name)
+    },
+  })
+
+/** The sheet's last line, New playlist, which no playlist's id can be. */
+const NEW_PLAYLIST_KEY = 'new-playlist'
 
 type OpenAddToPlaylistSheetProps = {
   /** What is being added, the sheet's title: "Add Airbag to a playlist". */
@@ -47,37 +41,37 @@ type OpenAddToPlaylistSheetProps = {
 }
 
 /**
- * The system's action sheet of the account's playlists, then New playlist, which asks for a
+ * This device's sheet of the account's playlists, then New playlist, which asks for a
  * name before it adds.
  */
-export const openAddToPlaylistSheet = ({
-  title,
-  playlists,
-  onPick,
-}: OpenAddToPlaylistSheetProps) => {
-  ActionSheetIOS.showActionSheetWithOptions(
-    {
-      title,
-      options: [...playlists.map((playlist) => playlist.name), MUSIC_COPY.newPlaylist, CANCEL],
-      cancelButtonIndex: playlists.length + 1,
-      userInterfaceStyle: themeNow().tone,
-    },
-    (index) => {
-      const chosen = playlists[index]
-      if (chosen !== undefined) {
-        onPick({ kind: PLAYLIST_PICKS.existing, playlistId: chosen.id, name: chosen.name })
-        return
-      }
-      if (index !== playlists.length) return
-      askPlaylistName({
-        title: MUSIC_COPY.newPlaylist,
-        initial: '',
-        submit: MUSIC_COPY.create,
-        onName: (name) => onPick({ kind: PLAYLIST_PICKS.fresh, name }),
-      })
-    },
-  )
-}
+export const openAddToPlaylistSheet = ({ title, playlists, onPick }: OpenAddToPlaylistSheetProps) =>
+  showChoice({
+    title,
+    message: null,
+    options: [
+      ...playlists.map((playlist) => ({
+        key: String(playlist.id),
+        label: playlist.name,
+        isDestructive: false,
+        onPress: () =>
+          onPick({ kind: PLAYLIST_PICKS.existing, playlistId: playlist.id, name: playlist.name }),
+      })),
+      {
+        key: NEW_PLAYLIST_KEY,
+        label: MUSIC_COPY.newPlaylist,
+        isDestructive: false,
+        onPress: () =>
+          askPlaylistName({
+            title: MUSIC_COPY.newPlaylist,
+            initial: '',
+            submit: MUSIC_COPY.create,
+            onName: (name) => onPick({ kind: PLAYLIST_PICKS.fresh, name }),
+          }),
+      },
+    ],
+    isOverPicture: false,
+    anchor: null,
+  })
 
 type ConfirmDeletePlaylistProps = { name: string; onDelete: () => void }
 

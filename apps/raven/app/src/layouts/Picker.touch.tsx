@@ -1,23 +1,21 @@
-import { THEME_TONES } from '@raven/core'
-import { type ComponentRef, type RefObject, useRef } from 'react'
-import { ActionSheetIOS, View, findNodeHandle } from 'react-native'
+import { type ComponentRef, useRef } from 'react'
+import type { View } from 'react-native'
 
 import { Chip } from '@/layouts/Chip.touch'
 import {
-  CANCEL,
   type PickerKit,
   type PickerProps,
   type ToolButtonProps,
   chosenLabelOf,
   pickerLabelOf,
 } from '@/layouts/gridKit'
-import { themeNow } from '@/theme/useTheme'
+import { type SheetAnchor, showChoice } from '@/layouts/touchSheets'
 
 type OpenPickerSheetProps<K extends string> = Pick<
   PickerProps<K>,
   'label' | 'options' | 'onChoose' | 'isOverPicture'
 > & {
-  anchor: RefObject<ComponentRef<typeof View> | null>
+  anchor: SheetAnchor
   /** The option drawn in red, as the sheet marks what cannot be undone. */
   destructiveKey?: K
   /** A line under the title: why an action is not offered. */
@@ -25,8 +23,9 @@ type OpenPickerSheetProps<K extends string> = Pick<
 }
 
 /**
- * Opens the system's action sheet for a picker, on an iPad as a popover pointing at `anchor`'s
- * view when it has one, light or dark as the theme's ground is, and dark over the video.
+ * Opens this device's sheet for a picker (the system's on an iPhone or iPad, as a popover
+ * pointing at `anchor`'s view on an iPad; raven's own on Android), light or dark as the theme's
+ * ground is, and dark over the video.
  */
 export const openPickerSheet = <K extends string>({
   label,
@@ -36,31 +35,25 @@ export const openPickerSheet = <K extends string>({
   anchor,
   destructiveKey,
   message = null,
-}: OpenPickerSheetProps<K>) => {
-  const node = anchor.current === null ? null : findNodeHandle(anchor.current)
-  const destructiveIndex = options.findIndex((option) => option.key === destructiveKey)
-  ActionSheetIOS.showActionSheetWithOptions(
-    {
-      title: label,
-      ...(message === null ? {} : { message }),
-      options: [...options.map((option) => option.label), CANCEL],
-      cancelButtonIndex: options.length,
-      ...(destructiveIndex === -1 ? {} : { destructiveButtonIndex: destructiveIndex }),
-      ...(node === null ? {} : { anchor: node }),
-      userInterfaceStyle: isOverPicture ? THEME_TONES.dark : themeNow().tone,
-    },
-    (index) => {
-      const chosen = options[index]
-      if (chosen !== undefined) onChoose(chosen.key)
-    },
-  )
-}
+}: OpenPickerSheetProps<K>) =>
+  showChoice({
+    title: label,
+    message,
+    options: options.map((option) => ({
+      key: option.key,
+      label: option.label,
+      isDestructive: option.key === destructiveKey,
+      onPress: () => onChoose(option.key),
+    })),
+    isOverPicture,
+    anchor,
+  })
 
 /**
- * A picker under the thumb: a chip that opens the system's action sheet, on an iPad as a
- * popover pointing at the chip. Only iPhones and iPads use the touch layout. Over the video the
- * chip is the player's dark glass and the sheet is dark, whatever the theme. Its word and its
- * value show unless `isIconOnly`; the spoken label says both either way.
+ * A picker under the thumb: a chip that opens this device's sheet, on an iPad as a popover
+ * pointing at the chip. Over the video the chip is the player's dark glass and the sheet is
+ * dark, whatever the theme. Its word and its value show unless `isIconOnly`; the spoken label
+ * says both either way.
  */
 const Picker = <K extends string>(props: PickerProps<K>) => {
   const chip = useRef<ComponentRef<typeof View>>(null)
@@ -89,5 +82,5 @@ const ToolButton = ({ icon, accessibilityLabel, onPress, isOverPicture }: ToolBu
   />
 )
 
-/** The toolbar on a phone or tablet: chips that open the system's sheet. */
+/** The toolbar on a phone or tablet: chips that open this device's sheet. */
 export const touchPicker: PickerKit = { Picker, ToolButton }

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 
-import { APP_PLATFORMS, NAV_KINDS, SYSTEMS, navKindOf, platformOf } from '@/platform/platform'
+import {
+  APP_PLATFORMS,
+  INPUT_KINDS,
+  NAV_KINDS,
+  PLATFORM_TRAITS,
+  SYSTEMS,
+  navKindOf,
+  platformOf,
+} from '@/platform/platform'
 
 /** A system React Native runs on that the app is not built for. */
 const UNBUILT_SYSTEMS = { web: 'web' } as const
@@ -11,15 +19,24 @@ describe('platformOf', () => {
     expect(platformOf({ os: SYSTEMS.ios, isTV: false })).toBe(APP_PLATFORMS.ios)
   })
 
-  it('counts every Android build as Android TV, the only one the app ships', () => {
+  it('tells Android TV from an Android phone, which both report android', () => {
     expect(platformOf({ os: SYSTEMS.android, isTV: true })).toBe(APP_PLATFORMS.androidTv)
-    expect(platformOf({ os: SYSTEMS.android, isTV: false })).toBe(APP_PLATFORMS.androidTv)
+    expect(platformOf({ os: SYSTEMS.android, isTV: false })).toBe(APP_PLATFORMS.androidPhone)
   })
 
   it('refuses a system the app is not built for', () => {
     expect(() => platformOf({ os: UNBUILT_SYSTEMS.web, isTV: false })).toThrow(
       `raven's app is not built for ${UNBUILT_SYSTEMS.web}`,
     )
+  })
+})
+
+describe('PLATFORM_TRAITS', () => {
+  it("drives an Android phone by touch, as an iPhone, over the Android TV's ExoPlayer ways", () => {
+    const phone = PLATFORM_TRAITS[APP_PLATFORMS.androidPhone]
+    const tv = PLATFORM_TRAITS[APP_PLATFORMS.androidTv]
+    expect(phone.input).toBe(INPUT_KINDS.touch)
+    expect({ ...phone, input: tv.input }).toEqual(tv)
   })
 })
 
