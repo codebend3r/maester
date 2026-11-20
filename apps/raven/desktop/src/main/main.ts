@@ -618,7 +618,7 @@ const startApp = (): void => {
     app.on('will-quit', quitGate)
 
     await app.whenReady()
-    // Packaged, the bundle's icon.icns is the Dock's; unpackaged, Electron's own would be.
+    // Packaged, the bundle's own icon is the Dock's; unpackaged, Electron's would be.
     if (!app.isPackaged) app.dock?.setIcon(join(app.getAppPath(), `${APP_ICON}.png`))
     /*
      * `powerMonitor` answers only once the app is ready. A sleep stops the downloads where

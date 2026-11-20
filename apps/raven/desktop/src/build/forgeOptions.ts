@@ -21,9 +21,14 @@ export const FONTS = join('resources', 'fonts')
 
 /**
  * The raven logo as the app icon, from this project's folder and without an extension: the
- * packager adds `.icns` on macOS and `.ico` on Windows, and an unpackaged launch puts the
- * `.png` in the Dock. The `.ico` is made from the `.png` with ImageMagick:
+ * packager adds `.icns` and `.icon` on macOS and `.ico` on Windows, and an unpackaged launch
+ * puts the `.png` in the Dock. The `.ico` is made from the `.png` with ImageMagick:
  * `magick icon.png -depth 8 -define icon:auto-resize=256,128,64,48,32,16 icon.ico`.
+ *
+ * The `.icon` is the Icon Composer document macOS 26 and later draw: the logo on a full-bleed
+ * ground the system masks itself. Those systems shrink the `.icns`, which draws its own rounded
+ * square, onto a grey plate, so it stays only for the older ones. Compiling the `.icon` takes
+ * Xcode 26 or later.
  */
 export const APP_ICON = join('resources', 'icon')
 
