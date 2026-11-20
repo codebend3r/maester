@@ -177,7 +177,7 @@ describe('adHocApps', () => {
 describe('APP_ICON', () => {
   const project = join(import.meta.dir, '..', '..')
 
-  it.each(['icns', 'ico', 'png'])('is a .%s the app ships with', (extension) => {
+  it.each(['icns', 'icon', 'ico', 'png'])('is a .%s the app ships with', (extension) => {
     expect(existsSync(join(project, `${APP_ICON}.${extension}`))).toBe(true)
   })
 })
