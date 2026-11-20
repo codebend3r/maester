@@ -25,6 +25,7 @@ import {
 import { TmdbClient } from '@/metadata/tmdbClient'
 import { requireTmdb, tmdbUnavailable } from '@/metadata/tmdbGate'
 import { Public } from '@/lock/lockGuard'
+import { PeopleRepository } from '@/people/peopleRepository'
 import { upcomingKindOf } from '@/upcoming/upcomingKind'
 import { UpcomingSearch } from '@/upcoming/upcomingSearch'
 import { UpcomingShelfPages } from '@/upcoming/upcomingShelfPages'
@@ -52,6 +53,7 @@ export class UpcomingController {
     @Inject(TmdbClient) private readonly tmdb: TmdbClient,
     @Inject(UpcomingShelfPages) private readonly shelves: UpcomingShelfPages,
     @Inject(UpcomingSearch) private readonly searches: UpcomingSearch,
+    @Inject(PeopleRepository) private readonly people: PeopleRepository,
   ) {}
 
   /**
@@ -94,8 +96,8 @@ export class UpcomingController {
   }
 
   /**
-   * One upcoming movie or show as TMDB describes it, the same for every
-   * viewer. Public to the PIN lock: no library holds it.
+   * One upcoming movie or show as TMDB describes it, cast and crew included,
+   * the same for every viewer. Public to the PIN lock: no library holds it.
    */
   @Get(UPCOMING_TITLE_PATH)
   @Public()
@@ -120,6 +122,7 @@ export class UpcomingController {
       genres: item.genres,
       runtime: item.runtime,
       kind: upcomingKindOf({ ...item, type: ask.type }),
+      credits: this.people.creditsOf(item.credits),
     }
   }
 }

@@ -7,6 +7,7 @@ import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { BrowseFan } from '@/components/AppShell/BrowseFan'
 import { FollowServer } from '@/components/AppShell/FollowServer'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
@@ -85,9 +86,8 @@ const NavItems = ({ places, isIconsOnly }: NavItemsProps) =>
     />
   ))
 
-/** The browsing places at the side menu's head, while the server is in reach. */
+/** The browsing places the nine-dot button fans out, under Home, while the server is in reach. */
 const BROWSE_PLACES = [
-  NAV_PLACES.home,
   NAV_PLACES.continueWatching,
   NAV_PLACES.binge,
   NAV_PLACES.comingSoon,
@@ -245,10 +245,11 @@ const PINNED_MARKS = {
 
 /**
  * The frame around every browsing page. Beside the page, the side menu
- * holds still as the page scrolls: the logo, Home, Continue watching, Binge,
- * Coming soon (what TMDB says is on its way) and Favourites, Music
- * (the music mode at `/music`) while a music library exists, then under a
- * Pinned heading the pinned libraries, each with its type's icon
+ * holds still as the page scrolls: the logo, Home, then a nine-dot button
+ * that fans out Continue watching, Binge, Coming soon (what TMDB says is on
+ * its way), Favourites and, while a music library exists, Music (the music
+ * mode at `/music`), then under a Pinned heading the pinned libraries, each
+ * with its type's icon
  * (with a lock on it for a locked one, whatever its type), an open one
  * marked instead of Libraries. Libraries and Settings sit at its foot, under
  * a rule and a Manage button that folds them away, open menu or icons alone,
@@ -282,6 +283,7 @@ export const AppShell = () => {
     ? []
     : (libraries.data ?? []).filter((library) => library.settings.pinned)
   const hasMusic = !isOffline && musicLibrariesOf(libraries.data ?? []).length > 0
+  const browsePlaces = hasMusic ? [...BROWSE_PLACES, NAV_PLACES.music] : BROWSE_PLACES
   const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
   const isPinnedOpen = pinned.some((library) =>
     isAnyOf({ patterns: libraryPages(library.id), pathname }),
@@ -303,8 +305,12 @@ export const AppShell = () => {
           <Logo isMarkOnly={isIconsOnly} />
         </Link>
         <div className={styles.links}>
-          {!isOffline && <NavItems places={BROWSE_PLACES} isIconsOnly={isIconsOnly} />}
-          {hasMusic && <NavItems places={[NAV_PLACES.music]} isIconsOnly={isIconsOnly} />}
+          {!isOffline && (
+            <>
+              <NavItems places={[NAV_PLACES.home]} isIconsOnly={isIconsOnly} />
+              <BrowseFan places={browsePlaces} isIconsOnly={isIconsOnly} />
+            </>
+          )}
           {pinned.length > 0 && (
             <>
               <PinnedMark />

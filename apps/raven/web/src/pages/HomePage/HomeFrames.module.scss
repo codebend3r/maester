@@ -11,6 +11,70 @@
   gap: var(--section-gap);
 }
 
+/*
+ * Home's sections in named slots, so a section can later be moved to
+ * another slot without touching the layout. On the widest screens Binge
+ * (slot-1) and the featured hero (slot-2) share `--first-row` over Continue
+ * watching (slot-3) and the libraries' shelves (slot-4); a slot with
+ * nothing in it gives the row to the other, and each of the two fills the
+ * row's height, so the shorter section grows to the taller. The rows have
+ * no gap: a slot that holds something pads its own foot, so an empty one
+ * leaves no hole.
+ */
+.slots {
+  --first-row: 'slot-1 slot-1 slot-2 slot-2';
+
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-areas:
+    var(--first-row)
+    'slot-3 slot-3 slot-3 slot-3'
+    'slot-4 slot-4 slot-4 slot-4';
+  column-gap: var(--section-gap);
+
+  &:has(> .slot1:empty) {
+    --first-row: 'slot-2 slot-2 slot-2 slot-2';
+  }
+
+  &:has(> .slot2:empty) {
+    --first-row: 'slot-1 slot-1 slot-1 slot-1';
+  }
+}
+
+.slot1,
+.slot2,
+.slot3,
+.slot4 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
+  padding-block-end: var(--section-gap);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.slot1 {
+  grid-area: slot-1;
+}
+
+.slot2 {
+  grid-area: slot-2;
+}
+
+.slot3 {
+  grid-area: slot-3;
+  align-content: start;
+}
+
+// The last on the page, whose foot is the page's own.
+.slot4 {
+  grid-area: slot-4;
+  align-content: start;
+  padding-block-end: 0;
+}
+
 // A heading over its cards.
 .section {
   display: grid;
@@ -18,17 +82,37 @@
   gap: var(--space-4);
 }
 
-// Eight to a row, as `POSTER_SIZES.row` measures them.
+/*
+ * A shelf of up to fifty cards in one line, scrolled sideways on its own.
+ * `--shelf-columns` is how many fit the page's width at once, as
+ * `POSTER_SIZES.row` measures them. The padding above leaves room for a
+ * card's lift on hover, which the scroller would otherwise clip.
+ */
 .row {
+  --shelf-columns: 12;
+  --shelf-gap: var(--space-3);
+
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: var(--space-4) var(--space-3);
+  grid-auto-flow: column;
+  grid-auto-columns: calc(
+    (100% - (var(--shelf-columns) - 1) * var(--shelf-gap)) / var(--shelf-columns)
+  );
+  column-gap: var(--shelf-gap);
+  padding-block: var(--space-1) var(--space-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+
+  > * {
+    scroll-snap-align: start;
+  }
 }
 
-// Continue watching's tiles, two across.
+// Continue watching's tiles, three across on the widest screens: home's three rows of three.
 .tiles {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-4);
 }
 
@@ -46,9 +130,39 @@
   padding: var(--space-4);
 }
 
+@media (max-width: 160rem) {
+  .row {
+    --shelf-columns: 10;
+  }
+}
+
+@media (max-width: 120rem) {
+  .row {
+    --shelf-columns: 8;
+  }
+
+  .slots {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'slot-1'
+      'slot-2'
+      'slot-3'
+      'slot-4';
+  }
+
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  // Two across, home's capped tiles drop an odd last one, so they fill whole rows: four of two.
+  .capped > :last-child:nth-child(odd) {
+    display: none;
+  }
+}
+
 @media (max-width: 64rem) {
   .row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    --shelf-columns: 4;
   }
 }
 
@@ -66,6 +180,6 @@
 
 @media (max-width: 40rem) {
   .row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --shelf-columns: 2;
   }
 }

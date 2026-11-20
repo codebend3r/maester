@@ -7,11 +7,11 @@ describe('homeContinueCountOf', () => {
     expect(homeContinueCountOf({ given: '12' })).toBe(12)
   })
 
-  it('keeps six for none, zero, a fraction or words', () => {
-    expect(homeContinueCountOf({ given: undefined })).toBe(6)
-    expect(homeContinueCountOf({ given: '' })).toBe(6)
-    expect(homeContinueCountOf({ given: '0' })).toBe(6)
-    expect(homeContinueCountOf({ given: '2.5' })).toBe(6)
-    expect(homeContinueCountOf({ given: 'many' })).toBe(6)
+  it('keeps nine for none, zero, a fraction or words', () => {
+    expect(homeContinueCountOf({ given: undefined })).toBe(9)
+    expect(homeContinueCountOf({ given: '' })).toBe(9)
+    expect(homeContinueCountOf({ given: '0' })).toBe(9)
+    expect(homeContinueCountOf({ given: '2.5' })).toBe(9)
+    expect(homeContinueCountOf({ given: 'many' })).toBe(9)
   })
 })

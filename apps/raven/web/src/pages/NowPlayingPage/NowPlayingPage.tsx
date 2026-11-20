@@ -161,7 +161,7 @@ type PlayingProps = { track: Track }
 
 /**
  * The page while `track` plays: it large, its controls, its lyrics or an
- * audiobook's chapters, and the queue under them.
+ * audiobook's chapters, and the queue beside them.
  */
 const Playing = ({ track }: PlayingProps) => {
   const titleId = useId()
@@ -194,7 +194,7 @@ const Playing = ({ track }: PlayingProps) => {
   const extras = extrasViewOf({ track, isAudiobook, chapters })
 
   return (
-    <section className={styles.page} aria-labelledby={titleId}>
+    <section className={styles.playing} aria-labelledby={titleId}>
       <BackButton fallback={links.home} className={styles.back} />
       <h1 id={titleId} className="visually-hidden">
         {NOW_PLAYING_COPY.title}
@@ -344,7 +344,7 @@ const nowPlayingViewOf = ({ track }: NowPlayingViewOfProps): ViewOf<NowPlayingVi
 /**
  * `/now-playing`: the playing track large, with its cover, a scrubber,
  * previous, play or pause, next, shuffle and repeat, then its lyrics, and
- * the queue under them, each track playable, removable or moved up. An
+ * the queue beside them on a wide window, each track playable, removable or moved up. An
  * audiobook shows its chapters in place of lyrics, with chapter skips and
  * a speed; never Skip intro, though a chapter may be named like one. Empty
  * when nothing plays.

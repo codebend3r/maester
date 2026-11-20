@@ -1,6 +1,7 @@
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native'
 import { View } from 'react-native'
 
+import { lineRoleOf } from '@/layouts/lineRole'
 import type { SettingsLineProps, SettingsSectionProps } from '@/layouts/settingsKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 
@@ -16,9 +17,6 @@ type SettingsPartsForProps = {
   /** The layout's styles for the parts, in the theme worn now. */
   useStyles: () => SettingsPartStyles
 }
-
-/** What a line is to a screen reader: an alert it says at once, or plain text. */
-const LINE_ROLES = { alert: 'alert', text: 'text' } as const
 
 /**
  * The parts Settings draws the same on a TV and under the thumb: a section under its heading
@@ -41,7 +39,7 @@ export const settingsPartsFor = ({ useStyles }: SettingsPartsForProps) => {
   const SettingsLine = ({ text, isAlert = false }: SettingsLineProps) => {
     const styles = useStyles()
     return (
-      <Text accessibilityRole={isAlert ? LINE_ROLES.alert : LINE_ROLES.text} style={styles.line}>
+      <Text accessibilityRole={lineRoleOf(isAlert)} style={styles.line}>
         {text}
       </Text>
     )

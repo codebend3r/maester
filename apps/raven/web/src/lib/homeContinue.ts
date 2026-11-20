@@ -1,5 +1,5 @@
-/** Tiles the home page shows when the build names no count: three rows of two. */
-const DEFAULT_COUNT = 6
+/** Tiles the home page shows when the build names no count: three rows of three. */
+const DEFAULT_COUNT = 9
 
 type HomeContinueCountProps = { given: string | undefined }
 

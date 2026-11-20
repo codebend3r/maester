@@ -17,9 +17,13 @@ export const HOME_HERO_COPY = {
   episodes: { one: 'episode', many: 'episodes' },
 } as const
 
-/** A row of the Libraries screen: a locked library's type with the web's note after it. */
+/** A card on the Libraries screen, in the web card's words: its type, a lock, its counts. */
 export const LIBRARY_LIST_COPY = {
-  locked: (kind: string) => `${kind} · Locked`,
+  separator: ' · ',
+  locked: 'Locked',
+  libraries: { one: 'library', many: 'libraries' },
+  videos: { one: 'video', many: 'videos' },
+  notMatched: (count: string) => `${count} not matched`,
 } as const
 
 /** The ways up from a video, as an item page's buttons and a card's menu both say them. */

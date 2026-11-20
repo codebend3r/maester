@@ -28,6 +28,8 @@ type FakeArrState = {
   resolutions: number[]
   queue: unknown[]
   hasFile: boolean
+  /** The first day out each title's record says, as the arr writes it; none when unset. */
+  released?: string
   /** What Radarr's calendar lists, and every series Sonarr holds. */
   calendar: unknown[]
   series: unknown[]
@@ -109,9 +111,14 @@ const fakeArrs =
     if (path === '/api/v3/queue/details') return json(state.queue)
     if (path === '/api/v3/calendar') return json(state.calendar)
     if (method === 'GET' && path === '/api/v3/series') return json(state.series)
-    if (path.startsWith('/api/v3/movie/')) return json({ hasFile: state.hasFile })
+    if (path.startsWith('/api/v3/movie/')) {
+      return json({ hasFile: state.hasFile, inCinemas: state.released })
+    }
     if (path.startsWith('/api/v3/series/')) {
-      return json({ statistics: { episodeFileCount: state.hasFile ? 3 : 0 } })
+      return json({
+        firstAired: state.released,
+        statistics: { episodeFileCount: state.hasFile ? 3 : 0 },
+      })
     }
     return json({ message: `unexpected ${method} ${path}` }, 404)
   }
@@ -234,6 +241,23 @@ describe('download requests', () => {
     })
   })
 
+  it('counts no file the arr holds of a title that has not come out yet', async () => {
+    state.arr.hasFile = true
+    state.arr.released = '2099-11-25T00:00:00Z'
+    const service = requests()
+    expect(await service.holding({ type: ITEM_TYPES.show, tmdbId: '11' })).toEqual({
+      status: REQUEST_STATUSES.notDownloadable,
+    })
+    expect(await service.holding({ type: ITEM_TYPES.movie, tmdbId: '2' })).toEqual({
+      status: REQUEST_STATUSES.notDownloadable,
+    })
+    state.arr.released = new Date(time.clock.now()).toISOString()
+    time.advance(STATUS_FRESH_MS)
+    expect(await service.holding({ type: ITEM_TYPES.show, tmdbId: '11' })).toEqual({
+      status: REQUEST_STATUSES.downloaded,
+    })
+  })
+
   it('refuses a show the arr already holds, and sends it nothing', async () => {
     const ask = { type: ITEM_TYPES.show, tmdbId: '11' } as const
     await expect(
@@ -294,6 +318,14 @@ describe('download requests', () => {
         firstAired: '1960-02-02T00:00:00Z',
       },
       {
+        id: 74,
+        title: 'Not Out Yet',
+        tmdbId: 402,
+        added: '2025-10-25T04:27:41Z',
+        firstAired: '2099-11-25T00:00:00Z',
+        statistics: { episodeFileCount: 8 },
+      },
+      {
         id: 73,
         title: 'No TMDB id',
         added: '2026-01-05T00:00:00Z',
@@ -327,6 +359,16 @@ describe('download requests', () => {
         title: 'Dune: Part Three',
         status: REQUEST_STATUSES.downloading,
         requestedAt: '2026-01-02T03:04:05Z',
+        isMine: false,
+        isHeld: true,
+        libraryItemId: null,
+      },
+      {
+        type: ITEM_TYPES.show,
+        tmdbId: '402',
+        title: 'Not Out Yet',
+        status: REQUEST_STATUSES.notDownloadable,
+        requestedAt: '2025-10-25T04:27:41Z',
         isMine: false,
         isHeld: true,
         libraryItemId: null,

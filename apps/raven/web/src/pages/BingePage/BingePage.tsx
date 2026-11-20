@@ -10,14 +10,15 @@ import { BINGE_COPY } from '@/lib/binge'
 import { bingeQuery } from '@/lib/bingeQuery'
 import { useBingeProfile, useSetBinge } from '@/lib/useBinge'
 import styles from '@/pages/BingePage/BingePage.module.scss'
+import { BingeRow, BingeRowSkeleton } from '@/pages/BingePage/BingeRow'
 import { APP_PATHS } from '@/lib/appPaths'
 
-/** How many cards stand in on the Binge page before the list says how many it holds. */
+/** How many rows stand in on the Binge page before the list says how many it holds. */
 const UNKNOWN_SKELETON_COUNT = 2
 
 type BingeSkeletonProps = { count: number }
 
-/** The cards on their way, laid out as the grid lays the real ones. */
+/** Home's cards on their way, laid out as the grid lays the real ones. */
 const BingeSkeleton = ({ count }: BingeSkeletonProps) => (
   <Loading label={BINGE_COPY.loading}>
     <ul className={styles.grid}>
@@ -90,15 +91,43 @@ export const HomeBinge = () => {
   )
 }
 
+type BingeRowsProps = {
+  shows: readonly ItemDetails[]
+  /** How many rows stand in while no show has arrived; none draws nothing then. */
+  skeletons: number
+}
+
+/** The Binge page's shows as a list, a row each; until one arrives, rows of their shape. */
+const BingeRows = ({ shows, skeletons }: BingeRowsProps) => (
+  <>
+    {shows.length === 0 && skeletons > 0 && (
+      <Loading label={BINGE_COPY.loading}>
+        <ul className={styles.list}>
+          {Array.from({ length: skeletons }, (_, index) => (
+            <BingeRowSkeleton key={index} />
+          ))}
+        </ul>
+      </Loading>
+    )}
+    {shows.length > 0 && (
+      <ul className={styles.list}>
+        {shows.map((item) => (
+          <BingeRow key={item.id} details={item} />
+        ))}
+      </ul>
+    )}
+  </>
+)
+
 type PageSkeletonCountProps = { isListPending: boolean; isPending: boolean; count: number }
 
-/** How many cards stand in on the page: a guess before the list is read, then one per show on its way. */
+/** How many rows stand in on the page: a guess before the list is read, then one per show on its way. */
 const pageSkeletonCountOf = ({ isListPending, isPending, count }: PageSkeletonCountProps) => {
   if (isListPending) return UNKNOWN_SKELETON_COUNT
   return isPending ? count : 0
 }
 
-/** The Binge page's list: the way to find shows while it is empty, each show that failed, then the cards. */
+/** The Binge page's list: the way to find shows while it is empty, each show that failed, then a row for each show. */
 const BingeList = () => {
   const { ids, isListPending, isPending, shows, failures } = useBingeShows()
   const setBinge = useSetBinge()
@@ -128,7 +157,7 @@ const BingeList = () => {
           <Button onClick={() => setBinge.mutate({ id, binge: false })}>{BINGE_COPY.remove}</Button>
         </section>
       ))}
-      <BingeGrid
+      <BingeRows
         shows={shows}
         skeletons={pageSkeletonCountOf({ isListPending, isPending, count: ids.length })}
       />

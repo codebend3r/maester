@@ -1,4 +1,11 @@
-import { CREDIT_JOBS, ITEM_TYPES, type ItemDetails, type MediaItem } from '@/contract'
+import {
+  CREDIT_JOBS,
+  ITEM_TYPES,
+  type ItemChild,
+  type ItemDetails,
+  type MediaItem,
+  type SeasonSummary,
+} from '@/contract'
 import { formatRuntime } from '@/format'
 import { tileWords } from '@/items'
 import { progressOf } from '@/mediaProgress'
@@ -37,6 +44,25 @@ export type BingeCardFacts = {
   episodeLine: string | null
   /** Null with no episode, or one not started that has no season and episode number. */
   status: BingeStatus | null
+  /** How much of the show has been watched, in episodes; null for one with none on disk. */
+  seen: BingeSeen | null
+}
+
+/** How many of a show's episodes on disk have been watched, of how many. */
+export type BingeSeen = { watched: number; total: number }
+
+const isSeason = (child: ItemChild): child is SeasonSummary => child.type === ITEM_TYPES.season
+
+/** The show's seasons' watched and on-disk episodes, added up; null with no episode on disk. */
+const seenOf = (details: ItemDetails): BingeSeen | null => {
+  const seen = details.children.filter(isSeason).reduce<BingeSeen>(
+    (sum, season) => ({
+      watched: sum.watched + season.watchedCount,
+      total: sum.total + season.episodeCount,
+    }),
+    { watched: 0, total: 0 },
+  )
+  return seen.total > 0 ? seen : null
 }
 
 const statusOf = (media: MediaItem | null): BingeStatus | null => {
@@ -49,7 +75,8 @@ const statusOf = (media: MediaItem | null): BingeStatus | null => {
 
 /**
  * The facts a Binge card shows of a show: its year, how long the episode it is on runs, its two
- * leading stars, that episode's code and title, a synopsis, and how far along it is. The Binge
+ * leading stars, that episode's code and title, a synopsis, how far along that episode is,
+ * and how much of the show has been watched. The Binge
  * lists hold shows only, so a movie gets no facts of its own here.
  */
 export const bingeCardFacts = ({ details, next, episode }: BingeCardFactsProps): BingeCardFacts => {
@@ -64,5 +91,6 @@ export const bingeCardFacts = ({ details, next, episode }: BingeCardFactsProps):
     synopsis: episode?.summary ?? details.summary ?? null,
     episodeLine: next === null ? null : tileWords(next).line,
     status: statusOf(next),
+    seen: seenOf(details),
   }
 }

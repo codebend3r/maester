@@ -80,9 +80,11 @@ export class PeopleController {
     const credits = person.credits.filter((credit) => viewer.seesItem(credit.item.id))
     /*
      * A person whose titles are all hidden from this caller is never looked
-     * up; the rest share two lookups at a time, with 20 waiting.
+     * up, but one credited on no title on disk (known from Coming soon) is;
+     * they share two lookups at a time, with 20 waiting.
      */
-    const asked = credits.length > 0 ? await this.filmographies.ensure({ personId: id }) : null
+    const isLookedUp = credits.length > 0 || person.credits.length === 0
+    const asked = isLookedUp ? await this.filmographies.ensure({ personId: id }) : null
     // Read again, for the name and photo a fetch just brought.
     const latest = this.people.profile(id) ?? { ...person, profile: null }
     return {

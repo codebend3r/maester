@@ -36,13 +36,20 @@ const TIME_FORMAT = new Intl.DateTimeFormat(undefined, {
   minute: '2-digit',
 })
 
+type RequestedByOnProps = { who: string; day: string }
+
 export const REQUEST_COPY = {
   heading: 'Request',
   request: 'Request download',
   requesting: 'Requesting',
-  requestedByYou: 'You requested this. Everyone can watch it once it arrives.',
-  requestedBySomeone: 'Someone has requested this. Everyone can watch it once it arrives.',
-  requestedAlready: 'This is requested already. Everyone can watch it once it arrives.',
+  /** Who asked for a title, and the day they did; a title only its arr holds has no day. */
+  requestedByOn: ({ who, day }: RequestedByOnProps) => `Requested by ${who} on ${day}.`,
+  requestedBy: (who: string) => `Requested by ${who}.`,
+  /** Who asked, where the viewer may not know their email. */
+  you: 'you',
+  someone: 'someone',
+  /** The info button beside a request's status, whose tooltip says what the status means. */
+  aboutStatus: 'What this status means',
   requested: 'Requested',
   /** What the green check on a requested title's poster says to a screen reader. */
   requestedMark: 'Requested',

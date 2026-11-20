@@ -9,6 +9,9 @@ import { CARD_PICTURES } from '@/lib/cardPictures'
 /** How many library rows stand in before home says which are pinned. */
 const SHELF_COUNT = 2
 
+/** Cards in each standing-in row: as many as the widest screen shows across at once. */
+const SHELF_CARD_COUNT = 12
+
 /** The hero's shape: words at the left, a poster beside them. */
 const HeroShape = () => (
   <div className={styles.hero}>
@@ -41,7 +44,7 @@ const ContinueTileShape = () => (
 
 type ContinueTileShapesProps = { count: number }
 
-/** `count` tiles on their way, two across as the real ones are. */
+/** `count` tiles on their way, laid out as the real ones are. */
 export const ContinueTileShapes = ({ count }: ContinueTileShapesProps) => (
   <ul className={frames.tiles}>
     {Array.from({ length: count }, (_, index) => (
@@ -66,7 +69,7 @@ const ShelfShapes = ({ count }: ShelfShapesProps) =>
     <section key={index} className={frames.section}>
       <Bone shape="heading" width="short" />
       <ul className={frames.row}>
-        <SkeletonCards picture={CARD_PICTURES.poster} count={8} />
+        <SkeletonCards picture={CARD_PICTURES.poster} count={SHELF_CARD_COUNT} />
       </ul>
     </section>
   ))

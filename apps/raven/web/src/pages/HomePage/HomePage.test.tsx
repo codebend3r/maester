@@ -291,7 +291,7 @@ describe('HomePage', () => {
     ])
   })
 
-  it('shows the first six videos in progress, and links to a page of every one', async () => {
+  it('shows the first nine videos in progress, and links to a page of every one', async () => {
     const watching = Array.from({ length: 10 }, (_, index) => ({
       media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
       poster: null,
@@ -299,15 +299,27 @@ describe('HomePage', () => {
     open({ inProgress: watching, shelves: [] })
     await screen.findByRole('heading', { name: 'Continue watching' })
     const section = shelf('Continue watching')
-    expect(within(section).getAllByRole('listitem')).toHaveLength(6)
+    expect(within(section).getAllByRole('listitem')).toHaveLength(9)
 
     const seeAll = within(section).getByRole('link', { name: /^See all 10/ })
     expect(seeAll).toHaveAttribute('href', '/continue-watching')
     expect(seeAll.textContent).toBe('See all 10')
   })
 
+  it('marks nine tiles capped, so two across drop the ninth, and links to all nine', async () => {
+    const watching = Array.from({ length: 9 }, (_, index) => ({
+      media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
+      poster: null,
+    }))
+    open({ inProgress: watching, shelves: [] })
+    await screen.findByRole('heading', { name: 'Continue watching' })
+    const section = shelf('Continue watching')
+    expect(within(section).getByRole('list')).toHaveClass('capped')
+    expect(within(section).getByRole('link', { name: /^See all 9/ })).toBeInTheDocument()
+  })
+
   it('has no See all link when every video in progress already shows', async () => {
-    const watching = Array.from({ length: 6 }, (_, index) => ({
+    const watching = Array.from({ length: 8 }, (_, index) => ({
       media: mediaItem({ id: 100 + index, title: `Halfway ${index}`, position: 60 }),
       poster: null,
     }))

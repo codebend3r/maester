@@ -4,7 +4,6 @@ import { type DesignToken, TOKEN_GROUPS } from '@raven/core'
 const SAMPLED_TOKENS = {
   focusRing: '--focus-ring',
   borderThick: '--border-thick',
-  maxWidth: '--max-width',
   measure: '--measure',
   fieldSize: '--field-size',
   trackingEyebrow: '--tracking-eyebrow',
@@ -71,7 +70,7 @@ const named =
 const sizeSample = (name: string): Sample => {
   if (name === SAMPLED_TOKENS.focusRing) return SAMPLES.focus
   if (name === SAMPLED_TOKENS.borderThick) return SAMPLES.border
-  if (name === SAMPLED_TOKENS.maxWidth || name === SAMPLED_TOKENS.measure) return SAMPLES.width
+  if (name === SAMPLED_TOKENS.measure) return SAMPLES.width
   if (name.startsWith('--control-size') || name === SAMPLED_TOKENS.fieldSize) return SAMPLES.height
   return SAMPLES.none
 }

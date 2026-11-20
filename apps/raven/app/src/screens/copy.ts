@@ -102,7 +102,8 @@ export const LIBRARIES_COPY = {
   title: LIBRARIES_ENTRY.label,
   gathering: 'Gathering the libraries',
   none: 'No libraries here yet. An admin adds them on the web.',
-  library: { one: 'library', many: 'libraries' },
+  showMore: (library: string) => `Show more of ${library}`,
+  showLess: (library: string) => `Show less of ${library}`,
 } as const
 
 export const SETTINGS_COPY = {

@@ -1,0 +1,135 @@
+/*
+ * A row of the list: the poster down the left, the title and its facts
+ * beside it over the progress, and the play button at the right. Its
+ * skeleton shares the shape.
+ */
+.row {
+  display: grid;
+  grid-template-columns: var(--binge-poster) minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'poster copy play'
+    'poster seen play';
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-canopy);
+
+  --binge-poster: 4.5rem;
+}
+
+.poster,
+.posterBone {
+  grid-area: poster;
+  display: grid;
+  grid-template-areas: 'frame';
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+
+  > * {
+    grid-area: frame;
+  }
+}
+
+.poster {
+  --poster-letter: var(--font-size-lg);
+
+  background: var(--color-deep);
+}
+
+.copy {
+  grid-area: copy;
+  display: grid;
+  align-content: end;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.title {
+  overflow: hidden;
+  color: var(--color-bark);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+.meta,
+.episode {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}
+
+.status {
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+// How much of the show has been watched: the bar across, the count at its end.
+.seen {
+  grid-area: seen;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'bar count';
+  align-items: center;
+  align-self: start;
+  gap: var(--space-3);
+}
+
+.bar {
+  grid-area: bar;
+  width: 100%;
+}
+
+.count {
+  grid-area: count;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+// A round button, the leaf's under the pointer.
+.play {
+  --icon-tint: 1;
+
+  grid-area: play;
+  display: grid;
+  place-items: center;
+  width: var(--control-size);
+  height: var(--control-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  color: var(--color-bark);
+
+  &:hover {
+    background: var(--color-leaf);
+    color: var(--color-on-leaf);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+@media (max-width: 30rem) {
+  .row {
+    --binge-poster: 3rem;
+
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-2);
+  }
+}

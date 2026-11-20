@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { BINGE_STATUS_KINDS, bingeCardFacts } from '@/binge'
 import { ITEM_TYPES } from '@/contract'
-import { itemDetails, itemSummary, mediaItem } from '@/test/fixtures'
+import { episodeSummary, itemDetails, itemSummary, mediaItem, seasonSummary } from '@/test/fixtures'
 
 const CAST = [
   { personId: 1, name: 'First Star', job: 'cast', role: 'A', photoVersion: null },
@@ -48,7 +48,28 @@ describe('bingeCardFacts', () => {
       synopsis: 'Mark is told to go on.',
       episodeLine: 'S01E02 · Half Loop',
       status: { kind: BINGE_STATUS_KINDS.left, media: NEXT },
+      seen: null,
     })
+  })
+
+  it("adds up the show's watched episodes over its seasons'", () => {
+    const details = {
+      ...SHOW,
+      children: [
+        seasonSummary({ id: 5, episodeCount: 9, watchedCount: 9 }),
+        seasonSummary({ id: 6, episodeCount: 10, watchedCount: 3 }),
+      ],
+    }
+    expect(bingeCardFacts({ details, next: null, episode: null }).seen).toEqual({
+      watched: 12,
+      total: 19,
+    })
+  })
+
+  it('has nothing seen to say of a show with no episode on disk, or of a season', () => {
+    expect(bingeCardFacts({ details: SHOW, next: null, episode: null }).seen).toBeNull()
+    const season = { ...SHOW, children: [episodeSummary({ id: 8 })] }
+    expect(bingeCardFacts({ details: season, next: null, episode: null }).seen).toBeNull()
   })
 
   it("falls back to the show's synopsis until its episode is read, and with no episode to play", () => {

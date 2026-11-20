@@ -16,6 +16,8 @@ export const COMING_SOON_COPY = {
   viewOnTmdb: 'View on TMDB',
   notFound: 'This title could not be found.',
   minutes: (minutes: number) => `${minutes} min`,
+  directedBy: (names: string) => `Directed by ${names}`,
+  cast: 'Cast',
   tabs: {
     label: 'Coming soon',
     upcoming: 'Upcoming',

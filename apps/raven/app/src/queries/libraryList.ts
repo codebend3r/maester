@@ -1,42 +1,27 @@
-import { KINDS, type Library, libraryIconOf } from '@raven/core'
+import { KINDS, type Library, plural } from '@raven/core'
 
-import { CARD_SHAPES, type ShelfCard } from '@/queries/cards'
 import { LIBRARY_LIST_COPY } from '@/queries/copy'
-import type { GridSection } from '@/queries/libraryGrid'
-import { ROUTE_TARGETS } from '@/routes'
 
-/** The one run of rows the Libraries screen lists. */
-const LIBRARIES_SECTION = 'libraries'
+const count = new Intl.NumberFormat()
 
 /**
- * A library as a row: its icon, its name and its type, a locked one's marked as the web's
- * Libraries page marks it, opening it as the side menu's row does.
+ * What a library's card says under its name, as the web's Libraries page says it: its type, a
+ * locked one marked, how many videos it holds and how many are not matched yet.
  */
-const libraryCard = ({ id, name, settings }: Library): ShelfCard => ({
-  key: `library:${id}`,
-  title: name,
-  line: settings.locked
-    ? LIBRARY_LIST_COPY.locked(KINDS[settings.kind].label)
-    : KINDS[settings.kind].label,
-  shape: CARD_SHAPES.poster,
-  picture: null,
-  progress: 0,
-  icon: libraryIconOf(settings),
-  subject: null,
-  isWatched: false,
-  target: { kind: ROUTE_TARGETS.library, libraryId: id, query: '' },
-})
+export const libraryLineOf = ({ settings, itemCount, unmatchedCount }: Library): string =>
+  [
+    KINDS[settings.kind].label,
+    ...(settings.locked ? [LIBRARY_LIST_COPY.locked] : []),
+    plural({ n: itemCount, ...LIBRARY_LIST_COPY.videos }),
+    ...(unmatchedCount > 0 ? [LIBRARY_LIST_COPY.notMatched(count.format(unmatchedCount))] : []),
+  ].join(LIBRARY_LIST_COPY.separator)
 
-/** Every library the viewer may see, pinned or not, in the server's order; none for none. */
-export const librarySectionsOf = (libraries: readonly Library[]): GridSection[] =>
-  libraries.length === 0
-    ? []
-    : [
-        {
-          key: LIBRARIES_SECTION,
-          title: null,
-          count: null,
-          shape: CARD_SHAPES.poster,
-          cards: libraries.map(libraryCard),
-        },
-      ]
+/** How many libraries there are and how many videos they hold between them: "3 libraries · 1,204 videos". */
+export const librariesSummaryOf = (libraries: readonly Library[]): string =>
+  [
+    plural({ n: libraries.length, ...LIBRARY_LIST_COPY.libraries }),
+    plural({
+      n: libraries.reduce((sum, library) => sum + library.itemCount, 0),
+      ...LIBRARY_LIST_COPY.videos,
+    }),
+  ].join(LIBRARY_LIST_COPY.separator)

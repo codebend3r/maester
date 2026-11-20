@@ -26,8 +26,8 @@ tags:
     visible: Lantern Bay
     timeout: 30000
 - pressKey: Back
-# The music library is not pinned, so it is reached through Libraries, whose one row names every
-# library in the server's order with the remote on the first, Films; Right is Music. It opens
+# The music library is not pinned, so it is reached through Libraries, whose cards stack every
+# library in the server's order with the remote on the first, Films; Down is Music. It opens
 # on its albums.
 - runFlow:
     file: steps/menuRow.dpad.yaml
@@ -39,8 +39,9 @@ tags:
       text: Films
       focused: true
     timeout: 30000
-- assertVisible: 3 libraries
-- pressKey: Remote Dpad Right
+# The summary counts the videos too: "3 libraries · 4 videos".
+- assertVisible: 3 libraries · .*
+- pressKey: Remote Dpad Down
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
     visible: Morning Chorus

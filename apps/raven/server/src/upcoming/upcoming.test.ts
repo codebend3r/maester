@@ -3,19 +3,26 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
+  CREDIT_JOBS,
   ITEM_TYPES,
+  isPersonDetails,
   isUpcoming,
+  isUpcomingDetails,
+  ROUTES,
   isUpcomingPage,
   UPCOMING_PARAMS,
   UPCOMING_PATH,
   UPCOMING_SHELF_PATH,
   UPCOMING_SHELVES,
+  UPCOMING_TITLE_PARAMS,
+  UPCOMING_TITLE_PATH,
   type UpcomingShelf,
   fillPath,
 } from '@raven/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
+import { ROUTE_PARAMS } from '@/requestParts'
 import { testConfig } from '@/test/app'
 
 /** TMDB's discover, answering each call with one dated title named after the route asked. */
@@ -36,6 +43,28 @@ const discover: MetadataFetch = async ({ url }) => {
             },
           ]
         : [],
+    }),
+  )
+}
+
+/** TMDB describing one movie still to come, with its cast and director, and Zendaya, the one person a page is opened for. */
+const described: MetadataFetch = async ({ url }) => {
+  const { pathname } = new URL(url)
+  if (pathname.startsWith('/3/person/')) {
+    return new Response(JSON.stringify({ id: Number(pathname.split('/')[3]), name: 'Zendaya' }))
+  }
+  return new Response(
+    JSON.stringify({
+      id: 7,
+      title: 'Dune: Part Three',
+      release_date: '2026-12-18',
+      credits: {
+        cast: [
+          { id: 31, name: 'Zendaya', character: 'Chani', profile_path: '/zendaya.jpg', order: 1 },
+          { id: 30, name: 'Timothée Chalamet', character: 'Paul', order: 0 },
+        ],
+        crew: [{ id: 40, name: 'Denis Villeneuve', job: 'Director' }],
+      },
     }),
   )
 }
@@ -119,6 +148,43 @@ describe('GET /api/upcoming', () => {
     expect(response.json()).toMatchObject({
       message: 'Set TMDB_API_TOKEN to see what is coming soon.',
     })
+  })
+
+  it("answers a title's cast and director as people raven knows, each with a page", async () => {
+    const app = await start({ token: 'test-token', fetch: described })
+    const url = fillPath({
+      path: UPCOMING_TITLE_PATH,
+      params: {
+        [UPCOMING_TITLE_PARAMS.type]: ITEM_TYPES.movie,
+        [UPCOMING_TITLE_PARAMS.tmdbId]: '7',
+      },
+    })
+    const response = await app.inject({ method: 'GET', url })
+    expect(response.statusCode).toBe(200)
+    const body: unknown = response.json()
+    if (!isUpcomingDetails(body)) throw new Error(`Unexpected body: ${response.payload}`)
+    expect(body.credits?.map(({ name, job, role }) => ({ name, job, role }))).toEqual([
+      { name: 'Timothée Chalamet', job: CREDIT_JOBS.cast, role: 'Paul' },
+      { name: 'Zendaya', job: CREDIT_JOBS.cast, role: 'Chani' },
+      { name: 'Denis Villeneuve', job: CREDIT_JOBS.director, role: 'Director' },
+    ])
+    expect(body.credits?.[1]?.photoVersion).not.toBeNull()
+    const again: unknown = (await app.inject({ method: 'GET', url })).json()
+    if (!isUpcomingDetails(again)) throw new Error('Unexpected second body')
+    expect(again.credits?.map((credit) => credit.personId)).toEqual(
+      body.credits?.map((credit) => credit.personId),
+    )
+    const person = await app.inject({
+      method: 'GET',
+      url: fillPath({
+        path: ROUTES.getPerson.path,
+        params: { [ROUTE_PARAMS.id]: body.credits?.[1]?.personId ?? 0 },
+      }),
+    })
+    expect(person.statusCode).toBe(200)
+    const details: unknown = person.json()
+    if (!isPersonDetails(details)) throw new Error(`Unexpected person: ${person.payload}`)
+    expect(details.name).toBe('Zendaya')
   })
 
   it('answers 503 when TMDB fails', async () => {

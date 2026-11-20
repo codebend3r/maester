@@ -5,7 +5,6 @@ import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
 import { fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
-import { pathWithId } from '@raven/native/testing'
 
 import { useAccountSession } from '@/account/session'
 import { Settings } from '@/screens/Settings'
@@ -115,18 +114,11 @@ describe("the owner's settings on a phone or tablet", () => {
     ).toBeTruthy()
   })
 
-  it("starts a library's quick scan", async () => {
+  it('lists no library of its own: their scans are on the Libraries page, as on the web', async () => {
     await renderScreen({ ui: <Settings />, client })
-    await fireEvent.press(await screen.findByRole('button', { name: 'Quick scan Films' }))
-    await waitFor(() =>
-      expect(writes()).toEqual([
-        {
-          method: HTTP_METHODS.post,
-          path: pathWithId({ path: APP_CLIENT_CALLS.quickScanLibrary.path, id: FILMS.id }),
-          body: undefined,
-        },
-      ]),
-    )
+    expect(await screen.findByRole('button', { name: 'Cancel all running scans' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: FILMS.name })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Quick scan Films' })).toBeNull()
   })
 
   it('approves an account waiting for it', async () => {

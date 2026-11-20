@@ -165,22 +165,20 @@ const preloadFonts = (): Plugin => ({
   },
 })
 
-/** How many Continue watching tiles the home page shows before its See all link, when the env does not say. */
-const DEFAULT_HOME_CONTINUE_COUNT = 6
-
 /**
- * RAVEN_HOME_CONTINUE_COUNT from the shell, else from raven's `.env`, else 6:
- * a whole number of tiles, at least 1.
+ * RAVEN_HOME_CONTINUE_COUNT from the shell, else from raven's `.env`, as given: empty for
+ * none, which leaves the count to `homeContinueCountOf`'s default. A given one must be a
+ * whole number of tiles, at least 1.
  */
-const homeContinueCount = (mode: string): number => {
+const homeContinueCount = (mode: string): string => {
   const given =
     process.env[ENV.homeContinueCount] ?? loadEnv(mode, RAVEN_DIR, '')[ENV.homeContinueCount] ?? ''
-  if (given.trim() === '') return DEFAULT_HOME_CONTINUE_COUNT
+  if (given.trim() === '') return ''
   const count = Number(given)
   if (!Number.isInteger(count) || count < 1) {
     throw new Error(`RAVEN_HOME_CONTINUE_COUNT must be a whole number of at least 1, not ${given}`)
   }
-  return count
+  return given
 }
 
 /**
@@ -230,7 +228,7 @@ const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
 export default defineConfig(({ mode }) => ({
   plugins: [react(), restartOnRavenEnv(), inlineRavenMark(), preloadStylesheets(), preloadFonts()],
   define: {
-    'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(String(homeContinueCount(mode))),
+    'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(homeContinueCount(mode)),
     'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(IS_NETLIFY ? NETLIFY_IMAGE_CDN : ''),
     'import.meta.env.VITE_API_ORIGIN': JSON.stringify(PROXIED_API_ORIGIN),
   },

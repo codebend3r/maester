@@ -66,6 +66,10 @@
   font-style: italic;
 }
 
+.directors {
+  font-size: var(--font-size-sm);
+}
+
 // The facts as one run of text that wraps: the date, the kind, the length and the genres.
 .facts {
   color: var(--color-lichen);

@@ -362,19 +362,25 @@ type SideLinkProps = { page: Page; name: string }
 export const sideLink = ({ page, name }: SideLinkProps) =>
   page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })
 
-type DismissMenuTipProps = { page: Page }
+type ReadySideMenuProps = { page: Page }
 
 /**
- * The side menu's first-visit tip rises over its lower links on a window as short as CI's, so a
- * test puts it away before it clicks them, as a person would. Once put away it stays away, so a
- * later launch on the same profile has none.
+ * Makes the side menu's lower links reachable, as a person would. Its first-visit tip rises
+ * over them, so that is put away; and Manage, which holds Libraries to Settings, starts folded,
+ * so that is opened. Both are remembered, so a later launch on the same profile finds the tip
+ * gone and Manage open.
  */
-const dismissMenuTip = async ({ page }: DismissMenuTipProps): Promise<void> => {
-  await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible()
+const readySideMenu = async ({ page }: ReadySideMenuProps): Promise<void> => {
+  const menu = page.getByRole('navigation', { name: 'Main' })
+  await expect(menu).toBeVisible()
   const tip = page.getByRole('complementary', { name: 'Tip' })
-  if ((await tip.count()) === 0) return
-  await tip.getByRole('button', { name: 'Got it' }).click()
-  await expect(tip).toHaveCount(0)
+  if ((await tip.count()) > 0) {
+    await tip.getByRole('button', { name: 'Got it' }).click()
+    await expect(tip).toHaveCount(0)
+  }
+  const manage = menu.getByRole('button', { name: 'Manage', exact: true })
+  if ((await manage.getAttribute('aria-expanded')) !== 'true') await manage.click()
+  await expect(manage).toHaveAttribute('aria-expanded', 'true')
 }
 
 type ExpectOfflineProps = { page: Page }
@@ -386,7 +392,7 @@ type ExpectOfflineProps = { page: Page }
 export const expectOffline = async ({ page }: ExpectOfflineProps): Promise<void> => {
   await expect(heading({ page, name: 'Downloads' })).toBeVisible()
   await expect(sideLink({ page, name: 'Home' })).toHaveCount(0)
-  await dismissMenuTip({ page })
+  await readySideMenu({ page })
 }
 
 type SignInProps = { page: Page }
@@ -398,5 +404,5 @@ export const signIn = async ({ page }: SignInProps): Promise<void> => {
   await page.getByRole('textbox', { name: 'Password' }).fill(FIXTURE_ACCOUNT.password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(heading({ page, name: 'Home' })).toBeVisible()
-  await dismissMenuTip({ page })
+  await readySideMenu({ page })
 }

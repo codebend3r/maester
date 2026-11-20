@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api } from '@/lib/api'
+import { LESS_MOTION } from '@/lib/motion'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useAuthSession } from '@/stores/authSession'
@@ -83,11 +84,19 @@ const screenOf =
   (query: string): MediaQueryList =>
     real(size === SCREEN_SIZES.medium && query === MEDIUM_SCREEN ? 'all' : 'not all')
 
+/** Opens the nine-dot button's fan and hands back its list of places. */
+const openBrowse = async (): Promise<HTMLElement> => {
+  await userEvent.hover(await within(nav()).findByRole('button', { name: 'Browse' }))
+  return screen.getByRole('list', { name: 'Browse' })
+}
+
 describe('AppShell', () => {
   const spies = { list: spyOn(api, 'listLibraries'), media: spyOn(window, 'matchMedia') }
 
+  // Manage opens folded; the tests that read its links start with it open.
   beforeEach(() => {
     spies.media.mockImplementation(screenOf(SCREEN_SIZES.wide))
+    useSideMenu.setState({ isManageFolded: false })
   })
 
   afterEach(() => {
@@ -103,7 +112,8 @@ describe('AppShell', () => {
   it('offers the music mode in the menu and the tabs once a music library exists', async () => {
     spies.list.mockImplementation(async () => [musicLibrary()])
     renderShell({ route: '/' })
-    const music = await within(nav()).findByRole('link', { name: 'Music' })
+    await within(tabs()).findByRole('link', { name: 'Music' })
+    const music = within(await openBrowse()).getByRole('link', { name: 'Music' })
     expect(music).toHaveAttribute('href', '/music')
     expect(iconOf(music)).toBe('music')
     expect(within(tabs()).getByRole('link', { name: 'Music' })).toHaveAttribute('href', '/music')
@@ -113,7 +123,7 @@ describe('AppShell', () => {
     spies.list.mockImplementation(async () => [library()])
     renderShell({ route: '/' })
     expect(await within(nav()).findByRole('link', { name: 'Movies' })).toBeInTheDocument()
-    expect(within(nav()).queryByRole('link', { name: 'Music' })).toBeNull()
+    expect(within(await openBrowse()).queryByRole('link', { name: 'Music' })).toBeNull()
     expect(within(tabs()).queryByRole('link', { name: 'Music' })).toBeNull()
   })
 
@@ -149,14 +159,15 @@ describe('AppShell', () => {
     expect(within(nav()).getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
-  it('links to the libraries and the favourites, marking the current page', () => {
+  it('links to the libraries and the favourites, marking the current page', async () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/favourites' })
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
       'href',
       '/libraries',
     )
-    const favourites = within(nav()).getByRole('link', { name: 'Favourites' })
+    expect(within(nav()).getByRole('button', { name: 'Browse' })).toHaveClass('current')
+    const favourites = within(await openBrowse()).getByRole('link', { name: 'Favourites' })
     expect(favourites).toHaveAttribute('href', '/favourites')
     expect(favourites).toHaveAttribute('aria-current', 'page')
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
@@ -175,10 +186,6 @@ describe('AppShell', () => {
     ).toEqual([
       'Raven',
       'Home',
-      'Continue watching',
-      'Binge',
-      'Coming soon',
-      'Favourites',
       'Movies',
       'Libraries',
       'Admin',
@@ -208,7 +215,7 @@ describe('AppShell', () => {
     const scroll = spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     renderShell({ route: '/' })
     expect(scroll).not.toHaveBeenCalled()
-    await userEvent.click(within(nav()).getByRole('link', { name: 'Favourites' }))
+    await userEvent.click(within(await openBrowse()).getByRole('link', { name: 'Favourites' }))
     expect(scroll).toHaveBeenCalledWith({ top: 0 })
     scroll.mockRestore()
   })
@@ -345,8 +352,8 @@ describe('AppShell', () => {
 
     await userEvent.click(toggle())
     expect(toggle()).toHaveAttribute('aria-expanded', 'true')
-    await userEvent.hover(within(nav()).getByRole('link', { name: 'Favourites' }))
-    expect(screen.queryByText('Favourites', { selector: '[aria-hidden]' })).toBeNull()
+    await userEvent.hover(within(nav()).getByRole('link', { name: 'Home' }))
+    expect(screen.queryByText('Home', { selector: '[aria-hidden]' })).toBeNull()
   })
 
   it('folds Shortcuts and Design with Manage, then opens Shortcuts when restored', async () => {
@@ -359,6 +366,98 @@ describe('AppShell', () => {
     expect(within(nav()).queryByRole('link', { name: 'Shortcuts' })).toBeNull()
     await userEvent.click(within(nav()).getByRole('button', { name: 'Manage' }))
     expect(within(nav()).getByRole('link', { name: 'Shortcuts' })).toBeInTheDocument()
+  })
+
+  it("paints the fan's glow in debug colours only while the address says ?debug=true", async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/?debug=true' })
+    await within(nav()).findByRole('button', { name: 'Browse' })
+    const places = await openBrowse()
+    expect(places.previousElementSibling).toHaveClass('debug')
+  })
+
+  it('keeps the night glow outside debug mode', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/?debug=false' })
+    await within(nav()).findByRole('button', { name: 'Browse' })
+    const places = await openBrowse()
+    expect(places.previousElementSibling).not.toHaveClass('debug')
+  })
+
+  it('fans the browsing places out of the nine-dot button, and folds them away again', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/favourites' })
+    const browse = await within(nav()).findByRole('button', { name: 'Browse' })
+    expect(iconOf(browse)).toBe('apps')
+    expect(browse).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('list', { name: 'Browse' })).toBeNull()
+
+    const places = await openBrowse()
+    expect(browse).toHaveAttribute('aria-expanded', 'true')
+    expect(
+      within(places)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['Continue watching', '/continue-watching'],
+      ['Binge', '/binge'],
+      ['Coming soon', '/coming-soon'],
+      ['Favourites', '/favourites'],
+    ])
+    expect(within(places).getByRole('link', { name: 'Favourites' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    const [first, , , last] = within(places).getAllByRole('listitem')
+    expect(first?.style.getPropertyValue('--angle')).toBe('-90deg')
+    expect(last?.style.getPropertyValue('--angle')).toBe('90deg')
+
+    await userEvent.unhover(browse)
+    expect(browse).toHaveAttribute('aria-expanded', 'false')
+    expect(places).toHaveClass('folding')
+    fireEvent.animationEnd(first!)
+    expect(places).toBeInTheDocument()
+    fireEvent.animationEnd(places.previousElementSibling!)
+    expect(screen.queryByRole('list', { name: 'Browse' })).toBeNull()
+  })
+
+  it('folds the fan away at once for a viewer who asks for less motion', async () => {
+    spies.media.mockImplementation((query) => real(query === LESS_MOTION ? 'all' : 'not all'))
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/' })
+    const browse = await within(nav()).findByRole('button', { name: 'Browse' })
+    await openBrowse()
+    await userEvent.unhover(browse)
+    expect(screen.queryByRole('list', { name: 'Browse' })).toBeNull()
+  })
+
+  it('opens the fan on a press, steps through it with the arrows and closes it with Escape', async () => {
+    spies.list.mockImplementation(async () => [])
+    renderShell({ route: '/' })
+    const browse = await within(nav()).findByRole('button', { name: 'Browse' })
+    act(() => browse.focus())
+    const places = screen.getByRole('list', { name: 'Browse' })
+    await userEvent.keyboard('{ArrowDown}')
+    expect(within(places).getByRole('link', { name: 'Continue watching' })).toHaveFocus()
+    await userEvent.keyboard('{ArrowUp}')
+    expect(within(places).getByRole('link', { name: 'Favourites' })).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(browse).toHaveFocus()
+    expect(browse).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.animationEnd(places.previousElementSibling!)
+    expect(screen.queryByRole('list', { name: 'Browse' })).toBeNull()
+  })
+
+  it('starts with Manage folded away', async () => {
+    useSideMenu.setState(useSideMenu.getInitialState(), true)
+    spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+    renderShell({ route: '/' })
+    await within(nav()).findByRole('link', { name: 'Movies' })
+    expect(within(nav()).getByRole('button', { name: 'Manage' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(within(nav()).queryByRole('link', { name: 'Settings' })).toBeNull()
   })
 
   it('folds Libraries to Settings away under Manage, open or down to its icons, and keeps it so', async () => {
@@ -586,10 +685,6 @@ describe('AppShell', () => {
     ).toEqual([
       '/',
       '/',
-      '/continue-watching',
-      '/binge',
-      '/coming-soon',
-      '/favourites',
       '/libraries',
       '/admin',
       '/streams',

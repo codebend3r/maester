@@ -4,6 +4,7 @@ export const APP_SHELL_COPY = {
   pinned: 'Pinned',
   locked: 'locked',
   music: 'Music',
+  browse: 'Browse',
   streams: 'Streams',
   bugReports: 'Bug reports',
   reports: 'Reports',

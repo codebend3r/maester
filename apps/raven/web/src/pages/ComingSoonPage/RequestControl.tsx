@@ -5,15 +5,18 @@ import type {
   TitleRequestAsk,
   TitleRequests,
 } from '@raven/core'
-import { BUTTON_TONES, Button } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { queryKeys } from '@raven/ui/headless'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ComponentType } from 'react'
+import { type ComponentType, useId } from 'react'
 import { api } from '@/lib/api'
 import { requestHoldingQuery, requestsQuery } from '@/lib/queries'
 import styles from '@/pages/ComingSoonPage/RequestControl.module.scss'
 import { REQUEST_COPY, REQUEST_STATUS_COPY } from '@/pages/ComingSoonPage/requestCopy'
 import { requestOf } from '@/pages/ComingSoonPage/titleRequests'
+import { useRequester } from '@/pages/ComingSoonPage/useRequester'
+
+const requestedDay = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' })
 
 /** What the control shows: nothing yet, requests off, where the title stands, the budget spent, or the button. */
 const REQUEST_CONTROL_STATES = {
@@ -26,22 +29,16 @@ const REQUEST_CONTROL_STATES = {
 
 type RequestControlState = (typeof REQUEST_CONTROL_STATES)[keyof typeof REQUEST_CONTROL_STATES]
 
-/** Where a requested title stands, and whose ask put it there. */
-type Standing = { status: RequestStatus; whose: string }
+/** Where a requested title stands, raven's request for it (null while only its arr holds it), and when it was asked for. */
+type Standing = { status: RequestStatus; request: TitleRequest | null }
 
 type StandingOfProps = { request: TitleRequest | null; holding: TitleHolding | undefined }
 
-/** Whose ask a listed request was: the caller's, nobody's (its arr held it already), or another account's. */
-const whoseOf = (request: TitleRequest): string => {
-  if (request.isMine) return REQUEST_COPY.requestedByYou
-  return request.isHeld ? REQUEST_COPY.requestedAlready : REQUEST_COPY.requestedBySomeone
-}
-
 /** raven's request for the title, else its arr's holding of it; null while it is free to request. */
 const standingOf = ({ request, holding }: StandingOfProps): Standing | null => {
-  if (request !== null) return { status: request.status, whose: whoseOf(request) }
+  if (request !== null) return { status: request.status, request }
   const held = holding?.status ?? null
-  return held === null ? null : { status: held, whose: REQUEST_COPY.requestedAlready }
+  return held === null ? null : { status: held, request: null }
 }
 
 type RequestViewProps = {
@@ -72,29 +69,52 @@ const Off = ({ ask }: RequestViewProps) => (
   <p className={styles.note}>{REQUEST_COPY.off[ask.type]}</p>
 )
 
+type StandingNoteProps = Standing & { ask: TitleRequestAsk }
+
 /**
- * Where the title stands, and whose ask put it there, under the button
- * greyed out: a title asked for once, or that its arr holds, is never asked
- * for again, so the button can not send it.
+ * Where the title stands, who asked for it and on which day, under the
+ * button greyed out: a title asked for once, or that its arr holds, is never
+ * asked for again, so the button can not send it.
  */
-const StandingNote = ({ status, whose }: Standing) => {
+const StandingNote = ({ ask, status, request }: StandingNoteProps) => {
   const copy = REQUEST_STATUS_COPY[status]
+  const who = useRequester({ ask, request })
+  const lineId = useId()
   return (
     <>
-      <Button tone={BUTTON_TONES.primary} size="large" icon="check" disabled>
-        {REQUEST_COPY.requested}
-      </Button>
-      <output className={styles.status} data-status={status}>
-        {copy.label}
-      </output>
-      <p className={styles.note}>{copy.line}</p>
-      <p className={styles.note}>{whose}</p>
+      <span className={styles.standing}>
+        <Button tone={BUTTON_TONES.primary} size="large" icon="check" disabled>
+          {REQUEST_COPY.requested}
+        </Button>
+        <span className={styles.status} data-status={status}>
+          <button
+            type="button"
+            className={styles.info}
+            aria-label={REQUEST_COPY.aboutStatus}
+            aria-describedby={lineId}
+          >
+            <Icon name="info" size="1.25em" />
+          </button>
+          <span id={lineId} role="tooltip" className={styles.tooltip}>
+            {copy.line}
+          </span>
+          <output>{copy.label}</output>
+        </span>
+      </span>
+      <p className={styles.note}>
+        {request === null
+          ? REQUEST_COPY.requestedBy(who)
+          : REQUEST_COPY.requestedByOn({
+              who,
+              day: requestedDay.format(new Date(request.requestedAt)),
+            })}
+      </p>
     </>
   )
 }
 
-const Requested = ({ standing }: RequestViewProps) =>
-  standing !== null && <StandingNote {...standing} />
+const Requested = ({ ask, standing }: RequestViewProps) =>
+  standing !== null && <StandingNote ask={ask} {...standing} />
 
 const Spent = ({ list }: RequestViewProps) => (
   <>

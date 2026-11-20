@@ -54,7 +54,7 @@ export const ADMIN_COPY = {
   movieTitles: 'Movie titles',
   scans: 'Library scans',
   scansHint:
-    'Shows scans running across every library. Cancelling stops only the work running now; scans can be started again from each library.',
+    'Shows scans running across every library. Cancelling stops only the work running now; scans can be started again from each library on the Libraries page.',
   stopScans: 'Cancel all running scans',
   noScans: 'No scan is running.',
   running: ({ library, work }: RunningProps) => `${library}: ${work}`,

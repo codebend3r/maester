@@ -65,10 +65,20 @@ test.describe.serial('the raven web app in Raven', () => {
   test('shows Home with the side menu, the app pages beside the web ones', async () => {
     const { page } = running()
     await Promise.all(
-      ['Home', 'Favourites', 'Libraries', 'On this Mac', 'Downloads', 'Settings'].map((name) =>
+      ['Home', 'Libraries', 'On this Mac', 'Downloads', 'Settings'].map((name) =>
         expect(sideLink({ page, name })).toBeVisible(),
       ),
     )
+    // Favourites is one of the places the nine-dot button fans out.
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('button', { name: 'Browse', exact: true })
+      .hover()
+    await expect(
+      page.getByRole('list', { name: 'Browse' }).getByRole('link', { name: 'Favourites' }),
+    ).toBeVisible()
+    await page.getByRole('heading', { name: 'Home', exact: true, level: 1 }).hover()
+    await expect(page.getByRole('list', { name: 'Browse' })).toHaveCount(0)
     const movies = page.getByRole('region', { name: 'Fixture Movies' })
     await expect(
       movies.getByRole('link', { name: FIXTURE_TITLES.first, exact: true }),

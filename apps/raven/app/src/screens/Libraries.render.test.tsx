@@ -64,7 +64,8 @@ describe('Libraries on a phone or tablet', () => {
     await renderScreen({ ui: <Libraries /> })
     expect(await screen.findByRole('button', { name: 'Archive' })).toBeTruthy()
     expect(screen.getByRole('header', { name: LIBRARIES_COPY.title })).toBeTruthy()
-    expect(screen.getByText('3 libraries')).toBeTruthy()
+    expect(screen.getByText('3 libraries · 6 videos')).toBeTruthy()
+    expect(screen.getByText('Movies · 2 videos')).toBeTruthy()
     const names = screen
       .getAllByRole('button')
       .map((button) => button.props.accessibilityLabel)

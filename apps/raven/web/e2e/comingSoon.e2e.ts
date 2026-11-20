@@ -6,7 +6,7 @@ import { comingSoonTitlePath } from '@/lib/appPaths'
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { REQUEST_COPY, REQUEST_STATUS_COPY } from '@/pages/ComingSoonPage/requestCopy'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
-import { sideLink } from '@/e2e/shell'
+import { openFromBrowse, openFromManage } from '@/e2e/shell'
 
 const { held, open } = FIXTURE_SERVER.upcoming
 const MOVIES = COMING_SOON_COPY.shelves[UPCOMING_SHELVES.movies].title
@@ -33,7 +33,7 @@ test.describe('Coming soon', () => {
     page,
   }) => {
     await page.goto('/')
-    await sideLink({ page, name: COMING_SOON_COPY.title }).click()
+    await openFromBrowse({ page, name: COMING_SOON_COPY.title })
     await expect(
       page.getByRole('heading', { level: 1, name: COMING_SOON_COPY.title }),
     ).toBeVisible()
@@ -45,7 +45,8 @@ test.describe('Coming soon', () => {
     await expect(page.getByRole('heading', { level: 1, name: held.title })).toBeVisible()
     await expect(page.getByRole('button', { name: REQUEST_COPY.requested })).toBeDisabled()
     await expect(page.getByRole('button', { name: REQUEST_COPY.request })).toHaveCount(0)
-    await expect(page.getByText(REQUEST_COPY.requestedAlready)).toBeVisible()
+    const radarr = COMING_SOON_COPY.everyone.downloaders[ITEM_TYPES.movie]
+    await expect(page.getByText(new RegExp(`^Requested by ${radarr}`, 'u'))).toBeVisible()
   })
 
   test('requests a title for everyone, then greys its button out and lists it in Settings', async ({
@@ -59,13 +60,15 @@ test.describe('Coming soon', () => {
     await expect(request.or(requested)).toBeVisible()
     if (await request.isVisible()) await request.click()
     await expect(requested).toBeDisabled()
-    await expect(page.getByText(REQUEST_COPY.requestedByYou)).toBeVisible()
+    await expect(
+      page.getByText(new RegExp(`^Requested by ${REQUEST_COPY.you} on `, 'u')),
+    ).toBeVisible()
 
     await page.goto('/')
-    await sideLink({ page, name: COMING_SOON_COPY.title }).click()
+    await openFromBrowse({ page, name: COMING_SOON_COPY.title })
     await expect(checkOn(cardOf({ page, title: open.title }))).toBeAttached()
 
-    await sideLink({ page, name: COMMON_COPY.settings }).click()
+    await openFromManage({ page, name: COMMON_COPY.settings })
     await page
       .getByRole('tab', { name: new RegExp(`^${SETTINGS_COPY.tabs.requests}`, 'u') })
       .click()

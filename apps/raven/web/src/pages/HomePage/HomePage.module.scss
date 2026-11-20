@@ -36,13 +36,65 @@
   color: var(--color-lichen);
 }
 
+/*
+ * A shelf's heading opens its library across the heading's whole width, not
+ * its name's alone: the name at the left, an arrow at the right. Under the
+ * pointer the name's underline draws in from the left and the arrow steps
+ * right, toward the library.
+ */
 .headingLink {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'name arrow';
+  align-items: center;
+  gap: var(--space-3);
   border-radius: var(--radius-sm);
   text-decoration: none;
 
-  &:hover {
-    text-decoration: underline;
-    text-decoration-color: var(--color-leaf-bright);
-    text-underline-offset: 0.18em;
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+// The underline is a bar under the name's text, sized to none until the pointer comes.
+.headingName {
+  grid-area: name;
+  justify-self: start;
+  padding-bottom: 0.08em;
+  background: linear-gradient(var(--color-leaf-bright), var(--color-leaf-bright)) left bottom / 0%
+    2px no-repeat;
+
+  .headingLink:hover &,
+  .headingLink:focus-visible & {
+    background-size: 100% 2px;
+  }
+}
+
+.headingArrow {
+  grid-area: arrow;
+  display: grid;
+  color: var(--color-lichen);
+
+  .headingLink:hover &,
+  .headingLink:focus-visible & {
+    translate: var(--space-0) 0;
+    color: var(--color-bark);
+  }
+}
+
+// The icon's own hover nudge, a there-and-back, would fight the one slide above, so it sits still here.
+.headingLink:hover .headingArrow > svg {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .headingName {
+    transition: background-size 240ms var(--ease-out);
+  }
+
+  .headingArrow {
+    transition:
+      translate 420ms var(--ease-out),
+      color 300ms ease;
   }
 }

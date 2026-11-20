@@ -176,7 +176,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-// The fan sizes from its column, so it never spills past the gutter.
+// The fan sizes from its column, so it never spills past the gutter, and fills its height.
 .stack {
   grid-area: stack;
   container-type: inline-size;
@@ -185,22 +185,36 @@
 
 /*
  * Every poster in one cell, the arrival on top, the ones before and after
- * it tilted out to either side, the rest tucked out of sight behind.
+ * it tilted out to either side, the rest tucked out of sight behind. The
+ * fan is as tall as whatever holds the hero, and never shorter than
+ * `--main`, the poster's width when the hero stands alone, asks for. The
+ * row takes no height from the posters, so they size from it and not it
+ * from them. `--widest` is the most of the column the main poster may take,
+ * and `--room` is the fan's height in poster widths: the poster's own 1.5,
+ * and the rest for its neighbours' tilt and its shadow.
  */
 .fan {
-  --main: min(18.75rem, 56cqi);
+  --widest: 56cqi;
+  --main: min(18.75rem, var(--widest));
+  --room: 1.62;
 
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-areas: 'poster';
   justify-items: center;
-  align-items: start;
+  align-items: center;
   isolation: isolate;
-  height: calc(var(--main) * 1.62);
+  min-height: calc(var(--main) * var(--room));
 }
 
+/*
+ * A poster fills its share of the fan's height until it would be wider than
+ * `--widest`. Each one's offsets are shares of its own size, so they hold at
+ * any height.
+ */
 .poster {
   grid-area: poster;
-  width: var(--main);
+  height: min(calc(100% * 1.5 / var(--room)), calc(var(--widest) * 1.5));
   aspect-ratio: 2 / 3;
   border-radius: var(--radius-lg);
   object-fit: cover;
@@ -210,12 +224,12 @@
 
 .front {
   z-index: 3;
-  translate: 0 calc(var(--main) * 0.03);
+  translate: 0 2%;
 }
 
 .previous {
   z-index: 1;
-  translate: calc(var(--main) * -0.54) calc(var(--main) * 0.02);
+  translate: -54% 1.3%;
   rotate: -9deg;
   scale: 0.73;
   opacity: 0.7;
@@ -223,7 +237,7 @@
 
 .next {
   z-index: 2;
-  translate: calc(var(--main) * 0.54) 0;
+  translate: 54% 0;
   rotate: 8deg;
   scale: 0.73;
   opacity: 0.7;
@@ -231,7 +245,7 @@
 
 .away {
   z-index: 0;
-  translate: 0 calc(var(--main) * 0.1);
+  translate: 0 6.7%;
   scale: 0.6;
   opacity: 0;
 }
@@ -272,8 +286,16 @@
     padding-top: 0;
   }
 
+  /*
+   * Stacked, the fan has no slot beside it to fill, so it takes its height
+   * outright: in a row sized by its content the posters' share of it would
+   * resolve against nothing, and each would draw at its picture's own size
+   * until that arrived, shifting the page.
+   */
   .fan {
     --main: min(14.375rem, 62cqi);
+
+    height: calc(var(--main) * var(--room));
   }
 }
 
@@ -288,11 +310,11 @@
   }
 
   .previous {
-    translate: calc(var(--main) * -0.35) calc(var(--main) * 0.02);
+    translate: -35% 1.3%;
   }
 
   .next {
-    translate: calc(var(--main) * 0.35) 0;
+    translate: 35% 0;
   }
 
   .line {

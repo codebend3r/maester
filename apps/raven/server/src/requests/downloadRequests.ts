@@ -178,6 +178,11 @@ export class DownloadRequests {
     return this.database.db
   }
 
+  /** `YYYY-MM-DD`, the day it is now on the server's clock, in UTC. */
+  private today(): string {
+    return utcDayOf(this.clock.now())
+  }
+
   private rows(): KeptRequest[] {
     return this.db
       .prepare<[], RequestRow>(
@@ -255,7 +260,7 @@ export class DownloadRequests {
 
   /** The titles still to come each arr holds, as requests nobody made; an arr that is off or fails holds none. */
   private async held(): Promise<TitleRequest[]> {
-    const from = utcDayOf(this.clock.now())
+    const from = this.today()
     const lists = await Promise.all(
       [ITEM_TYPES.movie, ITEM_TYPES.show]
         .filter((type) => this.arrs.isOn(type))
@@ -317,7 +322,7 @@ export class DownloadRequests {
 
   private async readStatus({ row, arrId }: ReadStatusProps): Promise<RequestStatus> {
     const [progress, isSearching] = await Promise.all([
-      this.arrs.progress({ type: row.type, arrId }),
+      this.arrs.progress({ type: row.type, arrId, today: this.today() }),
       row.command_id === null
         ? Promise.resolve(false)
         : this.arrs.isCommandRunning({ type: row.type, commandId: row.command_id }),
@@ -334,7 +339,7 @@ export class DownloadRequests {
   private async readHolding(ask: TitleRequestAsk): Promise<TitleHolding> {
     const arrId = await this.arrs.heldId(ask)
     if (arrId === null) return NOT_HELD
-    const progress = await this.arrs.progress({ type: ask.type, arrId })
+    const progress = await this.arrs.progress({ type: ask.type, arrId, today: this.today() })
     return { status: statusOf({ progress, isSearching: false }) }
   }
 
