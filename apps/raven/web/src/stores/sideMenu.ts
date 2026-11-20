@@ -27,7 +27,7 @@ export const useSideMenu = create<SideMenu>()(
     state: (set) => ({
       collapsed: false,
       tipSeen: false,
-      isManageFolded: false,
+      isManageFolded: true,
       toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
       dismissTip: () => set({ tipSeen: true }),
       toggleManage: () => set((current) => ({ isManageFolded: !current.isManageFolded })),

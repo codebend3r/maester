@@ -70,7 +70,7 @@ describe("the owner's settings on a TV", () => {
 
   it('still opens on Sign out once the Admin sections are drawn, the theme among the settings', async () => {
     await renderScreen({ ui: <Settings />, client })
-    await screen.findByRole('button', { name: 'Quick scan Films' })
+    await screen.findByRole('button', { name: 'Cancel all running scans' })
     expect(preferred()).toEqual(['Sign out'])
     expect(
       screen.getByRole('button', { name: `Theme: ${themeOf(DEFAULT_APP_PREFS.theme).name}` }),

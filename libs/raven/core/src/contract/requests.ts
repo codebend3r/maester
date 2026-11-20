@@ -1,4 +1,4 @@
-import { isMatchItemType } from '@/contract/items'
+import { isCredit, isMatchItemType } from '@/contract/items'
 import { isTmdbId } from '@/contract/metadata'
 import { isUpcomingKind } from '@/contract/upcoming'
 import {
@@ -153,6 +153,8 @@ export const isUpcomingDetails = object({
   runtime: nullable(isNumber),
   /** Whether it is a movie, a show, a documentary or anime; an older server leaves it out. */
   kind: optional(isUpcomingKind),
+  /** Its cast and crew in page order, each person one raven knows; an older server leaves it out. */
+  credits: optional(listOf(isCredit)),
 })
 
 export type UpcomingDetails = Infer<typeof isUpcomingDetails>

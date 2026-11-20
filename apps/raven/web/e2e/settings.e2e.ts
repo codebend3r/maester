@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { COMMON_COPY } from '@/lib/copy'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
-import { sideLink } from '@/e2e/shell'
+import { openFromManage } from '@/e2e/shell'
 
 test.describe('Settings', () => {
   test('opens on Preferences, and switches to Requests and back', async ({ page }) => {
     await page.goto('/')
-    await sideLink({ page, name: COMMON_COPY.settings }).click()
+    await openFromManage({ page, name: COMMON_COPY.settings })
     await expect(page.getByRole('heading', { level: 1, name: COMMON_COPY.settings })).toBeVisible()
 
     const preferences = page.getByRole('tab', { name: SETTINGS_COPY.tabs.preferences })
@@ -31,7 +31,7 @@ test.describe('Settings', () => {
     page,
   }) => {
     await page.goto('/')
-    await sideLink({ page, name: COMMON_COPY.settings }).click()
+    await openFromManage({ page, name: COMMON_COPY.settings })
     const autoplay = page.getByRole('checkbox', {
       name: new RegExp(`^${SETTINGS_COPY.autoplay}`, 'u'),
     })

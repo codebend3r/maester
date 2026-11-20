@@ -4,11 +4,37 @@ import { COMMON_COPY } from '@/lib/copy'
 
 type SideLinkProps = { page: Page; name: string }
 
+const sideMenu = ({ page }: PageProps): Locator =>
+  page.getByRole('navigation', { name: APP_SHELL_COPY.main })
+
 /** A link in the side menu, which every page but the player draws. */
 export const sideLink = ({ page, name }: SideLinkProps): Locator =>
-  page
-    .getByRole('navigation', { name: APP_SHELL_COPY.main })
+  sideMenu({ page }).getByRole('link', { name, exact: true })
+
+/** Opens a place the side menu's nine-dot button holds, by pointing at the button and pressing the place in its fan. */
+export const openFromBrowse = async ({ page, name }: SideLinkProps) => {
+  await sideMenu({ page }).getByRole('button', { name: APP_SHELL_COPY.browse, exact: true }).hover()
+  await page
+    .getByRole('list', { name: APP_SHELL_COPY.browse })
     .getByRole('link', { name, exact: true })
+    .click()
+}
+
+/**
+ * Opens a place under the side menu's Manage button, which starts folded, unfolding it first. On
+ * a first visit the tip about the B key rises over the folded button, so it is put away as a
+ * viewer would.
+ */
+export const openFromManage = async ({ page, name }: SideLinkProps) => {
+  const menu = sideMenu({ page })
+  const manage = menu.getByRole('button', { name: APP_SHELL_COPY.manage, exact: true })
+  if ((await manage.getAttribute('aria-expanded')) !== 'true') {
+    const gotIt = menu.getByRole('button', { name: APP_SHELL_COPY.gotIt, exact: true })
+    if (await gotIt.isVisible()) await gotIt.click()
+    await manage.click()
+  }
+  await sideLink({ page, name }).click()
+}
 
 type OpenFromShelfProps = { page: Page; library: string; title: string }
 

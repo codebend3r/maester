@@ -1,0 +1,206 @@
+// The button's cell in the side menu's column.
+.fan {
+  display: grid;
+}
+
+// A side menu row that is a button: the row's look, less the button's own.
+.trigger {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-expanded='true'] {
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+}
+
+/*
+ * The fan's measures, which its box and its glow both read. `--fan-stagger`
+ * is how far apart the places set out, and fold back last first.
+ */
+.places,
+.glow {
+  --fan-stagger: 35ms;
+  --fan-reach: 4.5rem;
+  --fan-place: var(--control-size);
+  --fan-hub: calc(var(--fan-place) / 2);
+}
+
+// The nine dots, measured for the glow's centre.
+.dots {
+  display: grid;
+}
+
+/*
+ * The fan's box, fixed over the page and every menu. Its hub, which each
+ * spoke turns about, is the middle of the button's right edge: half a place
+ * in from the box's left and halfway down, so the box runs back over the
+ * button and the pointer crosses no gap between them. The places are
+ * placed on their circle, not laid out, since nothing in a grid sits on one.
+ */
+.places {
+  position: fixed;
+  z-index: 40;
+  width: calc(var(--fan-reach) + var(--fan-place));
+  height: calc(2 * var(--fan-reach) + var(--fan-place));
+  translate: calc(-1 * var(--fan-hub)) -50%;
+  list-style: none;
+}
+
+/*
+ * The glow behind the places, centred on the nine dots, which the component
+ * measures: darkest there, clear at `--glow-radius`.
+ */
+.glow {
+  --glow-radius: 20rem;
+
+  position: fixed;
+  z-index: 39;
+  width: calc(2 * var(--glow-radius));
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    var(--color-night-haze),
+    var(--color-night-wash) 60%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/*
+ * In debug mode (`?debug=true`), solid contrasting stops in place of the
+ * night, so where the glow starts, turns and ends can be seen. Debugging
+ * colours, not the theme's, so they are literals.
+ */
+.debug {
+  background: radial-gradient(closest-side, rgb(255 0 0) 0%, rgb(255 0 0) 20%, rgb(0 255 255) 100%);
+}
+
+// Folding away: nothing in it answers the pointer any more.
+.folding {
+  pointer-events: none;
+}
+
+/*
+ * A place on its circle, at `--angle` from the hub, which the component
+ * sets. `--from-x` and `--from-y` are where the nine dots sit from the hub;
+ * each place sets out from there and folds back to it in a straight line.
+ */
+.spoke {
+  --at-x: calc(cos(var(--angle)) * var(--fan-reach));
+  --at-y: calc(sin(var(--angle)) * var(--fan-reach));
+
+  position: absolute;
+  top: calc(50% + var(--at-y));
+  left: calc(var(--fan-hub) + var(--at-x));
+  display: grid;
+  width: var(--fan-place);
+  height: var(--fan-place);
+  translate: -50% -50%;
+}
+
+// The round link that fills its place.
+.place {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-canopy-hi);
+  box-shadow: var(--shadow-menu);
+  color: var(--color-lichen);
+  text-decoration: none;
+
+  &:hover {
+    background: var(--color-moss-hi);
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+// The page open: the place it is, even under the pointer, and the button while it holds that place.
+.current,
+.place[aria-current='page'] {
+  --icon-tint: 0.4;
+
+  background: var(--color-moss);
+  color: var(--color-bark);
+}
+
+/*
+ * The fan opens from the nine dots: every place starts there, small and
+ * clear, and travels out to its own spot, each a stagger after the one
+ * before, while the glow spreads from the same centre. Folding runs each of
+ * them back the way it came, the last out first in, with
+ * keyframes of its own: an animation that has ended, turned round, would
+ * jump to its end.
+ */
+@keyframes set-out {
+  from {
+    translate: calc(-50% + var(--from-x) - var(--at-x)) calc(-50% + var(--from-y) - var(--at-y));
+    scale: 0.3;
+    opacity: 0;
+  }
+}
+
+@keyframes spread {
+  from {
+    scale: 0.3;
+    opacity: 0;
+  }
+}
+
+@keyframes fold-back {
+  to {
+    translate: calc(-50% + var(--from-x) - var(--at-x)) calc(-50% + var(--from-y) - var(--at-y));
+    scale: 0.3;
+    opacity: 0;
+  }
+}
+
+@keyframes draw-in {
+  to {
+    scale: 0.3;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .glow {
+    animation: spread 320ms var(--ease-out) both;
+  }
+
+  .spoke {
+    animation: set-out 320ms var(--ease-out) both;
+    animation-delay: calc(var(--index) * var(--fan-stagger));
+  }
+
+  .place {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+
+  .folding {
+    // The glow draws in over the whole staggered fold, since its end is the fan's.
+    &.glow {
+      animation: draw-in calc(220ms + (var(--fan-count) - 1) * var(--fan-stagger)) ease-in both;
+    }
+
+    .spoke {
+      animation: fold-back 220ms ease-in both;
+      animation-delay: calc((var(--fan-count) - 1 - var(--index)) * var(--fan-stagger));
+    }
+  }
+}

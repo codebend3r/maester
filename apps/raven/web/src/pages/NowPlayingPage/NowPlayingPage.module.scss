@@ -8,6 +8,25 @@
   justify-self: start;
 }
 
+/*
+ * The page while something plays. On the widest screens the track, its
+ * lyrics and the queue stand side by side; under 160rem the lyrics drop
+ * under the track and the queue keeps the right; under 64rem all three stack.
+ */
+.playing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 5fr) minmax(0, 1fr);
+  grid-template-areas:
+    'back back back'
+    'stage extras queue';
+  align-items: start;
+  gap: var(--space-6);
+
+  > .back {
+    grid-area: back;
+  }
+}
+
 .title {
   font-family: var(--font-display);
   font-size: var(--font-size-2xl);
@@ -19,6 +38,7 @@
 
 // The cover large and centred, the words under it, then the scrubber and the controls.
 .stage {
+  grid-area: stage;
   display: grid;
   grid-template-columns: minmax(0, 24rem);
   grid-template-areas:
@@ -138,11 +158,37 @@
 }
 
 .extras {
+  grid-area: extras;
   display: grid;
   gap: var(--space-3);
 }
 
 .queue {
+  grid-area: queue;
   display: grid;
   gap: var(--space-3);
+}
+
+@media (max-width: 160rem) {
+  .playing {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    // A long queue's extra height goes under the lyrics, not between them and the track.
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'back back'
+      'stage queue'
+      'extras queue';
+  }
+}
+
+@media (max-width: 64rem) {
+  .playing {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'back'
+      'stage'
+      'extras'
+      'queue';
+  }
 }

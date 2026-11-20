@@ -1,23 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
-import {
-  ITEM_IMAGE_KINDS,
-  ITEM_TYPES,
-  type ItemDetails,
-  bingeCardFacts,
-  itemPath,
-  mediaLabel,
-  watchLink,
-} from '@raven/core'
+import { ITEM_IMAGE_KINDS, type ItemDetails, mediaLabel, watchLink } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { Link } from 'react-router-dom'
 import { BINGE_CARD_COPY } from '@/components/BingeCard/copy'
-import { bingeStatusWords } from '@/components/BingeCard/bingeStatus'
+import { useBingeFacts } from '@/components/BingeCard/useBingeFacts'
 import { CardLink } from '@/components/CardLink/CardLink'
 import { ResumeBar } from '@/components/ResumeBar/ResumeBar'
 import { Bone, SkeletonPanel } from '@/components/Skeleton/Skeleton'
 import { api } from '@/lib/api'
 import { COMMON_COPY } from '@/lib/copy'
-import { itemQuery, nextEpisodeQuery } from '@/lib/queries'
 import styles from '@/components/BingeCard/BingeCard.module.scss'
 
 /**
@@ -39,17 +29,7 @@ type BingeCardProps = { details: ItemDetails }
  * resumes it; the logo or title opens its page.
  */
 export const BingeCard = ({ details }: BingeCardProps) => {
-  const isShow = details.type === ITEM_TYPES.show
-  const next = useQuery({ ...nextEpisodeQuery(details.id), enabled: isShow })
-  const episodeId = isShow ? (next.data?.item?.id ?? null) : null
-  const episode = useQuery(itemQuery(episodeId))
-  const facts = bingeCardFacts({
-    details,
-    next: next.data ?? null,
-    episode: episode.data ?? null,
-  })
-  const media = next.data ?? null
-  const status = bingeStatusWords(facts.status)
+  const { facts, media, status, page, meta } = useBingeFacts({ details })
   const backdrop =
     details.backdropVersion == null
       ? media && api.thumbnailUrl(media)
@@ -67,8 +47,6 @@ export const BingeCard = ({ details }: BingeCardProps) => {
           kind: ITEM_IMAGE_KINDS.logo,
           version: details.logoVersion,
         })
-  const page = itemPath(details) ?? '/'
-  const meta = [facts.year, facts.runtime].filter((fact): fact is string => fact != null)
 
   return (
     <li className={`${styles.frame} ${styles.card}`}>

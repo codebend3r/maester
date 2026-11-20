@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { DOWNLOAD_DIALOG_COPY } from '@/desktop/DownloadDialog/copy'
 import { DOWNLOAD_ROW_COPY, DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
-import { markWatchedAndBack, openFromShelf, sideLink } from '@/e2e/shell'
+import { markWatchedAndBack, openFromManage, openFromShelf } from '@/e2e/shell'
 import { COMMON_COPY } from '@/lib/copy'
 import { CACHE_NAMES } from '@/serviceWorker/fetchStrategy'
 
@@ -25,7 +25,7 @@ test.describe('Downloads in the browser', () => {
     await dialog.getByRole('button', { name: COMMON_COPY.download, exact: true }).click()
 
     // The film is an MKV, so the server makes its MP4 copy first, then the browser fetches it.
-    await sideLink({ page, name: COMMON_COPY.downloads }).click()
+    await openFromManage({ page, name: COMMON_COPY.downloads })
     const play = page.getByRole('button', {
       name: new RegExp(`^${COMMON_COPY.play} ${movie.title}`, 'u'),
     })
@@ -75,7 +75,7 @@ test.describe('Downloads in the installed app', () => {
     await page.getByRole('button', { name: COMMON_COPY.download, exact: true }).click()
     const dialog = page.getByRole('dialog', { name: DOWNLOAD_DIALOG_COPY.title.browser })
     await dialog.getByRole('button', { name: COMMON_COPY.download, exact: true }).click()
-    await sideLink({ page, name: COMMON_COPY.downloads }).click()
+    await openFromManage({ page, name: COMMON_COPY.downloads })
     const play = page.getByRole('button', {
       name: new RegExp(`^${COMMON_COPY.play} ${movie.title}`, 'u'),
     })

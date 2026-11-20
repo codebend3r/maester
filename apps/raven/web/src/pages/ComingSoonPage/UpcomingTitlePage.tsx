@@ -1,4 +1,7 @@
 import {
+  type Credit,
+  CREDIT_JOBS,
+  type CreditJob,
   formatAirDate,
   isTitleRequestAsk,
   type TitleRequestAsk,
@@ -10,6 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useId } from 'react'
 import { useParams } from 'react-router-dom'
 import { BackButton } from '@/components/BackButton/BackButton'
+import { CastRow } from '@/components/CastRow/CastRow'
 import { Loading } from '@/components/Skeleton/Skeleton'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { api } from '@/lib/api'
@@ -27,15 +31,31 @@ const BACK_TO_COMING_SOON = { to: APP_PATHS.comingSoon, label: COMING_SOON_COPY.
 const kindOf = ({ kind, type }: UpcomingDetails): string =>
   kind === undefined ? COMING_SOON_COPY.kinds[type] : COMING_SOON_COPY.upcomingKinds[kind]
 
+/** The jobs the cast row shows; the directors are named in the details instead. */
+const ACTING_JOBS: ReadonlySet<CreditJob> = new Set([CREDIT_JOBS.cast, CREDIT_JOBS.guest])
+
+const NAME_LIST = new Intl.ListFormat(undefined, { type: 'conjunction' })
+
+/** The directors' names as one run of text, or null when TMDB names none. */
+const directorsOf = (credits: readonly Credit[]): string | null => {
+  const names = credits
+    .filter((credit) => credit.job === CREDIT_JOBS.director)
+    .map((credit) => credit.name)
+    .filter((name, index, all) => all.indexOf(name) === index)
+  return names.length > 0 ? NAME_LIST.format(names) : null
+}
+
 type TitleDetailsProps = {
   /** The title as the address names it, which is all a request sends. */
   ask: TitleRequestAsk
   details: UpcomingDetails
 }
 
-/** The title's picture, poster, name, facts, summary and request. */
+/** The title's picture, poster, name, facts, directors, request, summary and cast. */
 const TitleDetails = ({ ask, details }: TitleDetailsProps) => {
   const headingId = useId()
+  const credits = details.credits ?? []
+  const directors = directorsOf(credits)
   const facts = [
     details.released === null ? null : formatAirDate(details.released),
     kindOf(details),
@@ -43,44 +63,53 @@ const TitleDetails = ({ ask, details }: TitleDetailsProps) => {
     ...details.genres,
   ].filter((fact): fact is string => fact !== null)
   return (
-    <article className={styles.title} aria-labelledby={headingId}>
-      {details.backdrop !== null && (
-        <img
-          className={styles.backdrop}
-          src={api.tmdbBackdropUrl(details.backdrop)}
-          alt=""
-          decoding="async"
-        />
-      )}
-      <span className={styles.poster}>
-        {details.poster !== null && (
+    <>
+      <article className={styles.title} aria-labelledby={headingId}>
+        {details.backdrop !== null && (
           <img
-            {...api.tmdbPosterSources(details.poster)}
-            sizes={POSTER_SIZES.row}
+            className={styles.backdrop}
+            src={api.tmdbBackdropUrl(details.backdrop)}
             alt=""
             decoding="async"
           />
         )}
-      </span>
-      <div className={styles.details}>
-        <h1 id={headingId} className={styles.heading}>
-          {details.title}
-        </h1>
-        {details.tagline !== null && <p className={styles.tagline}>{details.tagline}</p>}
-        <ul className={styles.facts}>
-          {facts.map((fact) => (
-            <li key={fact} className={styles.fact}>
-              {fact}
-            </li>
-          ))}
-        </ul>
-        <RequestControl ask={ask} />
-        {details.summary !== null && <p className={styles.summary}>{details.summary}</p>}
-        <a className={styles.tmdb} href={tmdbTitleUrl(details)} target="_blank" rel="noreferrer">
-          {COMING_SOON_COPY.viewOnTmdb}
-        </a>
-      </div>
-    </article>
+        <span className={styles.poster}>
+          {details.poster !== null && (
+            <img
+              {...api.tmdbPosterSources(details.poster)}
+              sizes={POSTER_SIZES.row}
+              alt=""
+              decoding="async"
+            />
+          )}
+        </span>
+        <div className={styles.details}>
+          <h1 id={headingId} className={styles.heading}>
+            {details.title}
+          </h1>
+          {details.tagline !== null && <p className={styles.tagline}>{details.tagline}</p>}
+          <ul className={styles.facts}>
+            {facts.map((fact) => (
+              <li key={fact} className={styles.fact}>
+                {fact}
+              </li>
+            ))}
+          </ul>
+          {directors !== null && (
+            <p className={styles.directors}>{COMING_SOON_COPY.directedBy(directors)}</p>
+          )}
+          <RequestControl ask={ask} />
+          {details.summary !== null && <p className={styles.summary}>{details.summary}</p>}
+          <a className={styles.tmdb} href={tmdbTitleUrl(details)} target="_blank" rel="noreferrer">
+            {COMING_SOON_COPY.viewOnTmdb}
+          </a>
+        </div>
+      </article>
+      <CastRow
+        credits={credits.filter((credit) => ACTING_JOBS.has(credit.job))}
+        title={COMING_SOON_COPY.cast}
+      />
+    </>
   )
 }
 

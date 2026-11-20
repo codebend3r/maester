@@ -13,6 +13,7 @@ import {
 } from '@raven/core'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Icon } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { AlbumCard } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton } from '@/components/BackButton/BackButton'
@@ -173,6 +174,18 @@ const libraryShelfViewOf = ({
   }
 }
 
+type ShelfHeadingLinkProps = { to: string; children: ReactNode }
+
+/** A shelf's heading as the way into its library: the whole line, the name at the left and an arrow at the right. */
+const ShelfHeadingLink = ({ to, children }: ShelfHeadingLinkProps) => (
+  <Link to={to} className={styles.headingLink}>
+    <span className={styles.headingName}>{children}</span>
+    <span className={styles.headingArrow}>
+      <Icon name="next" size={24} />
+    </span>
+  </Link>
+)
+
 type LibraryShelfProps = {
   shelf: HomeShelf
   library: Library
@@ -187,11 +200,7 @@ type LibraryShelfProps = {
 const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const to = librarySearchPath({ libraryId: library.id, query })
-  const title = (
-    <Link to={to} className={styles.headingLink}>
-      {library.name}
-    </Link>
-  )
+  const title = <ShelfHeadingLink to={to}>{library.name}</ShelfHeadingLink>
   return (
     <KeyedView<LibraryShelfViewProps>
       views={LIBRARY_SHELVES}
@@ -205,11 +214,7 @@ type AlbumsShelfProps = { shelf: AlbumShelf; library: Library }
 /** A music library's row: its newest releases first, one cover each, the library's name opening it. */
 const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
   <Shelf
-    title={
-      <Link to={libraryPath(library.id)} className={styles.headingLink}>
-        {library.name}
-      </Link>
-    }
+    title={<ShelfHeadingLink to={libraryPath(library.id)}>{library.name}</ShelfHeadingLink>}
     isEmpty={shelf.albums.length === 0}
   >
     {shelf.albums.map((album) => (
@@ -281,27 +286,34 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const isBare = home.isSuccess && inProgress.length === 0 && home.data.shelves.length === 0
 
   return (
-    <div className={frames.sections}>
-      <HomeBinge />
-      {home.isError && (
-        <p className={styles.message} role="alert">
-          {home.error.message}
-        </p>
-      )}
-      {(hero.isPending || areLibrariesPending) && <HeroSkeleton />}
-      {home.isPending && <ShelvesSkeleton />}
-      {isBare && <p className={styles.message}>{HOME_COPY.bare}</p>}
-
-      {featured.length > 0 && <HomeHero featured={featured} />}
-      {inProgress.length > 0 && <ContinueWatching entries={inProgress} />}
-      {shelves.map(({ shelf, library }) => (
-        <LibraryRow
-          key={library.id}
-          shelf={shelf}
-          library={library}
-          albumShelves={albums.data ?? []}
-        />
-      ))}
+    <div className={frames.slots}>
+      <div className={frames.slot1}>
+        <HomeBinge />
+      </div>
+      <div className={frames.slot2}>
+        {(hero.isPending || areLibrariesPending) && <HeroSkeleton />}
+        {featured.length > 0 && <HomeHero featured={featured} />}
+      </div>
+      <div className={frames.slot3}>
+        {home.isPending && <ShelvesSkeleton />}
+        {inProgress.length > 0 && <ContinueWatching entries={inProgress} />}
+      </div>
+      <div className={frames.slot4}>
+        {home.isError && (
+          <p className={styles.message} role="alert">
+            {home.error.message}
+          </p>
+        )}
+        {isBare && <p className={styles.message}>{HOME_COPY.bare}</p>}
+        {shelves.map(({ shelf, library }) => (
+          <LibraryRow
+            key={library.id}
+            shelf={shelf}
+            library={library}
+            albumShelves={albums.data ?? []}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -314,9 +326,10 @@ const HOME_BODIES = {
 /**
  * `/`: the hero's titles, picked by the admin or the newest releases, taking turns, then what
  * is being watched, as wide tiles, then a row for each pinned library with
- * its eight newest releases, in the side menu's order. A search from the
- * shell's bar, which rides in the address as `?q=`, shows what it found in
- * place of all of it. A locked library never shows on it, PIN or not.
+ * its fifty newest releases, each row scrolling on its own, in the side
+ * menu's order. A search from the shell's bar, which rides in the address as
+ * `?q=`, shows what it found in place of all of it. A locked library never
+ * shows on it, PIN or not.
  */
 export const HomePage = () => {
   const titleId = useId()

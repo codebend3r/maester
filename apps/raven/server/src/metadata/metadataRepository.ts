@@ -23,7 +23,7 @@ import { ItemImagesRepository, lineOf } from '@/metadata/itemImagesRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { LOCAL } from '@/metadata/localItems'
 import { ScoresRepository } from '@/metadata/scoresRepository'
-import type { FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbShapes'
+import type { FetchedCredit, FetchedItem, FetchedSaga, MovieExtras } from '@/metadata/tmdbShapes'
 
 type ItemRow = {
   id: number
@@ -130,6 +130,9 @@ type MetadataRepositoryLibraryPicturesProps = { id: number; libraryIds: readonly
 
 /** A stored item's id, and when TMDB was last read for it. */
 type StoredFetch = { id: number; fetchedAt: string }
+
+/** A credit as TMDB gave it, with the id raven keeps its person under and its place in the list. */
+export type SavedCredit = { credit: FetchedCredit; personId: number; position: number }
 
 /** What an episode's row says of it beyond its title. */
 type EpisodeFacts = {
@@ -420,19 +423,13 @@ export class MetadataRepository {
       )
 
       this.db.prepare('DELETE FROM credits WHERE item_id = ?').run(id)
-      const person = this.db.prepare<[string, string, string | null], { id: number }>(
-        `INSERT INTO people (tmdb_id, name, photo) VALUES (?, ?, ?)
-         ON CONFLICT (tmdb_id) DO UPDATE SET name = excluded.name, photo = excluded.photo
-         RETURNING id`,
-      )
       const credit = this.db.prepare(
         `INSERT INTO credits (item_id, person_id, job, role, position) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (item_id, person_id, job) DO NOTHING`,
       )
-      item.credits.forEach((entry, position) => {
-        const stored = person.get(entry.tmdbId, entry.name, entry.photo)
-        if (stored) credit.run(id, stored.id, entry.job, entry.role, position)
-      })
+      this.savePeople(item.credits).forEach(({ credit: entry, personId, position }) =>
+        credit.run(id, personId, entry.job, entry.role, position),
+      )
       return id
     })()
   }
@@ -448,6 +445,24 @@ export class MetadataRepository {
       episodes.forEach((episode) => this.save({ item: episode, parentId: id }))
       return { id, number, episodes: this.childNumbers(id) }
     })()
+  }
+
+  /**
+   * Keeps each credited person in `people` under their TMDB id, with the name and photo TMDB
+   * gives now, in one transaction, and answers each credit with the id raven knows them by.
+   */
+  savePeople(credits: readonly FetchedCredit[]): SavedCredit[] {
+    const person = this.db.prepare<[string, string, string | null], { id: number }>(
+      `INSERT INTO people (tmdb_id, name, photo) VALUES (?, ?, ?)
+       ON CONFLICT (tmdb_id) DO UPDATE SET name = excluded.name, photo = excluded.photo
+       RETURNING id`,
+    )
+    return this.db.transaction(() =>
+      credits.flatMap((credit, position) => {
+        const stored = person.get(credit.tmdbId, credit.name, credit.photo)
+        return stored ? [{ credit, personId: stored.id, position }] : []
+      }),
+    )()
   }
 
   /** Sort titles again with the current rule, for items stored under an older one. */

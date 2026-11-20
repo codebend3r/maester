@@ -11,7 +11,7 @@ import {
   tileWords,
   watchLink,
 } from '@raven/core'
-import { BUTTON_TONES, ButtonLink, Icon, FactParts } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, Icon, FactParts, classNames } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { CardLink } from '@/components/CardLink/CardLink'
@@ -200,11 +200,16 @@ const ContinueTile = ({ entry }: ContinueTileProps) => {
   )
 }
 
-type ContinueTilesProps = { entries: readonly PosterEntry[]; id?: string }
+type ContinueTilesProps = {
+  entries: readonly PosterEntry[]
+  id?: string
+  /** Whether these are home's first few of more, which drop an odd last tile where they are two across. */
+  isCapped?: boolean
+}
 
-/** The tiles, two across, one for each video in progress. */
-export const ContinueTiles = ({ entries, id }: ContinueTilesProps) => (
-  <ul id={id} className={frames.tiles}>
+/** The tiles, two across, three on the widest screens, one for each video in progress. */
+export const ContinueTiles = ({ entries, id, isCapped = false }: ContinueTilesProps) => (
+  <ul id={id} className={classNames([frames.tiles, isCapped && frames.capped])}>
     {entries.map((entry) => (
       <ContinueTile key={entry.media.id} entry={entry} />
     ))}
@@ -213,14 +218,19 @@ export const ContinueTiles = ({ entries, id }: ContinueTilesProps) => (
 
 type ContinueWatchingProps = { entries: PosterEntry[] }
 
+/** Of `HOME_CONTINUE_COUNT`, the most that fill whole rows two across, which every screen but the widest shows. */
+const EVEN_CONTINUE_COUNT = HOME_CONTINUE_COUNT - (HOME_CONTINUE_COUNT % 2)
+
 /**
  * The first few videos in progress, the most recently watched first, as wide
- * tiles two across. How many is `HOME_CONTINUE_COUNT`; when there are more,
- * See all, with an arrow, goes to the page that lists every one.
+ * tiles: three rows of three on the widest screens, four rows of two below
+ * them. How many is `HOME_CONTINUE_COUNT`, less an odd last one two across;
+ * when there are more than that, See all, with an arrow, goes to the page
+ * that lists every one.
  */
 export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
   const id = useId()
-  const hasMore = entries.length > HOME_CONTINUE_COUNT
+  const hasMore = entries.length > EVEN_CONTINUE_COUNT
   return (
     <section className={frames.section} aria-labelledby={id}>
       <SectionHeading
@@ -240,7 +250,10 @@ export const ContinueWatching = ({ entries }: ContinueWatchingProps) => {
       >
         {HOME_COPY.continueWatching}
       </SectionHeading>
-      <ContinueTiles entries={entries.slice(0, HOME_CONTINUE_COUNT)} />
+      <ContinueTiles
+        entries={entries.slice(0, HOME_CONTINUE_COUNT)}
+        isCapped={entries.length >= HOME_CONTINUE_COUNT}
+      />
     </section>
   )
 }

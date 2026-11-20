@@ -4,6 +4,8 @@ import { focusForm } from '@/layouts/Form.focus'
 import { focusGrid } from '@/layouts/Grid.focus'
 import { focusItem } from '@/layouts/ItemLayout.focus'
 import { touchItem } from '@/layouts/ItemLayout.touch'
+import { focusLibraries } from '@/layouts/Libraries.focus'
+import { touchLibraries } from '@/layouts/Libraries.touch'
 import { touchGrid } from '@/layouts/Grid.touch'
 import { focusPicker } from '@/layouts/Picker.focus'
 import { dpadPlayerChrome, tvosPlayerChrome } from '@/layouts/PlayerChrome.dpad'
@@ -72,6 +74,15 @@ export const { Shelves, Shelf, BingeShelf, ShelfPage } = byInput({
 export const { HomeHero } = byInput({
   [INPUT_KINDS.focus]: focusHero,
   [INPUT_KINDS.touch]: touchHero,
+})
+
+/**
+ * The Libraries page, the web's: every library a card stacked full width, its buttons a band the
+ * remote moves along on a TV, chips under the thumb.
+ */
+export const { LibrariesPage, LibraryCard } = byInput({
+  [INPUT_KINDS.focus]: focusLibraries,
+  [INPUT_KINDS.touch]: touchLibraries,
 })
 
 /** A library's grid: rows the remote moves through on a TV, columns under the thumb elsewhere. */

@@ -316,12 +316,16 @@
   background: var(--color-bark-faint);
 }
 
-// The one moment of motion: the film plays on for a few seconds after the page opens.
+/*
+ * The one moment of motion: the film plays on for a few seconds after the page opens.
+ * The bar spans the line and slides in from the left, clipped by the line's overflow, so the
+ * compositor moves it and nothing is laid out again; a changing width would relayout each frame.
+ */
 .played {
   grid-area: line;
-  width: 38%;
   border-radius: var(--radius-pill);
   background: var(--color-leaf-bright);
+  translate: -62% 0;
 
   @media (prefers-reduced-motion: no-preference) {
     animation: play 6s var(--ease-out) both;
@@ -330,11 +334,11 @@
 
 @keyframes play {
   from {
-    width: 31%;
+    translate: -69% 0;
   }
 
   to {
-    width: 38%;
+    translate: -62% 0;
   }
 }
 

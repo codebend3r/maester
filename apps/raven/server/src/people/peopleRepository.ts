@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 import {
+  type Credit,
   type CreditJob,
   isCreditJob,
   isMatchItemType,
@@ -15,7 +16,7 @@ import { parseJsonAs } from '@/db/json'
 import { likePattern, under } from '@/media/mediaSql'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
-import type { FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbShapes'
+import type { FetchedCredit, FetchedPerson, FetchedPersonCredit } from '@/metadata/tmdbShapes'
 
 /** One of a person's TMDB credits as stored, with raven's item for its title. */
 export type FilmographyRow = Pick<
@@ -175,6 +176,21 @@ export class PeopleRepository {
       )
       .all(personId, personId)
       .flatMap((row) => (isCreditJob(row.job) ? [{ ...row, job: row.job }] : []))
+  }
+
+  /**
+   * Credits as TMDB gave them for a title no library holds, each person kept
+   * in raven's people under their TMDB id, so their photo and page work as a
+   * library title's cast does.
+   */
+  creditsOf(credits: readonly FetchedCredit[]): Credit[] {
+    return this.metadata.savePeople(credits).map(({ credit, personId }) => ({
+      personId,
+      name: credit.name,
+      job: credit.job,
+      role: credit.role,
+      photoVersion: this.pictureVersions.photo({ id: personId, photo: credit.photo }),
+    }))
   }
 
   /** A person's photo path on TMDB, or null. */

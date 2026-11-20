@@ -7,8 +7,28 @@
   max-width: var(--measure);
 }
 
+// The greyed out button and where the title stands, side by side.
+.standing {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: var(--space-3);
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    justify-items: start;
+  }
+}
+
+// The info button, then the status's label; the tooltip floats over the pill.
 .status {
-  padding: var(--space-1) var(--space-3);
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   border-radius: var(--radius-pill);
   background: var(--color-moss);
   font-size: var(--font-size-sm);
@@ -22,6 +42,54 @@
 .status[data-status='downloaded'] {
   background: var(--color-leaf);
   color: var(--color-on-leaf);
+}
+
+.info {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: inherit;
+  cursor: help;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+// What the status means, shown only while the info button is pointed at or focused.
+.tooltip {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 10;
+  inline-size: max-content;
+  max-inline-size: min(22rem, calc(100vw - var(--space-6)));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-bark);
+  box-shadow: var(--shadow-menu);
+  color: var(--color-night);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  line-height: var(--line-body);
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      opacity 150ms var(--ease-out),
+      visibility 150ms var(--ease-out);
+  }
+
+  .info:hover + &,
+  .info:focus-visible + & {
+    visibility: visible;
+    opacity: 1;
+  }
 }
 
 .note {

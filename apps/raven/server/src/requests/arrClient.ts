@@ -124,22 +124,29 @@ const isSeries = object({
   statistics: optional(object({ episodeFileCount: optional(isNumber) })),
 })
 
+/** Each day an arr knows a title comes out on: a show's first episode, and a movie's releases. */
+const RELEASE_DAYS = {
+  firstAired: optional(nullable(isString)),
+  inCinemas: optional(nullable(isString)),
+  digitalRelease: optional(nullable(isString)),
+  physicalRelease: optional(nullable(isString)),
+} as const
+
+const isReleaseDays = object(RELEASE_DAYS)
+
+type ReleaseDays = Infer<typeof isReleaseDays>
+
 /** A title in an arr's library: its ids, when it was added, and each day the arr knows it comes out on. */
 const isHeldTitle = object({
   id: isNumber,
   title: isString,
   added: isString,
   tmdbId: optional(nullable(isNumber)),
-  firstAired: optional(nullable(isString)),
-  inCinemas: optional(nullable(isString)),
-  digitalRelease: optional(nullable(isString)),
-  physicalRelease: optional(nullable(isString)),
+  ...RELEASE_DAYS,
 })
 
-type HeldTitle = Infer<typeof isHeldTitle>
-
-/** The first day a held title comes out on, `YYYY-MM-DD`: a show's first episode, or the earliest of a movie's releases. */
-const releasedOf = (held: HeldTitle): string | null =>
+/** The first day a title comes out on, `YYYY-MM-DD`: a show's first episode, or the earliest of a movie's releases. */
+const releasedOf = (held: ReleaseDays): string | null =>
   [held.firstAired, held.inCinemas, held.digitalRelease, held.physicalRelease]
     .flatMap((day) => (day == null || day === '' ? [] : [day.slice(0, 10)]))
     .toSorted()[0] ?? null
@@ -167,6 +174,7 @@ export type ArrQualityProfile = { id: number; resolutions: number[] }
 /** What the arr holds of a title now: its downloads in the queue and whether it has a file. */
 export type ArrProgress = {
   queue: QueueEntry[]
+  /** False before the title comes out, whatever the arr says: see `hasFileOf`. */
   hasFile: boolean
 }
 
@@ -203,6 +211,11 @@ type HoldingsProps = {
 }
 
 type ByTitleProps = { type: MatchItemType; arrId: number }
+
+type ProgressProps = ByTitleProps & {
+  /** `YYYY-MM-DD`, the day it is now; a file the arr holds of a title not out by then is not counted. */
+  today: string
+}
 
 type CommandProps = { type: MatchItemType; commandId: number }
 
@@ -401,7 +414,7 @@ export class ArrClient {
           addedAt: held.added,
           progress: {
             queue: queue.filter((entry) => entry[QUEUE_FILTERS[type]] === held.id),
-            hasFile: hasFileOf({ type, held }),
+            hasFile: hasFileOf({ type, held, today: from }),
           },
         },
       ]
@@ -409,7 +422,7 @@ export class ArrClient {
   }
 
   /** The title's downloads in the queue, and whether the arr holds a file of it. */
-  async progress({ type, arrId }: ByTitleProps): Promise<ArrProgress> {
+  async progress({ type, arrId, today }: ProgressProps): Promise<ArrProgress> {
     const [queue, held] = await Promise.all([
       this.call({
         type,
@@ -418,14 +431,29 @@ export class ArrClient {
       this.call({ type, path: `${TITLE_ROUTES[type]}/${arrId}` }),
     ])
     if (!listOf(isQueueEntry)(queue)) throw this.unreadable('the download queue')
-    return { queue, hasFile: hasFileOf({ type, held }) }
+    return { queue, hasFile: hasFileOf({ type, held, today }) }
   }
 }
 
-type HasFileOfProps = { type: MatchItemType; held: unknown }
+type HasFileOfProps = { type: MatchItemType; held: unknown; today: string }
 
-/** Radarr's `hasFile`, or Sonarr's count of episode files over none. */
-const hasFileOf = ({ type, held }: HasFileOfProps): boolean => {
+type IsUnreleasedProps = Omit<HasFileOfProps, 'type'>
+
+/** Whether the title's first release day is still to come; one the arr knows no day for is not. */
+const isUnreleased = ({ held, today }: IsUnreleasedProps): boolean => {
+  if (!isReleaseDays(held)) return false
+  const released = releasedOf(held)
+  return released !== null && released > today
+}
+
+/**
+ * Radarr's `hasFile`, or Sonarr's count of episode files over none. A file of
+ * a title that has not come out yet is no download but a mismatch, an old
+ * folder the arr's library import took for the title, which would never reach
+ * a library, so it is not counted.
+ */
+const hasFileOf = ({ type, held, today }: HasFileOfProps): boolean => {
+  if (isUnreleased({ held, today })) return false
   if (type === ITEM_TYPES.movie) return isMovie(held) && !!held.hasFile
   return isSeries(held) && (held.statistics?.episodeFileCount ?? 0) > 0
 }

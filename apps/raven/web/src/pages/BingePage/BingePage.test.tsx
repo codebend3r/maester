@@ -1,17 +1,27 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApiError, ITEM_TYPES, type ItemDetails } from '@raven/core'
+import { ApiError, ITEM_TYPES, type ItemDetails, type SeasonSummary } from '@raven/core'
 import { createQueryClient } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { BINGE_COPY } from '@/lib/binge'
 import { BingePage, HomeBinge } from '@/pages/BingePage/BingePage'
 import { fakeBinge } from '@/test/fakeBinge'
-import { itemDetails } from '@/test/fixtures'
+import { itemDetails, itemSummary } from '@/test/fixtures'
 import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 
 let binge = fakeBinge()
+
+type SeasonProps = { id: number; episodeCount: number; watchedCount: number }
+
+/** A season on its show's page, with how many of its episodes are on disk and watched. */
+const seasonSummary = ({ id, episodeCount, watchedCount }: SeasonProps): SeasonSummary => ({
+  ...itemSummary({ id }),
+  type: ITEM_TYPES.season,
+  episodeCount,
+  watchedCount,
+})
 
 /** The ids the server holds, as `mark` adds them in order: the newest first. */
 const mark = (...ids: number[]) => {
@@ -55,6 +65,26 @@ describe('BingePage', () => {
       expect.stringContaining('Series 2'),
       expect.stringContaining('Series 1'),
     ])
+  })
+
+  it('shows each show as a row with a bar of how much of it has been watched', async () => {
+    mark(3)
+    item.mockImplementation(async (id) =>
+      itemDetails({
+        id,
+        type: ITEM_TYPES.show,
+        title: 'Severance',
+        children: [
+          seasonSummary({ id: 30, episodeCount: 9, watchedCount: 9 }),
+          seasonSummary({ id: 31, episodeCount: 10, watchedCount: 3 }),
+        ],
+      }),
+    )
+    renderWithProviders({ ui: <BingePage /> })
+    const bar = await screen.findByRole('progressbar', { name: '12 of 19 episodes watched' })
+    expect(bar).toHaveAttribute('value', '12')
+    expect(bar).toHaveAttribute('max', '19')
+    expect(screen.getByText('12 of 19 episodes · 63%')).toBeInTheDocument()
   })
 
   it('shows loading on its page but hides the home section until a show arrives', async () => {

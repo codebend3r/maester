@@ -4,7 +4,7 @@ import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
 import { ALBUM_COPY } from '@/pages/AlbumPage/copy'
-import { sideLink } from '@/e2e/shell'
+import { openFromBrowse } from '@/e2e/shell'
 
 const { album } = FIXTURE_SERVER
 const [firstTrack] = album.tracks
@@ -12,7 +12,7 @@ const [firstTrack] = album.tracks
 test.describe('Music', () => {
   test('plays a track from its album under the mini-player, and stops', async ({ page }) => {
     await page.goto('/')
-    await sideLink({ page, name: APP_SHELL_COPY.music }).click()
+    await openFromBrowse({ page, name: APP_SHELL_COPY.music })
     await page.getByRole('link', { name: album.title, exact: true }).click()
     await expect(page.getByRole('heading', { level: 1, name: album.title })).toBeVisible()
     const tracks = page.getByRole('list', { name: ALBUM_COPY.tracks })

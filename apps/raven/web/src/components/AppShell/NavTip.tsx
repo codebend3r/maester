@@ -1,8 +1,7 @@
 import { type ReactNode, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { besideOf, type SideAnchor } from '@/components/AppShell/anchor'
 import styles from '@/components/AppShell/NavTip.module.scss'
-
-type TipAnchor = { top: number; left: number }
 
 type OnPointerEnterProps = { currentTarget: Element }
 
@@ -28,13 +27,10 @@ type NavTipProps = {
  * the eye needs it; the child already carries the name for screen readers.
  */
 export const NavTip = ({ text, isOn, children }: NavTipProps) => {
-  const [anchor, setAnchor] = useState<TipAnchor | null>(null)
+  const [anchor, setAnchor] = useState<SideAnchor | null>(null)
   type ShowProps = { currentTarget: Element }
 
-  const show = ({ currentTarget }: ShowProps) => {
-    const rect = currentTarget.getBoundingClientRect()
-    setAnchor({ top: rect.top + rect.height / 2, left: rect.right })
-  }
+  const show = ({ currentTarget }: ShowProps) => setAnchor(besideOf({ element: currentTarget }))
   const hide = () => setAnchor(null)
   return (
     <>

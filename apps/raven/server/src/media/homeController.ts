@@ -25,7 +25,7 @@ import { QUERY_PARAMS } from '@/queryValues'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 
 /** How many of a pinned library's newest releases its shelf on the home page holds. */
-const SHELF_SIZE = 8
+const SHELF_SIZE = 50
 
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
 const SEARCH_SHELF_SIZE = 16

@@ -2,15 +2,14 @@ import {
   CAPTION_COLOURS,
   CAPTION_SIZES,
   MAX_HEIGHTS,
-  MEMBER_STATUSES,
   type MaxHeight,
   isMaxHeight,
 } from '@raven/core'
 import { CAPTION_COLOUR_NAMES, CAPTION_SIZE_NAMES, useCaptionStyle } from '@raven/ui/headless'
-import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
 import { useAccountSession } from '@/account/session'
+import { useOwnerId } from '@/account/useOwnerId'
 import {
   SettingsButton,
   SettingsChoice,
@@ -56,10 +55,8 @@ type OwnerSettingsProps = { session: AppQueries }
  * approved owner; anyone else sees nothing more. The server stays the authority on each call.
  */
 const OwnerSettings = ({ session }: OwnerSettingsProps) => {
-  const userId = useAccountSession((state) => state.session?.userId ?? null)
-  const { data: account } = useQuery(session.queries.accountQuery(userId))
-  const isOwner = !!account?.isOwner && account.status === MEMBER_STATUSES.approved
-  return isOwner && <AdminSettings ownerId={account.id} session={session} />
+  const ownerId = useOwnerId(session)
+  return ownerId !== null && <AdminSettings ownerId={ownerId} session={session} />
 }
 
 /**

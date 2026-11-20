@@ -47,6 +47,9 @@ type SmallPlayProps = { x: number; y: number; h: number }
 const smallPlay = ({ x, y, h }: SmallPlayProps) =>
   `M${x} ${y + 0.5}v${h - 1}a.6.6 0 0 0 .9.5l${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 0-1l-${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 -.9.5z`
 
+/** Where the nine dots' rows and columns sit. */
+const DOT_LINES = [6, 12, 18] as const
+
 /** The popcorn bucket: its rim wider than its foot, the kernels heaped over the rim. */
 const POPCORN_BUCKET = 'M4.5 10.5h15l-1.4 10.5H5.9z'
 
@@ -159,6 +162,10 @@ export const DRAWINGS = {
       'M10.3 4.9a2 2 0 0 1 3.4 0l7 12.1a2 2 0 0 1-1.7 3h-14a2 2 0 0 1-1.7-3zM12 9.5v4M12 16.8v.2',
     fill: 'M10.3 4.9a2 2 0 0 1 3.4 0l7 12.1a2 2 0 0 1-1.7 3h-14a2 2 0 0 1-1.7-3z',
   },
+  info: {
+    stroke: `${circle({ cx: 12, cy: 12, r: 8.5 })}M12 11v5.5M12 7.8v.2`,
+    fill: circle({ cx: 12, cy: 12, r: 8.5 }),
+  },
   bell: {
     stroke: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0',
     fill: 'M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z',
@@ -187,6 +194,11 @@ export const DRAWINGS = {
     stroke: `${PANEL}M3.5 16l4.6-4.6a1.5 1.5 0 0 1 2.1 0L15 16.2M13.5 14.7l1.6-1.6a1.5 1.5 0 0 1 2.1 0l3.3 3.3`,
     fill: PANEL,
     marks: circle({ cx: 15.5, cy: 9, r: 1.5 }),
+  },
+  // Nine dots, three by three: the button that holds a group of places.
+  apps: {
+    stroke: '',
+    marks: DOT_LINES.flatMap((cy) => DOT_LINES.map((cx) => circle({ cx, cy, r: 1.7 }))).join(''),
   },
   grid: {
     stroke: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 4, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,

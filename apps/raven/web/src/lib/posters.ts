@@ -36,8 +36,8 @@ export const POSTER_SIZES = {
   download: '3rem',
   /** Now Playing's cover: most of a phone's width, 24rem past it. */
   nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 24rem',
-  /** Home's rows: two, four, then eight across the page, which stops growing at 120rem. */
-  row: 'auto, (max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), 13rem',
+  /** Home's rows: two, four, eight, ten, then twelve across the page's full width. */
+  row: 'auto, (max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), (max-width: 160rem) 10vw, 8.5vw',
   /** A saga's deck: 55% of its card, in a grid of `minmax(min(15rem, 100%), 1fr)`. */
   deck: 'auto, (max-width: 40rem) calc(55vw - 1.75rem), (max-width: 48rem) 12rem, (max-width: 64rem) 16.5rem, 12rem',
   /** A season in its show's row: `9rem`. */
@@ -52,6 +52,8 @@ export const POSTER_SIZES = {
   sagaFilm: 'auto, 5rem',
   /** A row of a Movies or TV library's list: `2.25rem`. */
   list: '2.25rem',
+  /** A row of the Binge page's list: `4.5rem`, `3rem` on a phone. */
+  bingeRow: '(max-width: 30rem) 3rem, 4.5rem',
   /** A movie on the Duplicates tab. */
   duplicate: '(max-width: 30rem) 3.5rem, 5rem',
 } as const
@@ -73,6 +75,7 @@ const NARROWEST: Record<PosterSizes, number> = {
   [POSTER_SIZES.movieTile]: 72,
   [POSTER_SIZES.sagaFilm]: 56,
   [POSTER_SIZES.list]: 36,
+  [POSTER_SIZES.bingeRow]: 48,
   [POSTER_SIZES.duplicate]: 56,
   [POSTER_SIZES.album]: 256,
   [POSTER_SIZES.bar]: 48,
