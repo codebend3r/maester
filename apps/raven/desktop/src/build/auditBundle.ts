@@ -11,6 +11,7 @@ import {
   auditMachO,
   auditPe,
   bundleProblems,
+  gatekeeperProblems,
   isPeFile,
   MPV_IN_WINDOWS_APP,
   PACKAGED_APP,
@@ -21,6 +22,7 @@ import {
   windowsBundleProblems,
 } from '@/build/bundleAudit'
 import { versionOf } from '@/build/dmgMaker'
+import { signingFrom } from '@/build/forgeOptions'
 import { listSignables, SIGNABLE_KINDS } from '@/build/machO'
 
 const execFileAsync = promisify(execFile)
@@ -104,6 +106,10 @@ const auditMac = async ({ project }: AuditProps): Promise<number> => {
     args: ['--verify', '--deep', '--strict', '--verbose=2', app],
     name: PACKAGED_APP,
   })
+  const isDeveloperIdBuild = !!signingFrom(process.env).osxSign
+  const gatekeeper = isDeveloperIdBuild
+    ? await gatekeeperProblems({ run, app, name: PACKAGED_APP })
+    : []
   const problems = [
     ...bundleProblems({
       files: audited.flatMap(({ file }) => (file === null ? [] : [file])),
@@ -113,6 +119,7 @@ const auditMac = async ({ project }: AuditProps): Promise<number> => {
     }),
     ...audited.flatMap((file) => file.problems),
     ...appSignature,
+    ...gatekeeper,
   ]
   if (problems.length > 0) {
     problems.forEach((problem) => console.error(problem))

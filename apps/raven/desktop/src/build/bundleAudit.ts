@@ -230,25 +230,59 @@ const ask = async ({
   }
 }
 
+type ToolProblemsProps = {
+  run: ToolRun
+  command: string
+  args: string[]
+  /** What a failure means, before what the tool said: "Raven.app is not signed". */
+  verdict: string
+}
+
+/** A tool that answers on stderr and fails with a status: a failure is the problem it names. */
+const toolProblems = async ({
+  run,
+  command,
+  args,
+  verdict,
+}: ToolProblemsProps): Promise<string[]> => {
+  try {
+    await run({ command, args })
+    return []
+  } catch (error) {
+    return [`${verdict}: ${failureText(error)}`]
+  }
+}
+
 type SignatureProblemsProps = {
   run: ToolRun
   args: string[]
   name: string
 }
 
-/** codesign answers on stderr and fails with a status, so a failure is the problem it names. */
-export const signatureProblems = async ({
-  run,
-  args,
-  name,
-}: SignatureProblemsProps): Promise<string[]> => {
-  try {
-    await run({ command: 'codesign', args })
-    return []
-  } catch (error) {
-    return [`${name} is not signed: ${failureText(error)}`]
-  }
+export const signatureProblems = ({ run, args, name }: SignatureProblemsProps): Promise<string[]> =>
+  toolProblems({ run, command: 'codesign', args, verdict: `${name} is not signed` })
+
+type GatekeeperProblemsProps = {
+  run: ToolRun
+  app: string
+  name: string
 }
+
+/**
+ * Gatekeeper's own verdict on a Developer ID build: accepted and notarized, or a problem.
+ * An ad hoc build is never asked, since Gatekeeper refuses every one.
+ */
+export const gatekeeperProblems = ({
+  run,
+  app,
+  name,
+}: GatekeeperProblemsProps): Promise<string[]> =>
+  toolProblems({
+    run,
+    command: 'spctl',
+    args: ['--assess', '--type', 'execute', '--verbose=4', app],
+    verdict: `${name} is not accepted by Gatekeeper`,
+  })
 
 type AuditMachOProps = {
   relative: string
