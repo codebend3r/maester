@@ -2,16 +2,19 @@
   "name": "@raven/app",
   "version": "0.9.0",
   "private": true,
-  "description": "raven on iPhone, iPad, Apple TV and Android TV",
+  "description": "raven on iPhone, iPad, Apple TV, Android TV and Android phones",
   "main": "index.ts",
   "imports": {
     "#package": "./package.json"
   },
   "scripts": {
-    "build:android-tv": "ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk} JAVA_HOME=\"${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./android/gradlew -p android assembleRelease",
+    "assemble:android": "ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk} JAVA_HOME=\"${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./android/gradlew -p android assembleRelease",
+    "build:android": "bun run assemble:android",
+    "build:android-tv": "bun run assemble:android",
     "banner:tv": "./scripts/tv_banner.sh",
     "icons:tvos": "./scripts/tv_apple_icons.sh",
     "deploy:tvos": "./scripts/deploy_tvos.sh",
+    "deploy:android": "./scripts/deploy_android.sh",
     "deploy:android-tv": "./scripts/deploy_android_tv.sh",
     "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
@@ -29,6 +32,7 @@
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
+    "prebuild:android": "expo prebuild --platform android --clean",
     "prebuild:android-tv": "EXPO_TV=1 expo prebuild --platform android --clean",
     "prebuild:ios": "NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
     "prebuild:tvos": "EXPO_TV=1 NODE_PATH=$PWD/node_modules REACT_NATIVE_NODE_MODULES_DIR=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo prebuild --platform ios --clean",
@@ -115,8 +119,7 @@
         "exclude": [
           "react-native-reanimated",
           "react-native-worklets",
-          "react-native-gesture-handler",
-          "@raven/audio"
+          "react-native-gesture-handler"
         ]
       }
     }
@@ -133,9 +136,11 @@
       "prebuild:ios",
       "prebuild:tvos",
       "prebuild:android-tv",
+      "prebuild:android",
       "build:ios",
       "build:tvos",
       "build:android-tv",
+      "build:android",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -150,7 +155,8 @@
       "dev:ipad",
       "dev:tvos",
       "deploy:tvos",
-      "deploy:android-tv"
+      "deploy:android-tv",
+      "deploy:android"
     ],
     "targets": {
       "test": {
@@ -262,6 +268,30 @@
         ],
         "cache": true
       },
+      "build:android": {
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          {
+            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+        ],
+        "outputs": [
+          "{projectRoot}/android"
+        ],
+        "cache": true
+      },
       "prebuild:ios": {
         "dependsOn": [
           "^build",
@@ -319,6 +349,28 @@
         "cache": true
       },
       "prebuild:android-tv": {
+        "dependsOn": [
+          "^build",
+          "check:patches"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/patches/react-native-video@*.patch",
+          {
+            "env": "APP_VARIANT"
+          },
+          {
+            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+          },
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+        ],
+        "outputs": [
+          "{projectRoot}/android"
+        ],
+        "cache": true
+      },
+      "prebuild:android": {
         "dependsOn": [
           "^build",
           "check:patches"
@@ -434,6 +486,12 @@
       "deploy:android-tv": {
         "dependsOn": [
           "build:android-tv"
+        ],
+        "cache": false
+      },
+      "deploy:android": {
+        "dependsOn": [
+          "build:android"
         ],
         "cache": false
       },

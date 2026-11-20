@@ -1,4 +1,4 @@
-# raven for iPhone, iPad, Apple TV and Android TV
+# raven for iPhone, iPad, Apple TV, Android TV and Android phones
 
 raven's device app: an [Expo](https://expo.dev) app on [`react-native-tvos`](https://github.com/react-native-tvos/react-native-tvos), the React Native fork that builds for Apple TV and Android TV as well as phones and tablets. It is `@raven/app` in the workspace; the [root README](../../../README.md) covers the workspace and the [design](../../../docs/superpowers/specs/2026-10-17-raven-device-apps-design.md) covers the app.
 

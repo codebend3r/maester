@@ -23,6 +23,7 @@ import { clearOnServerSwitch } from '@/queries/serverCache'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { stripEdge } from '@/layouts'
 import { STRIP_EDGES } from '@/layouts/musicKit'
+import { DrawnSheetHost } from '@/layouts/DrawnSheet.touch'
 import { TouchMenu } from '@/layouts/TouchMenu'
 import { TouchTabs, useIsTabBarShown } from '@/layouts/TouchTabs'
 import { MusicHost } from '@/music/MusicHost'
@@ -186,6 +187,8 @@ const AppRoutes = () => {
         {stripEdge === STRIP_EDGES.bottom && strip}
         {/* An iPhone's tab bar along the foot, or an iPad's side menu over the routes and the strip. */}
         {hasNav && <DeviceNav key={session.server.id} session={session} />}
+        {/* The sheets raven draws where the system has none, over everything else. */}
+        <DrawnSheetHost />
       </View>
     </QueryClientProvider>
   )

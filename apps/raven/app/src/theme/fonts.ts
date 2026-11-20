@@ -1,5 +1,5 @@
 import { DEVICE_TRAITS } from '@/platform/devicePlatform'
-import { FONT_SYSTEMS, type FontSystem } from '@/platform/platform'
+import { ECOSYSTEMS, type Ecosystem } from '@/platform/platform'
 
 /**
  * The web's two faces, as `--font-display` and `--font-body` set them: Young Serif for display
@@ -12,11 +12,11 @@ import { FONT_SYSTEMS, type FontSystem } from '@/platform/platform'
  * (see `Text`).
  */
 const FAMILIES = {
-  [FONT_SYSTEMS.android]: { body: 'InstrumentSans', display: 'YoungSerif', code: 'monospace' },
-  [FONT_SYSTEMS.apple]: { body: 'Instrument Sans', display: 'Young Serif', code: 'Menlo' },
-} as const satisfies Record<FontSystem, Record<string, string>>
+  [ECOSYSTEMS.android]: { body: 'InstrumentSans', display: 'YoungSerif', code: 'monospace' },
+  [ECOSYSTEMS.apple]: { body: 'Instrument Sans', display: 'Young Serif', code: 'Menlo' },
+} as const satisfies Record<Ecosystem, Record<string, string>>
 
-const families = FAMILIES[DEVICE_TRAITS.fonts]
+const families = FAMILIES[DEVICE_TRAITS.ecosystem]
 
 export const BODY_FONT = families.body
 

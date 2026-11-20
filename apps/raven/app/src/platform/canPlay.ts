@@ -46,11 +46,11 @@ const APPLE = {
 } as const satisfies PlayTable
 
 /**
- * ExoPlayer on Android TV, which reads MKV and WebM as well as MP4 and MOV and decodes H.264,
- * HEVC, AV1 and VP9; it starts generous and narrows from what fails in use. H.264 is 8-bit only,
- * as on Apple: few TVs have a High 10 decoder, and a remux copies the same video. DTS and TrueHD
- * are sure: the patched player decodes them with FFmpeg where the TV's own decoders do not, as
- * Jellyfin's does, so a UHD Blu-ray remux plays as it is.
+ * ExoPlayer on Android TV and Android phones, which reads MKV and WebM as well as MP4 and MOV
+ * and decodes H.264, HEVC, AV1 and VP9; it starts generous and narrows from what fails in use.
+ * H.264 is 8-bit only, as on Apple: few TVs or phones have a High 10 decoder, and a remux copies
+ * the same video. DTS and TrueHD are sure: the patched player decodes them with FFmpeg where the
+ * device's own decoders do not, as Jellyfin's does, so a UHD Blu-ray remux plays as it is.
  */
 const EXOPLAYER = {
   containers: [CONTAINERS.mkv, CONTAINERS.mp4, CONTAINERS.mov, CONTAINERS.webm],
@@ -78,6 +78,7 @@ const PLAY_TABLES: Record<AppPlatform, PlayTable> = {
   [APP_PLATFORMS.ios]: APPLE,
   [APP_PLATFORMS.tvos]: APPLE,
   [APP_PLATFORMS.androidTv]: EXOPLAYER,
+  [APP_PLATFORMS.androidPhone]: EXOPLAYER,
 }
 
 const CODECS_PARAM = /codecs="([^"]*)"/

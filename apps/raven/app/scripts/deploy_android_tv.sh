@@ -17,17 +17,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 REPO="$(cd ../../.. && pwd)"
+source scripts/android_apk.sh
 
-export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
-ADB="$ANDROID_HOME/platform-tools/adb"
-APK=android/app/build/outputs/apk/release/app-release.apk
-APP_ID=io.github.codebend3r.raven.app
 RELAY_PORT="${ADB_RELAY_PORT:-15556}"
 SERIAL="127.0.0.1:$RELAY_PORT"
 TV_NAME="${ANDROID_TV_NAME:-Google-TV-Streamer}"
 ACCEPT_TIMEOUT=180
-
-say() { printf '\n==> %s\n' "$*"; }
 
 # dns-sd never exits and holds its output back when piped, so it runs under a pty for a moment.
 mdns_zone() {
@@ -65,8 +60,7 @@ start_relay() {
   RELAY_PID=$!
 }
 
-[ -f "$APK" ] || { echo "No APK at $APK: run build:android-tv first (the deploy target depends on it)." >&2; exit 1; }
-[ -x "$ADB" ] || { echo "No adb at $ADB: install the Android SDK platform tools (the get-started skill)." >&2; exit 1; }
+require_apk_and_adb build:android-tv
 
 if is_listening; then
   say "Using the relay already listening on $SERIAL"
@@ -109,16 +103,12 @@ until [ "$("$ADB" -s "$SERIAL" get-state 2> /dev/null || true)" = "device" ]; do
 done
 "$ADB" -s "$SERIAL" devices -l | grep "$SERIAL" || true
 
-say "Installing $APK ($(du -h "$APK" | cut -f1))"
-"$ADB" -s "$SERIAL" install -r "$APK"
+# From here adb acts on the relayed TV alone, as the shared steps expect.
+export ANDROID_SERIAL="$SERIAL"
+install_apk
 
 say "Launching"
 # A TV asleep or in its screensaver keeps a launched app behind the dream; waking it first.
-"$ADB" -s "$SERIAL" shell input keyevent KEYCODE_WAKEUP
+"$ADB" shell input keyevent KEYCODE_WAKEUP
 sleep 1
-"$ADB" -s "$SERIAL" shell am start -W -n "$APP_ID/.MainActivity" > /dev/null
-front="$("$ADB" -s "$SERIAL" shell dumpsys activity activities | grep -m1 topResumedActivity || true)"
-case "$front" in
-  *"$APP_ID"*) say "raven is on the Android TV" ;;
-  *) echo "raven was installed but is not in front: $front" >&2; exit 1 ;;
-esac
+launch_in_front "the Android TV"

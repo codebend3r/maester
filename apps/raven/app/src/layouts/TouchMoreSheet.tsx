@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { PINNED_HEADING, SETTINGS_ENTRY } from '@/layouts/shelfKit'
+import { footSheetPanelOf } from '@/layouts/footSheet'
 import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TOUCH_NAV_COPY, isDroppedBy } from '@/layouts/touchMenuKit'
@@ -26,9 +27,6 @@ import { useReduceMotion } from '@/stores/reduceMotion'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
-
-/** The sheet's tallest, as a share of the room above the bar. */
-const SHEET_MAX_SHARE = '85%'
 
 /** The drag handle's size at the sheet's top. */
 const HANDLE = { width: 36, height: 4 } as const
@@ -219,18 +217,12 @@ const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     scrim: { backgroundColor: colours.ground },
     sheet: {
+      ...footSheetPanelOf(colours),
       position: 'absolute',
       left: 0,
       right: 0,
       bottom: 0,
-      maxHeight: SHEET_MAX_SHARE,
-      gap: SIZES.space2,
       paddingTop: SIZES.space2,
-      backgroundColor: colours.ground,
-      borderTopLeftRadius: SIZES.radiusLg,
-      borderTopRightRadius: SIZES.radiusLg,
-      borderTopWidth: 1,
-      borderTopColor: colours.line,
     },
     handle: {
       alignSelf: 'center',

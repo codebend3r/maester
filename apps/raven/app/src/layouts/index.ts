@@ -137,14 +137,15 @@ export const {
 } = byInput({ [INPUT_KINDS.focus]: focusMusic, [INPUT_KINDS.touch]: touchMusic })
 
 /**
- * Each platform's player controls: raven's own on every one, under the thumb on iPhones and iPads
- * and under the remote on the two TVs (the Siri Remote and the d-pad), all with the subtitle cues
- * raven draws itself.
+ * Each platform's player controls: raven's own on every one, under the thumb on iPhones, iPads
+ * and Android phones and under the remote on the two TVs (the Siri Remote and the d-pad), all
+ * with the subtitle cues raven draws itself.
  */
 const PLAYER_CHROMES = {
   [APP_PLATFORMS.ios]: touchPlayerChrome,
   [APP_PLATFORMS.tvos]: tvosPlayerChrome,
   [APP_PLATFORMS.androidTv]: dpadPlayerChrome,
+  [APP_PLATFORMS.androidPhone]: touchPlayerChrome,
 } as const satisfies Record<AppPlatform, PlayerChromeKit>
 
 /**
