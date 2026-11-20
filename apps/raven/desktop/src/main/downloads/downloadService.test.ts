@@ -46,13 +46,7 @@ import { CALL_MESSAGES } from '@/main/servers/serverCalls'
 import { tokenFor } from '@/main/test/accountTokens'
 import { configFor } from '@/main/test/configFakes'
 import { createGrants } from '@/main/grants'
-import {
-  addRecent,
-  EMPTY_STATE,
-  type FileFacts,
-  type PlayerState,
-  savePosition,
-} from '@/main/playerState'
+import { EMPTY_STATE, type FileFacts, type PlayerState, savePosition } from '@/main/playerState'
 import { createJsonStore, type StateFs } from '@/main/stateStore'
 import {
   accountTicket,
@@ -1468,12 +1462,12 @@ describe('playing a download', () => {
     if (last?.type !== 'downloads') throw new Error('expected a downloads event')
     return last.downloads
   }
-  /** A player state holding a recent and a resume spot at 100 of 3000 for each path. */
+  /** A player state holding a resume spot at 100 of 3000 for each path. */
   const remembering = (...paths: string[]): PlayerState =>
     paths.reduce(
       (state, path) =>
         savePosition({
-          state: addRecent({ state, path, at: 1 }),
+          state,
           file: factsOf(path),
           position: 100,
           duration: 3000,
@@ -1481,10 +1475,7 @@ describe('playing a download', () => {
         }),
       EMPTY_STATE,
     )
-  const pathsIn = (state: PlayerState) => ({
-    recents: state.recents.flatMap((recent) => (recent.kind === 'file' ? [recent.path] : [])),
-    resume: state.resume.map(({ path }) => path),
-  })
+  const resumePathsIn = (state: PlayerState): string[] => state.resume.map(({ path }) => path)
 
   it('plays a download through its playback, and tells the page what a position changed', async () => {
     const world = setup({
@@ -1528,21 +1519,19 @@ describe('playing a download', () => {
     expect(world.state.read().resume).toEqual([])
     expect(entryOf(world)?.watchedAt).toBe(NOW)
     expect(world.service.views()[0]?.watched).toBe(1)
-    expect(world.service.isWatched({ path: VIDEO })).toBe(true)
-    expect(world.service.isWatched({ path: MOVIE_PATH })).toBe(false)
   })
 
   it.each([
     ['remove', (world: World) => world.service.remove({ downloadId: ID })],
     ['removeAll', (world: World) => world.service.removeAll()],
-  ])("drops a download's recent and resume spot through %s", async (_, removing) => {
+  ])("drops a download's resume spot through %s", async (_, removing) => {
     const world = setup({
       initial: holding(entryFor({})),
       videos: { [VIDEO]: FILE },
       player: remembering(VIDEO, MOVIE_PATH),
     })
     await removing(world)
-    expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
+    expect(resumePathsIn(world.state.read())).toEqual([MOVIE_PATH])
   })
 
   it("shows each ready file's share watched, read off its file at launch", async () => {
@@ -1635,9 +1624,9 @@ describe('reaching the server', () => {
     // The launch sends what is pending once, so the position is saved after it.
     await ticks(10)
     const granted = await world.grants.grant(VIDEO)
-    if (!granted.ok) throw new Error('expected a grant')
-    world.service.noteOpened({ fileId: granted.file.fileId })
-    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    if (granted === null) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.fileId })
+    world.service.notePosition({ fileId: granted.fileId, position: 750, duration: 3000 })
     await ticks(5)
     expect(world.log).toEqual([])
     fireAfter(world, SYNC_DEBOUNCE_MS)
@@ -1659,9 +1648,9 @@ describe('reaching the server', () => {
     })
     await ticks(10)
     const granted = await world.grants.grant(VIDEO)
-    if (!granted.ok) throw new Error('expected a grant')
-    world.service.noteOpened({ fileId: granted.file.fileId })
-    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    if (granted === null) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.fileId })
+    world.service.notePosition({ fileId: granted.fileId, position: 750, duration: 3000 })
     expect(entries(world)[0]?.pending ?? null).toEqual({ ...PLAYED, accountId: ACCOUNT_A })
     world.table[playOf(11)] = NO_CONTENT
     world.table[progress(11, 750)] = NO_CONTENT
@@ -1713,9 +1702,9 @@ describe('reaching the server', () => {
     const before = world.heard.length
 
     const granted = await world.grants.grant(VIDEO)
-    if (!granted.ok) throw new Error('expected a grant')
-    world.service.noteOpened({ fileId: granted.file.fileId })
-    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    if (granted === null) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.fileId })
+    world.service.notePosition({ fileId: granted.fileId, position: 750, duration: 3000 })
     expect(world.store.read().owed).toEqual([
       { serverId: SERVER_ID, mediaId: 11, pending: { ...PLAYED, accountId: ACCOUNT_A } },
     ])
@@ -1749,17 +1738,17 @@ describe('reaching the server', () => {
     })
     await ticks(10)
     const granted = await world.grants.grant(VIDEO)
-    if (!granted.ok) throw new Error('expected a grant')
-    world.service.noteOpened({ fileId: granted.file.fileId })
-    world.service.notePosition({ fileId: granted.file.fileId, position: 750, duration: 3000 })
+    if (granted === null) throw new Error('expected a grant')
+    world.service.noteOpened({ fileId: granted.fileId })
+    world.service.notePosition({ fileId: granted.fileId, position: 750, duration: 3000 })
     world.table[playOf(11)] = NO_CONTENT
     world.table[progress(11, 1000)] = NO_CONTENT
     const offline = world.heard.length
 
     world.signedIn.accountId = ACCOUNT_B
     world.service.accountSwitched()
-    world.service.notePosition({ fileId: granted.file.fileId, position: 900, duration: 3000 })
-    world.service.notePosition({ fileId: granted.file.fileId, position: 1000, duration: 3000 })
+    world.service.notePosition({ fileId: granted.fileId, position: 900, duration: 3000 })
+    world.service.notePosition({ fileId: granted.fileId, position: 1000, duration: 3000 })
     expect(entries(world)[0]?.pending ?? null).toEqual(NO_PENDING)
     expect(world.store.read().owed).toEqual([
       {

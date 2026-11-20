@@ -14,19 +14,14 @@ const REFUSED = {
   message: 'Raven could not read its own reply.',
 }
 
-type BridgeOfProps = {
-  request?: (request: unknown) => Promise<unknown>
-  dropFiles?: (files: readonly unknown[]) => Promise<unknown>
-}
+type BridgeOfProps = { request?: (request: unknown) => Promise<unknown> }
 
 const bridgeOf = ({
   request = async () => ({ type: DESKTOP_REPLIES.done }),
-  dropFiles = async () => ({ type: DESKTOP_REPLIES.done }),
 }: BridgeOfProps = {}) => {
   const listeners: ((event: unknown) => void)[] = []
   return {
     request: mock(request),
-    dropFiles: mock(dropFiles),
     subscribe: (listener: (event: unknown) => void) => {
       listeners.push(listener)
       return () => undefined
@@ -62,8 +57,8 @@ describe('clientFor', () => {
   it('turns a reply it cannot read, or a failed request, into a refusal', async () => {
     const odd = clientFor(bridgeOf({ request: async () => ({ type: 'nonsense' }) }))
     expect(await odd?.request({ type: DESKTOP_REQUESTS.ready })).toEqual(REFUSED)
-    const broken = clientFor(bridgeOf({ dropFiles: () => Promise.reject(new Error('gone')) }))
-    expect(await broken?.dropFiles([])).toEqual(REFUSED)
+    const broken = clientFor(bridgeOf({ request: () => Promise.reject(new Error('gone')) }))
+    expect(await broken?.request({ type: DESKTOP_REQUESTS.ready })).toEqual(REFUSED)
   })
 
   it('hands on the events it understands and warns of the rest', () => {
@@ -79,27 +74,31 @@ describe('clientFor', () => {
 })
 
 describe('readMain', () => {
-  const request = { type: DESKTOP_REQUESTS.listRecents } as const
+  const request = { type: DESKTOP_REQUESTS.listDownloads } as const
   const clientAnswering = (reply: DesktopReply) => ({ request: async () => reply })
 
   it('hands back the reply main gives the request', async () => {
-    const recents: DesktopReply = { type: DESKTOP_REPLIES.recents, recents: [] }
+    const downloads: DesktopReply = {
+      type: DESKTOP_REPLIES.downloads,
+      downloads: [],
+      shouldAutoDeleteByDefault: false,
+    }
     expect(
-      await readMain({ client: clientAnswering(recents), request, fallback: 'No recents.' }),
-    ).toEqual(recents)
+      await readMain({ client: clientAnswering(downloads), request, fallback: 'No downloads.' }),
+    ).toEqual(downloads)
   })
 
   it("throws a refusal in main's words, and another kind of reply in the fallback's", async () => {
     const refused = { type: DESKTOP_REPLIES.refused, message: 'Main said no.' } as const
     await expect(
-      readMain({ client: clientAnswering(refused), request, fallback: 'No recents.' }),
+      readMain({ client: clientAnswering(refused), request, fallback: 'No downloads.' }),
     ).rejects.toThrow('Main said no.')
     await expect(
       readMain({
         client: clientAnswering({ type: DESKTOP_REPLIES.done }),
         request,
-        fallback: 'No recents.',
+        fallback: 'No downloads.',
       }),
-    ).rejects.toThrow('No recents.')
+    ).rejects.toThrow('No downloads.')
   })
 })

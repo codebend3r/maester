@@ -40,7 +40,7 @@ bun run ci:desktop:e2e -- --skip-nx-cache
 ## On screen
 
 - A **Raven** window (an unpackaged Electron app, so the Dock shows Electron's icon) opens, does its test and closes, then the next one opens: dozens in a row, each coming to the front. Each runs on a throwaway profile, never `~/Library/Application Support/raven`.
-- The windows show raven's web pages: sign-in against the fake Auth, the library, Downloads, On this Mac, Settings, the player's controls.
+- The windows show raven's web pages: sign-in against the fake Auth, the library, Downloads, Settings, the player's controls.
 - No video picture and no sound: mpv runs headless and Chromium's audio output is off, so a playing title shows the player's controls over a blank stage.
 - Ask the user not to click or type in the windows while it runs; a stolen focus or keypress can fail a test.
 - The terminal prints Playwright's list reporter: each test with a pass or fail mark and its time.

@@ -109,7 +109,7 @@ describe('AuthGate', () => {
       expect(screen.queryByRole('heading', { name: 'You are offline' })).toBeNull()
     })
 
-    it('keeps a local file or download playing', () => {
+    it('keeps a download playing', () => {
       getMe.mockImplementation(() => new Promise(() => undefined))
       onlineManager.setOnline(false)
       renderGate({ route: playPathOf(FILE_ID) })
@@ -117,14 +117,14 @@ describe('AuthGate', () => {
     })
   })
 
-  it('keeps a local file or download playing while the account is read', () => {
+  it('keeps a download playing while the account is read', () => {
     getMe.mockImplementation(() => new Promise(() => undefined))
     renderGate({ route: playPathOf(FILE_ID) })
     expect(screen.getByText('Library')).toBeInTheDocument()
     expect(screen.queryByText('Loading')).toBeNull()
   })
 
-  it('keeps a local file or download playing when the account cannot be read', async () => {
+  it('keeps a download playing when the account cannot be read', async () => {
     getMe.mockRejectedValue(
       refused({
         status: 503,
@@ -137,7 +137,7 @@ describe('AuthGate', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
-  it('keeps a local file or download playing while accounts cannot be reached', () => {
+  it('keeps a download playing while accounts cannot be reached', () => {
     renderGate({
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
       route: playPathOf(FILE_ID),

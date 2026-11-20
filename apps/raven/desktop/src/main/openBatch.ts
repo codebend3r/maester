@@ -1,4 +1,3 @@
-import { isAbsolute } from 'node:path'
 import {
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
@@ -19,9 +18,8 @@ type CreateOpenBatchProps<T> = {
 }
 
 /**
- * Holds opens (Finder's one `open-file` per file, links, a second launch) until the
- * renderer is ready, then hands them over in bursts so a multi-file open plays the
- * first and queues the rest instead of replacing the video once per file.
+ * Holds opens (links, a second launch) until the renderer is ready, then hands them over
+ * in bursts, so the page hears one answer for a burst and not one per link.
  */
 export const createOpenBatch = <T>({
   delayMs,
@@ -56,10 +54,6 @@ export const createOpenBatch = <T>({
 
 const isLink = (arg: string): boolean => arg.toLowerCase().startsWith(URL_PROTOCOLS.raven)
 
-/** The files a launch was asked to open: absolute paths after the executable, never switches or links. */
-export const pathsFromArgv = (argv: readonly string[]): string[] =>
-  argv.slice(1).filter((arg) => !arg.startsWith('-') && !isLink(arg) && isAbsolute(arg))
-
 /**
  * The `raven:` links a launch was asked to open. Windows hands a link to the app in its
  * arguments, on a cold launch and to the running app through `second-instance`; macOS sends
@@ -67,34 +61,17 @@ export const pathsFromArgv = (argv: readonly string[]): string[] =>
  */
 export const linksFromArgv = (argv: readonly string[]): string[] => argv.slice(1).filter(isLink)
 
-type LaunchPathsProps = {
-  argv: readonly string[]
-  isDefaultApp: boolean
-}
-
-/**
- * `pathsFromArgv` for a launch. Unpackaged, Electron is run as `electron <app> ...`,
- * so the first argument that is not a switch is the app's folder, not a file to open.
- */
-export const launchPaths = ({ argv, isDefaultApp }: LaunchPathsProps): string[] => {
-  if (!isDefaultApp) return pathsFromArgv(argv)
-  const appIndex = argv.findIndex((arg, index) => index > 0 && !arg.startsWith('-'))
-  return pathsFromArgv(appIndex === -1 ? argv : argv.toSpliced(appIndex, 1))
-}
-
-/** What the page is told after main opens files or links on its own (Finder, a second launch, `open-url`). */
+/** What the page is told after main opens links on its own (a second launch, `open-url`). */
 export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
   switch (reply.type) {
-    case DESKTOP_REPLIES.play:
-      return { type: DESKTOP_EVENTS.play, target: reply.target }
     case DESKTOP_REPLIES.navigate:
       return { type: DESKTOP_EVENTS.navigate, to: reply.to }
     case DESKTOP_REPLIES.downloadAsk:
       return { type: DESKTOP_EVENTS.downloadAsk, ask: reply.ask }
     case DESKTOP_REPLIES.refused:
       return { type: DESKTOP_EVENTS.notice, message: reply.message }
+    case DESKTOP_REPLIES.play:
     case DESKTOP_REPLIES.file:
-    case DESKTOP_REPLIES.recents:
     case DESKTOP_REPLIES.output:
     case DESKTOP_REPLIES.done:
     case DESKTOP_REPLIES.title:

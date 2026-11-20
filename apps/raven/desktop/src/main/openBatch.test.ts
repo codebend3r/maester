@@ -1,12 +1,6 @@
 import { DESKTOP_EVENTS, DESKTOP_REPLIES, PLAYER_SOURCE_KINDS, TITLE_REFUSALS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
-import {
-  createOpenBatch,
-  eventForOpen,
-  launchPaths,
-  linksFromArgv,
-  pathsFromArgv,
-} from '@/main/openBatch'
+import { createOpenBatch, eventForOpen, linksFromArgv } from '@/main/openBatch'
 import type { Timers } from '@/main/timers'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
@@ -106,59 +100,6 @@ describe('createOpenBatch', () => {
   })
 })
 
-describe('pathsFromArgv', () => {
-  it('keeps only absolute paths after the executable, skipping switches', () => {
-    expect(
-      pathsFromArgv([
-        '/Applications/Raven.app/Contents/MacOS/Raven',
-        '--inspect',
-        '/m/Film.mkv',
-        '.',
-        'relative.mkv',
-      ]),
-    ).toEqual(['/m/Film.mkv'])
-  })
-
-  it('never takes the executable itself', () => {
-    expect(pathsFromArgv(['/usr/local/bin/electron'])).toEqual([])
-  })
-})
-
-describe('launchPaths', () => {
-  it('skips the app folder Electron is given when run unpackaged', () => {
-    expect(
-      launchPaths({
-        argv: ['/usr/local/bin/electron', '/src/apps/raven/desktop', '/m/Film.mkv'],
-        isDefaultApp: true,
-      }),
-    ).toEqual(['/m/Film.mkv'])
-  })
-
-  it('keeps every path after a packaged executable', () => {
-    expect(
-      launchPaths({
-        argv: ['/Applications/Raven.app/Contents/MacOS/Raven', '/m/Film.mkv'],
-        isDefaultApp: false,
-      }),
-    ).toEqual(['/m/Film.mkv'])
-  })
-
-  it('never takes a raven link for a file to open', () => {
-    expect(
-      launchPaths({
-        argv: ['/Raven/Raven.exe', 'raven:/play?media=7', '/m/Film.mkv'],
-        isDefaultApp: false,
-      }),
-    ).toEqual(['/m/Film.mkv'])
-    expect(
-      launchPaths({
-        argv: ['/usr/local/bin/electron', '/src/apps/raven/desktop', 'raven://play?media=7'],
-        isDefaultApp: true,
-      }),
-    ).toEqual([])
-  })
-})
-
 describe('linksFromArgv', () => {
   it('picks the raven links out of a Windows launch, past the executable and its switches', () => {
     expect(
@@ -183,13 +124,6 @@ describe('linksFromArgv', () => {
 })
 
 describe('eventForOpen', () => {
-  it('turns a play reply into a play event', () => {
-    expect(eventForOpen({ type: 'play', target: { fileId: FILM, queue: [NEXT] } })).toEqual({
-      type: 'play',
-      target: { fileId: FILM, queue: [NEXT] },
-    })
-  })
-
   it('turns a refusal into a notice', () => {
     expect(eventForOpen({ type: 'refused', message: 'Raven opens video files only.' })).toEqual({
       type: 'notice',
@@ -217,6 +151,7 @@ describe('eventForOpen', () => {
 
   it('sends nothing for a reply that opens nothing', () => {
     expect(eventForOpen({ type: 'done' })).toBeNull()
+    expect(eventForOpen({ type: 'play', target: { fileId: FILM, queue: [NEXT] } })).toBeNull()
     expect(
       eventForOpen({ type: 'downloads', downloads: [], shouldAutoDeleteByDefault: false }),
     ).toBeNull()

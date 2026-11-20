@@ -3,17 +3,9 @@ import {
   EMPTY_STATE,
   END_MARGIN_S,
   forgetResume,
-  FORMER_RECENT_KINDS,
-  RECENT_KINDS,
-  RECENTS_CAP,
   RESUME_CAP,
   TRACKS_CAP,
-  addRecent,
-  clearRecents,
-  isStoredPlayerState,
-  recentKey,
-  removeRecent,
-  removeRecentByKey,
+  isPlayerState,
   resumeFor,
   savePosition,
   setTrackPick,
@@ -43,83 +35,9 @@ const withMany = ({ count, reduce }: WithManyProps) => distinct(count).reduce(re
 
 describe('constants', () => {
   it('pins the caps and the end margin', () => {
-    expect(RECENTS_CAP).toBe(50)
     expect(RESUME_CAP).toBe(1000)
     expect(TRACKS_CAP).toBe(1000)
     expect(END_MARGIN_S).toBe(10)
-  })
-})
-
-describe('addRecent', () => {
-  it('puts the newest first', () => {
-    const state = addRecent({
-      state: addRecent({ state: EMPTY_STATE, path: '/a.mkv', at: 1 }),
-      path: '/b.mkv',
-      at: 2,
-    })
-    expect(state.recents.map(recentKey)).toEqual(['file:/b.mkv', 'file:/a.mkv'])
-    expect(state.recents[0]).toEqual({ kind: 'file', path: '/b.mkv', openedAt: 2 })
-  })
-
-  it('moves an existing path to the front without duplicating it', () => {
-    const first = addRecent({ state: EMPTY_STATE, path: '/a.mkv', at: 1 })
-    const second = addRecent({ state: first, path: '/b.mkv', at: 2 })
-    const again = addRecent({ state: second, path: '/a.mkv', at: 3 })
-    expect(again.recents.map(recentKey)).toEqual(['file:/a.mkv', 'file:/b.mkv'])
-    expect(again.recents[0]!.openedAt).toBe(3)
-  })
-
-  it('drops the oldest at the 51st distinct path', () => {
-    const state = withMany({
-      count: RECENTS_CAP + 1,
-      reduce: (current, index) => addRecent({ state: current, path: `/f${index}.mkv`, at: index }),
-    })
-    expect(state.recents.length).toBe(50)
-    expect(state.recents.some((entry) => recentKey(entry) === 'file:/f0.mkv')).toBe(false)
-    expect(recentKey(state.recents[0]!)).toBe('file:/f50.mkv')
-  })
-})
-
-describe('removeRecent and clearRecents', () => {
-  it('removes one path and keeps the rest', () => {
-    const state = addRecent({
-      state: addRecent({ state: EMPTY_STATE, path: '/a', at: 1 }),
-      path: '/b',
-      at: 2,
-    })
-    expect(removeRecent({ state, path: '/a' }).recents.map(recentKey)).toEqual(['file:/b'])
-  })
-
-  it('clears every recent but leaves the rest of the state', () => {
-    const saved = savePosition({
-      state: EMPTY_STATE,
-      file: facts({ path: '/a' }),
-      position: 40,
-      duration: 120,
-      at: 1,
-    })
-    const state = clearRecents(addRecent({ state: saved, path: '/a', at: 1 }))
-    expect(state.recents).toEqual([])
-    expect(state.resume.length).toBe(1)
-  })
-})
-
-describe('recentKey', () => {
-  it('keys a file by its path', () => {
-    expect(recentKey({ kind: RECENT_KINDS.file, path: '/m/a.mkv', openedAt: 1 })).toBe(
-      'file:/m/a.mkv',
-    )
-  })
-
-  it('removes one entry by its key', () => {
-    const state = addRecent({
-      state: addRecent({ state: EMPTY_STATE, path: '/b.mkv', at: 1 }),
-      path: '/a.mkv',
-      at: 2,
-    })
-    expect(removeRecentByKey({ state, key: 'file:/a.mkv' }).recents.map(recentKey)).toEqual([
-      'file:/b.mkv',
-    ])
   })
 })
 
@@ -361,14 +279,14 @@ describe('resumeFor', () => {
 describe('forgetResume', () => {
   const saved = [facts({ path: '/a' }), facts({ path: '/b' })].reduce(
     (state, file) => savePosition({ state, file, position: 40, duration: 120, at: 1 }),
-    addRecent({ state: EMPTY_STATE, path: '/a', at: 1 }),
+    setTrackPick({ state: EMPTY_STATE, path: '/a', audio: 1, subtitle: null, at: 1 }),
   )
 
-  it("drops the path's resume spot and keeps the others and the recents", () => {
+  it("drops the path's resume spot and keeps the others and the track picks", () => {
     const forgotten = forgetResume({ state: saved, path: '/a' })
     expect(forgotten.resume.map((entry) => entry.path)).toEqual(['/b'])
     expect(resumeFor({ state: forgotten, file: facts({ path: '/a' }) })).toBe(0)
-    expect(forgotten.recents).toEqual(saved.recents)
+    expect(forgotten.tracks).toEqual(saved.tracks)
   })
 
   it('hands back the same state when the path has no spot, so nothing is written', () => {
@@ -478,16 +396,16 @@ describe('setWindowBounds', () => {
   })
 })
 
-describe('isStoredPlayerState', () => {
+describe('isPlayerState', () => {
   it('accepts EMPTY_STATE', () => {
-    expect(isStoredPlayerState(EMPTY_STATE)).toBe(true)
+    expect(isPlayerState(EMPTY_STATE)).toBe(true)
   })
 
   it('accepts a populated state after a JSON round trip', () => {
     const state = setWindowBounds({
       state: setTrackPick({
         state: savePosition({
-          state: addRecent({ state: EMPTY_STATE, path: '/a', at: 1 }),
+          state: EMPTY_STATE,
           file: facts({ path: '/a' }),
           position: 40,
           duration: null,
@@ -500,70 +418,43 @@ describe('isStoredPlayerState', () => {
       }),
       bounds: { x: 0, y: 0, width: 1, height: 1, displayId: 1 },
     })
-    expect(isStoredPlayerState(JSON.parse(JSON.stringify(state)))).toBe(true)
+    expect(isPlayerState(JSON.parse(JSON.stringify(state)))).toBe(true)
   })
 
-  it('accepts a version 1 file written before server titles, holding only file recents', () => {
-    const written = {
-      version: 1,
-      recents: [
-        { kind: 'file', path: '/m/a.mkv', openedAt: 2 },
-        { kind: 'file', path: '/m/b.mkv', openedAt: 1 },
-      ],
-      resume: [],
-      tracks: [],
-      window: null,
-    }
-    expect(isStoredPlayerState(JSON.parse(JSON.stringify(written)))).toBe(true)
-  })
-
-  it("reads an older Raven's server titles and leaves them out of the recents", () => {
+  it("reads an older Raven's file and leaves out the recents it kept", () => {
+    const kept = savePosition({
+      state: EMPTY_STATE,
+      file: facts({ path: '/m/a.mkv' }),
+      position: 40,
+      duration: 120,
+      at: 1,
+    })
     const written: unknown = JSON.parse(
       JSON.stringify({
-        ...EMPTY_STATE,
+        ...kept,
         recents: [
-          {
-            kind: FORMER_RECENT_KINDS.server,
-            serverId: 'a',
-            mediaId: 7,
-            label: 'Dune',
-            watched: null,
-            openedAt: 2,
-          },
-          { kind: RECENT_KINDS.file, path: '/m/a.mkv', openedAt: 1 },
+          { kind: 'server', serverId: 'a', mediaId: 7, label: 'Dune', watched: null, openedAt: 2 },
+          { kind: 'file', path: '/m/a.mkv', openedAt: 1 },
         ],
       }),
     )
-    if (!isStoredPlayerState(written)) throw new Error('an older state should read')
-    expect(upgradeState(written)).toEqual({
-      ...EMPTY_STATE,
-      recents: [{ kind: RECENT_KINDS.file, path: '/m/a.mkv', openedAt: 1 }],
-    })
-  })
-
-  it('rejects a recent of a kind it never kept', () => {
-    expect(
-      isStoredPlayerState({ ...EMPTY_STATE, recents: [{ kind: 'url', path: 'https://x' }] }),
-    ).toBe(false)
+    if (!isPlayerState(written)) throw new Error('an older state should read')
+    expect(upgradeState(written)).toEqual(kept)
   })
 
   it('rejects another version', () => {
-    expect(isStoredPlayerState({ ...EMPTY_STATE, version: 2 })).toBe(false)
-  })
-
-  it('rejects recents that are not a list', () => {
-    expect(isStoredPlayerState({ ...EMPTY_STATE, recents: 'x' })).toBe(false)
+    expect(isPlayerState({ ...EMPTY_STATE, version: 2 })).toBe(false)
   })
 
   it('rejects a malformed entry', () => {
-    expect(isStoredPlayerState({ ...EMPTY_STATE, resume: [{ path: '/a' }] })).toBe(false)
+    expect(isPlayerState({ ...EMPTY_STATE, resume: [{ path: '/a' }] })).toBe(false)
   })
 })
 
 describe('purity', () => {
   it('no reducer mutates its input', () => {
     const base = savePosition({
-      state: addRecent({ state: EMPTY_STATE, path: '/a', at: 1 }),
+      state: EMPTY_STATE,
       file: facts({ path: '/a' }),
       position: 40,
       duration: 120,
@@ -571,11 +462,7 @@ describe('purity', () => {
     })
     const withPick = setTrackPick({ state: base, path: '/a', audio: 1, subtitle: 'en', at: 1 })
     const reducers: Array<(state: PlayerState) => PlayerState> = [
-      (state) => addRecent({ state, path: '/b', at: 2 }),
-      (state) => addRecent({ state, path: '/a', at: 2 }),
-      (state) => removeRecent({ state, path: '/a' }),
-      (state) => removeRecentByKey({ state, key: 'file:/a' }),
-      (state) => clearRecents(state),
+      (state) => forgetResume({ state, path: '/a' }),
       (state) =>
         savePosition({ state, file: facts({ path: '/a' }), position: 50, duration: 120, at: 2 }),
       (state) =>

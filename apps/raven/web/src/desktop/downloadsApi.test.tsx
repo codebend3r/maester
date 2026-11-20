@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { applyDownloadsEvent, type DownloadsData, useChangeDownloads } from '@/desktop/downloadsApi'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useToasts } from '@raven/ui'
-import { asDesktop, DL_2, fakeClient, viewOf } from '@/test/desktop'
+import { asDesktop, DL_2, fakeClient, FILE_ID, viewOf } from '@/test/desktop'
 
 type InvalidatedByProps = {
   before: DownloadsData['downloads']
@@ -44,19 +44,23 @@ describe('applyDownloadsEvent', () => {
     expect(await invalidatedBy({ before, after })).toEqual([DESKTOP_QUERY_KEYS.space])
   })
 
-  it('reads the recents and the disk again once one leaves', async () => {
+  it('reads the disk again once one leaves', async () => {
     const before = [viewOf(), viewOf({ downloadId: DL_2 })]
     const after = [viewOf()]
-    expect(await invalidatedBy({ before, after })).toEqual([
-      DESKTOP_QUERY_KEYS.recents,
-      DESKTOP_QUERY_KEYS.space,
-    ])
+    expect(await invalidatedBy({ before, after })).toEqual([DESKTOP_QUERY_KEYS.space])
   })
 })
 
 describe('useChangeDownloads', () => {
   it('reads an answer it cannot use as a refusal, and says the change was not made', async () => {
-    asDesktop(fakeClient({ request: async () => ({ type: DESKTOP_REPLIES.recents, recents: [] }) }))
+    asDesktop(
+      fakeClient({
+        request: async () => ({
+          type: DESKTOP_REPLIES.play,
+          target: { fileId: FILE_ID, queue: [] },
+        }),
+      }),
+    )
     type WrapperProps = { children: ReactNode }
 
     const wrapper = ({ children }: WrapperProps) => (

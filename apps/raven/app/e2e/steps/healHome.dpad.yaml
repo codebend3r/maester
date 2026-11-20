@@ -11,7 +11,7 @@ name: Leave Home as the fixture had it, nothing in progress and no show on Binge
 # The show on Binge: its card stands over the hero, the one card on Home that writes its episode
 # as S01E01 with its name. Home's opening focus does not always settle on the card, so the heal
 # goes through the side menu, which the remote reaches from wherever it is, and the show's
-# library. That opens on its Continue watching view while the episode has a spot, the remote on
+# library. That opens on its In progress page while the episode has a spot, the remote on
 # the episode's card, so the spot goes first from the episode's page, and the library is on its
 # grid again when Back lands on it. Then the show's page, where Binging is pressed off.
 - runFlow:
@@ -39,7 +39,7 @@ name: Leave Home as the fixture had it, nothing in progress and no show on Binge
                 env:
                   ROW: second
             - extendedWaitUntil:
-                visible: Show Continue watching
+                visible: Show In progress
                 timeout: 30000
       - pressKey: Back
       - runFlow:

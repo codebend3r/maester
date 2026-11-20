@@ -5,16 +5,16 @@ import { MESSAGES } from '@/main/desktopService'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isTrustedSender } from '@/main/security'
 
-const ENVELOPE = { kind: 'page', request: { type: 'listRecents' } } as const
+const REQUEST = { type: 'ready' } as const
 
-const setup = (handle: (envelope: unknown) => Promise<DesktopReply>) => {
+const setup = (handle: (request: unknown) => Promise<DesktopReply>) => {
   const handled: unknown[] = []
   const warnings: string[] = []
   const handler = createRequestHandler({
     isTrustedSender,
-    handle: (envelope) => {
-      handled.push(envelope)
-      return handle(envelope)
+    handle: (request) => {
+      handled.push(request)
+      return handle(request)
     },
     warn: (message) => {
       warnings.push(message)
@@ -28,7 +28,7 @@ const DONE = { type: 'done' } as const satisfies DesktopReply
 describe('createRequestHandler', () => {
   it('refuses a sender off the page origin without calling the service', async () => {
     const { handler, handled, warnings } = setup(async () => DONE)
-    expect(await handler({ frameUrl: 'https://evil.example/', payload: ENVELOPE })).toEqual({
+    expect(await handler({ frameUrl: 'https://evil.example/', payload: REQUEST })).toEqual({
       type: DESKTOP_REPLIES.refused,
       message: MESSAGES.unknownRequest,
     })
@@ -39,7 +39,7 @@ describe('createRequestHandler', () => {
 
   it('refuses a frame on the old app://raven origin', async () => {
     const { handler, handled, warnings } = setup(async () => DONE)
-    expect(await handler({ frameUrl: 'app://raven/', payload: ENVELOPE })).toEqual({
+    expect(await handler({ frameUrl: 'app://raven/', payload: REQUEST })).toEqual({
       type: DESKTOP_REPLIES.refused,
       message: MESSAGES.unknownRequest,
     })
@@ -49,7 +49,7 @@ describe('createRequestHandler', () => {
 
   it('refuses a request with no sender frame', async () => {
     const { handler, handled, warnings } = setup(async () => DONE)
-    expect(await handler({ frameUrl: null, payload: ENVELOPE })).toEqual({
+    expect(await handler({ frameUrl: null, payload: REQUEST })).toEqual({
       type: DESKTOP_REPLIES.refused,
       message: MESSAGES.unknownRequest,
     })
@@ -57,17 +57,17 @@ describe('createRequestHandler', () => {
     expect(warnings).toHaveLength(1)
   })
 
-  it('passes the envelope from the page frame to the service unchanged', async () => {
+  it('passes the request from the page frame to the service unchanged', async () => {
     const { handler, handled, warnings } = setup(async () => DONE)
-    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })).toEqual(DONE)
-    expect(handled).toEqual([ENVELOPE])
+    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })).toEqual(DONE)
+    expect(handled).toEqual([REQUEST])
     expect(warnings).toEqual([])
   })
 
   it('logs every refusal the service gives', async () => {
     const refusal = { type: 'refused', message: MESSAGES.missing } as const satisfies DesktopReply
     const { handler, warnings } = setup(async () => refusal)
-    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })).toEqual(refusal)
+    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })).toEqual(refusal)
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain(MESSAGES.missing)
   })
@@ -76,7 +76,7 @@ describe('createRequestHandler', () => {
     const { handler, warnings } = setup(async () => {
       throw new Error('dialog crashed')
     })
-    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })).toEqual({
+    expect(await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })).toEqual({
       type: DESKTOP_REPLIES.refused,
       message: MESSAGES.unknownRequest,
     })
@@ -90,7 +90,7 @@ describe('createRequestHandler', () => {
     const { handler, warnings } = setup(async () => {
       throw failure
     })
-    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })
+    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })
     expect(warnings[0]).toContain('at showOpenDialog (main.ts:180:5)')
   })
 
@@ -102,7 +102,7 @@ describe('createRequestHandler', () => {
     const { handler, warnings } = setup(async () => {
       throw failure
     })
-    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })
+    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })
     // Node names the call `realpath`, Bun `lstat`.
     expect(warnings).toHaveLength(1)
     expect(warnings[0] ?? '').toMatch(/^Raven failed to answer a request: [a-z]+ ENOENT$/)
@@ -114,7 +114,7 @@ describe('createRequestHandler', () => {
     const { handler, warnings } = setup(async () => {
       throw failure
     })
-    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: ENVELOPE })
+    await handler({ frameUrl: `${PAGE_ORIGIN}/`, payload: REQUEST })
     expect(warnings[0]).toContain('dialog crashed')
   })
 })

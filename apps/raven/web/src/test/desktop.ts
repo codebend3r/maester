@@ -33,7 +33,6 @@ export const DL_3 = '0a000000-0000-4000-8000-000000000003'
 export const SERVER_ID = '0b000000-0000-4000-8000-000000000001'
 export const ASK_ID = '0c000000-0000-4000-8000-000000000001'
 export const FILE_ID = '0d000000-0000-4000-8000-000000000001'
-export const RECENT_ID = '0e000000-0000-4000-8000-000000000001'
 
 const SPACE: SpaceView = { free: 412 * GB, total: 1000 * GB, used: 34.2 * GB }
 
@@ -69,18 +68,16 @@ export const viewOf = (overrides: Partial<DownloadView> = {}): DownloadView => (
 })
 
 /** A client whose calls are recorded; `emit` pushes an event to whoever subscribed. */
-type FakeClientProps = Partial<Pick<DesktopClient, 'request' | 'dropFiles' | 'platform'>>
+type FakeClientProps = Partial<Pick<DesktopClient, 'request' | 'platform'>>
 
 export const fakeClient = ({
   request = async () => DONE,
-  dropFiles = async () => DONE,
   platform = DESKTOP_PLATFORMS.mac,
 }: FakeClientProps = {}) => {
   const listeners = new Set<(event: DesktopEvent) => void>()
   return {
     platform,
     request: mock<DesktopClient['request']>(request),
-    dropFiles: mock<DesktopClient['dropFiles']>(dropFiles),
     subscribe: mock<DesktopClient['subscribe']>((listener) => {
       listeners.add(listener)
       return () => {
@@ -246,8 +243,6 @@ export const downloadsMain = ({
         return listed()
       case DESKTOP_REQUESTS.readSpace:
         return { type: DESKTOP_REPLIES.space, space }
-      case DESKTOP_REQUESTS.listRecents:
-        return { type: DESKTOP_REPLIES.recents, recents: [] }
       case DESKTOP_REQUESTS.pauseDownload:
         return update({
           downloadId: request.downloadId,

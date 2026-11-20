@@ -1,26 +1,8 @@
-import { type Infer, isNumber, isString, listOf, nullable, object, oneOf, union } from '@raven/core'
+import { type Infer, isNumber, isString, listOf, nullable, object, oneOf } from '@raven/core'
 
-export const RECENTS_CAP = 50
 export const RESUME_CAP = 1000
 export const TRACKS_CAP = 1000
 export const END_MARGIN_S = 10
-
-export const RECENT_KINDS = { file: 'file' } as const
-
-/** The kinds of recent an older Raven kept besides: server titles, before the web app. */
-export const FORMER_RECENT_KINDS = { server: 'server' } as const
-
-const isRecentEntry = object({
-  kind: oneOf([RECENT_KINDS.file]),
-  path: isString,
-  openedAt: isNumber,
-})
-
-/**
- * A server title in an older Raven's recents. It is read only to be dropped: the web app's
- * own lists show what was watched on the server now.
- */
-const isFormerRecent = object({ kind: oneOf([FORMER_RECENT_KINDS.server]) })
 
 const isResumeEntry = object({
   path: isString,
@@ -46,22 +28,14 @@ const isWindowBounds = object({
   displayId: isNumber,
 })
 
-const STATE_FIELDS = {
+/** What `player-state.json` holds. An older Raven's also listed the files it had opened, as `recents`. */
+export const isPlayerState = object({
   version: oneOf([1]),
   resume: listOf(isResumeEntry),
   tracks: listOf(isTrackPick),
   window: nullable(isWindowBounds),
-}
-
-const isPlayerState = object({ ...STATE_FIELDS, recents: listOf(isRecentEntry) })
-
-/** What `player-state.json` may hold: this, or an older Raven's, whose recents held server titles too. */
-export const isStoredPlayerState = object({
-  ...STATE_FIELDS,
-  recents: listOf(union(isRecentEntry, isFormerRecent)),
 })
 
-export type RecentEntry = Infer<typeof isRecentEntry>
 type ResumeEntry = Infer<typeof isResumeEntry>
 export type WindowBounds = Infer<typeof isWindowBounds>
 export type PlayerState = Infer<typeof isPlayerState>
@@ -82,7 +56,6 @@ export const readFacts = ({ stat, path }: ReadFactsProps): Promise<FileFacts | n
 
 export const EMPTY_STATE: PlayerState = {
   version: 1,
-  recents: [],
   resume: [],
   tracks: [],
   window: null,
@@ -97,54 +70,13 @@ type UpsertFirstProps<T extends { path: string }> = {
 const upsertFirst = <T extends { path: string }>({ list, entry, cap }: UpsertFirstProps<T>): T[] =>
   [entry, ...list.filter((existing) => existing.path !== entry.path)].slice(0, cap)
 
-/** The state as this Raven keeps it: an older one's server titles leave the recents. */
-export const upgradeState = (stored: Infer<typeof isStoredPlayerState>): PlayerState => ({
-  ...stored,
-  recents: stored.recents.filter(isRecentEntry),
+/** The state as this Raven keeps it: whatever else an older one stored, its recents among it, is left behind. */
+export const upgradeState = ({ version, resume, tracks, window }: PlayerState): PlayerState => ({
+  version,
+  resume,
+  tracks,
+  window,
 })
-
-/** One key per recent: a file by its path. */
-export const recentKey = (entry: RecentEntry): string => `${entry.kind}:${entry.path}`
-
-type WithRecentProps = { state: PlayerState; entry: RecentEntry }
-
-/** Puts `entry` first, dropping any older entry with its key, and keeps the newest `RECENTS_CAP`. */
-const withRecent = ({ state, entry }: WithRecentProps): PlayerState => {
-  const key = recentKey(entry)
-  return {
-    ...state,
-    recents: [entry, ...state.recents.filter((existing) => recentKey(existing) !== key)].slice(
-      0,
-      RECENTS_CAP,
-    ),
-  }
-}
-
-type AddRecentProps = {
-  state: PlayerState
-  path: string
-  at: number
-}
-
-export const addRecent = ({ state, path, at }: AddRecentProps): PlayerState =>
-  withRecent({ state, entry: { kind: RECENT_KINDS.file, path, openedAt: at } })
-
-type RemoveRecentByKeyProps = {
-  state: PlayerState
-  key: string
-}
-
-export const removeRecentByKey = ({ state, key }: RemoveRecentByKeyProps): PlayerState => ({
-  ...state,
-  recents: state.recents.filter((entry) => recentKey(entry) !== key),
-})
-
-type RemoveRecentProps = { state: PlayerState; path: string }
-
-export const removeRecent = ({ state, path }: RemoveRecentProps): PlayerState =>
-  removeRecentByKey({ state, key: recentKey({ kind: RECENT_KINDS.file, path, openedAt: 0 }) })
-
-export const clearRecents = (state: PlayerState): PlayerState => ({ ...state, recents: [] })
 
 type IsFinishedProps = {
   position: number

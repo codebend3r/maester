@@ -17,21 +17,18 @@ import { DesktopHost } from '@/desktop/DesktopHost'
 import type { DownloadsData } from '@/desktop/downloadsApi'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
-import { useDragging } from '@/stores/dragging'
 import { SIGNED_IN } from '@/test/authClient'
 import { Where, where } from '@/test/authPage'
 import {
   ASK_ID,
   asDesktop,
   fakeClient,
-  FILE_ID,
   type FakeClient,
   SERVER_ID,
   sentOfType,
   viewOf,
 } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
-import { playPathOf } from '@/desktop/paths'
 
 const askOf = (status: DownloadAsk['status']): DownloadAsk => ({
   askId: ASK_ID,
@@ -78,12 +75,10 @@ describe('DesktopHost', () => {
     expect(client.subscribe).toHaveBeenCalledTimes(1)
   })
 
-  it('goes where main sends it, and plays what it opens', async () => {
+  it('goes where main sends it', async () => {
     const { client } = renderHost()
     await client.emit({ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings })
     expect(where()).toBe(PAGE_PATHS.settings)
-    await client.emit({ type: DESKTOP_EVENTS.play, target: { fileId: FILE_ID, queue: [] } })
-    expect(where()).toBe(playPathOf(FILE_ID))
   })
 
   it("shows main's notices and a newer release as toasts", async () => {
@@ -149,29 +144,6 @@ describe('DesktopHost', () => {
     ])
     await waitFor(() => expect(warn).toHaveBeenCalledTimes(1))
     warn.mockRestore()
-  })
-
-  it('plays files dropped on the window, and says while they are dragged over it', async () => {
-    const client = fakeClient({
-      dropFiles: async () => ({
-        type: DESKTOP_REPLIES.play,
-        target: { fileId: FILE_ID, queue: [] },
-      }),
-    })
-    renderHost({ client })
-    const files = { types: ['Files'], files: [] }
-    fireEvent.dragEnter(window, { dataTransfer: files })
-    expect(useDragging.getState().isDragging).toBe(true)
-    fireEvent.dragLeave(window, { dataTransfer: files })
-    expect(useDragging.getState().isDragging).toBe(false)
-    fireEvent.dragEnter(window, { dataTransfer: { types: ['text/plain'], files: [] } })
-    expect(useDragging.getState().isDragging).toBe(false)
-    fireEvent.dragOver(window, { dataTransfer: files })
-    await act(async () => {
-      fireEvent.drop(window, { dataTransfer: files })
-    })
-    expect(where()).toBe(playPathOf(FILE_ID))
-    expect(client.dropFiles).toHaveBeenCalledTimes(1)
   })
 })
 

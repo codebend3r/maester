@@ -6,6 +6,7 @@ import {
   CAPTION_COLOURS,
   CAPTION_SIZES,
   type FetchLike,
+  ITEM_TYPES,
   SCROBBLE_RETURNS,
   SCROBBLE_SERVICES,
   TITLE_DISPLAYS,
@@ -34,7 +35,8 @@ const routeOf = ({ method, path }: AppClientCall) =>
  * and the account's playlists and its album and artist favourites, by the audio spec's PR 7;
  * and the account's scrobbling links, a playlist's sharing and its copies, by the music spec's
  * PR 10; and the account's binge list, by the device Home's binge cards; and its subtitle look, by
- * the players' subtitle settings; and the owner's own,
+ * the players' subtitle settings; and a Coming soon title's request, by the app's Coming soon
+ * page; and the owner's own,
  * which only `APP_OWNER_CALLS` lists, by the app's admin settings.
  */
 const WRITES = [
@@ -49,6 +51,7 @@ const WRITES = [
   APP_CLIENT_CALLS.setArtistFavourite,
   APP_CLIENT_CALLS.setBinge,
   APP_CLIENT_CALLS.setCaptionStyle,
+  APP_CLIENT_CALLS.requestDownload,
   APP_CLIENT_CALLS.createPlaylist,
   APP_CLIENT_CALLS.renamePlaylist,
   APP_CLIENT_CALLS.deletePlaylist,
@@ -74,6 +77,7 @@ const WRITES = [
   APP_OWNER_CALLS.updateLibraryRatings,
   APP_OWNER_CALLS.cancelLibraryRatings,
   APP_OWNER_CALLS.matchLibrary,
+  APP_OWNER_CALLS.deleteMedia,
 ]
 
 const ownerCallNames: readonly string[] = Object.keys(APP_OWNER_CALLS)
@@ -163,6 +167,7 @@ describe('the calls raven’s app may make', () => {
       api.setArtistFavourite({ artistId: 5, favourite: true }),
       api.setBinge({ id: 8, binge: true }),
       api.setCaptionStyle({ size: CAPTION_SIZES.large, colour: CAPTION_COLOURS.yellow }),
+      api.requestDownload({ type: ITEM_TYPES.movie, tmdbId: '603' }),
       api.createPlaylist({ name: 'Mix' }),
       api.renamePlaylist({ id: 6, name: 'Mix' }),
       api.deletePlaylist(6),
@@ -191,6 +196,7 @@ describe('the calls raven’s app may make', () => {
       api.updateLibraryRatings(1),
       api.cancelLibraryRatings(1),
       api.matchLibrary(1),
+      api.deleteMedia(7),
     ])
     expect(heard).toEqual(WRITES)
   })

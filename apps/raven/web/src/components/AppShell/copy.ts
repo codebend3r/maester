@@ -24,8 +24,6 @@ export const APP_SHELL_COPY = {
   expandSideMenu: 'Expand the side menu (B)',
   collapseSideMenu: 'Collapse the side menu (B)',
   noteSuffix: (note: string) => ` (${note})`,
-  onThisComputer: (computer: string) => `On this ${computer}`,
-  thisComputer: (computer: string) => `This ${computer}`,
   inProgress: (count: number) => `${count} in progress`,
   version: (version: string) => `v${version}`,
 } as const

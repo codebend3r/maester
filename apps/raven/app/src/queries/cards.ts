@@ -102,7 +102,15 @@ export const isAllWatched = ({ watched, total }: IsAllWatchedProps): boolean =>
 
 /** Where a card's picture comes from and what goes with the request for it. */
 export type Pictures = {
-  api: Pick<ApiClient, 'itemImageUrl' | 'thumbnailUrl' | 'photoUrl' | 'albumCoverUrl'>
+  api: Pick<
+    ApiClient,
+    | 'itemImageUrl'
+    | 'thumbnailUrl'
+    | 'photoUrl'
+    | 'albumCoverUrl'
+    | 'tmdbPosterSources'
+    | 'tmdbBackdropUrl'
+  >
   headersFor: (uri: string) => Record<string, string>
 }
 

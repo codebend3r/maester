@@ -62,7 +62,7 @@ type TouchMoreSheetProps = {
 
 /**
  * The More sheet, up from the bar over a dimmed scrim that shuts it when pressed: a handle,
- * its heading, Search, Binge, Downloads and Settings, then the pinned libraries. A swipe down, an entry or the
+ * its heading, Search, Binge, Coming soon, Downloads and Settings, then the pinned libraries. A swipe down, an entry or the
  * accessibility escape shuts it too. It is drawn only while up or sliding.
  */
 export const TouchMoreSheet = ({
@@ -169,6 +169,12 @@ export const TouchMoreSheet = ({
                 icon={APP_ICONS.popcorn}
                 label={TOUCH_NAV_COPY.binge}
                 onPress={() => choose({ pathname: APP_ROUTES.binge, params: {} })}
+                width={tileWidth}
+              />
+              <MoreTile
+                icon={APP_ICONS.calendar}
+                label={TOUCH_NAV_COPY.comingSoon}
+                onPress={() => choose({ pathname: APP_ROUTES.comingSoon, params: {} })}
                 width={tileWidth}
               />
               <MoreTile

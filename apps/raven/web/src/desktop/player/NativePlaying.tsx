@@ -14,7 +14,7 @@ type NativePlayingProps = {
   services: PlayerServices
   player: NativePlayer
   source: PlayerSource
-  /** The library file the source plays, for the header; null for a plain local file. */
+  /** The library file the source plays, for the header; null when it is not known. */
   file: PlaybackFile | null
   resumeAt: number
   onLost: (at: number) => void

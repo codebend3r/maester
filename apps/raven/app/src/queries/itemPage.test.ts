@@ -67,6 +67,7 @@ describe('playablePage', () => {
       backdrop: at('/api/pictures/items/40/backdrop/b40'),
       tagline: 'Every table has a story.',
       summary: 'Two busboys at a downtown steakhouse plan one last perfect shift.',
+      notes: [],
     })
   })
 

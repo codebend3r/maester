@@ -15,7 +15,7 @@ type ApplyReplyProps = {
 }
 
 /**
- * What to do with main's answer to opening something: play a file (replacing a video already
+ * What to do with main's answer to opening something: play a download (replacing a video already
  * on screen, so Back leaves the player), show a page, ask about a download, or say why not.
  */
 const applyReply = ({ reply, navigate, pathname, state, showNotice }: ApplyReplyProps): void => {
@@ -35,8 +35,6 @@ const applyReply = ({ reply, navigate, pathname, state, showNotice }: ApplyReply
       return useDownloadAsk.getState().show(reply.ask)
     case DESKTOP_REPLIES.refused:
       return showNotice(reply.message)
-    case DESKTOP_REPLIES.done:
-      return
     default: {
       const unreachable: never = reply
       return unreachable

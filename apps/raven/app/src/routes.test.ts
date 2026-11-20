@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { SESSION_KINDS, SESSION_PARAMS } from '@raven/core'
+import { ITEM_TYPES, SESSION_KINDS, SESSION_PARAMS } from '@raven/core'
 
 import {
   APP_ROUTES,
@@ -48,6 +48,15 @@ describe('hrefOf', () => {
     expect(hrefOf({ kind: ROUTE_TARGETS.saga, libraryId: 1, sagaId: '119' })).toEqual({
       pathname: APP_ROUTES.saga,
       params: { [APP_ROUTE_PARAMS.id]: '119', [APP_ROUTE_PARAMS.library]: '1' },
+    })
+  })
+
+  it('opens a title still to come on its own Coming soon page', () => {
+    expect(
+      hrefOf({ kind: ROUTE_TARGETS.upcoming, title: { type: ITEM_TYPES.movie, tmdbId: '603' } }),
+    ).toEqual({
+      pathname: APP_ROUTES.comingSoonTitle,
+      params: { [APP_ROUTE_PARAMS.type]: ITEM_TYPES.movie, [APP_ROUTE_PARAMS.tmdbId]: '603' },
     })
   })
 

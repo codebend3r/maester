@@ -26,8 +26,7 @@ import { NO_TITLE_EXTRAS } from '@raven/ui/headless'
 const FILE: LocalFile = {
   fileId: FILE_ID,
   label: 'Clip 01',
-  folder: 'Clips',
-  isDownload: false,
+  folder: 'Downloaded from raven',
   mediaId: null,
   logo: null,
   resumeAt: 42,
@@ -66,14 +65,14 @@ describe('playerActionFor', () => {
 })
 
 describe('fileServicesFor', () => {
-  it('describes a local file, going back to On this Mac', () => {
+  it('describes a download, saying where it came from and going back to Downloads', () => {
     expect(setup().services.title).toEqual({
       ...NO_TITLE_EXTRAS,
       label: 'Clip 01',
-      context: null,
+      context: 'Downloaded from raven',
       duration: null,
       resumeAt: 42,
-      backTo: DESKTOP_PATHS.local,
+      backTo: DESKTOP_PATHS.downloads,
       next: null,
     })
   })
@@ -91,7 +90,7 @@ describe('fileServicesFor', () => {
 
   it('takes a download opened from the music mode back to its Downloads, and the next file too', () => {
     const { services } = setup({
-      file: { ...FILE, isDownload: true, next: { fileId: DL_1, label: 'Clip 02', queue: [] } },
+      file: { ...FILE, next: { fileId: DL_1, label: 'Clip 02', queue: [] } },
       downloadsPage: MUSIC_PATHS.downloads,
     })
     expect(services.title.backTo).toBe('/music/downloads')

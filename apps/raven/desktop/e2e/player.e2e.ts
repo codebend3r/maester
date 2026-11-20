@@ -1,16 +1,14 @@
 import { expect, type Page, test } from '@playwright/test'
-import { DESKTOP_PATHS, PAGE_ORIGIN } from '@raven/core'
 import { type Clips, makeClips } from '@/e2e/clips'
 import {
   expectOffline,
   freshUserData,
   heading,
-  openFile,
   removeDir,
-  sideLink,
   watchedPercent,
   withApp,
 } from '@/e2e/harness'
+import { episodeGroup, playDownload, seedDownloads } from '@/e2e/seedDownloads'
 
 type VideoFacts = { readyState: number; paused: boolean; currentTime: number }
 
@@ -45,124 +43,75 @@ const distanceFrom = async ({ page, seconds }: DistanceFromProps) => {
   return facts === null ? Number.POSITIVE_INFINITY : Math.abs(facts.currentTime - seconds)
 }
 
-const localHeading = (page: Page) => heading({ page, name: 'On this Mac' })
-
-/** On this Mac, from the side menu of the frame a launch with no server opens. */
-const openLocal = async (page: Page) => {
-  await expectOffline({ page })
-  await sideLink({ page, name: 'On this Mac' }).click()
-  await expect(localHeading(page)).toBeVisible()
-}
-
-const DRAG_EVENTS = { enter: 'dragenter', drop: 'drop' } as const
-
-type ForgedDragProps = {
-  page: Page
-  type: (typeof DRAG_EVENTS)[keyof typeof DRAG_EVENTS]
-  name: string
-}
-
-/** Sends the window a drag event carrying a File the page made. */
-const forgedDrag = ({ page, type, name }: ForgedDragProps) =>
-  page.evaluate(
-    ({ eventType, fileName }) => {
-      const transfer = new DataTransfer()
-      transfer.items.add(new File(['x'], fileName, { type: 'video/mp4' }))
-      window.dispatchEvent(
-        new DragEvent(eventType, { dataTransfer: transfer, bubbles: true, cancelable: true }),
-      )
-    },
-    { eventType: type, fileName: name },
-  )
-
-const dropOverlay = (page: Page) => page.getByText('Drop to play')
-
-type DropForgedFileOnLocalProps = { page: Page; name: string }
-
-/**
- * Drags a File the page made over On this Mac until its "Drop to play" shows, which proves the
- * drop listener is attached, then drops it: main refuses it with a notice.
- */
-const dropForgedFileOnLocal = async ({ page, name }: DropForgedFileOnLocalProps) => {
-  await expect(async () => {
-    await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
-    await expect(dropOverlay(page)).toBeVisible({ timeout: 500 })
-  }).toPass()
-  await forgedDrag({ page, type: DRAG_EVENTS.drop, name })
-  await expect(dropOverlay(page)).toBeHidden()
-}
-
-type DropForgedFileProps = { page: Page; name: string }
-
-/**
- * Drags and drops a File the page made over a video that has played for a while, so the
- * window's drop listener is long attached; the watch route shows no overlay to wait for.
- */
-const dropForgedFile = async ({ page, name }: DropForgedFileProps) => {
-  await forgedDrag({ page, type: DRAG_EVENTS.enter, name })
-  await forgedDrag({ page, type: DRAG_EVENTS.drop, name })
-}
-
-/** A notice over the watch route sits wholly above the controls bar's timeline. */
-const expectNoticeClearOfControls = async (page: Page) => {
-  await dropForgedFile({ page, name: 'Not a path.mp4' })
-  const notice = page.getByText('Drop a video file to play it.')
-  await expect(notice).toBeVisible()
-  const noticeBox = await notice.boundingBox()
-  const timelineBox = await page.getByRole('slider', { name: /seek/i }).boundingBox()
-  expect(noticeBox).not.toBeNull()
-  expect(timelineBox).not.toBeNull()
-  if (noticeBox === null || timelineBox === null) return
-  expect(noticeBox.y + noticeBox.height).toBeLessThan(timelineBox.y)
-}
-
-// The html engine's suite: with no video engine, local files play through Chromium.
+// The html engine's suite: with no video engine, a download plays through Chromium.
 const MPV = 'off'
 
-test.describe.serial('playing a local file through the web engine fallback', () => {
+// The seeded downloads: two episodes of one show, so the second is up next after the first.
+const LABELS = { first: 'Clip 01', second: 'Clip 02 Été' } as const
+const SHOW = { id: 10, title: 'Clips' } as const
+
+test.describe.serial('playing a download through the web engine fallback', () => {
   let userData = ''
   let clips: Clips = { folder: '', first: '', second: '' }
 
   test.beforeAll(async () => {
     userData = await freshUserData()
     clips = await makeClips()
+    await seedDownloads({
+      userData,
+      clips: [
+        {
+          path: clips.first,
+          label: LABELS.first,
+          mediaId: 1,
+          group: episodeGroup({ showId: SHOW.id, title: SHOW.title, episode: 1 }),
+        },
+        {
+          path: clips.second,
+          label: LABELS.second,
+          mediaId: 2,
+          group: episodeGroup({ showId: SHOW.id, title: SHOW.title, episode: 2 }),
+        },
+      ],
+    })
   })
 
   test.afterAll(async () => {
     await Promise.all([removeDir(userData), removeDir(clips.folder)])
   })
 
-  test('opens a clip from Finder, plays, pauses, seeks and resumes after a relaunch', async () => {
+  test('plays a download, pauses, seeks and resumes after a relaunch', async () => {
     await withApp({
       userData,
       mpv: MPV,
-      run: async ({ app, page }) => {
-        await openFile({ app, path: clips.first })
-        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
+      run: async ({ page }) => {
+        await expectOffline({ page })
+        await playDownload({ page, label: LABELS.first })
+        await expect(heading({ page, name: LABELS.first })).toBeVisible()
         await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
         await expectClockAdvancing(page)
 
         /*
-         * Paused before the seek, so the position main stores is exactly half way and the
-         * next test can read 50%: a seek while playing keeps moving until the pause lands.
+         * Paused before the seek, so the position main stores is exactly half way: a seek
+         * while playing keeps moving until the pause lands.
          */
         await page.keyboard.press('k')
         await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
         await page.keyboard.press('5')
         await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
 
-        // The AppleDouble sidecar and the text file between them are skipped.
-        await expect(page.getByRole('link', { name: 'Up next: Clip 02 Été' })).toBeVisible()
+        await expect(page.getByRole('link', { name: `Up next: ${LABELS.second}` })).toBeVisible()
         // Main has the position before the app quits.
-        await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
+        await expect.poll(() => watchedPercent({ page, label: LABELS.first })).toBe(50)
       },
     })
 
     await withApp({
       userData,
       mpv: MPV,
-      run: async ({ app, page }) => {
-        await openFile({ app, path: clips.first })
+      run: async ({ page }) => {
+        await expectOffline({ page })
+        await playDownload({ page, label: LABELS.first })
         await expect(page.getByText('Resumed at 0:15')).toBeVisible()
         // The note shows on mount; the video itself starts from there once it plays.
         await expect.poll(async () => isPlaying(await videoFacts(page))).toBe(true)
@@ -170,57 +119,6 @@ test.describe.serial('playing a local file through the web engine fallback', () 
           .poll(async () => (await videoFacts(page))?.currentTime ?? 0)
           .toBeGreaterThanOrEqual(14)
         await expectClockAdvancing(page)
-        await expectNoticeClearOfControls(page)
-
-        /*
-         * It plays on from 0:15, so park it at half way again for the next test: pause,
-         * then 0% (a jump of ten seconds or more saves) and back to 50%, both saved.
-         */
-        await page.keyboard.press('k')
-        await expect.poll(async () => isPaused(await videoFacts(page))).toBe(true)
-        await page.keyboard.press('0')
-        await expect.poll(() => distanceFrom({ page, seconds: 0 })).toBeLessThanOrEqual(1)
-        await page.keyboard.press('5')
-        await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
-        await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
-      },
-    })
-  })
-
-  test('lists recents on On this Mac after a relaunch, plays one and removes it', async () => {
-    await withApp({
-      userData,
-      mpv: MPV,
-      run: async ({ page }) => {
-        await openLocal(page)
-        const recents = page.getByRole('region', { name: 'Recent' })
-        const recent = recents.getByRole('button', { name: /^Clip 01/u })
-        await expect(recent).toBeVisible()
-        await expect(recents.getByRole('progressbar', { name: '50% watched' })).toBeVisible()
-
-        await recent.click()
-        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
-        await page.keyboard.press('Escape')
-        await expect(localHeading(page)).toBeVisible()
-
-        await recents.getByRole('button', { name: 'Remove Clip 01 from recents' }).click()
-        await expect(recents.getByText('Nothing opened yet.')).toBeVisible()
-      },
-    })
-  })
-
-  test('refuses a File the page made', async () => {
-    await withApp({
-      userData,
-      mpv: MPV,
-      run: async ({ page }) => {
-        await openLocal(page)
-        // Named for a real video, so a path taken from the name would play it.
-        await dropForgedFileOnLocal({ page, name: clips.first })
-
-        await expect(page.getByText('Drop a video file to play it.')).toBeVisible()
-        expect(page.url()).toBe(`${PAGE_ORIGIN}${DESKTOP_PATHS.local}`)
-        await expect(localHeading(page)).toBeVisible()
       },
     })
   })

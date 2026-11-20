@@ -6,9 +6,7 @@ import {
   isDesktopEvent,
   isDesktopReply,
   type DesktopPlatform,
-  type OpenReply,
   type RepliesFor,
-  isOpenReply,
   isRavenDesktopBridge,
   isReplyTo,
 } from '@raven/core'
@@ -16,7 +14,6 @@ import {
 /** The page's one door to main, with every reply and event checked on the way in. */
 export type DesktopClient = {
   request: (request: DesktopRequest) => Promise<DesktopReply>
-  dropFiles: (files: readonly File[]) => Promise<DesktopReply>
   subscribe: (listener: (event: DesktopEvent) => void) => () => void
   /** The system Raven runs on, which says who draws the window's controls and names the computer. */
   platform: DesktopPlatform
@@ -52,7 +49,6 @@ export const clientFor = (bridge: unknown): DesktopClient | null => {
   return {
     platform: bridge.platform,
     request: (request) => replyOf(() => bridge.request(request)),
-    dropFiles: (files) => replyOf(() => bridge.dropFiles(files)),
     subscribe: (listener) =>
       bridge.subscribe((event) => {
         if (!isDesktopEvent(event)) {
@@ -112,7 +108,3 @@ export const readMain = async <R extends DesktopRequest>({
   if (isAnswerTo(request)(reply)) return reply
   throw new Error(refusalText({ reply, fallback }))
 }
-
-/** A reply to a way of opening something, as `useOpenReply` takes it; any other reads as a refusal. */
-export const openReplyOf = (reply: DesktopReply): OpenReply | Refusal =>
-  isOpenReply(reply) ? reply : UNREADABLE

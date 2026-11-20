@@ -7,13 +7,7 @@ import {
   remove,
   type DownloadEntry,
 } from '@/main/downloads/downloadState'
-import {
-  addRecent,
-  EMPTY_STATE,
-  type FileFacts,
-  type PlayerState,
-  savePosition,
-} from '@/main/playerState'
+import { EMPTY_STATE, type FileFacts, type PlayerState, savePosition } from '@/main/playerState'
 import { ticks, until } from '@/main/test/downloadFakes'
 import {
   ACCOUNT_A,
@@ -25,7 +19,6 @@ import {
   NOW,
   OTHER_SERVER_ID,
   SERVER_ID,
-  USER_DATA,
   type Video,
   type World,
   entryFor,
@@ -63,12 +56,12 @@ const shelved = (...entries: DownloadEntry[]): Record<string, Video> =>
 
 const factsOf = (path: string, video: Video = FILE): FileFacts => ({ path, ...video })
 
-/** A player state holding a recent and a resume spot at 100 of 3000 for each path. */
+/** A player state holding a resume spot at 100 of 3000 for each path. */
 const remembering = (...paths: string[]): PlayerState =>
   paths.reduce(
     (state, path) =>
       savePosition({
-        state: addRecent({ state, path, at: 1 }),
+        state,
         file: factsOf(path),
         position: 100,
         duration: 3000,
@@ -77,10 +70,7 @@ const remembering = (...paths: string[]): PlayerState =>
     EMPTY_STATE,
   )
 
-const pathsIn = (state: PlayerState) => ({
-  recents: state.recents.flatMap((recent) => (recent.kind === 'file' ? [recent.path] : [])),
-  resume: state.resume.map(({ path }) => path),
-})
+const resumePathsIn = (state: PlayerState): string[] => state.resume.map(({ path }) => path)
 
 const pathOf = (world: World, fileId: string): string | null =>
   world.grants.fileOf(fileId)?.path ?? null
@@ -93,11 +83,11 @@ const targetOf = (reply: DesktopReply) => {
 const opened = async (world: World, downloadId = ID): Promise<string> =>
   targetOf(await world.playback.open({ downloadId })).fileId
 
-/** A grant made outside `open`, as Home's recents, a drop or the open dialog make one. */
+/** A grant made outside `open`. */
 const granted = async (world: World, path: string): Promise<string> => {
-  const result = await world.grants.grant(path)
-  if (!result.ok) throw new Error(`expected a grant, got ${result.reason}`)
-  return result.file.fileId
+  const file = await world.grants.grant(path)
+  if (file === null) throw new Error('expected a grant')
+  return file.fileId
 }
 
 const entryOf = (world: World, downloadId = ID) =>
@@ -290,18 +280,6 @@ describe('what names a download', () => {
   it('says only "Downloaded" for a download of a server Raven no longer keeps, never its folder', () => {
     const world = setup({ entries: [entryFor({ serverId: OTHER_SERVER_ID })] })
     expect(world.playback.fromLabelOf({ path: videoOf(11, OTHER_SERVER_ID) })).toBe('Downloaded')
-  })
-
-  it('knows a path in the downloads folder no download names, as a deleted one a queue still holds', () => {
-    const world = setup({ entries: [entryFor({})] })
-    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(false)
-    expect(world.playback.isStaleDownload({ path: videoOf(12) })).toBe(true)
-    expect(world.playback.isStaleDownload({ path: videoOf(11, OTHER_SERVER_ID) })).toBe(true)
-    expect(world.playback.isStaleDownload({ path: MOVIE_PATH })).toBe(false)
-    expect(world.playback.isStaleDownload({ path: `${DOWNLOADS}/../Movies/x.mkv` })).toBe(false)
-    expect(world.playback.isStaleDownload({ path: `${USER_DATA}/downloads-old/x.mkv` })).toBe(false)
-    removing(world)
-    expect(world.playback.isStaleDownload({ path: VIDEO })).toBe(true)
   })
 
   it("names a download's video by its title, and nothing for another file", () => {
@@ -779,9 +757,6 @@ describe('the share watched', () => {
     })
     expect(world.playback.watchedOf(entryFor({ watchedAt: NOW }))).toBe(1)
     expect(world.playback.watchedOf(entryFor({ downloadId: OTHER_ID, mediaId: 12 }))).toBeNull()
-    expect(world.playback.isWatched({ path: VIDEO })).toBe(true)
-    expect(world.playback.isWatched({ path: videoOf(12) })).toBe(false)
-    expect(world.playback.isWatched({ path: MOVIE_PATH })).toBe(false)
   })
 
   it('tells the page nothing when no file could be read', async () => {
@@ -824,7 +799,7 @@ describe('the share watched', () => {
 })
 
 describe('forget', () => {
-  it("drops a removed download's recent, resume spot and share, and keeps another file's", async () => {
+  it("drops a removed download's resume spot and share, and keeps another file's", async () => {
     const world = setup({
       entries: [entryFor({})],
       videos: { [VIDEO]: FILE },
@@ -834,7 +809,7 @@ describe('forget', () => {
     world.playback.notePosition({ fileId, position: 100, duration: 3000 })
     expect(world.playback.watchedOf(entryFor({}))).not.toBeNull()
     removing(world)
-    expect(pathsIn(world.state.read())).toEqual({ recents: [MOVIE_PATH], resume: [MOVIE_PATH] })
+    expect(resumePathsIn(world.state.read())).toEqual([MOVIE_PATH])
     expect(world.playback.watchedOf(entryFor({}))).toBeNull()
   })
 

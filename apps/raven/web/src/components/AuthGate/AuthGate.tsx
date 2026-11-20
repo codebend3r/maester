@@ -164,8 +164,8 @@ const GATE_SCREENS = {
  * show a screen to try again from, and never sign anyone out. Where the page
  * keeps downloads, inside Raven or in a browser that can, a server out of
  * reach opens the pages that need none instead (the host's `offlinePages`:
- * Downloads, Settings, and Raven's On this Mac), and any other page goes to
- * Downloads, which goes back to it once the server answers again. A local file or download
+ * Downloads and Settings), and any other page goes to
+ * Downloads, which goes back to it once the server answers again. A download
  * playing stays on screen while the account is read, or cannot be.
  */
 export const AuthGate = () => {

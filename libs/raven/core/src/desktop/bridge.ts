@@ -3,12 +3,10 @@ import { oneOf } from '@/schema'
 /**
  * What the preload exposes to the page as `window.ravenDesktop`. The player's port is not
  * on it: the preload hands it over with `window.postMessage`, since a port cannot cross
- * `contextBridge`. `dropFiles` takes `unknown` files because core has no DOM types for `File`;
- * the preload checks what it gets.
+ * `contextBridge`.
  */
 export type RavenDesktopBridge = {
   request: (request: unknown) => Promise<unknown>
-  dropFiles: (files: readonly unknown[]) => Promise<unknown>
   subscribe: (listener: (event: unknown) => void) => () => void
   platform: DesktopPlatform
 }
@@ -23,7 +21,7 @@ const isDesktopPlatform = oneOf(Object.values(DESKTOP_PLATFORMS))
 /** The name the preload exposes the bridge under, `window.ravenDesktop`. */
 export const RAVEN_DESKTOP_BRIDGE_KEY = 'ravenDesktop'
 
-/** What the page calls the computer, in "On this Mac" and "free on this PC". */
+/** What the page calls the computer, in "Sound on this Mac" and "free on this PC". */
 export const COMPUTER_NAMES = {
   [DESKTOP_PLATFORMS.mac]: 'Mac',
   [DESKTOP_PLATFORMS.windows]: 'PC',
@@ -61,8 +59,6 @@ export const isRavenDesktopBridge = (value: unknown): value is RavenDesktopBridg
   value !== null &&
   'request' in value &&
   isFunction(value.request) &&
-  'dropFiles' in value &&
-  isFunction(value.dropFiles) &&
   'subscribe' in value &&
   isFunction(value.subscribe) &&
   'platform' in value &&

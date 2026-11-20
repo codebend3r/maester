@@ -33,9 +33,9 @@ import { useState } from 'react'
 
 import { MusicPages } from '@/music/MusicPages'
 import { hasSagas } from '@/queries/sagaCards'
+import { FavouritesGrid, FinishedGrid, type MarksGridProps } from '@/screens/LibraryMarks'
 import { SagasGrid, type SagasGridProps } from '@/screens/LibrarySagas'
 import type { ShelfCard } from '@/queries/cards'
-import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { showArtIdsOf } from '@/queries/showArt'
 import { useShowArts } from '@/queries/useShowArts'
 import { type Listing, continueSectionsOf, librarySectionsOf } from '@/queries/libraryGrid'
@@ -52,26 +52,32 @@ import { useLibraryView } from '@/screens/useLibraryView'
 import { APP_ICONS } from '@/theme/icons'
 
 /**
- * The pages a library opens on: what is being watched in it, for picking up where one left
- * off, the library itself, its listing sorted, laid out and searched, and, in a movie library,
- * its sagas.
+ * A library's pages, the web's tabs: all of it, its listing sorted, laid out and searched, what
+ * is being watched in it, for picking up where one left off, its favourites, in a movie library
+ * its sagas, and what was finished in it most recently.
  */
-const LIBRARY_PAGES = { continue: 'continue', library: 'library', sagas: 'sagas' } as const
+const LIBRARY_PAGES = {
+  library: 'library',
+  continue: 'continue',
+  favourites: 'favourites',
+  sagas: 'sagas',
+  finished: 'finished',
+} as const
 
 type LibraryPage = (typeof LIBRARY_PAGES)[keyof typeof LIBRARY_PAGES]
 
-/** What each page's button says and draws: the web's icons for them. */
+/** What each page's button says and draws: the web's names for its tabs. */
 const PAGE_TABS = {
-  [LIBRARY_PAGES.continue]: { name: CONTINUE_WATCHING, icon: APP_ICONS.history },
-  [LIBRARY_PAGES.library]: { name: LIBRARY_COPY.library, icon: APP_ICONS.libraries },
+  [LIBRARY_PAGES.library]: { name: LIBRARY_COPY.all, icon: APP_ICONS.grid },
+  [LIBRARY_PAGES.continue]: { name: LIBRARY_COPY.inProgressPage, icon: APP_ICONS.history },
+  [LIBRARY_PAGES.favourites]: { name: LIBRARY_COPY.favourites, icon: APP_ICONS.heart },
   [LIBRARY_PAGES.sagas]: { name: LIBRARY_COPY.sagas, icon: APP_ICONS.covers },
+  [LIBRARY_PAGES.finished]: { name: LIBRARY_COPY.recentlyFinished, icon: APP_ICONS.check },
 } as const satisfies Record<LibraryPage, PageTab>
 
-/** The pages a library has, in the order their buttons stand: Sagas only where files are matched to movies. */
+/** The pages a library has, in the order the web's tabs stand: Sagas only where files are matched to movies. */
 const pagesOf = (kind: LibraryKind): LibraryPage[] =>
-  hasSagas(kind)
-    ? [LIBRARY_PAGES.continue, LIBRARY_PAGES.library, LIBRARY_PAGES.sagas]
-    : [LIBRARY_PAGES.continue, LIBRARY_PAGES.library]
+  Object.values(LIBRARY_PAGES).filter((page) => page !== LIBRARY_PAGES.sagas || hasSagas(kind))
 
 type LineOfProps = { settings: LibrarySettings; library: LibraryRecord; listed: Listing | null }
 
@@ -125,7 +131,7 @@ type ContinueGridProps = {
 }
 
 /**
- * A library's Continue watching page: its videos with a saved spot, most recently watched
+ * A library's In progress page: its videos with a saved spot, most recently watched
  * first, wide as Home's shelf draws them, under the library's name and the way to its listing.
  */
 const ContinueGrid = ({ session, library, entries, frame }: ContinueGridProps) => {
@@ -254,6 +260,8 @@ type LibraryPagesViewProps = {
   [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGridProps
   [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGridProps
   [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGridProps<LibraryPage>
+  [LIBRARY_PAGES_VIEW_KEYS.favourites]: MarksGridProps<LibraryPage>
+  [LIBRARY_PAGES_VIEW_KEYS.finished]: MarksGridProps<LibraryPage>
 }
 
 const LIBRARY_PAGES_VIEWS = {
@@ -261,6 +269,8 @@ const LIBRARY_PAGES_VIEWS = {
   [LIBRARY_PAGES_VIEW_KEYS.continue]: ContinueGrid,
   [LIBRARY_PAGES_VIEW_KEYS.library]: LibraryGrid,
   [LIBRARY_PAGES_VIEW_KEYS.sagas]: SagasGrid,
+  [LIBRARY_PAGES_VIEW_KEYS.favourites]: FavouritesGrid,
+  [LIBRARY_PAGES_VIEW_KEYS.finished]: FinishedGrid,
 } as const satisfies ViewsOf<LibraryPagesViewProps>
 
 type LibraryPagesViewOfProps = LibraryPagesProps & {
@@ -290,6 +300,16 @@ const libraryPagesViewOf = ({
         key: LIBRARY_PAGES_VIEW_KEYS.sagas,
         props: { session: shown.session, library: shown.library, frame },
       }
+    case LIBRARY_PAGES.favourites:
+      return {
+        key: LIBRARY_PAGES_VIEW_KEYS.favourites,
+        props: { session: shown.session, library: shown.library, frame },
+      }
+    case LIBRARY_PAGES.finished:
+      return {
+        key: LIBRARY_PAGES_VIEW_KEYS.finished,
+        props: { session: shown.session, library: shown.library, frame },
+      }
     default: {
       const unknown: never = frame.page
       return unknown
@@ -298,9 +318,10 @@ const libraryPagesViewOf = ({
 }
 
 /**
- * A library's pages, Continue watching, the library itself and, in a movie library, its Sagas,
- * with a press to each of the others. It opens on Continue watching while anything in it is in progress, so a show is picked
- * up in one press, and on the library otherwise; a search handed over opens the library too.
+ * A library's pages, the web's tabs: All, In progress, Favourites, in a movie library its Sagas,
+ * and Recently finished, with a press to each of the others. It opens on In progress while
+ * anything in it is in progress, so a show is picked up in one press, and on All otherwise; a
+ * search handed over opens All too.
  */
 const LibraryPages = (props: LibraryPagesProps) => {
   const router = useRouter()
@@ -486,8 +507,8 @@ const ServerLibrary = ({ session, id, asked }: ServerLibraryProps) => {
 
 /**
  * `/library/[id]`: a library's videos or shows, searched, sorted, laid out and grouped as this
- * device last left it, in the ways its type allows, with the web's jump strip. A card opens
- * its item. `?q=` opens it on a search, as a search through every library hands one over.
+ * device last left it, in the ways its type allows, with the web's jump strip, beside what is
+ * in progress, its favourites and what was recently finished there. A card opens its item. `?q=` opens it on a search, as a search through every library hands one over.
  */
 export const Library = () => {
   const params = useLocalSearchParams()

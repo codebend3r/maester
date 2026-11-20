@@ -13,7 +13,6 @@ import { useDesktopBridge } from '@/stores/desktop'
 const noop = () => undefined
 const bridgeWith = (platform: string) => ({
   request: noop,
-  dropFiles: noop,
   subscribe: noop,
   platform,
 })

@@ -74,6 +74,7 @@ export const captionHeightOf = ({ shape, captionHeight }: CaptionHeightOfProps):
 type CardWidthForRowsProps = {
   shape: CardShape
   listHeight: number
+  /** How tall the card's caption stands: none for a card drawn without one. */
   captionHeight: number
   size: GridSize
 }
@@ -92,10 +93,7 @@ export const cardWidthForRows = ({
   const fit = GRID_SIZE_FITS[size]
   const shelfWidth = focusCardWidthOf(shape) * fit.widest
   if (listHeight <= 0) return shelfWidth
-  const pictureHeight =
-    listHeight / (fit.rows + NEXT_ROW_GLIMPSE) -
-    captionHeightOf({ shape, captionHeight }) -
-    2 * GROWTH_ROOM
+  const pictureHeight = listHeight / (fit.rows + NEXT_ROW_GLIMPSE) - captionHeight - 2 * GROWTH_ROOM
   const perWidth = pictureHeightOf({ shape, width: 1 })
   return Math.max(tvSize(1), Math.min(shelfWidth, pictureHeight / perWidth))
 }

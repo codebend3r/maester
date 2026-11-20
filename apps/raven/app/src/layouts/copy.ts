@@ -14,6 +14,9 @@ export const GRID_SIZE_COPY = {
   sizes: { small: 'Small', medium: 'Medium', large: 'Large' },
 } as const
 
+/** The menus' way to the account's favourites. */
+export const FAVOURITES_ENTRY = { label: 'Favourites' } as const
+
 /** The side menus' way to every library on the server, pinned or not, and that screen's title. */
 export const LIBRARIES_ENTRY = { label: 'Libraries' } as const
 

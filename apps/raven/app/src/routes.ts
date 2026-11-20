@@ -1,4 +1,4 @@
-import { type ViewingSession, sessionQueryOf } from '@raven/core'
+import { type TitleRequestAsk, type ViewingSession, sessionQueryOf } from '@raven/core'
 
 /** The app's route paths, one per file under `app/`. */
 export const APP_ROUTES = {
@@ -16,6 +16,8 @@ export const APP_ROUTES = {
   favourites: '/favourites',
   continueWatching: '/continue-watching',
   binge: '/binge',
+  comingSoon: '/coming-soon',
+  comingSoonTitle: '/coming-soon/[type]/[tmdbId]',
   libraries: '/libraries',
   settings: '/settings',
   downloads: '/downloads',
@@ -35,6 +37,8 @@ export const APP_ROUTE_PARAMS = {
   query: 'q',
   at: 'at',
   from: 'from',
+  type: 'type',
+  tmdbId: 'tmdbId',
 } as const
 
 /** Where `?from=` starts the player: from the very beginning, whatever spot was saved. */
@@ -55,6 +59,8 @@ export const APP_SCREENS = {
   favourites: 'favourites',
   continueWatching: 'continue-watching',
   binge: 'binge',
+  comingSoon: 'coming-soon/index',
+  comingSoonTitle: 'coming-soon/[type]/[tmdbId]',
   libraries: 'libraries',
   settings: 'settings',
   downloads: 'downloads',
@@ -62,7 +68,7 @@ export const APP_SCREENS = {
 
 /**
  * Where a card or a link takes the viewer: an item's page, the player, a library, an album, an
- * artist, a saga or one of the account's playlists.
+ * artist, a saga, one of the account's playlists or a title still to come.
  */
 export const ROUTE_TARGETS = {
   item: 'item',
@@ -72,6 +78,7 @@ export const ROUTE_TARGETS = {
   artist: 'artist',
   saga: 'saga',
   playlist: 'playlist',
+  upcoming: 'upcoming',
 } as const
 
 export type RouteTarget =
@@ -104,6 +111,8 @@ export type RouteTarget =
   /** A saga's page, by the library that lists it and its TMDB collection's id. */
   | { kind: typeof ROUTE_TARGETS.saga; libraryId: number; sagaId: string }
   | { kind: typeof ROUTE_TARGETS.playlist; playlistId: number }
+  /** A title still to come, on its own Coming soon page, by its type and TMDB id. */
+  | { kind: typeof ROUTE_TARGETS.upcoming; title: TitleRequestAsk }
 
 /** An item's page, with neither a library nor a file named. */
 export const itemTarget = (itemId: number): RouteTarget => ({
@@ -180,6 +189,14 @@ export const hrefOf = (target: RouteTarget): Href => {
       return {
         pathname: APP_ROUTES.playlist,
         params: { [APP_ROUTE_PARAMS.id]: String(target.playlistId) },
+      }
+    case ROUTE_TARGETS.upcoming:
+      return {
+        pathname: APP_ROUTES.comingSoonTitle,
+        params: {
+          [APP_ROUTE_PARAMS.type]: target.title.type,
+          [APP_ROUTE_PARAMS.tmdbId]: target.title.tmdbId,
+        },
       }
     default: {
       const unknown: never = target

@@ -21,7 +21,7 @@ import type { Timers } from '@/main/timers'
 
 /** What the page hears when a store cannot be saved. */
 const STORE_NOTICES = {
-  state: 'Raven could not save your recent videos.',
+  state: 'Raven could not save where you stopped.',
   config: 'Raven could not save its settings.',
   downloads: 'Raven could not save its downloads.',
 } as const
@@ -49,7 +49,7 @@ type OpenAppStoresProps = {
 }
 
 export type AppStores = {
-  /** The player's state: recents, resume spots and the window. */
+  /** The player's state: resume spots, track picks and the window. */
   store: StateStore
   config: ConfigStore
   downloadsStore: DownloadsStore

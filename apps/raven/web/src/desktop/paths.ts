@@ -3,14 +3,13 @@ import { generatePath, matchPath } from 'react-router-dom'
 import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
 import { MUSIC_PATHS, isMusicPath } from '@/lib/music'
 
-/** A local file or download playing, by the id main granted for it. */
+/** A download playing, by the id main granted for its file. */
 export const playPathOf = (fileId: string): string => generatePath(DESKTOP_PATHS.play, { fileId })
 
 /** What Raven shows while its server cannot be reached: nothing that needs the server. */
 export const DESKTOP_OFFLINE_PAGES = [
   DESKTOP_PATHS.downloads,
   MUSIC_PATHS.downloads,
-  DESKTOP_PATHS.local,
   DESKTOP_PATHS.play,
   PAGE_PATHS.settings,
 ] as const
@@ -27,7 +26,7 @@ export const isOfflinePage = ({ pathname, pages }: IsOfflinePageProps): boolean 
 /** Raven's player of a file, and the browser's of a download. */
 const FILE_PLAYERS = [DESKTOP_PATHS.play, BROWSER_PLAY_PATH] as const
 
-/** Whether a local file or a download is playing: a page that needs neither server nor account. */
+/** Whether a download is playing: a page that needs neither server nor account. */
 export const isFilePlaying = (pathname: string): boolean =>
   FILE_PLAYERS.some((pattern) => matchPath(pattern, pathname) !== null)
 

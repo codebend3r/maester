@@ -54,7 +54,7 @@ describe('AppRoutes inside Raven', () => {
 
   afterEach(() => list.mockReset())
 
-  it('opens Downloads and On this Mac, which a browser does not have', async () => {
+  it('opens Downloads, which a browser does not have', async () => {
     list.mockImplementation(async () => [])
     const client = downloadsMain()
     asDesktop(client)
@@ -99,11 +99,10 @@ describe('AppRoutes inside Raven', () => {
 
   it('has no Downloads page in a browser', async () => {
     list.mockImplementation(async () => [])
-    renderWithProviders({ ui: <AppRoutes />, route: DESKTOP_PATHS.local })
+    renderWithProviders({ ui: <AppRoutes />, route: DESKTOP_PATHS.downloads })
     expect(
       await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
     ).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'On this Mac' })).toBeNull()
   })
 })
 

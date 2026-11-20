@@ -74,20 +74,16 @@ const finishesAny = ({ before, after }: ListMove): boolean => {
 
 /**
  * What the host pushes when a download changes: it replaces what the list holds. The disk is read
- * again only when a file finished or left, never for progress, which comes four times a second,
- * and the recents only when one left, as one deleted once watched leaves them too.
+ * again only when a file finished or left, never for progress, which comes four times a second.
  */
 export const applyDownloadsEvent = async ({ queryClient, event }: ListChange): Promise<void> => {
   const before =
     queryClient.getQueryData<DownloadsData>(DESKTOP_QUERY_KEYS.downloads)?.downloads ?? []
   setDownloads({ queryClient, event })
   const move = { before, after: event.downloads }
-  const isDropped = dropsAny(move)
-  await Promise.all([
-    isDropped && queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.recents }),
-    (isDropped || finishesAny(move)) &&
-      queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.space }),
-  ])
+  if (dropsAny(move) || finishesAny(move)) {
+    await queryClient.invalidateQueries({ queryKey: DESKTOP_QUERY_KEYS.space })
+  }
 }
 
 /** The disk the host keeps its downloads on. */

@@ -1,4 +1,4 @@
-import { isAbsolute, relative, sep } from 'node:path'
+import { relative, sep } from 'node:path'
 import {
   DESKTOP_REPLIES,
   type DesktopReply,
@@ -31,8 +31,6 @@ import {
   forgetResume,
   type PlayerState,
   readFacts as readFileFacts,
-  RECENT_KINDS,
-  removeRecent,
   resumeFor,
   watchedShare,
 } from '@/main/playerState'
@@ -48,9 +46,9 @@ export type DownloadPlaybackDeps = {
   /** The id the server's downloads are filed under; another's owe it nothing. */
   serverId: string
   userData: string
-  /** A download plays as any local file does, through a grant. */
+  /** A download plays through a grant: the page holds its id, never its path. */
   grants: Grants
-  /** The player's state, which holds a download's recent, resume spot and share watched. */
+  /** The player's state, which holds a download's resume spot and share watched. */
   state: StateStore
   stat: (path: string) => Promise<{ size: number; mtimeMs: number }>
   now: () => number
@@ -78,8 +76,6 @@ type FromLabelOfProps = { path: string }
 
 type LabelOfProps = { path: string }
 
-type IsStaleDownloadProps = { path: string }
-
 type ServerPositionOfProps = { fileId: string }
 
 type NoteOpenedProps = { fileId: string }
@@ -90,10 +86,8 @@ type NotePlayingProps = { fileId: string | null }
 
 type PlaybackLeftProps = { fileId: string }
 
-type IsWatchedProps = { path: string }
-
 export type DownloadPlayback = {
-  /** Plays a ready download as a local file, with its group's later ready files queued. */
+  /** Plays a ready download, with its group's later ready files queued. */
   open: (input: OpenProps) => Promise<DesktopReply>
   /**
    * The granted video of a server title's ready download, which playing the title prefers: the
@@ -109,8 +103,7 @@ export type DownloadPlayback = {
   trackPathOf: (input: OpenTitleProps) => Promise<string | null>
   /**
    * The next ready download of a granted download's group, granted, for a play whose queue has
-   * run out (opened from On this Mac's recents, or past `MAX_QUEUE`); null after the last, and for any
-   * other file.
+   * run out (past `MAX_QUEUE`); null after the last, and for any other file.
    */
   nextOf: (input: NextOfProps) => Promise<Readonly<GrantedFile> | null>
   /** The subtitle files kept beside a granted download's video; none for any other file. */
@@ -126,11 +119,6 @@ export type DownloadPlayback = {
   mediaIdOf: (input: LabelOfProps) => number | null
   /** The saved title art of the download whose video is at `path`, and the name it spells; else null. */
   logoOf: (input: LabelOfProps) => LocalFile['logo']
-  /**
-   * Whether `path` lies in the downloads folder but is no download's video: a deleted download
-   * that a play queue still holds a grant for, since a grant outlives its download.
-   */
-  isStaleDownload: (input: IsStaleDownloadProps) => boolean
   /**
    * Where the server had a granted download when it was confirmed, for a file with no local
    * resume spot; 0 once a position was noted here, and for any other file.
@@ -163,16 +151,14 @@ export type DownloadPlayback = {
    */
   isMidTitle: (downloadId: string) => boolean
   /**
-   * A download's share watched, as On this Mac's recents show one: 1 once it is marked watched,
+   * A download's share watched, as its row shows it: 1 once it is marked watched,
    * else the share its resume spot gives, null until its file was read. It takes the entry, so
    * the views read every row's share without searching the list for each.
    */
   watchedOf: (entry: DownloadEntry) => number | null
-  /** Whether the video at `path` is a download marked watched, which the recents show whole. */
-  isWatched: (input: IsWatchedProps) => boolean
   /** Reads these ready downloads' files for their share watched, then tells the page. */
   readFiles: (entries: readonly DownloadEntry[]) => void
-  /** The queue's `onRemoved`: what names a removed download goes, its recent and resume spot too. */
+  /** The queue's `onRemoved`: what names a removed download goes, its resume spot too. */
   forget: (entries: readonly DownloadEntry[]) => void
 }
 
@@ -191,18 +177,9 @@ const PLAY_SIDES = { page: 'page', engine: 'engine' } as const
 
 type ForgetVideosProps = { paths: readonly string[] }
 
-/** Drops these videos' recents and resume spots; the same state when it names none of them. */
-const forgetVideos = (state: PlayerState, { paths }: ForgetVideosProps): PlayerState => {
-  const isNamed = (path: string): boolean =>
-    state.recents.some((recent) => recent.kind === RECENT_KINDS.file && recent.path === path) ||
-    state.resume.some((spot) => spot.path === path)
-  return paths
-    .filter(isNamed)
-    .reduce(
-      (next, path) => forgetResume({ state: removeRecent({ state: next, path }), path }),
-      state,
-    )
-}
+/** Drops these videos' resume spots; the same state when it holds none of them. */
+const forgetVideos = (state: PlayerState, { paths }: ForgetVideosProps): PlayerState =>
+  paths.reduce((next, path) => forgetResume({ state: next, path }), state)
 
 // Reaching the end drops the resume spot, so a download marked watched is read whole.
 const isMarked = (entry: DownloadEntry | null): boolean =>
@@ -263,10 +240,10 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
 
   /** Grants a download's video and remembers whose it is; null when the file has gone. */
   const grantVideo = async (entry: DownloadEntry): Promise<string | null> => {
-    const result = await grants.grant(mediaPathOf(entry))
-    if (!result.ok) return null
-    learn({ fileId: result.file.fileId, downloadId: entry.downloadId })
-    return result.file.fileId
+    const file = await grants.grant(mediaPathOf(entry))
+    if (file === null) return null
+    learn({ fileId: file.fileId, downloadId: entry.downloadId })
+    return file.fileId
   }
 
   /** The ready downloads after `entry` in its group, in play order. */
@@ -383,12 +360,6 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return serverId === deps.serverId
       ? DOWNLOAD_MESSAGES.downloadedFrom
       : DOWNLOAD_MESSAGES.downloadedElsewhere
-  }
-
-  const isStaleDownload: DownloadPlayback['isStaleDownload'] = ({ path }) => {
-    const inside = relative(downloadsDirFor({ userData: deps.userData }), path)
-    const isInFolder = inside !== '' && !isAbsolute(inside) && inside.split(sep)[0] !== '..'
-    return isInFolder && entryAt(path) === null
   }
 
   const playingIds = (): (string | null)[] => [playing.page.downloadId, playing.engine.downloadId]
@@ -522,7 +493,6 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
       const name = entry.group.kind === DOWNLOAD_KINDS.saga ? entry.label : entry.group.title
       return { pictureId: logo.id, name }
     },
-    isStaleDownload,
     serverPositionOf: ({ fileId }) => entryOfFile(fileId)?.serverPosition ?? 0,
     noteOpened,
     notePosition,
@@ -532,7 +502,6 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     isPlaying: (downloadId) => playingIds().includes(downloadId),
     isMidTitle,
     watchedOf,
-    isWatched: ({ path }) => isMarked(entryAt(path)),
     readFiles,
     forget,
   }

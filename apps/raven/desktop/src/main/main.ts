@@ -11,7 +11,6 @@ import {
   type DesktopReply,
   FILE_SCHEME,
   PICTURE_SCHEME,
-  VIDEO_EXTENSIONS,
   LINK_SCHEME,
 } from '@raven/core'
 import { desktopPlatformFor, SYSTEM_NAMES } from '@/shared/platform'
@@ -23,7 +22,6 @@ import {
   crashReporter,
   dialog,
   Menu,
-  type OpenDialogOptions,
   powerMonitor,
   protocol,
   screen,
@@ -62,7 +60,7 @@ import { logsDirFor } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
 import { fetchReleases } from '@/main/netFetches'
 import { removeTree } from '@/main/nodeFs'
-import { createOpenBatch, eventForOpen, launchPaths, linksFromArgv } from '@/main/openBatch'
+import { createOpenBatch, eventForOpen, linksFromArgv } from '@/main/openBatch'
 import { ENGINE_STATUSES } from '@/main/player/engine'
 import { createMarks } from '@/main/player/marks'
 import { attachMusicPlayer, type MusicPlayer } from '@/main/player/audioPlayer'
@@ -103,7 +101,7 @@ const USER_DATA_HOOK = 'RAVEN_DESKTOP_USER_DATA'
 /** Where an older Raven kept its own sign-ins, encrypted: the page signs in now. */
 const FORMER_ACCOUNTS_DIR = 'accounts'
 
-// Finder sends one `open-file` per file; this gathers a multi-file open into one batch.
+// A burst of links (several `open-url`s, a second launch's arguments) is gathered into one batch.
 const OPEN_BATCH_MS = 100
 
 const platform = desktopPlatformFor({ platform: process.platform })
@@ -204,8 +202,6 @@ const startApp = (): void => {
     timers,
     histogram: () => monitorEventLoopDelay({ resolution: 10 }),
   })
-  // A file opened before the window is ready is a cold "Open With", timed to its first frame.
-  let isWindowReady = false
 
   /*
    * The server this build plays from, and the other origins its links may name it by. Each is
@@ -312,22 +308,6 @@ const startApp = (): void => {
    * which the window's page sends, so by then it has resolved.
    */
   let serviceReady: Promise<DesktopService> | null = null
-  const openFromMain = async (paths: readonly string[]): Promise<void> => {
-    const service = await serviceReady
-    if (service === null) return
-    announce(await service.openPaths(paths))
-    reveal()
-  }
-
-  const fileBatch = createOpenBatch<string>({
-    delayMs: OPEN_BATCH_MS,
-    timers,
-    deliver: (paths) => {
-      openFromMain(paths).catch((error: unknown) => {
-        reportError({ text: 'Raven could not open those files.', error })
-      })
-    },
-  })
   // Shown first, so the page that answers a link is on a window the person can see.
   const openLinksFromMain = async (links: readonly string[]): Promise<void> => {
     const service = await serviceReady
@@ -349,7 +329,6 @@ const startApp = (): void => {
 
   app.on('second-instance', (_event, argv) => {
     reveal()
-    launchPaths({ argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
     linksFromArgv(argv).forEach(linkBatch.push)
   })
   /*
@@ -360,19 +339,13 @@ const startApp = (): void => {
     app.setAsDefaultProtocolClient(LINK_SCHEME)
   }
 
-  // Registered here so a cold launch from Finder or a link still reaches them.
+  // Registered here so a cold launch from a link still reaches it.
   app.on('will-finish-launching', () => {
-    app.on('open-file', (event, path) => {
-      event.preventDefault()
-      if (!isWindowReady) marks.opened()
-      fileBatch.push(path)
-    })
     app.on('open-url', (event, url) => {
       event.preventDefault()
       linkBatch.push(url)
     })
   })
-  launchPaths({ argv: process.argv, isDefaultApp: process.defaultApp }).forEach(fileBatch.push)
   linksFromArgv(process.argv).forEach(linkBatch.push)
 
   const createService = async (): Promise<DesktopService> => {
@@ -467,34 +440,14 @@ const startApp = (): void => {
       })
     }
 
-    const showOpenDialog = async (): Promise<string[]> => {
-      const options = {
-        filters: [{ name: 'Videos', extensions: [...VIDEO_EXTENSIONS] }],
-        properties: ['openFile', 'multiSelections'],
-      } satisfies OpenDialogOptions
-      const window = currentWindow
-      const result =
-        window === null
-          ? await dialog.showOpenDialog(options)
-          : await dialog.showOpenDialog(window, options)
-      return result.canceled ? [] : result.filePaths
-    }
-
     const service = createDesktopService({
       grants,
       store,
-      readdir: (dir) => readdir(dir),
-      showOpenDialog,
-      addRecentDocument: (path) => app.addRecentDocument(path),
-      clearRecentDocuments: () => app.clearRecentDocuments(),
-      stat: (path) => stat(path),
-      timers,
       /*
        * The page sends `ready` once per mount; a reload sends it again, which the batches ignore
        * and which hands the new page a fresh player port (Ruling 12).
        */
       onReady: () => {
-        fileBatch.ready()
         linkBatch.ready()
         checkAtLaunch()
         const player = windowPlayer
@@ -512,7 +465,6 @@ const startApp = (): void => {
       onError: (error) => {
         reportError({ text: 'Raven failed to answer a request.', error })
       },
-      newId: randomUUID,
       now: Date.now,
       output: {
         read: async () => {
@@ -663,14 +615,6 @@ const startApp = (): void => {
           isDevelopment: !app.isPackaged,
           platform,
           actions: {
-            openDialog: () => {
-              service
-                .openDialog()
-                .then(announce)
-                .catch((error: unknown) => {
-                  reportError({ text: 'Raven could not show the open dialog.', error })
-                })
-            },
             send,
             toggleDevTools,
             showLogs: fromMenu(help.showLogs),
@@ -691,9 +635,6 @@ const startApp = (): void => {
     })
 
     const window = openWindow({ store, launchedAt, appLog, platform })
-    window.once('ready-to-show', () => {
-      isWindowReady = true
-    })
     currentWindow = window
     // A test hook shortens both periods; a packaged app never reads it (Ruling 13).
     const budgetWindow = budgetWindowFrom({ isPackaged: app.isPackaged, env: process.env })
@@ -759,6 +700,6 @@ if (isPrimary) {
   )
   startApp()
 } else if (isLaunch) {
-  // Another Raven is running; it receives this launch's files through `second-instance`.
+  // Another Raven is running; it receives this launch's links through `second-instance`.
   app.quit()
 }

@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
-import { screen } from '@testing-library/react-native'
+import { fireEvent, screen } from '@testing-library/react-native'
 
+import { APP_ROUTES } from '@/routes'
 import { Binge } from '@/screens/Binge'
 import { BINGE_PAGE_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
@@ -45,10 +46,24 @@ describe('Binge on a phone or tablet', () => {
     expect(screen.getByRole('header', { name: BINGE_PAGE_COPY.title })).toBeTruthy()
   })
 
-  it("draws each binged show as Home's Binge card", async () => {
+  it("lists each binged show as a row, as the web's Binge page does", async () => {
     mockBinge.ids = [SEVERANCE_PAGE.id]
     await renderScreen({ ui: <Binge /> })
     expect(await screen.findByText(SEVERANCE_PAGE.title)).toBeTruthy()
     expect(screen.queryByText(BINGE_PAGE_COPY.none)).toBeNull()
+    expect(screen.getByText('0 of 9 episodes · 0%')).toBeTruthy()
+    expect(screen.getByLabelText('0 of 9 episodes watched')).toBeTruthy()
+  })
+
+  it("opens the show's page from a row's title", async () => {
+    mockBinge.ids = [SEVERANCE_PAGE.id]
+    await renderScreen({ ui: <Binge /> })
+    await fireEvent.press(await screen.findByRole('link', { name: SEVERANCE_PAGE.title }))
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: APP_ROUTES.item,
+        params: expect.objectContaining({ id: String(SEVERANCE_PAGE.id) }),
+      }),
+    )
   })
 })

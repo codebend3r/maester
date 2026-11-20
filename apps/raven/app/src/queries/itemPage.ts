@@ -88,6 +88,8 @@ export type ItemHero = {
   backdrop: Picture | null
   tagline: string | null
   summary: string | null
+  /** Lines under the actions, which say what the first action did or why it cannot: an upcoming title's request; none on a library's page. */
+  notes: readonly string[]
 }
 
 /** One person in the cast and crew: their roles, and their photo or initials. */
@@ -233,6 +235,7 @@ const movieHero = ({ details, shown, primary, ...pictures }: MovieHeroProps): It
   backdrop: backdropOf({ details, ...pictures }),
   tagline: details.tagline,
   summary: details.summary,
+  notes: [],
 })
 
 type EpisodeHeroProps = PlayableHeroProps & {
@@ -285,6 +288,7 @@ const episodeHero = ({
     backdrop: isShowPending ? null : (backdropOf({ details: show, ...pictures }) ?? still),
     tagline: null,
     summary: details.summary,
+    notes: [],
   }
 }
 
@@ -385,6 +389,7 @@ export const showPage = ({ details, ...pictures }: ShowPageProps): ItemPage =>
       backdrop: backdropOf({ details, ...pictures }),
       tagline: details.tagline,
       summary: details.summary,
+      notes: [],
     },
     details,
     seasons: seasonsOf(details).map((season): ShelfCard => ({
@@ -432,6 +437,7 @@ export const seasonPage = ({ season, show, ...pictures }: SeasonPageProps): Item
       backdrop: backdropOf({ details: show, ...pictures }),
       tagline: null,
       summary: season.summary,
+      notes: [],
     },
     details: season,
     episodes: episodes.map((episode): EpisodeRow => {

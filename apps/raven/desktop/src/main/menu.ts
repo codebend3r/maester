@@ -10,7 +10,6 @@ import {
 import type { MenuItemConstructorOptions } from 'electron'
 
 type MenuActions = {
-  openDialog: () => void
   send: (event: DesktopEvent) => void
   toggleDevTools: () => void
   showLogs: () => void
@@ -49,15 +48,10 @@ type AppMenusProps = Pick<MenuTemplateProps, 'appName' | 'platform' | 'actions'>
 
 /**
  * The app's own items and the File menu. macOS puts the app's items in a menu of its own,
- * with the hide roles and the recent documents it alone keeps; Windows has no app menu, so
- * they end the File menu there.
+ * with the hide roles it alone keeps; Windows has no app menu, so they end the File menu
+ * there.
  */
 const appMenus = ({ appName, platform, actions }: AppMenusProps): MenuEntry[] => {
-  const open = {
-    label: 'Open…',
-    accelerator: 'CommandOrControl+O',
-    click: actions.openDialog,
-  } as const satisfies MenuEntry
   const openLink = {
     label: 'Open Link…',
     accelerator: 'CommandOrControl+L',
@@ -94,18 +88,7 @@ const appMenus = ({ appName, platform, actions }: AppMenusProps): MenuEntry[] =>
         },
         {
           label: 'File',
-          submenu: [
-            open,
-            // macOS keeps this list, fed by `app.addRecentDocument`; choosing one fires `open-file`.
-            {
-              label: 'Open Recent',
-              role: 'recentDocuments',
-              submenu: [{ role: 'clearRecentDocuments' }],
-            },
-            openLink,
-            SEPARATOR,
-            { role: 'close' },
-          ],
+          submenu: [openLink, SEPARATOR, { role: 'close' }],
         },
       ]
     case DESKTOP_PLATFORMS.windows:
@@ -113,7 +96,6 @@ const appMenus = ({ appName, platform, actions }: AppMenusProps): MenuEntry[] =>
         {
           label: 'File',
           submenu: [
-            open,
             openLink,
             SEPARATOR,
             settings,

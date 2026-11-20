@@ -11,7 +11,6 @@ import { OpenLinkDialog } from '@/desktop/OpenLinkDialog/OpenLinkDialog'
 import { useOpenReply } from '@/desktop/openReply'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
 import { useFollowServerReach, useReturnWhenReached } from '@/desktop/serverReach'
-import { useFileDrop } from '@/desktop/useFileDrop'
 import { WindowControls } from '@/desktop/WindowControls/WindowControls'
 import { WindowEdges } from '@/desktop/WindowEdges/WindowEdges'
 import { useDesktop } from '@/stores/desktop'
@@ -21,8 +20,8 @@ import { handled } from '@/lib/handled'
 /**
  * Raven's part of the page, mounted once over every route: it hears main's events and
  * says the page is ready for them, hands main the page's account, follows whether the server
- * can be reached (going back to the page it left while it could not), takes files dropped on
- * the window, and shows the download and Open Link dialogs.
+ * can be reached (going back to the page it left while it could not), and shows the download
+ * and Open Link dialogs.
  */
 export const DesktopHost = () => {
   const { client, menu } = useDesktop()
@@ -37,11 +36,9 @@ export const DesktopHost = () => {
   useFollowServerReach({ shouldFollowDevice: false })
   useReturnWhenReached()
   useSendAccountToken(client)
-  useFileDrop({ client, onReply: openReply })
 
   const onEvent = useEffectEvent((event: DesktopEvent) => {
     switch (event.type) {
-      case DESKTOP_EVENTS.play:
       case DESKTOP_EVENTS.downloadAsk:
         return openReply(event)
       case DESKTOP_EVENTS.navigate:

@@ -67,6 +67,8 @@ export type ShelfKit = {
   Shelves: (props: ShelvesProps) => ReactNode
   Shelf: (props: ShelfProps) => ReactNode
   BingeShelf: (props: BingeShelfProps) => ReactNode
+  /** The Binge page's list, the web's: a row a show, with how much of it is watched. */
+  BingeRows: (props: BingeShelfProps) => ReactNode
   ShelfPage: (props: ShelfPageProps) => ReactNode
 }
 

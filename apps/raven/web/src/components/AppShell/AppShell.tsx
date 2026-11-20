@@ -1,4 +1,4 @@
-import { DESKTOP_PATHS, musicLibrariesOf, libraryPath } from '@raven/core'
+import { musicLibrariesOf, libraryPath } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useLocation } from 'react-router-dom'
@@ -24,7 +24,6 @@ import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
-import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { SIDE_MENU_KEY, useSideMenu } from '@/stores/sideMenu'
@@ -136,22 +135,6 @@ const CountedIcon = ({ icon, count }: CountedIconProps) => (
 
 type HostNavItemProps = { isIconsOnly: boolean }
 
-type LocalNavItemProps = HostNavItemProps
-
-/** Raven's own row: the files on this computer. */
-const LocalNavItem = ({ isIconsOnly }: LocalNavItemProps) => {
-  const computer = useComputerName()
-  return (
-    <NavItem
-      to={DESKTOP_PATHS.local}
-      patterns={[DESKTOP_PATHS.local]}
-      icon={<Icon name="file-play" />}
-      label={APP_SHELL_COPY.onThisComputer(computer)}
-      isIconsOnly={isIconsOnly}
-    />
-  )
-}
-
 type DownloadsNavItemProps = HostNavItemProps
 
 /** The downloads' row, where the page keeps any, with how many are under way. */
@@ -178,19 +161,19 @@ type ManageGroupProps = { isIconsOnly: boolean; children: ReactNode }
  */
 const ManageGroup = ({ isIconsOnly, children }: ManageGroupProps) => {
   const groupId = useId()
-  const isFolded = useSideMenu((state) => state.isManageFolded)
+  const isOpen = useSideMenu((state) => state.isManageOpen)
   const toggleManage = useSideMenu((state) => state.toggleManage)
   return (
     <>
       <NavTip
-        text={isFolded ? APP_SHELL_COPY.showManage : APP_SHELL_COPY.hideManage}
+        text={isOpen ? APP_SHELL_COPY.hideManage : APP_SHELL_COPY.showManage}
         isOn={isIconsOnly}
       >
         {(handlers) => (
           <button
             type="button"
             className={styles.manageToggle}
-            aria-expanded={!isFolded}
+            aria-expanded={isOpen}
             aria-controls={groupId}
             aria-label={isIconsOnly ? APP_SHELL_COPY.manage : undefined}
             onClick={toggleManage}
@@ -203,7 +186,7 @@ const ManageGroup = ({ isIconsOnly, children }: ManageGroupProps) => {
           </button>
         )}
       </NavTip>
-      <div id={groupId} className={styles.manage} hidden={isFolded}>
+      <div id={groupId} className={styles.manage} hidden={!isOpen}>
         {children}
       </div>
     </>
@@ -263,9 +246,9 @@ const PINNED_MARKS = {
  * the menu frosts over it. While the frame is open, what the pages show
  * follows the server's changes, and the admin lock coming on or going off.
  * The player leaves the frame behind for the whole screen. Inside raven
- * player the menu adds On this Mac and Downloads over Settings, and the
+ * player the menu adds Downloads over Settings, and the
  * window is dragged by a strip along its top; while the app cannot reach
- * its server, the frame keeps only those three and what needs no server.
+ * its server, the frame keeps only those two and what needs no server.
  */
 export const AppShell = () => {
   const navId = useId()
@@ -274,7 +257,6 @@ export const AppShell = () => {
   const isMediumScreen = useIsMediumScreen()
   const isIconsOnly = collapsed || isMediumScreen
   const isFrosted = usePageBackdrop((state) => state.shown != null)
-  const isDesktop = useIsDesktop()
   const hasDownloads = useDownloadsHostOrNone() !== null
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
@@ -345,7 +327,6 @@ export const AppShell = () => {
                 <NavItems places={ACCOUNT_PLACES} isIconsOnly={isIconsOnly} />
               </>
             )}
-            {isDesktop && <LocalNavItem isIconsOnly={isIconsOnly} />}
             {hasDownloads && <DownloadsNavItem isIconsOnly={isIconsOnly} />}
             <NavItems places={APP_PLACES} isIconsOnly={isIconsOnly} />
             <AdminOnly>

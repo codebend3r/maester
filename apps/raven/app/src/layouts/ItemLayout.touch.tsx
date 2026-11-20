@@ -222,6 +222,11 @@ const Hero = ({ hero, actions, links, onOpen }: HeroProps) => {
           </View>
         )}
       </View>
+      {hero.notes.map((note) => (
+        <Text key={note} style={styles.note}>
+          {note}
+        </Text>
+      ))}
       {!isWide && <Synopsis hero={hero} />}
     </View>
   )
@@ -523,6 +528,7 @@ const useStyles = themedStyles((colours) =>
       fontWeight: 'bold',
     },
     byline: { color: colours.text, fontSize: SIZES.textSm },
+    note: { color: colours.muted, fontSize: SIZES.textSm },
     small: { color: colours.muted, fontSize: SIZES.textSm, lineHeight: SIZES.textSm * LINE_RATIO },
     progress: { gap: SIZES.space0, paddingTop: SIZES.space0, maxWidth: SIZES.measure },
     track: { height: SIZES.space0, borderRadius: SIZES.space0, backgroundColor: colours.track },

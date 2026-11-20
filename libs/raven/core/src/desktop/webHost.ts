@@ -41,7 +41,6 @@ export const isUnreachableAnswer = ({ status, body }: IsUnreachableAnswerProps):
 /** Raven's own pages, which a browser does not have. */
 export const DESKTOP_PATHS = {
   downloads: '/downloads',
-  local: '/local',
   play: '/play/:fileId',
 } as const
 

@@ -5,6 +5,7 @@ export const APP_ICONS = {
   ascending: 'ascending',
   back: 'back',
   backspace: 'backspace',
+  calendar: 'calendar',
   captions: 'captions',
   check: 'check',
   close: 'close',

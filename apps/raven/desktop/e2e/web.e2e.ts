@@ -65,7 +65,7 @@ test.describe.serial('the raven web app in Raven', () => {
   test('shows Home with the side menu, the app pages beside the web ones', async () => {
     const { page } = running()
     await Promise.all(
-      ['Home', 'Libraries', 'On this Mac', 'Downloads', 'Settings'].map((name) =>
+      ['Home', 'Libraries', 'Downloads', 'Settings'].map((name) =>
         expect(sideLink({ page, name })).toBeVisible(),
       ),
     )

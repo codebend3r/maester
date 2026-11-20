@@ -371,12 +371,12 @@ describe('Library on a TV', () => {
     expect(preferred(FILM_TITLES)).toEqual(['Night Train'])
     expect(screen.queryByRole('button', { name: 'Ashfall Gate' })).toBeNull()
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Show Library' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Show All' }))
     await layOut()
     expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
     expect(screen.getByText(/^\d+ videos$/u)).toBeTruthy()
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Show Continue watching' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Show In progress' }))
     await layOut()
     expect(await screen.findByText('1 video in progress')).toBeTruthy()
   })
@@ -384,7 +384,7 @@ describe('Library on a TV', () => {
   it('opens on the library when nothing is in progress, and still offers Continue watching', async () => {
     await renderLibrary({ id: FILMS.id })
     expect(await screen.findByRole('button', { name: 'Ashfall Gate' })).toBeTruthy()
-    await fireEvent.press(screen.getByRole('button', { name: 'Show Continue watching' }))
+    await fireEvent.press(screen.getByRole('button', { name: 'Show In progress' }))
     expect(await screen.findByText('Nothing in progress here yet.')).toBeTruthy()
   })
 

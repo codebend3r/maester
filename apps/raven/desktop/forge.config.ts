@@ -5,13 +5,11 @@ import { MakerZIP } from '@electron-forge/maker-zip'
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
-import { VIDEO_EXTENSIONS } from '@raven/core'
 // Forge loads this file through jiti, which reads no tsconfig `paths`: relative imports only.
 import { MakerDmg } from './src/build/dmgMaker'
 import {
   adHocApps,
   APP_ICON,
-  documentTypes,
   FONTS,
   FUSES,
   isPackagedPath,
@@ -56,7 +54,6 @@ const config: ForgeConfig = {
     prune: false,
     ignore: (file) => !isPackagedPath(file),
     protocols: [{ name: 'raven link', schemes: [LINK_SCHEME] }],
-    extendInfo: documentTypes(VIDEO_EXTENSIONS),
     // Task Manager and the Start menu shortcut Squirrel makes read Raven.exe's version info.
     win32metadata: { ProductName: APP_NAME, FileDescription: APP_NAME, CompanyName: AUTHOR },
     /*

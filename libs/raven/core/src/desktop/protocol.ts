@@ -121,14 +121,13 @@ const isUpNext = (value: unknown): value is number[] =>
 
 export const isTrackChoice = object({ audio: nullable(isNumber), subtitle: nullable(isString) })
 
+/** A download as the play page shows it: main grants its file an id, and never hands over its path. */
 export const isLocalFile = object({
   fileId: isOpaqueId,
   label: isString,
-  /** The folder the file is in, or for a download "Downloaded from <server>". */
+  /** Where the download came from, "Downloaded from <server>", which the player's header names. */
   folder: isString,
-  /** A download's `folder` says where it came from, so the player's header names it. */
-  isDownload: isBoolean,
-  /** A download's media on the server, whose art the player's header draws; null for any other file. */
+  /** The download's media on the server, whose art the player's header draws; null once main no longer lists it. */
   mediaId: nullable(isMediaId),
   /** A download's saved title art and the name it spells out, for the player's header; null with none. */
   logo: nullable(object({ pictureId: isOpaqueId, name: isString })),
@@ -138,15 +137,6 @@ export const isLocalFile = object({
 })
 
 export type LocalFile = Infer<typeof isLocalFile>
-
-export const isRecentView = object({
-  recentId: isOpaqueId,
-  label: isString,
-  from: isString,
-  watched: nullable(isNumber),
-})
-
-export type RecentView = Infer<typeof isRecentView>
 
 const isAudioDevice = object({ name: isString, description: isString })
 
@@ -208,13 +198,8 @@ export type WindowEdge = (typeof WINDOW_EDGES)[keyof typeof WINDOW_EDGES]
 
 export const DESKTOP_REQUESTS = {
   ready: 'ready',
-  openDialog: 'openDialog',
   describeFile: 'describeFile',
   savePosition: 'savePosition',
-  listRecents: 'listRecents',
-  openRecent: 'openRecent',
-  removeRecent: 'removeRecent',
-  clearRecents: 'clearRecents',
   saveTracks: 'saveTracks',
   windowButtons: 'windowButtons',
   windowControl: 'windowControl',
@@ -254,7 +239,6 @@ export const isDesktopRequest = tagged({
   tag: 'type',
   variants: {
     [DESKTOP_REQUESTS.ready]: {},
-    [DESKTOP_REQUESTS.openDialog]: {},
     [DESKTOP_REQUESTS.describeFile]: {
       fileId: isOpaqueId,
       queue: listOf(isOpaqueId),
@@ -264,10 +248,6 @@ export const isDesktopRequest = tagged({
       position: isNumber,
       duration: nullable(isNumber),
     },
-    [DESKTOP_REQUESTS.listRecents]: {},
-    [DESKTOP_REQUESTS.openRecent]: { recentId: isOpaqueId },
-    [DESKTOP_REQUESTS.removeRecent]: { recentId: isOpaqueId },
-    [DESKTOP_REQUESTS.clearRecents]: {},
     [DESKTOP_REQUESTS.saveTracks]: {
       fileId: isOpaqueId,
       audio: nullable(isTrackIndex),
@@ -347,7 +327,6 @@ export type TitleRefusal = Infer<typeof isTitleRefusal>
 export const DESKTOP_REPLIES = {
   play: 'play',
   file: 'file',
-  recents: 'recents',
   output: 'output',
   done: 'done',
   refused: 'refused',
@@ -365,7 +344,6 @@ export const isDesktopReply = tagged({
   variants: {
     [DESKTOP_REPLIES.play]: { target: isPlayTarget },
     [DESKTOP_REPLIES.file]: { file: isLocalFile },
-    [DESKTOP_REPLIES.recents]: { recents: listOf(isRecentView) },
     [DESKTOP_REPLIES.output]: {
       output: isOutputSettings,
       devices: listOf(isAudioDevice),
@@ -404,8 +382,8 @@ export type DesktopReplyType = DesktopReply['type']
 const R = DESKTOP_REQUESTS
 const A = DESKTOP_REPLIES
 
-/** What main answers a page's way of opening something with: a file to play, a page, a download to ask about. */
-export const OPEN_REPLY_TYPES = [A.play, A.navigate, A.downloadAsk, A.done] as const
+/** What main answers a page's way of opening something with: a download to play, a page, a download to ask about. */
+export const OPEN_REPLY_TYPES = [A.play, A.navigate, A.downloadAsk] as const
 
 /**
  * The replies main gives each request, besides `refused`, which any request may get: main
@@ -413,13 +391,8 @@ export const OPEN_REPLY_TYPES = [A.play, A.navigate, A.downloadAsk, A.done] as c
  */
 export const DESKTOP_REPLIES_FOR = {
   [R.ready]: [A.done],
-  [R.openDialog]: [A.play, A.done],
   [R.describeFile]: [A.file],
   [R.savePosition]: [A.done],
-  [R.listRecents]: [A.recents],
-  [R.openRecent]: [A.play],
-  [R.removeRecent]: [A.done],
-  [R.clearRecents]: [A.done],
   [R.saveTracks]: [A.done],
   [R.windowButtons]: [A.done],
   [R.windowControl]: [A.done],
@@ -466,7 +439,7 @@ export type RepliesFor<T extends DesktopRequestType> = ReplyOfType<
   (typeof DESKTOP_REPLIES_FOR)[T][number]
 >
 
-/** What main answers a way of opening something with: the files dropped, a link, a recent. */
+/** What main answers a way of opening something with: a download, a link. */
 export type OpenReply = ReplyOfType<(typeof OPEN_REPLY_TYPES)[number]>
 
 /** A guard for a reply of one of `allowed`, or a refusal, which any request may get. */
@@ -482,11 +455,7 @@ const isReplyAmong =
 export const isReplyTo = <T extends DesktopRequestType>(type: T) =>
   isReplyAmong<(typeof DESKTOP_REPLIES_FOR)[T][number]>(DESKTOP_REPLIES_FOR[type])
 
-/** Whether `reply` is one main gives a way of opening something. */
-export const isOpenReply = isReplyAmong(OPEN_REPLY_TYPES)
-
 export const DESKTOP_EVENTS = {
-  play: 'play',
   player: 'player',
   navigate: 'navigate',
   notice: 'notice',
@@ -497,14 +466,13 @@ export const DESKTOP_EVENTS = {
 } as const
 
 /**
- * What main pushes on its own: menu actions (File > Open Link among them), `open-file`, links,
- * downloads, notices. `navigate` names a path on the page's origin: Settings from the menu, or a
+ * What main pushes on its own: menu actions (File > Open Link among them), links, downloads,
+ * notices. `navigate` names a path on the page's origin: Settings from the menu, or a
  * `raven://play` link's `/watch/<mediaId>` with its `WATCH_PARAMS`.
  */
 export const isDesktopEvent = tagged({
   tag: 'type',
   variants: {
-    [DESKTOP_EVENTS.play]: { target: isPlayTarget },
     [DESKTOP_EVENTS.player]: { action: isMenuPlayerAction },
     [DESKTOP_EVENTS.navigate]: { to: isPagePath },
     [DESKTOP_EVENTS.notice]: { message: isString },
@@ -519,23 +487,6 @@ export const isDesktopEvent = tagged({
 })
 
 export type DesktopEvent = Infer<typeof isDesktopEvent>
-
-export const ENVELOPE_KINDS = { page: 'page', drop: 'drop' } as const
-
-/**
- * What the preload sends on the request channel. The preload builds it, so a
- * request from the page can never be mistaken for a drop, and only a drop
- * carries paths (taken from the dropped files by `webUtils`, never from the page).
- */
-export const isInvokeEnvelope = tagged({
-  tag: 'kind',
-  variants: {
-    [ENVELOPE_KINDS.page]: { request: isDesktopRequest },
-    [ENVELOPE_KINDS.drop]: { paths: listOf(isString) },
-  },
-})
-
-export type InvokeEnvelope = Infer<typeof isInvokeEnvelope>
 
 export const PLAYER_CONNECTION_STATUSES = { native: 'native', unavailable: 'unavailable' } as const
 

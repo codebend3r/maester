@@ -23,7 +23,6 @@ describe('desktop paths', () => {
 
   it('knows the pages that need no server', () => {
     expect(isOffline(DESKTOP_PATHS.downloads)).toBe(true)
-    expect(isOffline(DESKTOP_PATHS.local)).toBe(true)
     expect(isOffline(PAGE_PATHS.settings)).toBe(true)
     expect(isOffline(`/play/${FILE_ID}`)).toBe(true)
     expect(isOffline('/music/downloads')).toBe(true)
@@ -39,12 +38,11 @@ describe('desktop paths', () => {
     expect(isBrowserOffline(browserPlayPathOf(FILE_ID))).toBe(true)
     expect(isBrowserOffline(watchPageOf(7))).toBe(true)
     expect(isBrowserOffline(PAGE_PATHS.settings)).toBe(true)
-    expect(isBrowserOffline(DESKTOP_PATHS.local)).toBe(false)
     expect(isBrowserOffline(MUSIC_PATHS.downloads)).toBe(false)
     expect(isFilePlaying(browserPlayPathOf(FILE_ID))).toBe(true)
   })
 
-  it('knows when a local file or download is playing', () => {
+  it('knows when a download is playing', () => {
     expect(isFilePlaying(`/play/${FILE_ID}`)).toBe(true)
     expect(isFilePlaying(`${PAGE_PATHS.watch}/7`)).toBe(false)
     expect(isFilePlaying(DESKTOP_PATHS.downloads)).toBe(false)

@@ -12,7 +12,6 @@ type SetupProps = { isDevelopment?: boolean; platform?: DesktopPlatform }
 
 const setup = ({ isDevelopment = false, platform = DESKTOP_PLATFORMS.mac }: SetupProps = {}) => {
   const sent: DesktopEvent[] = []
-  const dialogs = { opened: 0 }
   const devTools = { toggles: 0 }
   const help = { showLogs: 0, showCrashReports: 0, copyDiagnostics: 0 }
   const updates = { checks: 0 }
@@ -21,9 +20,6 @@ const setup = ({ isDevelopment = false, platform = DESKTOP_PLATFORMS.mac }: Setu
     isDevelopment,
     platform,
     actions: {
-      openDialog: () => {
-        dialogs.opened += 1
-      },
       send: (event) => {
         sent.push(event)
       },
@@ -44,7 +40,7 @@ const setup = ({ isDevelopment = false, platform = DESKTOP_PLATFORMS.mac }: Setu
       },
     },
   })
-  return { template, sent, dialogs, devTools, help, updates }
+  return { template, sent, devTools, help, updates }
 }
 
 const everyItem = (entries: readonly MenuEntry[]): MenuEntry[] =>
@@ -131,26 +127,11 @@ describe('menuTemplate', () => {
     expect(sent).toEqual([])
   })
 
-  it('opens the dialog from Open… with Command O', () => {
-    const { template, dialogs } = setup()
-    const open = itemOf({ menu: topLevel({ template, name: 'File' }), label: 'Open…' })
-    expect(open.accelerator).toBe('CommandOrControl+O')
-    click(open)
-    expect(dialogs.opened).toBe(1)
-  })
-
-  it('gives Open Recent the native list and its Clear Menu', () => {
-    const { template } = setup()
-    const recent = itemOf({ menu: topLevel({ template, name: 'File' }), label: 'Open Recent' })
-    expect(recent.role).toBe('recentDocuments')
-    expect((recent.submenu ?? []).map((entry) => entry.role)).toEqual(['clearRecentDocuments'])
-  })
-
-  it('opens a link from Open Link… with Command L, just after Open Recent', () => {
+  it('opens a link from Open Link… with Command L, the first of File', () => {
     const { template, sent } = setup()
     const file = topLevel({ template, name: 'File' })
     const labels = (file.submenu ?? []).map((entry) => entry.label ?? entry.role ?? entry.type)
-    expect(labels.indexOf('Open Link…')).toBe(labels.indexOf('Open Recent') + 1)
+    expect(labels).toEqual(['Open Link…', 'separator', 'close'])
     const openLink = itemOf({ menu: file, label: 'Open Link…' })
     expect(openLink.accelerator).toBe('CommandOrControl+L')
     click(openLink)
@@ -289,10 +270,9 @@ describe('menuTemplate on Windows', () => {
     ])
   })
 
-  it('ends File with Settings, Check for Updates and Quit, and no recent documents', () => {
+  it('ends File with Settings, Check for Updates and Quit', () => {
     const { template } = windows()
     expect(rolesOf({ template, name: 'File' })).toEqual([
-      'Open…',
       'Open Link…',
       'separator',
       'Settings…',
@@ -306,7 +286,6 @@ describe('menuTemplate on Windows', () => {
   it('keeps the accelerators', () => {
     const { template, sent, updates } = windows()
     const file = topLevel({ template, name: 'File' })
-    expect(itemOf({ menu: file, label: 'Open…' }).accelerator).toBe('CommandOrControl+O')
     expect(itemOf({ menu: file, label: 'Open Link…' }).accelerator).toBe('CommandOrControl+L')
     const settings = itemOf({ menu: file, label: 'Settings…' })
     expect(settings.accelerator).toBe('CommandOrControl+,')
@@ -318,7 +297,7 @@ describe('menuTemplate on Windows', () => {
 
   it('leaves out the roles only macOS has', () => {
     const roles = everyItem(windows().template).map((entry) => entry.role)
-    ;['about', 'hide', 'hideOthers', 'unhide', 'recentDocuments'].forEach((role) => {
+    ;['about', 'hide', 'hideOthers', 'unhide'].forEach((role) => {
       expect(roles).not.toContain(role)
     })
   })

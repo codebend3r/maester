@@ -4,7 +4,7 @@ import { type ComponentRef, type Ref, useRef } from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { LIBRARIES_ENTRY } from '@/layouts/copy'
+import { FAVOURITES_ENTRY, LIBRARIES_ENTRY } from '@/layouts/copy'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Icon } from '@raven/native'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
@@ -17,7 +17,9 @@ import {
   type ShelvesProps,
   menuRowLabelOf,
 } from '@/layouts/shelfKit'
+import { BINGE_COPY } from '@/queries/bingeCards'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+import { COMING_SOON_COPY } from '@/queries/comingSoonCopy'
 import { APP_ROUTES } from '@/routes'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { isMenuOpen, useSideMenu } from '@/stores/sideMenu'
@@ -29,7 +31,10 @@ import { APP_ICONS } from '@/theme/icons'
 /** Where the entries that open a screen sit on Home, places no shelf's card shares. */
 const MENU_PLACES = {
   settings: 'settings',
+  favourites: 'favourites',
   continueWatching: 'continue-watching',
+  binge: 'binge',
+  comingSoon: 'coming-soon',
   libraries: 'libraries',
 } as const
 
@@ -148,7 +153,7 @@ const ThemeChoice = () => {
 type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'>
 
 /**
- * The side menu, as the web's: the search, Continue watching and every library, then the
+ * The side menu, as the web's: the search, Continue watching, Binge, Coming soon, Favourites and every library, then the
  * pinned libraries under their heading, each with its icon, and at the foot Settings, the theme and the toggle
  * that pins the menu open, kept on this device. It is folded to its icons until the remote moves into it, when it opens over
  * the page, labels and all, and folds again as the remote leaves; pinned, it stays open beside
@@ -172,6 +177,24 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
         label={CONTINUE_WATCHING}
         onPress={() => router.push(APP_ROUTES.continueWatching)}
         place={MENU_PLACES.continueWatching}
+      />
+      <OpenerRow
+        icon={APP_ICONS.popcorn}
+        label={BINGE_COPY.title}
+        onPress={() => router.push(APP_ROUTES.binge)}
+        place={MENU_PLACES.binge}
+      />
+      <OpenerRow
+        icon={APP_ICONS.calendar}
+        label={COMING_SOON_COPY.title}
+        onPress={() => router.push(APP_ROUTES.comingSoon)}
+        place={MENU_PLACES.comingSoon}
+      />
+      <OpenerRow
+        icon={APP_ICONS.heart}
+        label={FAVOURITES_ENTRY.label}
+        onPress={() => router.push(APP_ROUTES.favourites)}
+        place={MENU_PLACES.favourites}
       />
       <OpenerRow
         icon={APP_ICONS.libraries}

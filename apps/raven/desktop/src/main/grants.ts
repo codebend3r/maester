@@ -9,29 +9,18 @@ export type GrantedFile = {
   mtimeMs: number
 }
 
-export const GRANT_REFUSALS = {
-  missing: 'missing',
-  notAFile: 'not-a-file',
-  notAVideo: 'not-a-video',
-} as const
-
-export type GrantRefusal = (typeof GRANT_REFUSALS)[keyof typeof GRANT_REFUSALS]
-
-type GrantResult = { ok: true; file: Readonly<GrantedFile> } | { ok: false; reason: GrantRefusal }
-
 export type GrantFs = {
   realpath: (path: string) => Promise<string>
   stat: (path: string) => Promise<{ isFile: () => boolean; size: number; mtimeMs: number }>
 }
 
 export type Grants = {
-  grant: (path: string) => Promise<GrantResult>
+  /** Grants a video file an id the page may hold; null for a path that is missing, no file or no video. */
+  grant: (path: string) => Promise<Readonly<GrantedFile> | null>
   fileOf: (fileId: string) => Readonly<GrantedFile> | null
 }
 
 const ID_DRAWS = 8
-
-const refuse = (reason: GrantRefusal): GrantResult => ({ ok: false, reason })
 
 const attempt = async <T>(run: () => Promise<T>): Promise<T | null> => {
   try {
@@ -54,16 +43,15 @@ export const createGrants = ({ fs, newId }: CreateGrantsProps): Grants => {
     return byId.has(id) ? unusedId(draws - 1) : id
   }
 
-  const grant = async (path: string): Promise<GrantResult> => {
-    if (!isAbsolute(path)) return refuse(GRANT_REFUSALS.missing)
+  const grant: Grants['grant'] = async (path) => {
+    if (!isAbsolute(path)) return null
     const real = await attempt(() => fs.realpath(path))
-    if (real === null) return refuse(GRANT_REFUSALS.missing)
+    if (real === null) return null
     // The real name counts too: a link called trailer.mp4 must not expose a non-video.
-    if (!isVideoFile(basename(path)) || !isVideoFile(basename(real)))
-      return refuse(GRANT_REFUSALS.notAVideo)
+    if (!isVideoFile(basename(path)) || !isVideoFile(basename(real))) return null
     const stats = await attempt(() => fs.stat(real))
-    if (stats === null) return refuse(GRANT_REFUSALS.missing)
-    if (!stats.isFile()) return refuse(GRANT_REFUSALS.notAFile)
+    if (stats === null) return null
+    if (!stats.isFile()) return null
 
     const fileId = idByPath.get(real) ?? unusedId(ID_DRAWS)
     const file = Object.freeze({
@@ -75,7 +63,7 @@ export const createGrants = ({ fs, newId }: CreateGrantsProps): Grants => {
     } satisfies GrantedFile)
     idByPath.set(real, fileId)
     byId.set(fileId, file)
-    return { ok: true, file }
+    return file
   }
 
   return { grant, fileOf: (fileId) => byId.get(fileId) ?? null }

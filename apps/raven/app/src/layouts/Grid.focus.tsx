@@ -179,6 +179,7 @@ type GridRowContext = {
   preferred: string | null
   heightOf: (row: GridRow) => number
   widthOf: (shape: CardShape) => number
+  hasCaption: (shape: CardShape) => boolean
   jumpOf: (card: ShelfCard) => JumpFocus | null
   toggle: ReturnType<typeof useGrid>['toggle']
   settle: () => void
@@ -207,7 +208,7 @@ type CardCellProps = GridCellProps
 const CardCell = ({ card, width, grid }: CardCellProps) => (
   <FocusCard
     card={card}
-    hasCaption={hasCaptionOf(card.shape)}
+    hasCaption={grid.hasCaption(card.shape)}
     isPreferred={card.key === grid.preferred}
     jump={grid.jumpOf(card)}
     onPress={() => grid.onOpen(card)}
@@ -295,7 +296,18 @@ const gridRowViewOf = <K extends GridRowKind>({
  * own search box is the touch layout's alone; a TV searches from Home. Focus starts on the first
  * card, and each jump moves it to the card jumped to.
  */
-const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen }: GridProps) => {
+const Grid = ({
+  title,
+  icon,
+  line,
+  notice,
+  toolbar,
+  sections,
+  view,
+  jump,
+  onOpen,
+  hasPosterCaptions = false,
+}: GridProps) => {
   const screen = useWindowDimensions()
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
@@ -304,11 +316,16 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
   const changePrefs = useAppPrefs((prefs) => prefs.change)
   const [listHeight, setListHeight] = useState(0)
   const captionHeight = focusCaptionHeightOf(screen.fontScale)
+  const hasCaption = (shape: CardShape): boolean => hasPosterCaptions || hasCaptionOf(shape)
+  const captionOf = (shape: CardShape): number =>
+    hasPosterCaptions ? captionHeight : captionHeightOf({ shape, captionHeight })
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
     leastOf: (shape) =>
-      isRows ? LEAST_ROW_WIDTH : cardWidthForRows({ shape, listHeight, captionHeight, size }),
+      isRows
+        ? LEAST_ROW_WIDTH
+        : cardWidthForRows({ shape, listHeight, captionHeight: captionOf(shape), size }),
   })
   const wordsHeight = linesHeightOf({
     sizes: [TV_SIZES.textLg, TV_SIZES.text],
@@ -329,7 +346,7 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
-      captionHeightOf({ shape: row.shape, captionHeight }) +
+      captionOf(row.shape) +
       2 * GROWTH_ROOM
     )
   }
@@ -370,6 +387,7 @@ const Grid = ({ title, icon, line, notice, toolbar, sections, view, jump, onOpen
     preferred,
     heightOf,
     widthOf,
+    hasCaption,
     jumpOf,
     toggle,
     settle,

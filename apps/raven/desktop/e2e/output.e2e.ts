@@ -2,17 +2,11 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, type Page, test } from '@playwright/test'
 import { type Clips, makeClips } from '@/e2e/clips'
-import {
-  expectOffline,
-  freshUserData,
-  heading,
-  openFile,
-  removeDir,
-  sideLink,
-  withApp,
-} from '@/e2e/harness'
+import { expectOffline, freshUserData, heading, removeDir, sideLink, withApp } from '@/e2e/harness'
+import { playDownload, seedDownloads } from '@/e2e/seedDownloads'
 
 const SAVED = 'Sound output saved.'
+const LABEL = 'Clip 01'
 
 /** Settings' This computer section, which the frame offers with no server too. */
 const openThisComputer = async (page: Page) => {
@@ -42,6 +36,7 @@ test.describe.serial('choosing how this computer sends sound', () => {
   test.beforeAll(async () => {
     userData = await freshUserData()
     clips = await makeClips()
+    await seedDownloads({ userData, clips: [{ path: clips.first, label: LABEL, mediaId: 1 }] })
   })
 
   test.afterAll(async () => {
@@ -75,15 +70,16 @@ test.describe.serial('choosing how this computer sends sound', () => {
   test('fixes the volume under receiver passthrough', async () => {
     await withApp({
       userData,
-      run: async ({ app, page }) => {
+      run: async ({ page }) => {
         await openThisComputer(page)
         await soundOutput(page).getByRole('radio', { name: 'Receiver passthrough' }).check()
         await expect(page.getByText(SAVED)).toBeVisible()
         await expect(page.getByText('Volume is set on your receiver.')).toBeVisible()
         await expect.poll(() => storedProfile(userData)).toBe('passthrough')
 
-        await openFile({ app, path: clips.first })
-        await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
+        await sideLink({ page, name: 'Downloads' }).click()
+        await playDownload({ page, label: LABEL })
+        await expect(heading({ page, name: LABEL })).toBeVisible()
         await expect(page.locator('html')).toHaveAttribute('data-surface', 'native')
         // The mute button, since the slider hides on a window as narrow as CI's.
         await expect(

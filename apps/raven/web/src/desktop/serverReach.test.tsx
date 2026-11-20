@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
-import { ApiError, AUTH_CONFIG_STATES, DESKTOP_PATHS } from '@raven/core'
+import { ApiError, AUTH_CONFIG_STATES, DESKTOP_PATHS, PAGE_PATHS } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, waitFor } from '@testing-library/react'
@@ -116,7 +116,7 @@ describe('following whether the server can be reached', () => {
   it('stays where the person went while the server was out of reach', async () => {
     useServerReach.setState({ isOffline: true })
     const { client } = renderHost({
-      route: DESKTOP_PATHS.local,
+      route: PAGE_PATHS.settings,
       ui: (
         <Routes>
           <Route path="*" element={<Where />} />
@@ -125,6 +125,6 @@ describe('following whether the server can be reached', () => {
     })
     act(() => client.setQueryData(queryKeys.authConfig, { state: AUTH_CONFIG_STATES.off }))
     expect(isOffline()).toBe(false)
-    expect(where()).toBe(DESKTOP_PATHS.local)
+    expect(where()).toBe(PAGE_PATHS.settings)
   })
 })

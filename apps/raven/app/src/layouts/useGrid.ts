@@ -20,9 +20,20 @@ type UseGridProps = {
   top: number
 }
 
+type OpenBucketProps = Pick<GridSection, 'key' | 'isOpenFirst'>
+
+type FlippedProps = { turned: ReadonlySet<string>; key: string }
+
+/** The turned buckets with `key` turned the other way. */
+const flipped = ({ turned, key }: FlippedProps): ReadonlySet<string> => {
+  const next = new Set(turned)
+  if (!next.delete(key)) next.add(key)
+  return next
+}
+
 /**
  * What both grids share: the rows the sections cut into, which buckets are open (none, to
- * start, as the web's), and the jump, which scrolls to a card, opening its bucket first and
+ * start, as the web's, but those a page says start open), and the jump, which scrolls to a card, opening its bucket first and
  * scrolling once the bucket's rows are drawn. `top` is how far down the list its first row
  * starts.
  */
@@ -31,7 +42,13 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
   const list = useRef<FlatList<GridRow>>(null)
   // A card jumped to in a bucket that was shut, scrolled to once the bucket's rows are drawn.
   const pending = useRef<string | null>(null)
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set())
+  // The buckets the viewer turned from how they start: opened, or shut where one starts open.
+  const [turned, setTurned] = useState<ReadonlySet<string>>(() => new Set())
+  const open = new Set(
+    sections
+      .filter((section) => !!section.isOpenFirst !== turned.has(section.key))
+      .map(({ key }) => key),
+  )
   const rows = gridRowsOf({ sections, open, columnsOf })
   // Where each row sits, so a jump scrolls straight to a row the list has not drawn yet.
   const offsets = rowOffsetsOf({ rows, heightOf })
@@ -57,12 +74,11 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
     if (card !== null && scrollTo(card)) pending.current = null
   })
 
-  const toggle = (key: string) =>
-    setOpen((was) => {
-      const next = new Set(was)
-      if (!next.delete(key)) next.add(key)
-      return next
-    })
+  const toggle = (key: string) => setTurned((was) => flipped({ turned: was, key }))
+
+  /** Opens a bucket whichever way it starts; one open already stays as it is, however often it is asked. */
+  const openBucket = ({ key, isOpenFirst }: OpenBucketProps) =>
+    setTurned((was) => (!!isOpenFirst === was.has(key) ? flipped({ turned: was, key }) : was))
 
   /** Scrolls to the first card of `keys` the grid shows, and names it; null when there is none. */
   const jumpTo = (keys: ReadonlySet<string>): string | null => {
@@ -72,7 +88,7 @@ export const useGrid = ({ sections, columnsOf, heightOf, top }: UseGridProps) =>
     const section = sections.find(({ key }) => key === target.section)
     if (section !== undefined && isBucket(section)) {
       pending.current = target.card
-      setOpen((was) => new Set(was).add(target.section))
+      openBucket(section)
     }
     return target.card
   }

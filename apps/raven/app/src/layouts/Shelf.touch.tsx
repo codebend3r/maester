@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 
 import { BingeCardView } from '@/layouts/BingeCard.touch'
+import { BingeRowView } from '@/layouts/BingeRow.touch'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES } from '@/queries/cards'
 import { TouchCard } from '@/layouts/TouchCard'
@@ -282,8 +283,22 @@ const ShelfPage = ({ title, onBack, note, children }: ShelfPageProps) => {
   )
 }
 
+/** The Binge page's list under the thumb: a row a show, stacked down the page. */
+const BingeRows = ({ cards, onOpen }: BingeShelfProps) => {
+  const styles = useStyles()
+  return (
+    cards.length > 0 && (
+      <View accessibilityRole="list" style={styles.rows}>
+        {cards.map((card) => (
+          <BingeRowView key={card.key} card={card} onOpen={onOpen} />
+        ))}
+      </View>
+    )
+  )
+}
+
 /** Home on a phone or tablet: Binge, then the shelves stacked down the page, each scrolled sideways. */
-export const touchShelf: ShelfKit = { Shelves, Shelf, BingeShelf, ShelfPage }
+export const touchShelf: ShelfKit = { Shelves, Shelf, BingeShelf, BingeRows, ShelfPage }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -294,6 +309,7 @@ const useStyles = themedStyles((colours) =>
       paddingHorizontal: SIZES.space3,
     },
     shelf: { gap: SIZES.space2 },
+    rows: { gap: SIZES.space3, paddingHorizontal: SIZES.space3 },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'baseline',

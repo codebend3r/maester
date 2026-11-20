@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { EMPTY_STATE, addRecent, type PlayerState } from '@/main/playerState'
+import { EMPTY_STATE, setTrackPick, type PlayerState } from '@/main/playerState'
 import { isDesktopConfig } from '@/main/desktopConfig'
 import { SERVER, configFor } from '@/main/test/configFakes'
 import {
@@ -108,7 +108,8 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 const writes = (calls: Call[]) => calls.filter((call) => call.op === FS_OPS.writeFile)
 
-const named = (path: string): PlayerState => addRecent({ state: EMPTY_STATE, path, at: 1 })
+const named = (path: string): PlayerState =>
+  setTrackPick({ state: EMPTY_STATE, path, audio: null, subtitle: null, at: 1 })
 
 const setup = (initial: Record<string, string> = {}) => {
   const fake = createFakeFs(initial)
@@ -171,6 +172,14 @@ describe('loadState', () => {
   it('loads a valid file as written and renames nothing', async () => {
     const written = named('/a.mkv')
     const { fs, calls } = createFakeFs({ [FILE]: JSON.stringify(written) })
+    expect(await loadState({ fs, file: FILE, now })).toEqual(written)
+    expect(calls.filter((call) => call.op === FS_OPS.rename)).toEqual([])
+  })
+
+  it("loads an older Raven's file without the recents it kept, and renames nothing", async () => {
+    const written = named('/a.mkv')
+    const older = { ...written, recents: [{ kind: 'file', path: '/m/a.mkv', openedAt: 1 }] }
+    const { fs, calls } = createFakeFs({ [FILE]: JSON.stringify(older) })
     expect(await loadState({ fs, file: FILE, now })).toEqual(written)
     expect(calls.filter((call) => call.op === FS_OPS.rename)).toEqual([])
   })

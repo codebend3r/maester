@@ -24,7 +24,6 @@ import {
   DESKTOP_EVENTS,
   DESKTOP_REPLIES,
   DESKTOP_REQUESTS,
-  ENVELOPE_KINDS,
   FILE_SCHEME,
   PICTURE_SCHEME,
   pictureUrlFor,
@@ -39,7 +38,6 @@ import {
   isDesktopEvent,
   isDesktopReply,
   isDesktopRequest,
-  isInvokeEnvelope,
   isLocalFile,
   isMenuPlayerAction,
   isPagePath,
@@ -47,7 +45,6 @@ import {
   isPlayerConnection,
   isPlayerPortMessage,
   isPlayTarget,
-  isRecentView,
   isTitleRefusal,
   isTrackChoice,
   isUpdateStatus,
@@ -152,14 +149,13 @@ describe('fileUrlFor', () => {
 })
 
 describe('the building blocks', () => {
-  it('accepts a play target, a local file, a recent view and a menu action', () => {
+  it('accepts a play target, the file of a download and a menu action', () => {
     expect(isPlayTarget({ fileId: id, queue: [id, other] })).toBe(true)
     expect(
       isLocalFile({
         fileId: id,
         label: 'film.mkv',
         folder: 'Movies',
-        isDownload: false,
         mediaId: null,
         logo: null,
         resumeAt: 12,
@@ -172,7 +168,6 @@ describe('the building blocks', () => {
         fileId: id,
         label: 'film.mkv',
         folder: 'Movies',
-        isDownload: true,
         mediaId: 42,
         logo: { pictureId: id, name: 'Severance' },
         resumeAt: 0,
@@ -184,7 +179,6 @@ describe('the building blocks', () => {
       fileId: id,
       label: 'film.mkv',
       folder: 'Downloaded from raven',
-      isDownload: true,
       logo: null,
       resumeAt: 0,
       next: null,
@@ -194,12 +188,6 @@ describe('the building blocks', () => {
     expect(isLocalFile({ ...download, mediaId: 0 })).toBe(false)
     expect(isLocalFile({ ...download, mediaId: '42' })).toBe(false)
     expect(isLocalFile({ ...download, mediaId: 1.5 })).toBe(false)
-    expect(isRecentView({ recentId: id, label: 'film.mkv', from: 'Movies', watched: null })).toBe(
-      true,
-    )
-    expect(isRecentView({ recentId: id, label: 'film.mkv', from: 'Movies', watched: 0.5 })).toBe(
-      true,
-    )
     expect(isMenuPlayerAction.values).toEqual([
       'togglePlay',
       'skipBack',
@@ -213,7 +201,6 @@ describe('the building blocks', () => {
   it('rejects ids that are not opaque and unknown actions', () => {
     expect(isPlayTarget({ fileId: '/Users/me/film.mkv', queue: [] })).toBe(false)
     expect(isPlayTarget({ fileId: id, queue: ['/Users/me/next.mkv'] })).toBe(false)
-    expect(isRecentView({ recentId: 'abc', label: 'a', from: 'b', watched: null })).toBe(false)
     expect(isMenuPlayerAction('devtools')).toBe(false)
   })
 
@@ -247,14 +234,9 @@ describe('the building blocks', () => {
 describe('isDesktopRequest', () => {
   it.each([
     [{ type: DESKTOP_REQUESTS.ready }],
-    [{ type: DESKTOP_REQUESTS.openDialog }],
     [{ type: DESKTOP_REQUESTS.describeFile, fileId: id, queue: [other] }],
     [{ type: DESKTOP_REQUESTS.savePosition, fileId: id, position: 12.5, duration: 600 }],
     [{ type: DESKTOP_REQUESTS.savePosition, fileId: id, position: 12.5, duration: null }],
-    [{ type: DESKTOP_REQUESTS.listRecents }],
-    [{ type: DESKTOP_REQUESTS.openRecent, recentId: id }],
-    [{ type: DESKTOP_REQUESTS.removeRecent, recentId: id }],
-    [{ type: DESKTOP_REQUESTS.clearRecents }],
     [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 1, subtitle: 'embedded-0' }],
     [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: null, subtitle: null }],
     [{ type: DESKTOP_REQUESTS.saveTracks, fileId: id, audio: 0, subtitle: null }],
@@ -465,7 +447,6 @@ describe('isDesktopReply', () => {
           fileId: id,
           label: 'a.mkv',
           folder: 'Movies',
-          isDownload: false,
           mediaId: null,
           logo: null,
           resumeAt: 0,
@@ -482,13 +463,6 @@ describe('isDesktopReply', () => {
         isEngineReady: true,
       },
     ],
-    [
-      {
-        type: DESKTOP_REPLIES.recents,
-        recents: [{ recentId: id, label: 'a', from: 'b', watched: 0.25 }],
-      },
-    ],
-    [{ type: DESKTOP_REPLIES.recents, recents: [] }],
     [{ type: DESKTOP_REPLIES.done }],
     [{ type: DESKTOP_REPLIES.refused, message: 'no such file' }],
     [{ type: DESKTOP_REPLIES.navigate, to: '/watch/7?at=30&next=8%2C9' }],
@@ -732,7 +706,6 @@ describe('isPageSession and isTitleRefusal', () => {
 
 describe('isDesktopEvent', () => {
   it.each([
-    [{ type: DESKTOP_EVENTS.play, target: { fileId: id, queue: [] } }],
     [{ type: DESKTOP_EVENTS.player, action: MENU_PLAYER_ACTIONS.togglePlay }],
     [{ type: DESKTOP_EVENTS.player, action: MENU_PLAYER_ACTIONS.stats }],
     [{ type: DESKTOP_EVENTS.navigate, to: PAGE_PATHS.settings }],
@@ -759,7 +732,8 @@ describe('isDesktopEvent', () => {
       'a newer release with a number for its version',
       { type: DESKTOP_EVENTS.updateAvailable, version: 6 },
     ],
-    ['openRecent, which only the page asks for', { type: DESKTOP_REQUESTS.openRecent }],
+    ['openDownload, which only the page asks for', { type: DESKTOP_REQUESTS.openDownload }],
+    ['play, which main no longer pushes', { type: 'play', target: { fileId: id, queue: [] } }],
     [
       'space, which only the page asks for',
       { type: DESKTOP_REPLIES.space, space: { free: 1, total: 2, used: 0 } },
@@ -775,29 +749,6 @@ describe('isDesktopEvent', () => {
     ],
   ])('rejects %s', (_name, value) => {
     expect(isDesktopEvent(value)).toBe(false)
-  })
-})
-
-describe('isInvokeEnvelope', () => {
-  it.each([
-    [{ kind: ENVELOPE_KINDS.page, request: { type: DESKTOP_REQUESTS.ready } }],
-    [{ kind: ENVELOPE_KINDS.page, request: { type: DESKTOP_REQUESTS.openRecent, recentId: id } }],
-    [{ kind: ENVELOPE_KINDS.drop, paths: ['/Users/me/film.mkv', '/Users/me/next.mkv'] }],
-    [{ kind: ENVELOPE_KINDS.drop, paths: [] }],
-  ])('accepts %j', (value) => {
-    expect(isInvokeEnvelope(value)).toBe(true)
-  })
-
-  it.each([
-    [
-      'a page request off the list',
-      { kind: ENVELOPE_KINDS.page, request: { type: 'readFile', path: '/etc/hosts' } },
-    ],
-    ['a drop of numbers', { kind: ENVELOPE_KINDS.drop, paths: [1] }],
-    ['an unknown kind', { kind: 'shell', command: 'ls' }],
-    ['a bare request', { type: DESKTOP_REQUESTS.ready }],
-  ])('rejects %s', (_name, value) => {
-    expect(isInvokeEnvelope(value)).toBe(false)
   })
 })
 
@@ -987,7 +938,6 @@ describe('the download ask and views', () => {
       fileId: pictureId,
       label: 'S01E02 Half Loop',
       folder: 'Downloaded from Vhagar',
-      isDownload: true,
       mediaId: 42,
       resumeAt: 0,
       next: null,

@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import {
   APP_CLIENT_CALLS,
+  type HistoryEntry,
   type Library as LibraryRecord,
   LIBRARY_VIEWS,
   LIBRARY_VIEW_LABELS,
   MEDIA_SORTS,
+  type PosterEntry,
   type Saga,
   SEARCH_DELAY_MS,
   SORT_FIELD_LABELS,
@@ -23,9 +25,11 @@ import { useActiveServer } from '@/stores/activeServer'
 import { useLibraryViews } from '@/stores/libraryViews'
 import { FILMS, NAS, SERIES } from '@/test/homeServer'
 import {
+  BUSBOYS_FINISHED,
   FILM_SEARCHES,
   GROUPED_FILMS,
   NIGHT_SAGA,
+  NIGHT_TRAIN,
   libraryApi,
   libraryPath,
 } from '@/test/libraryServer'
@@ -60,11 +64,15 @@ const mockServer: {
   requests: string[]
   libraries: LibraryRecord[]
   sagas: Saga[]
+  favourites: PosterEntry[]
+  finished: HistoryEntry[]
   reads: (path: string) => Promise<void>
 } = {
   requests: [],
   libraries: [],
   sagas: [NIGHT_SAGA],
+  favourites: [],
+  finished: [],
   reads: async () => undefined,
 }
 const mockApi = jest.fn((_server: AppServer) =>
@@ -74,6 +82,8 @@ const mockApi = jest.fn((_server: AppServer) =>
     },
     libraries: () => mockServer.libraries,
     sagas: () => mockServer.sagas,
+    favourites: () => mockServer.favourites,
+    finished: () => mockServer.finished,
     reads: (path) => mockServer.reads(path),
   }),
 )
@@ -183,6 +193,8 @@ describe('Library on a phone or tablet', () => {
     mockServer.requests = []
     mockServer.libraries = []
     mockServer.sagas = [NIGHT_SAGA]
+    mockServer.favourites = []
+    mockServer.finished = []
     mockServer.reads = async () => undefined
     mockFontScale.mockReturnValue(1)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
@@ -233,7 +245,7 @@ describe('Library on a phone or tablet', () => {
     expect(within(sort).getByText('Title')).toBeTruthy()
 
     const iconOnly = [
-      screen.getByRole('button', { name: 'Show Continue watching' }),
+      screen.getByRole('button', { name: 'Show In progress' }),
       screen.getByRole('button', { name: 'Shuffle Films' }),
       screen.getByRole('button', { name: 'Order: A to Z' }),
       screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` }),
@@ -249,8 +261,10 @@ describe('Library on a phone or tablet', () => {
     await screen.findByRole('button', { name: 'Night Train' })
 
     expect(toolbarLabels()).toEqual([
-      'Show Continue watching',
+      'Show In progress',
+      'Show Favourites',
       'Show Sagas',
+      'Show Recently finished',
       'Shuffle Films',
       'Sort: Title',
       'Order: A to Z',
@@ -533,6 +547,57 @@ describe('Library on a phone or tablet', () => {
     ).toBe(false)
   })
 
+  describe('favourites', () => {
+    it("opens a library's favourites from a button, each a card", async () => {
+      mockServer.favourites = [{ media: NIGHT_TRAIN, poster: null }]
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Favourites' }))
+
+      expect(await screen.findByText('1 favourite')).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Night Train/ })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /Busboys/ })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Show All' })).toBeTruthy()
+    })
+
+    it('says so when the library has none', async () => {
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Favourites' }))
+
+      expect(await screen.findByText(LIBRARY_COPY.favouritesEmpty('Films'))).toBeTruthy()
+    })
+  })
+
+  describe('recently finished', () => {
+    it('opens what was finished in a library from a button, each a card', async () => {
+      mockServer.finished = [BUSBOYS_FINISHED]
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Recently finished' }))
+
+      expect(await screen.findByText('1 video finished')).toBeTruthy()
+      expect(screen.getByRole('button', { name: /Busboys/ })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /Night Train/ })).toBeNull()
+    })
+
+    it('says so when nothing was finished there', async () => {
+      await renderLibrary({ id: FILMS.id })
+      await screen.findByRole('button', { name: 'Night Train' })
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Recently finished' }))
+
+      expect(
+        await screen.findByText(
+          LIBRARY_COPY.finishedEmpty({ name: FILMS.name, percent: FILMS.settings.watchedPercent }),
+        ),
+      ).toBeTruthy()
+    })
+  })
+
   describe('sagas', () => {
     it("opens a movies library's sagas from a button, each a card that opens its page", async () => {
       await renderLibrary({ id: FILMS.id })
@@ -552,7 +617,7 @@ describe('Library on a phone or tablet', () => {
         },
       })
       // Back to the listing, and on to the sagas again: the buttons name where each goes.
-      expect(screen.getByRole('button', { name: 'Show Library' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Show All' })).toBeTruthy()
     })
 
     it('says so when the library has none', async () => {

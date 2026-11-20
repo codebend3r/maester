@@ -1,8 +1,7 @@
 import { ENGINE_STOPPED } from '@raven/core'
 
 export const PLAYER_MESSAGES = {
-  notOpen:
-    'That video is no longer open. Open it again from the files on this computer or from Downloads.',
+  notOpen: 'That video is no longer open. Open it again from Downloads.',
   cannotOpen: 'Raven could not open this video.',
   stopped: 'Raven could not keep playing this video.',
   trackStopped: 'Raven could not keep playing this track.',
