@@ -1,0 +1,42 @@
+@use '../../styles/mixins';
+
+.header {
+  display: grid;
+  grid-template-areas: 'close middle more';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.close {
+  display: grid;
+  grid-area: close;
+}
+
+.more {
+  display: grid;
+  grid-area: more;
+}
+
+.middle {
+  display: grid;
+  grid-area: middle;
+  justify-items: center;
+  min-inline-size: 0;
+}
+
+.overline,
+.name {
+  max-inline-size: 100%;
+  @include mixins.one-line;
+}
+
+.overline {
+  @include mixins.overline;
+}
+
+.name {
+  color: var(--color-text);
+  font: var(--type-tile-title);
+  text-align: center;
+}

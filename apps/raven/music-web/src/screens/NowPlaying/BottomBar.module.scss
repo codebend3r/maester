@@ -1,0 +1,32 @@
+@use '../../styles/mixins';
+
+.bar {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.item {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  place-content: center;
+  align-items: center;
+  min-inline-size: var(--size-touch-target);
+  block-size: var(--size-touch-target);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-2);
+}
+
+.active {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.label {
+  @include mixins.one-line;
+  font: var(--type-control);
+}

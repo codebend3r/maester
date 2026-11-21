@@ -1,0 +1,90 @@
+@use '../../styles/mixins';
+
+.idle {
+  display: grid;
+  gap: var(--space-8);
+  min-inline-size: 0;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+// Every tile in one row on the wide layout, two to a row on the narrow one.
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+
+  @media (max-width: 48rem) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cell {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.tile {
+  display: grid;
+  align-content: space-between;
+  min-inline-size: 0;
+  block-size: var(--size-browse-tile);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--tile-ground);
+  color: var(--tile-ink);
+}
+
+.tileLabel,
+.recentName,
+.recentLine {
+  @include mixins.one-line;
+}
+
+.tileLabel {
+  font: var(--type-row-strong);
+}
+
+.recents,
+.recentRows {
+  display: grid;
+  min-inline-size: 0;
+}
+
+// A row's main press takes the room its x leaves.
+.recent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--size-row-gap);
+  align-items: center;
+  min-block-size: var(--size-nav-row);
+  border-block-end: var(--size-hairline) solid var(--color-line);
+}
+
+.recentMain {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--size-row-gap);
+  align-items: center;
+  min-inline-size: 0;
+  min-block-size: var(--size-nav-row);
+}
+
+.recentText {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.recentName {
+  color: var(--color-text);
+  font: var(--type-row-title);
+}
+
+.recentLine {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}

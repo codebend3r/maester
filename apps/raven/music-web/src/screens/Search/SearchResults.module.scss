@@ -1,0 +1,51 @@
+.sections,
+.main {
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  min-inline-size: 0;
+}
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+// A heading sits straight on its rows, which bring their own height.
+.rows,
+.row {
+  display: grid;
+  min-inline-size: 0;
+}
+
+// The wide layout's All: the songs and albums take 1.4 parts of the width, the artists 1.
+.columns {
+  display: grid;
+  grid-template-areas: 'main side';
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.main {
+  grid-area: main;
+}
+
+.side {
+  display: grid;
+  grid-area: side;
+  min-inline-size: 0;
+}
+
+// The mark the songs' next page is asked for at: it holds a place and draws nothing.
+.end {
+  block-size: var(--size-hairline);
+}
+
+.searching {
+  display: grid;
+  justify-items: center;
+  padding-block: var(--space-8);
+  color: var(--color-text-3);
+}

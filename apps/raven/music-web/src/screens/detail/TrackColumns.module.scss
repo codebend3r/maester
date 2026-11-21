@@ -1,0 +1,21 @@
+// Lined up with an inset row: its number, its title, then its length before the room More takes.
+.columns {
+  display: grid;
+  grid-template-columns: var(--size-track-number) minmax(0, 1fr) auto;
+  gap: var(--size-row-gap);
+  align-items: center;
+  padding: 0 calc(var(--space-3) + var(--size-small-button)) var(--space-3) var(--space-3);
+  border-block-end: var(--size-hairline) solid var(--color-line);
+  color: var(--color-text-3);
+  font: var(--type-overline);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+
+  @media (max-width: 48rem) {
+    display: none;
+  }
+}
+
+.number {
+  text-align: center;
+}

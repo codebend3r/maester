@@ -1,0 +1,17 @@
+@use '../../styles/mixins';
+
+// The name takes the room the tile and the chip leave.
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: var(--size-nav-row);
+  padding-block: var(--space-3);
+}
+
+.name {
+  @include mixins.one-line;
+  color: var(--color-text);
+  font: var(--type-row-title);
+}

@@ -1,0 +1,8 @@
+.rows {
+  display: grid;
+}
+
+.row {
+  display: grid;
+  border-block-end: var(--size-hairline) solid var(--color-line);
+}

@@ -1,0 +1,62 @@
+@use '../../styles/mixins';
+
+// Its icon over its word: the narrow layout's.
+@mixin labelled {
+  gap: var(--space-1);
+  min-inline-size: var(--size-touch-target);
+  min-block-size: var(--size-touch-target);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-item);
+  box-shadow: none;
+
+  .label {
+    display: block;
+  }
+}
+
+// Its icon alone in an outlined circle: the wide layout's, and an artist's Follow everywhere.
+@mixin circle {
+  inline-size: var(--size-button-large);
+  block-size: var(--size-button-large);
+  border-radius: var(--radius-pill);
+  @include mixins.hairline-ring;
+
+  .label {
+    display: none;
+  }
+}
+
+.action {
+  display: grid;
+  place-content: center;
+  place-items: center;
+  color: var(--color-text-2);
+
+  @include mixins.press-feedback;
+}
+
+.label {
+  @include mixins.one-line;
+  font: var(--type-action-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.on {
+  color: var(--color-accent-text);
+}
+
+.labelled {
+  @include labelled;
+}
+
+.circle {
+  @include circle;
+}
+
+.byLayout {
+  @include circle;
+
+  @media (max-width: 48rem) {
+    @include labelled;
+  }
+}

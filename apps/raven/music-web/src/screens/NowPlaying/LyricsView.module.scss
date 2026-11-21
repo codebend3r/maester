@@ -1,0 +1,62 @@
+// A column that scrolls inside the room its pane gives it, with no scrollbar drawn, as the apps'.
+@mixin scroller {
+  min-block-size: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.lines {
+  @include scroller;
+
+  // The lines' tops are read against the list itself.
+  position: relative;
+  display: grid;
+  gap: calc(var(--space-4) + var(--space-1) / 2);
+  align-content: start;
+  justify-items: start;
+  padding-block-end: var(--space-10);
+
+  @media (prefers-reduced-motion: no-preference) {
+    scroll-behavior: smooth;
+  }
+}
+
+.sung,
+.current,
+.upcoming {
+  font: var(--type-lyric);
+}
+
+.sung {
+  color: var(--color-text-3);
+  opacity: var(--opacity-sung);
+}
+
+.current {
+  color: var(--color-text);
+}
+
+.upcoming {
+  color: var(--color-text-2);
+}
+
+.plain {
+  @include scroller;
+
+  padding-block-end: var(--space-10);
+  color: var(--color-text-2);
+  font: var(--type-lyric);
+  white-space: pre-wrap;
+}
+
+.empty {
+  display: grid;
+  place-content: center;
+  color: var(--color-text-2);
+  font: var(--type-body);
+  text-align: center;
+}
+
+.reading {
+  display: block;
+}

@@ -14,6 +14,7 @@ You are the parity monitor for raven. One product ships on several surfaces, and
 | Raven, the desktop app | `apps/raven/desktop` (`@raven/desktop`)                                      | The `@raven/web` build in an Electron window. It has no pages of its own. Desktop-only UI is `apps/raven/web/src/desktop/` |
 | Device app             | `apps/raven/app` (`@raven/app`)                                              | React Native. Its own screens in `src/screens`, with touch, tablet and TV variants                                         |
 | Wren                   | `apps/raven/music` (`@raven/music`)                                          | React Native, music only. Compare it with the web's music mode and the device app's music screens                          |
+| Wren on the web        | `apps/raven/music-web` (`@raven/music-web`)                                  | Wren's screens again in React. The `wren-parity` agent keeps it and Wren the same app; hand it anything between those two  |
 | Shared                 | `libs/raven/core`, `libs/raven/ui`, `libs/raven/native`, `apps/raven/server` | The contract, the player and the data every surface reads                                                                  |
 
 Read the root `CLAUDE.md`, `apps/raven/CLAUDE.md`, `apps/raven/app/CLAUDE.md` and `apps/raven/music/CLAUDE.md` before judging. A difference one of them states and explains is intended, not drift: say so in the report and move on. A difference nobody wrote down is drift until someone decides otherwise.
