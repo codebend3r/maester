@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { SIGN_IN_ERRORS, type SignInErrorCopy, signInErrorTextOf } from '@/account/signInErrors'
+import { SIGN_IN_ERRORS, type SignInErrorCopy, signInErrorTextOf } from '@/signInErrors'
 
 const COPY = {
   [SIGN_IN_ERRORS.missing]: 'Fill in both fields.',

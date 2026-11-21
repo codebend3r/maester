@@ -1,13 +1,8 @@
 import type { Session } from '@supabase/supabase-js'
+import { type ReadyAuthConfig, hasSessionCookie } from '@raven/core'
 import { create } from 'zustand'
 import { keptInStorage, STORE_KEYS } from '@/stores/storage'
-import {
-  type AuthClient,
-  type ReadyAuthConfig,
-  AUTH_EVENTS,
-  createAuthClient,
-  hasSessionCookie,
-} from '@/lib/authClient'
+import { type AuthClient, AUTH_EVENTS, createAuthClient } from '@/lib/authClient'
 import { clearAccountState } from '@/lib/clearAccountState'
 import { queryKeys } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'

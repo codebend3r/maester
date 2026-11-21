@@ -11,7 +11,7 @@ export {
   type SignInError,
   type SignInErrorCopy,
   signInErrorTextOf,
-} from '@/account/signInErrors'
+} from '@raven/core'
 export { tokenRenewalFor } from '@/account/tokenRenewal'
 export { useSubmit } from '@/account/useSubmit'
 export { isDevelopmentVariant } from '@/config/appVariant'
@@ -47,8 +47,8 @@ export {
   queueSourceOf,
   tracksForBrowse,
 } from '@/music/browseTree'
-export { TRACK_STREAM_KINDS } from '@/music/audioItem'
-export type { TrackPlan, TrackStream } from '@/music/audioItem'
+export type { TrackPlan } from '@/music/audioItem'
+export { TRACK_STREAM_KINDS, type TrackStream } from '@raven/core'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { nativePlayerOf } from '@/music/nativePlayer'
 export { createActiveServerStore } from '@/servers/activeServerStore'

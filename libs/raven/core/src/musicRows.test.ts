@@ -60,7 +60,12 @@ describe('albumDiscsOf', () => {
       ['Disc 1', ['1. Airbag', '2. Paranoid Android']],
       ['Disc 2', ['3. Lucky']],
     ])
-    expect(discs[1]?.tracks[0] ?? null).toMatchObject({ index: 2, number: '1', length: '5:00' })
+    expect(discs[1]?.tracks[0] ?? null).toMatchObject({
+      index: 2,
+      number: '1',
+      length: '5:00',
+      track: LUCKY,
+    })
   })
 
   it('keeps one untitled disc for an album of one, numbering a track the tags leave unnumbered by its place', () => {
@@ -88,7 +93,7 @@ describe('playlists', () => {
       ['101:0', '1. Airbag'],
       ['101:1', '2. Airbag'],
     ])
-    expect(rows[0]).toMatchObject({ line: 'Radiohead', length: '5:00' })
+    expect(rows[0]).toMatchObject({ line: 'Radiohead', length: '5:00', track: AIRBAG })
   })
 })
 

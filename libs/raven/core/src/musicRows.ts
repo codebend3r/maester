@@ -40,6 +40,8 @@ export type PlaylistTrack = {
   id: number
   /** Its place in the playlist, which Play, Move up and Remove name. */
   index: number
+  /** The track itself, for what a row's menu and cover read. */
+  track: Track
   title: string
   line: string
   length: string
@@ -55,6 +57,7 @@ export const playlistTracksOf = ({ tracks }: PlaylistTracksOfProps): PlaylistTra
     key: `${track.id}:${index}`,
     id: track.id,
     index,
+    track,
     title: track.title,
     line: artistNames(track),
     length: formatDuration(track.duration),
@@ -80,6 +83,8 @@ export type AlbumTrack = {
   id: number
   /** Where it sits in the album's tracks, which Play starts from. */
   index: number
+  /** The track itself, for what a row's menu reads. */
+  track: Track
   /** Its number on its disc, or its place in the album when the tags say none. */
   number: string
   title: string
@@ -105,6 +110,7 @@ export const albumDiscsOf = ({ tracks, discCount }: AlbumDiscsOfProps): AlbumDis
               key: String(track.id),
               id: track.id,
               index,
+              track,
               number: String(track.number ?? index + 1),
               title: track.title,
               length: formatDuration(track.duration),

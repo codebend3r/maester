@@ -8,18 +8,15 @@ import {
   AUDIO_PLATFORMS,
   MAX_HEIGHTS,
   MEDIA_TICKET_PARAM,
+  TRACK_STREAM_KINDS,
   type Track,
+  type TrackStream,
   appClientCallOf,
   createApiClient,
   toQueryString,
 } from '@raven/core'
 
-import {
-  TRACK_STREAM_KINDS,
-  type TrackPlan,
-  type TrackStream,
-  audioItemOf,
-} from '@/music/audioItem'
+import { type TrackPlan, audioItemOf } from '@/music/audioItem'
 import { mediaAccessFor } from '@/servers/mediaAccess'
 
 const ORIGIN = 'https://raven.example'
