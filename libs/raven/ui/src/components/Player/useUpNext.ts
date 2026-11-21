@@ -1,6 +1,6 @@
 import type { Marker } from '@raven/core'
 import { useEffect, useEffectEvent, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useWatchReplace } from '@/components/Player/useWatchReplace'
 import { useUpNextCountdown } from '@/lib/useUpNextCountdown'
 import { useHostServices } from '@/stores/playerServices'
 
@@ -25,14 +25,14 @@ type UseUpNextProps = {
  * `skipCredits` to that scene.
  */
 export const useUpNext = ({ ended, time, duration, credits, seek }: UseUpNextProps) => {
-  const navigate = useNavigate()
+  const replace = useWatchReplace()
   const next = useHostServices((services) => services.title.next)
   const wasEnded = useRef(false)
   const hasLeft = useRef(false)
   const playNext = () => {
     if (!next || hasLeft.current) return
     hasLeft.current = true
-    Promise.resolve(navigate(next.to, { replace: true, state: next.state })).catch(() => undefined)
+    replace(next)
   }
   const {
     isOffered,

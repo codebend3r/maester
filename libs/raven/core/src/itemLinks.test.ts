@@ -96,6 +96,27 @@ describe('watchLink', () => {
     const session = { kind: SESSION_KINDS.saga, sagaId: '10' } as const
     expect(watchLink({ media, session }).state.session).toEqual(session)
   })
+
+  it('remembers what a queue played before it and the session it was shuffled from', () => {
+    const media = mediaItem({ id: 9 })
+    const played = [mediaItem({ id: 7 }), mediaItem({ id: 8 })]
+    const session = { kind: SESSION_KINDS.queue } as const
+    expect(
+      watchLink({ media, session, played, shuffledFrom: { kind: SESSION_KINDS.season } }).state,
+    ).toEqual({
+      media,
+      session,
+      upNext: [],
+      played,
+      shuffledFrom: { kind: SESSION_KINDS.season },
+    })
+  })
+
+  it('keeps only the last fifty videos played', () => {
+    const played = Array.from({ length: 60 }, (_, index) => mediaItem({ id: index + 100 }))
+    const kept = watchLink({ media: mediaItem({ id: 9 }), played }).state.played ?? []
+    expect(kept.map(({ id }) => id)).toEqual(played.slice(10).map(({ id }) => id))
+  })
 })
 
 describe('queueLink', () => {

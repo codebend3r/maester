@@ -126,6 +126,8 @@ export type QueueRow = {
   key: string
   /** Where it sits in the play order, which a jump or a remove names. */
   place: number
+  /** The track itself, for what a row's menu and cover read. */
+  track: Track
   title: string
   line: string
   /** How long the track runs, "4:05", so every listing of songs says it. */
@@ -145,6 +147,7 @@ export const queueRowsOf = ({ queue, tracks }: QueueRowsOfProps): QueueRow[] =>
           {
             key: `${id}:${place}`,
             place,
+            track,
             title: track.title,
             line: artistNames(track),
             length: formatDuration(track.duration),

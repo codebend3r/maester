@@ -106,6 +106,7 @@ describe('queueRowsOf', () => {
       {
         key: `${AIRBAG.id}:0`,
         place: 0,
+        track: AIRBAG,
         title: 'Airbag',
         line: 'Radiohead',
         length: '5:00',
@@ -114,6 +115,7 @@ describe('queueRowsOf', () => {
       {
         key: `${PARANOID.id}:1`,
         place: 1,
+        track: PARANOID,
         title: 'Paranoid Android',
         line: 'Radiohead',
         length: '5:00',

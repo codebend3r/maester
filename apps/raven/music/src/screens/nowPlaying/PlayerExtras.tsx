@@ -1,12 +1,11 @@
 import { AUDIOBOOK_SPEEDS, usePlayerPrefs } from '@raven/ui/headless'
 import { View } from 'react-native'
 
+import { NOW_PLAYING_COPY, PLAYER_COPY } from '@raven/wren'
 import { Adjuster } from '@/player/Adjuster'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
 import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { SegmentedControl } from '@/ui/SegmentedControl'
-import { PLAYER_COPY } from '@/ui/copy'
 
 // How far a screen reader's swipe moves the volume.
 const VOLUME_STEP = 0.1

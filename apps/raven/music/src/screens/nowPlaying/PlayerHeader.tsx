@@ -1,8 +1,8 @@
+import type { SourceTitle } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { Text, View } from 'react-native'
 
-import { NOW_PLAYING_COPY } from '@/screens/copy'
-import type { SourceTitle } from '@/screens/nowPlaying/nowPlayingModel'
+import { NOW_PLAYING_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'

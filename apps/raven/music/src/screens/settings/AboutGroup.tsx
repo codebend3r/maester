@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Text, View } from 'react-native'
 
 import packageJson from '#package'
-import { SETTINGS_COPY } from '@/screens/copy'
+import { SETTINGS_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'
+import { FactRow } from '@/ui/FactRow'
 import { GroupedList } from '@/ui/GroupedList'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
 import { ICONS } from '@/ui/WrenIcon'
@@ -41,12 +42,7 @@ export function AboutGroup() {
   return (
     <>
       <GroupedList heading={SETTINGS_COPY.about}>
-        <NavigationRow
-          icon={ICONS.info}
-          label={SETTINGS_COPY.version}
-          value={packageJson.version}
-          variant={NAVIGATION_ROW_VARIANTS.settings}
-        />
+        <FactRow icon={ICONS.info} label={SETTINGS_COPY.version} value={packageJson.version} />
         <NavigationRow
           label={SETTINGS_COPY.licenses}
           onPress={() => setIsShowingLicenses(true)}

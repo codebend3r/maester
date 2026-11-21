@@ -1,11 +1,10 @@
+import { barWordsOf, type Pane, PANES } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
-import { PANES, type Pane } from '@/screens/nowPlaying/nowPlayingModel'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   bar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -27,19 +26,19 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 
 type BarItemProps = {
   icon: WrenIconName
-  label: string
-  /** The words beside the icon; the Output pill's alone. */
-  text?: string
   pane: Pane
   current: Pane
   onPane: (pane: Pane) => void
+  /** "raven · This iPhone", the Output pill's words. */
+  output: string
 }
 
 /** One of the bar's buttons, on a soft red pill while its pane shows. */
-function BarItem({ icon, label, text, pane, current, onPane }: BarItemProps) {
+function BarItem({ icon, pane, current, onPane, output }: BarItemProps) {
   const styles = useStyles()
   const { colors } = useWrenTheme()
   const isActive = pane === current
+  const { label, text } = barWordsOf({ pane, output })
   return (
     <Pressable
       accessibilityLabel={label}
@@ -49,7 +48,7 @@ function BarItem({ icon, label, text, pane, current, onPane }: BarItemProps) {
       style={pressedStyleOf({ style: [styles.item, isActive && styles.active] })}
     >
       <WrenIcon color={isActive ? colors.accentText : colors.text2} name={icon} size={SIZE.icon} />
-      {text !== undefined && (
+      {text !== null && (
         <Text numberOfLines={1} style={[styles.label, isActive && styles.activeLabel]}>
           {text}
         </Text>
@@ -57,6 +56,13 @@ function BarItem({ icon, label, text, pane, current, onPane }: BarItemProps) {
     </Pressable>
   )
 }
+
+// The bar's buttons in the order they sit; the Output pill in the middle shows the player itself.
+const BAR_ITEMS = [
+  { pane: PANES.lyrics, icon: ICONS.lyrics },
+  { pane: PANES.player, icon: ICONS.output },
+  { pane: PANES.upNext, icon: ICONS.upNext },
+] as const
 
 type BottomBarProps = {
   pane: Pane
@@ -73,28 +79,16 @@ export function BottomBar({ pane, onPane, output }: BottomBarProps) {
   const styles = useStyles()
   return (
     <View style={styles.bar}>
-      <BarItem
-        current={pane}
-        icon={ICONS.lyrics}
-        label={PLAYER_COPY.lyrics}
-        onPane={onPane}
-        pane={PANES.lyrics}
-      />
-      <BarItem
-        current={pane}
-        icon={ICONS.output}
-        label={output}
-        onPane={onPane}
-        pane={PANES.player}
-        text={output}
-      />
-      <BarItem
-        current={pane}
-        icon={ICONS.upNext}
-        label={PLAYER_COPY.upNext}
-        onPane={onPane}
-        pane={PANES.upNext}
-      />
+      {BAR_ITEMS.map((item) => (
+        <BarItem
+          current={pane}
+          icon={item.icon}
+          key={item.pane}
+          onPane={onPane}
+          output={output}
+          pane={item.pane}
+        />
+      ))}
     </View>
   )
 }

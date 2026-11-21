@@ -20,6 +20,7 @@ import {
 } from '@/components/Player/copy'
 import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Player/menus'
 import { stepDownNote } from '@/components/Player/playbackFacts'
+import type { PlayerQueue, QueueEntry } from '@/components/Player/PlayerServices'
 import type { ChoiceGroup as Group, PlayChoices } from '@/components/Player/playChoices'
 import type { StepDown } from '@/components/Player/usePlaybackLadder'
 import styles from '@/components/Player/SettingsMenu.module.scss'
@@ -273,6 +274,36 @@ const SpeedGroup = ({ name, rate, onPickRate }: SpeedGroupProps) => (
   />
 )
 
+type SwitchGroupProps = {
+  /** Names the radio group. */
+  name: string
+  legend: string
+  isOn: boolean
+  onPick: (isOn: boolean) => void
+}
+
+/** A setting that is on or off, as two choices side by side. */
+const SwitchGroup = ({ name, legend, isOn, onPick }: SwitchGroupProps) => (
+  <ChoiceRow
+    name={name}
+    legend={legend}
+    choices={[
+      {
+        key: SETTINGS_MENU_COPY.on,
+        label: SETTINGS_MENU_COPY.on,
+        isChecked: isOn,
+        onSelect: () => onPick(true),
+      },
+      {
+        key: SETTINGS_MENU_COPY.off,
+        label: SETTINGS_MENU_COPY.off,
+        isChecked: !isOn,
+        onSelect: () => onPick(false),
+      },
+    ]}
+  />
+)
+
 type AutoplayGroupProps = {
   name: string
   autoplay: boolean
@@ -281,24 +312,32 @@ type AutoplayGroupProps = {
 
 /** Whether what is up next starts by itself once the video ends. */
 const AutoplayGroup = ({ name, autoplay, onPickAutoplay }: AutoplayGroupProps) => (
-  <ChoiceRow
+  <SwitchGroup
     name={`${name}-autoplay`}
     legend={SETTINGS_MENU_COPY.autoplay}
-    choices={[
-      {
-        key: SETTINGS_MENU_COPY.on,
-        label: SETTINGS_MENU_COPY.on,
-        isChecked: autoplay,
-        onSelect: () => onPickAutoplay(true),
-      },
-      {
-        key: SETTINGS_MENU_COPY.off,
-        label: SETTINGS_MENU_COPY.off,
-        isChecked: !autoplay,
-        onSelect: () => onPickAutoplay(false),
-      },
-    ]}
+    isOn={autoplay}
+    onPick={onPickAutoplay}
   />
+)
+
+type QueueRowProps = { entry: QueueEntry; onPlay: (entry: QueueEntry) => void }
+
+/** One video of the queue: a press plays it, but for the one on screen. */
+const QueueRow = ({ entry, onPlay }: QueueRowProps) => (
+  <li>
+    <button
+      type="button"
+      className={styles.entry}
+      aria-current={entry.isCurrent}
+      disabled={entry.isCurrent}
+      onClick={() => onPlay(entry)}
+    >
+      <span className={styles.entryLabel}>{entry.label}</span>
+      <span className={styles.entryDetail}>
+        {entry.isCurrent ? SETTINGS_MENU_COPY.nowPlaying : entry.detail}
+      </span>
+    </button>
+  </li>
 )
 
 type MenuBodyProps = GroupProps & {
@@ -312,6 +351,8 @@ type MenuBodyProps = GroupProps & {
   onShowInfo: () => void
   onHandoff?: () => void
   handoffLabel?: string
+  queue: PlayerQueue | null
+  onPlayEntry: (entry: QueueEntry) => void
 }
 
 type PlaybackBodyProps = MenuBodyProps
@@ -358,10 +399,40 @@ const PlaybackBody = ({
   </>
 )
 
+type QueueBodyProps = MenuBodyProps
+
+/** The session's videos in the order they play, then whether the next starts itself and whether they are shuffled. */
+const QueueBody = ({
+  labelledBy,
+  name,
+  queue,
+  onPlayEntry,
+  autoplay,
+  onPickAutoplay,
+}: QueueBodyProps) => (
+  <>
+    <ol className={styles.queue} aria-labelledby={labelledBy}>
+      {(queue?.entries ?? []).map((entry) => (
+        <QueueRow key={entry.key} entry={entry} onPlay={onPlayEntry} />
+      ))}
+    </ol>
+    <AutoplayGroup name={name} autoplay={autoplay} onPickAutoplay={onPickAutoplay} />
+    {!!queue?.shuffle && (
+      <SwitchGroup
+        name={`${name}-shuffle`}
+        legend={SETTINGS_MENU_COPY.shuffle}
+        isOn={queue.shuffle.isOn}
+        onPick={queue.shuffle.set}
+      />
+    )}
+  </>
+)
+
 const MENU_BODIES = {
   [MENU_SECTIONS.audio]: AudioGroup,
   [MENU_SECTIONS.subtitles]: SubtitleGroup,
   [MENU_SECTIONS.playback]: PlaybackBody,
+  [MENU_SECTIONS.queue]: QueueBody,
 } as const satisfies Record<MenuSection, ComponentType<MenuBodyProps>>
 
 type SettingsMenuProps = {
@@ -383,12 +454,15 @@ type SettingsMenuProps = {
   onClose: () => void
   onHandoff?: () => void
   handoffLabel?: string
+  /** The session's videos, for the Queue menu; null where the video plays on its own. */
+  queue: PlayerQueue | null
+  onPlayEntry: (entry: QueueEntry) => void
 }
 
 /**
  * The menu a pill opens over the picture: the audio tracks, the subtitles
  * with the account's size and colour for them, or how the file is reaching the browser, with Playback info for the
- * detail, a host's handoff, and the speed and autoplay under them. Each choice is a
+ * detail, a host's handoff, and the speed and autoplay under them, or the queue with autoplay and shuffle. Each choice is a
  * native radio group, so the arrow keys, the space bar and screen readers
  * all work as they do anywhere else.
  */
@@ -410,6 +484,8 @@ export const SettingsMenu = ({
   onClose,
   onHandoff,
   handoffLabel,
+  queue,
+  onPlayEntry,
 }: SettingsMenuProps) => {
   const id = useId()
   const heading = `${id}-heading`
@@ -456,6 +532,8 @@ export const SettingsMenu = ({
             onShowInfo={onShowInfo}
             onHandoff={onHandoff}
             handoffLabel={handoffLabel}
+            queue={queue}
+            onPlayEntry={onPlayEntry}
           />
         </div>
       </dialog>

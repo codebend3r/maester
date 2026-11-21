@@ -16,10 +16,13 @@ const props = (overrides: Partial<ControlsProps> = {}): ControlsProps => ({
   subtitlesOn: true,
   menuOpen: false,
   settingsButton: createRef<HTMLButtonElement>(),
+  previous: null,
+  hasQueue: false,
   upNext: 'Busboys 2 (2027)',
   countdown: null,
   endsAt: 'Ends at 2:20 AM',
   onRestart: () => {},
+  onPrevious: () => {},
   onNext: () => {},
   onTogglePlay: () => {},
   onSeek: () => {},
@@ -45,6 +48,24 @@ describe('Controls', () => {
       'Forward 10 seconds (l)',
       'Next: Busboys 2 (2027)',
     ])
+  })
+
+  it('goes to the video before this one where the session has one', async () => {
+    const onRestart = mock(() => {})
+    const onPrevious = mock(() => {})
+    render(<Controls {...props({ previous: 'Busboys (2026)', onRestart, onPrevious })} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Previous: Busboys (2026)' }))
+    expect(onPrevious).toHaveBeenCalledTimes(1)
+    expect(onRestart).not.toHaveBeenCalled()
+  })
+
+  it('offers the Queue pill only to a session with a queue', async () => {
+    const onToggleMenu = mock(() => {})
+    const { rerender } = render(<Controls {...props({ onToggleMenu })} />)
+    expect(screen.queryByRole('button', { name: 'Queue' })).toBeNull()
+    rerender(<Controls {...props({ hasQueue: true, onToggleMenu })} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Queue' }))
+    expect(onToggleMenu).toHaveBeenCalledWith('queue')
   })
 
   it('goes back to the start and on to what is up next', async () => {

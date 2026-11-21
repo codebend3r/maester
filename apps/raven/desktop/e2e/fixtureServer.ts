@@ -48,6 +48,9 @@ import {
   FIXTURE_MEDIA,
   FIXTURE_TITLE_ITEMS,
   FIXTURE_TITLES,
+  dealtFor,
+  markersOf,
+  nextOf,
 } from '@/e2e/fixtureLibrary'
 import { API_PATHS } from '@/main/servers/allowlist'
 import { mediaItemFor } from '@/shared/test/mediaItem'
@@ -94,6 +97,8 @@ const MEDIA_ROUTES = {
   ticket: `${SERVER_METHODS.get} /ticket`,
   progress: `${SERVER_METHODS.put} /progress`,
   plays: `${SERVER_METHODS.post} /plays`,
+  next: `${SERVER_METHODS.get} /next`,
+  markers: `${SERVER_METHODS.get} /markers`,
 } as const
 
 export const FIXTURE_ADMIN_KINDS = {
@@ -269,6 +274,7 @@ const MEDIA_ROUTE = /^\/api\/media\/(\d+)(\/.*)?$/u
 const MP4_EXTENSION = '.mp4'
 const RANGE_OUTCOMES = { unsatisfiable: 'unsatisfiable' } as const
 const ITEM_ROUTE = /^\/api\/items\/(\d+)$/u
+const SHUFFLE_ROUTE = /^\/api\/items\/(\d+)\/shuffle$/u
 const PING_PATH = ROUTES.ping.path
 const LIBRARY_ROUTE = /^\/api\/libraries\/(\d+)$/u
 const SAGAS_PATH = byId(ROUTES.listSagas.path)(FIXTURE_ITEMS.library)
@@ -731,6 +737,10 @@ export const startFixtureServer = async ({
       case MEDIA_ROUTES.progress:
       case MEDIA_ROUTES.plays:
         return sendEmpty({ response, status: 204 })
+      case MEDIA_ROUTES.markers:
+        return sendJson({ response, status: 200, body: markersOf(mediaId) })
+      case MEDIA_ROUTES.next:
+        return sendJson({ response, status: 200, body: nextOf({ media: mediaItems, mediaId }) })
       default:
         return sendMissing(response)
     }
@@ -786,6 +796,11 @@ export const startFixtureServer = async ({
     const found = libraries.find(({ id }) => id === libraryId)
     if (found !== undefined) return () => sendJson({ response, status: 200, body: found })
     if (pathname === SAGAS_PATH) return () => answerSagas({ request, response })
+    const dealt = dealtFor({
+      media: mediaItems,
+      itemId: Number(SHUFFLE_ROUTE.exec(pathname)?.[1] ?? 0),
+    })
+    if (dealt !== null) return () => sendJson({ response, status: 200, body: dealt })
     const item = ITEM_ROUTE.exec(pathname)
     if (item === null) return null
     return () => answerItem({ request, response, itemId: Number(item[1]) })

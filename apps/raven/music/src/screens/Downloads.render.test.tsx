@@ -3,10 +3,20 @@ import { AUDIO_BITRATES, QUEUE_SOURCE_KINDS, formatBytes } from '@raven/core'
 import type * as Native from '@raven/native'
 import { RAVEN_SERVER } from '@raven/native/headless'
 import { useAudioQueue } from '@raven/ui/headless'
+import {
+  countsLineOf,
+  DOWNLOAD_BUTTON_COPY,
+  DOWNLOAD_COPY,
+  factsLineOf,
+  KIT_COPY,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  OFFLINE_COPY,
+  PLAYER_COPY,
+} from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import {
-  DOWNLOAD_COPY,
   DOWNLOAD_SOURCES,
   DOWNLOAD_STATUSES,
   type DownloadEntry,
@@ -14,9 +24,7 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
-import { LIBRARY_SEGMENTS, WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
-import { DOWNLOAD_BUTTON_COPY } from '@/components/copy'
-import { LIBRARY_PAGE_COPY, OFFLINE_COPY } from '@/screens/copy'
+import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
@@ -30,8 +38,6 @@ import {
 } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { KIT_COPY, PLAYER_COPY } from '@/ui/copy'
-import { countsLineOf, factsLineOf } from '@/ui/counts'
 
 const mockApi = musicApi()
 const playTracks = jest.fn<ReturnType<typeof useAudioQueue.getState>['playTracks']>()

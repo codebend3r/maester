@@ -2,7 +2,7 @@ import type { Track } from '@raven/core'
 import { IGNORED } from '@raven/native/headless'
 import { type ReactNode, useState } from 'react'
 
-import { DOWNLOAD_BUTTON_COPY } from '@/components/copy'
+import { DOWNLOAD_BUTTON_COPY } from '@raven/wren'
 import { DetailAction } from '@/components/DetailAction'
 import { type DownloadCollection, useDownloads } from '@/downloads/downloadStore'
 import { DOWNLOAD_PROGRESS, downloadProgressOf } from '@/downloads/downloadViews'

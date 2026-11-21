@@ -517,7 +517,7 @@ bunx nx run @raven/desktop:smoke:packaged # launches the packaged app, waits for
 bunx nx run @raven/desktop:e2e            # Playwright against electron .
 ```
 
-`smoke:packaged` runs the packaged app as a person would, with your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`, and refuses to start while another Raven runs. In the PR checks, the `🏗️ Build Mac app` job runs `make`, `audit:bundle` and `smoke:packaged` and uploads the app as `raven-player-darwin-arm64-<sha>`, and `🎬 E2E Mac` runs `e2e`.
+`smoke:packaged` runs the packaged app as a person would, with your own `~/Library/Application Support/raven` and `~/Library/Logs/raven`, and refuses to start while another Raven runs. In the PR checks, the `🏗️ Build Mac app` job runs `make`, `audit:bundle` and `smoke:packaged` and uploads the app as `raven-player-darwin-arm64-<sha>`. `🎬 E2E Mac` runs `e2e` on main, once the PR merges, on the native pieces the PR's checks built.
 
 ### Release it
 
@@ -570,6 +570,8 @@ A sideloaded APK has no expiry: reinstall only to update it.
 
 ### Test it end to end
 
+Which features each raven app's end to end suite covers, and where the gaps are, is a table of its own: [End to end coverage, app by app](docs/e2e-coverage.md).
+
 The Maestro flows in `apps/raven/app/e2e` sign in to a real raven server, then browse, search and play it. That server comes from the repo with a fixture library:
 
 ```bash
@@ -586,7 +588,7 @@ xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-ipho
 bun run app:e2e
 ```
 
-Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app's end to end notes](app/docs/end-to-end.md) have its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps there). In the PR checks, four jobs run on their own runners: `🏗️ Build Apple TV` builds the Apple TV simulator app and runs its remote flow against a fixture server, `🏗️ Build iPhone` builds the iPhone app and runs its flows against another fixture server, `🏗️ Build Android TV` builds the APK and runs the remote flows on an emulator against its own fixture server, and `🏗️ Build Android phone` builds the phone APK, with no flows yet. All four stand behind `🖥️ Desktop`.
+Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app's end to end notes](app/docs/end-to-end.md) have its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps there). In the PR checks, four jobs build on their own runners and upload what they built: `🏗️ Build Apple TV`, `🏗️ Build iPhone`, `🏗️ Build Android TV` and `🏗️ Build Android phone`. No flow runs on a PR. Once the PR merges, the push to main downloads those builds and runs `🎬 E2E Apple TV`, `🎬 E2E iPhone` and `🎬 E2E Android TV`, each against a fixture server of its own; the Android phone has no flows yet. [CI jobs](../../docs/ci-jobs.md#where-the-end-to-end-tests-run) has the detail.
 
 ## Layout
 

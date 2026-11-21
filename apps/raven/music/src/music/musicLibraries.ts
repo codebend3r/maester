@@ -1,13 +1,7 @@
-import type { Library } from '@raven/core'
+import { type Library, musicLibrariesOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 
 import type { WrenSession } from '@/useWren'
-import { musicLibrariesOf } from '@raven/core'
-
-/** What a page says when raven holds no music. */
-export const LIBRARY_COPY = {
-  noMusic: 'raven has no music library yet.',
-} as const
 
 const NO_LIBRARIES: readonly Library[] = []
 

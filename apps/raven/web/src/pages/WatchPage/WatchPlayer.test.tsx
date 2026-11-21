@@ -87,7 +87,16 @@ describe('Player escape feedback', () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(clipboard).toHaveBeenCalledWith(
@@ -104,7 +113,16 @@ describe('Player escape feedback', () => {
     })
     spies.push(clipboard)
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(
@@ -130,7 +148,16 @@ describe('Player file link on the media plane', () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     // The page sets its own origin as it mounts; this one stands for a proxied page's.
     act(() => useMediaOrigin.setState({ pick: { origin: lan, at: Date.now() } }))
@@ -158,7 +185,16 @@ describe('Player file link on the media plane', () => {
     )
     spies.push(spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {}))
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
       account: fakeAccount(),
     })
     // The page sets its own origin as it mounts; this one stands for a proxied page's.
@@ -180,7 +216,16 @@ describe('Player file link on the media plane', () => {
     const clipboard = spyOn(navigator.clipboard, 'writeText').mockImplementation(async () => {})
     spies.push(clipboard)
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await userEvent.click(await screen.findByRole('button', { name: 'Copy file link' }))
     expect(clipboard).toHaveBeenCalledWith(
@@ -203,7 +248,14 @@ describe('WatchPlayer Report this error', () => {
     renderWithProviders({
       ui: (
         <>
-          <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />
+          <Player
+            media={mediaItem()}
+            session={SINGLE}
+            upNext={[]}
+            played={[]}
+            shuffledFrom={null}
+            backTo="/libraries/2"
+          />
           <Toaster />
         </>
       ),
@@ -230,6 +282,8 @@ describe('Player progress', () => {
           media={mediaItem({ container: 'mp4', position: 600 })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -257,6 +311,8 @@ describe('Player progress', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -286,6 +342,8 @@ describe('Player history', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -311,6 +369,8 @@ describe('shared player capability module', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -338,6 +398,8 @@ describe('WatchPlayer up next', () => {
                 media={mediaItem({ container: 'mp4' })}
                 session={QUEUE}
                 upNext={upNext}
+                played={[]}
+                shuffledFrom={null}
                 backTo="/libraries/2"
               />
             }
@@ -383,7 +445,16 @@ describe('WatchPlayer title art', () => {
   it("heads an episode with its show's logo, linked to the show, its own title and number under it", async () => {
     const getItem = stubShow()
     renderWithProviders({
-      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={episode}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     const logo = await screen.findByRole('img', { name: 'Severance' })
     expect(logo.getAttribute('src') ?? '').toContain('/pictures/items/4/logo/l1')
@@ -396,7 +467,16 @@ describe('WatchPlayer title art', () => {
   it('draws the logo even when Settings spells titles out elsewhere', async () => {
     const getItem = stubShow()
     renderWithProviders({
-      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={episode}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
       display: { titles: TITLE_DISPLAYS.text },
     })
     expect(await screen.findByRole('img', { name: 'Severance' })).toBeInTheDocument()
@@ -409,7 +489,16 @@ describe('WatchPlayer title art', () => {
     )
     spies.push(getItem)
     renderWithProviders({
-      ui: <Player media={episode} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={episode}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await waitFor(() => expect(getItem).toHaveBeenCalledWith(4))
     expect(screen.queryByRole('img', { name: 'Severance' })).toBeNull()
@@ -436,6 +525,8 @@ describe('WatchPlayer sessions', () => {
                 media={mediaItem({ container: 'mp4' })}
                 session={show}
                 upNext={[]}
+                played={[]}
+                shuffledFrom={null}
                 backTo="/libraries/2"
               />
             }
@@ -479,7 +570,16 @@ describe('WatchPlayer sessions', () => {
         <Routes>
           <Route
             path="/"
-            element={<Player media={playing} session={season} upNext={[]} backTo="/libraries/2" />}
+            element={
+              <Player
+                media={playing}
+                session={season}
+                upNext={[]}
+                played={[]}
+                shuffledFrom={null}
+                backTo="/libraries/2"
+              />
+            }
           />
           <Route path="watch/:id" element={<WatchProbe />} />
         </Routes>
@@ -513,6 +613,8 @@ describe('WatchPlayer sessions', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -541,6 +643,8 @@ describe('WatchPlayer markers', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -582,7 +686,16 @@ describe('WatchPlayer Open in Raven', () => {
   it('offers nothing on Unplayable while this browser has not asked for it', async () => {
     setBrowserSupport(() => false)
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={SINGLE} upNext={[]} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await screen.findByRole('button', { name: 'Copy file link' })
     expect(screen.queryByRole('button', { name: 'Open in Raven' })).toBeNull()
@@ -595,6 +708,8 @@ describe('WatchPlayer Open in Raven', () => {
           media={mediaItem({ container: 'mp4' })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -614,6 +729,8 @@ describe('WatchPlayer Open in Raven', () => {
           media={mediaItem()}
           session={QUEUE}
           upNext={[mediaItem({ id: 8 }), mediaItem({ id: 9 })]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -647,6 +764,8 @@ describe('WatchPlayer Open in Raven', () => {
           media={mediaItem({ position: 600, duration: 7200 })}
           session={SINGLE}
           upNext={[]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -670,6 +789,8 @@ describe('WatchPlayer Open in Raven', () => {
           media={mediaItem({ container: 'mp4' })}
           session={QUEUE}
           upNext={[mediaItem({ id: 8 })]}
+          played={[]}
+          shuffledFrom={null}
           backTo="/libraries/2"
         />
       ),
@@ -700,7 +821,16 @@ describe('WatchPlayer Open in Raven', () => {
     )
     const upNext = [mediaItem({ id: 0 }), mediaItem({ id: 1.5 }), ...playable]
     renderWithProviders({
-      ui: <Player media={mediaItem()} session={QUEUE} upNext={upNext} backTo="/libraries/2" />,
+      ui: (
+        <Player
+          media={mediaItem()}
+          session={QUEUE}
+          upNext={upNext}
+          played={[]}
+          shuffledFrom={null}
+          backTo="/libraries/2"
+        />
+      ),
     })
     await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
     const next = playable.slice(0, PLAY_LINK_MAX_NEXT).map(({ id }) => id)

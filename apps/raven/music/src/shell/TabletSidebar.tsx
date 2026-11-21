@@ -1,16 +1,17 @@
+import {
+  HOME_COPY,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  SEARCH_COPY,
+  SETTINGS_COPY,
+} from '@raven/wren'
 import { type Href, usePathname, useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { WrenLockup } from '@/components/WrenLockup'
-import {
-  LIBRARY_SEGMENTS,
-  type LibrarySegment,
-  WREN_ROUTES,
-  collectionPathOf,
-  libraryHref,
-} from '@/routes'
-import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@/screens/copy'
+import { WREN_ROUTES, collectionPathOf, libraryHref } from '@/routes'
 import { type WrenTheme, themedStyles, useIsPortrait, useWrenTheme } from '@/theme/wrenTheme'
 import { FONTS, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'

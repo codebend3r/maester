@@ -1,14 +1,14 @@
 import type { ComponentType } from 'react'
 import { Pressable, Text, View } from 'react-native'
+import { KIT_COPY, SONG_LEADS, type SongLead, songLeadOf, type SongLeadOf } from '@raven/wren'
 
+import type { Cover } from '@/music/useCovers'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
-import { KIT_COPY } from '@/ui/copy'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { SONG_LEADS, type SongLead, type SongLeadOf, songLeadOf } from '@/ui/songLead'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -43,7 +43,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   },
 }))
 
-type LeadProps = { lead: SongLeadOf; isPlaying: boolean }
+type LeadProps = { lead: SongLeadOf<Cover>; isPlaying: boolean }
 
 function ArtLead({ lead }: LeadProps) {
   return (
@@ -86,7 +86,7 @@ type SongRowProps = {
   /** The track's length, "3:36". */
   duration: string
   /** What leads the row: its cover, or its number on its album's page. */
-  lead: SongLeadOf
+  lead: SongLeadOf<Cover>
   /** Whether this is the queue's track: its title in red and, numbered, the equalizer. */
   isCurrent?: boolean
   /** Whether the queue's track is playing rather than paused, so the equalizer moves. */

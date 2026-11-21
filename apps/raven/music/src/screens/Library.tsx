@@ -1,10 +1,17 @@
 import { formatBytes } from '@raven/core'
+import {
+  countsLineOf,
+  countValueOf,
+  factsLineOf,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  RECENT_SORTS,
+} from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { ScrollView, View } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { countText } from '@/screens/library/counts'
 import {
   useDownloadsSummary,
   usePlaylists,
@@ -12,15 +19,13 @@ import {
   useSongCount,
 } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
-import { LIBRARY_SEGMENTS, type LibrarySegment, WREN_ROUTES, libraryHref } from '@/routes'
+import { WREN_ROUTES, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
-import { RECENT_SORTS } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { AlbumTileOf } from '@/ui/AlbumTile'
-import { countsLineOf, factsLineOf } from '@/ui/counts'
 import { IconButton } from '@/ui/IconButton'
-import { NavigationRow } from '@/ui/NavigationRow'
+import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
 import { PageHeader } from '@/ui/PageHeader'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
@@ -52,20 +57,6 @@ const CATEGORIES = [
   { kind: LIBRARY_SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads, icon: ICONS.downloads },
 ] as const satisfies readonly Category[]
 
-type ValueOfProps = {
-  /** The count, or null while it is on its way or could not be read. */
-  n: number | null
-  /** What none reads as, when it is worth saying; left out otherwise. */
-  none?: string
-}
-
-/** A category's value: its count, "None yet" where that says something, or nothing at all. */
-const valueOf = ({ n, none }: ValueOfProps): string | undefined => {
-  if (n === null) return undefined
-  if (n === 0) return none
-  return countText(n)
-}
-
 type CategoryValuesProps = { session: WrenSession }
 
 /**
@@ -82,13 +73,13 @@ const useCategoryValues = ({
   const downloads = useDownloadsSummary(session.server.id)
   const downloaded = countsLineOf({ albums: downloads.albums, playlists: downloads.playlists })
   return {
-    [LIBRARY_SEGMENTS.playlists]: valueOf({
+    [LIBRARY_SEGMENTS.playlists]: countValueOf({
       n: playlists.data?.length ?? null,
       none: LIBRARY_PAGE_COPY.noneYet,
     }),
     [LIBRARY_SEGMENTS.artists]: undefined,
     [LIBRARY_SEGMENTS.albums]: undefined,
-    [LIBRARY_SEGMENTS.songs]: valueOf({ n: songs }),
+    [LIBRARY_SEGMENTS.songs]: countValueOf({ n: songs }),
     [LIBRARY_SEGMENTS.downloads]:
       downloaded === ''
         ? LIBRARY_PAGE_COPY.noneYet
@@ -149,6 +140,7 @@ function LibraryPage({ session }: LibraryPageProps) {
               label={category.label}
               onPress={() => router.push(libraryHref(category.kind))}
               value={values[category.kind]}
+              variant={NAVIGATION_ROW_VARIANTS.library}
             />
           </View>
         ))}

@@ -10,6 +10,7 @@ import {
   matching,
   nullable,
   object,
+  orElse,
   oneOf,
   optional,
   tagged,
@@ -37,6 +38,17 @@ describe('oneOf', () => {
     expect(isSize('medium')).toBe(false)
     expect(isSize('3')).toBe(false)
     expect(isSize.values).toEqual(['small', 'large', 3])
+  })
+})
+
+describe('orElse', () => {
+  const sizeOf = orElse({ guard: oneOf(['small', 'large']), fallback: 'small' })
+
+  it('reads a value its guard passes as itself, and anything else as the fallback', () => {
+    expect(sizeOf('large')).toBe('large')
+    expect(sizeOf('medium')).toBe('small')
+    expect(sizeOf(undefined)).toBe('small')
+    expect(sizeOf(['large'])).toBe('small')
   })
 })
 

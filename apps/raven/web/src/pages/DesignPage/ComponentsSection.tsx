@@ -90,10 +90,13 @@ const ControlsDemo = () => {
           }}
           menuOpen={false}
           settingsButton={settingsButton}
+          previous={null}
+          hasQueue={false}
           upNext={COPY.upNext}
           countdown={null}
           endsAt={COPY.endsAt}
           onRestart={noop}
+          onPrevious={noop}
           onNext={noop}
           onTogglePlay={() => setPaused((current) => !current)}
           onSeek={noop}

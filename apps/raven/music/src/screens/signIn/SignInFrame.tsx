@@ -2,8 +2,8 @@ import type { ComponentType, ReactNode } from 'react'
 import { KeyboardAvoidingView, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { SIGN_IN_COPY } from '@raven/wren'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup'
-import { SIGN_IN_COPY } from '@/screens/copy'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import {
   BRAND,

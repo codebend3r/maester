@@ -1,20 +1,65 @@
 import { type Artist, type Track, artistNames } from '@raven/core'
+import {
+  KIT_COPY,
+  SEARCH_COPY,
+  type SearchFilter,
+  TOP_RESULT_KINDS,
+  type TopResult,
+} from '@raven/wren'
 import { type ComponentType, type ReactNode } from 'react'
-import { FlatList, Pressable, Text, View } from 'react-native'
+import { FlatList, Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native'
 
 import type { Covers } from '@/music/useCovers'
-import { SEARCH_COPY } from '@/screens/copy'
-import { TOP_RESULT_KINDS, type TopResult } from '@/screens/search/topResult'
 import type { ResultActions } from '@/screens/search/useResultActions'
+import type { SearchResults as Results } from '@/screens/search/useSearchResults'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { SEARCH_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { FORM_FACTORS, SEARCH_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { ArtistAvatar } from '@/ui/ArtistAvatar'
+import { BUTTON_VARIANTS } from '@/ui/Button'
 import { Card } from '@/ui/Card'
-import { KIT_COPY } from '@/ui/copy'
+import { EmptyState } from '@/ui/EmptyState'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
+import { GRID_COLUMNS, type GridColumns } from '@/ui/TileGrid'
 import { ICONS } from '@/ui/WrenIcon'
+
+/** What every view of a search's results is handed. */
+export type ResultsProps = {
+  results: Results
+  query: string
+  filter: SearchFilter
+  onFilter: (filter: SearchFilter) => void
+  onClear: () => void
+  covers: Covers
+  actions: ResultActions
+  /** The scroller's padding, clear of the gutters and what sits under the page. */
+  contentStyle: StyleProp<ViewStyle>
+}
+
+// Album tiles to a row under the Albums chip, and in a tablet's All.
+export const ALBUM_COLUMNS = {
+  [FORM_FACTORS.phone]: GRID_COLUMNS[FORM_FACTORS.phone],
+  [FORM_FACTORS.tablet]: 4,
+} as const satisfies GridColumns
+
+/** Nothing matched, the whole search or the kind a chip narrowed it to, with a way to clear it. */
+export function NoMatches({ query, onClear, contentStyle }: ResultsProps) {
+  return (
+    <View style={contentStyle}>
+      <EmptyState
+        action={{
+          label: SEARCH_COPY.clearSearch,
+          onPress: onClear,
+          variant: BUTTON_VARIANTS.secondary,
+        }}
+        body={SEARCH_COPY.noMatchesHint}
+        icon={ICONS.search}
+        title={SEARCH_COPY.noMatches(query)}
+      />
+    </View>
+  )
+}
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   card: {
@@ -107,8 +152,8 @@ function TopSong({
   covers,
   actions,
 }: TopViewProps<typeof TOP_RESULT_KINDS.song>) {
-  const play = () =>
-    actions.playSongs({ tracks: songs, startAt: Math.max(0, songs.indexOf(track)) })
+  // The top song is always the first found (`topResultOf`).
+  const play = () => actions.playSongs({ tracks: songs, startAt: 0 })
   return (
     <TopCard
       art={<AlbumArt cover={covers.trackCoverOf(track)} size={SEARCH_SIZES.topResultArt} />}

@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
+import { HOME_COPY } from '@raven/wren'
 import type { Covers } from '@/music/useCovers'
-import { HOME_COPY } from '@/screens/copy'
 import { WREN_ROUTES } from '@/routes'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {

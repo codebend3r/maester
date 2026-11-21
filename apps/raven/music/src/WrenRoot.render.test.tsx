@@ -7,13 +7,13 @@ import { queryKeys, useAudioQueue } from '@raven/ui/headless'
 import { router } from 'expo-router'
 import { act, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 
+import { LIBRARY_PAGE_COPY } from '@raven/wren'
 import { DOWNLOAD_STATUSES, downloadKeyOf, useDownloads } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { AIRBAG, LISTENER, MIXTAPE, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 
 const mockApi = musicApi()
 

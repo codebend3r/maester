@@ -2,13 +2,14 @@ import type { Track } from '@raven/core'
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 import { View } from 'react-native'
+import { type SongLeadOf } from '@raven/wren'
 
-import { MENU_VIEWS, type MenuView, TrackMenu } from '@/components/TrackMenu'
+import type { Cover } from '@/music/useCovers'
+import { TrackMenu } from '@/components/TrackMenu'
 import { useDownloads } from '@/downloads/downloadStore'
 import { downloadedOf } from '@/downloads/downloadViews'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SPACE } from '@/theme/wrenTokens'
-import type { SongLeadOf } from '@/ui/songLead'
 import { SongRow } from '@/ui/SongRow'
 import { useWren } from '@/useWren'
 
@@ -30,7 +31,7 @@ const useIsDownloaded = (id: number): boolean => {
 type TrackRowProps = {
   track: Track
   /** Its number on its album's page, or its cover in a list of many albums' songs. */
-  lead: SongLeadOf
+  lead: SongLeadOf<Cover>
   /** What sits under the title: the artists, or nothing on their own album. */
   subtitle?: string | null
   length: string
@@ -59,10 +60,10 @@ export function TrackRow({
   onPress,
 }: TrackRowProps) {
   const styles = useStyles()
-  const [menu, setMenu] = useState<MenuView | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const isPlaying = useAudioQueue((store) => isCurrent && isPlayingOf(store))
   const isDownloaded = useIsDownloaded(track.id)
-  const openMenu = () => setMenu(MENU_VIEWS.actions)
+  const openMenu = () => setIsMenuOpen(true)
   return (
     <View style={isHighlighted && [styles.inset, isCurrent && styles.highlighted]}>
       <SongRow
@@ -78,7 +79,7 @@ export function TrackRow({
         subtitle={subtitle}
         title={track.title}
       />
-      {menu !== null && <TrackMenu onView={setMenu} track={track} view={menu} />}
+      {isMenuOpen && <TrackMenu onClose={() => setIsMenuOpen(false)} track={track} />}
     </View>
   )
 }

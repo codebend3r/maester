@@ -1,9 +1,9 @@
 import { Modal, Text, View } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
-import { KIT_COPY } from '@/ui/copy'
 import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({

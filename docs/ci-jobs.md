@@ -26,11 +26,11 @@ Rows 1, 2, 3 and 6 were measured while each of those jobs built the app and then
 | 14 | 🔦 Lighthouse | PR checks | 4m 13s | 0m 31s | 6m 19s | 66 | Yes | The pass, while the web app and the server are unchanged |
 | 15 | 🏗️ Build Windows app | PR checks, main native checks | 4m 07s | 2m 54s | 5m 36s | 76 | Partly | The app's build; not the installer, its audit or its smoke test |
 | 16 | 🧠 Evals | Sparrow evals | 3m 05s | 2m 49s | 3m 29s | 7 | Nightly | The last pass, on the nightly run; a run from the Actions tab always runs |
-| 17 | 🎬 E2E Mac | PR checks, main native checks | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
+| 17 | 🎬 E2E Mac | Main native checks | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
 | 18 | 🏗️ Build Windows native | PR checks, main native checks | 2m 31s | 1m 48s | 4m 40s | 80 | Yes | The libmpv fetch, the addon, its audit and the native tests |
 | 19 | 🧪 Tests | PR checks | 2m 07s | 0m 34s | 4m 34s | 71 | Yes | Each project's pass |
 | 20 | 🏗️ Build Mac app | PR checks, main native checks | 2m 05s | 1m 23s | 3m 15s | 67 | Partly | The app's build; not the packaged app, its audit or its smoke test |
-| 21 | 🌐 Web end to end | PR checks | 1m 30s | 0m 33s | 2m 40s | 67 | Yes | The pass, while the web app and the server are unchanged |
+| 21 | 🌐 Web end to end | Main native checks | 1m 30s | 0m 33s | 2m 40s | 67 | Yes | The pass, while the web app and the server are unchanged |
 | 22 | 🧪 Test Mac player | PR checks, main native checks | 1m 17s | 0m 30s | 2m 06s | 67 | Yes | The tests' pass |
 | 23 | 🗄️ Supabase | PR checks | 1m 11s | 0m 23s | 2m 01s | 76 | Yes | The Edge Function checks, and the database tests and lint with the stack they start |
 | 24 | 📸 Screen tests | PR checks | 1m 06s | 0m 20s | 2m 13s | 73 | Yes | Each project's pass |
@@ -40,6 +40,8 @@ Rows 1, 2, 3 and 6 were measured while each of those jobs built the app and then
 Every other job averages under a minute. Of those, the lint, format, type-check, spellcheck, dead code, dead CSS, repository rule and build jobs are Nx cached; the sparrow and rookery smoke tests and the version and release jobs run no Nx task.
 
 ## Where the end to end tests run
+
+No end to end suite runs on a pull request. A pull request's checks build each native app and upload the build as an artifact named for its head commit, so it hears back sooner; the push to main that merges it runs the suites (`main-native-checks.yml`). There, 🔎 Select affected native checks looks up the merged pull request's passing checks run (`scripts/find_pr_builds.sh`) and plans each group once (`scripts/plan_native_stage.sh`): whether to build it, whether to test it, and which run holds its builds. The end to end jobs download the pull request's builds, so main compiles nothing it was already handed. A group with no build to find (a push with no pull request, a manual run, an expired artifact, a group the pull request never built) is built on main first, as it was before. An end to end failure therefore shows after the merge, on main, where it emails the pusher. The times and the Workflow column of the build rows above predate this: those builds now run on main only as that fallback.
 
 Every suite runs in a job of its own. The device app's and Wren's run after the job that builds the app, on a second runner: the build job uploads the build as an artifact (the simulator app, or the APK; the Apple TV's also uploads the Xcode project and the remote test target), and the end to end job downloads it, boots the simulator or emulator, starts the fixture server and runs the flows. It sets up through the same `raven-app-setup` action with `compiles: false`, which leaves out the CocoaPods, Gradle and ccache caches and the NDK. A failed build skips its end to end job.
 
@@ -58,7 +60,7 @@ The step times are from the same 150 runs, when the device app's and Wren's suit
 - Wren's jobs (🏗️ Build Wren iPhone, its 🎬 E2E Wren iPhone, and 🏗️ Build Wren Android) run whenever a change touches Wren. The two build jobs ran once in those runs.
 - Android phones, Raven on Windows and Wren on the web have no end to end suite in CI: the first two jobs build and smoke-test only, and `@raven/music-web` has no e2e target.
 
-The device app's builds are one matrix (`app-build`) and its flows a second (`app-e2e`); Wren has the same pair (`music-build`, `music-e2e`). An end to end matrix starts once every row of its build matrix has finished, so the "Waits for" column names the build a row's artifact comes from, not the only job it waits for. 🔦 Lighthouse is a job of its own beside the checks matrix, so the build and the native jobs never wait for it.
+The native workflow has no matrix: each device is a build job named for it (`build-iphone`) and, where it has flows, an end to end job (`e2e-iphone`) that waits for that build alone, so one slow device never holds another's flows. What a device needs is its job's `APP_*` variables; the builds share one list of steps, and the end to end jobs share theirs. 🔦 Lighthouse is a job of its own beside the checks matrix, so the build and the native jobs never wait for it.
 
 The four end to end jobs that follow a build are new, with no run to time yet:
 

@@ -29,6 +29,7 @@ const MENU_ICONS = {
   subtitles: 'captions',
   audio: 'headphones',
   playback: 'settings',
+  queue: 'list',
 } as const satisfies Record<MenuSection, IconName>
 
 type ControlButtonProps = {
@@ -180,6 +181,10 @@ export type ControlsProps = {
   menuOpen: MenuSection | false
   /** Held by the open menu's pill, for focus to go back to when the menu closes. */
   settingsButton: RefObject<HTMLButtonElement | null>
+  /** What played before this, by name; null, the button goes back to the start. */
+  previous: string | null
+  /** Whether the session has a queue for the Queue pill to open. */
+  hasQueue: boolean
   /** What is up next, by name; null with nothing to play after this. */
   upNext: string | null
   /** How far the countdown to what is up next has run, 0 to 1; null while none runs. */
@@ -192,6 +197,7 @@ export type ControlsProps = {
    */
   endsAt: string | null
   onRestart: () => void
+  onPrevious: () => void
   onNext: () => void
   onTogglePlay: () => void
   onSeek: (time: number) => void
@@ -206,9 +212,9 @@ export type ControlsProps = {
 /**
  * The bar along the bottom: the up next card at its right while it shows,
  * the time played beside the timeline, then the
- * transport (back to the start, back 10 seconds, play, forward 10 seconds,
- * next) and the video's length or end time on the left, and volume and glass
- * icon pills for subtitles, audio, quality and full screen on the right.
+ * transport (the video before this one or back to the start, back 10 seconds, play,
+ * forward 10 seconds, next) and the video's length or end time on the left, and volume and glass
+ * icon pills for subtitles, audio, quality, the queue and full screen on the right.
  */
 export const Controls = ({
   shown,
@@ -225,11 +231,14 @@ export const Controls = ({
   menuValues = {},
   menuOpen,
   settingsButton,
+  previous,
+  hasQueue,
   upNext,
   countdown,
   card,
   endsAt,
   onRestart,
+  onPrevious,
   onNext,
   onTogglePlay,
   onSeek,
@@ -246,7 +255,11 @@ export const Controls = ({
       (subtitlesOn ? CONTROLS_COPY.subtitlesOn : CONTROLS_COPY.subtitlesOff),
     audio: menuValues.audio ?? null,
     playback: menuValues.playback ?? null,
+    queue: menuValues.queue ?? null,
   }
+  const sections = Object.values(MENU_SECTIONS).filter(
+    (section) => hasQueue || section !== MENU_SECTIONS.queue,
+  )
   const fullscreenLabel = fullscreen ? CONTROLS_COPY.exitFullScreen : CONTROLS_COPY.fullScreen
   return (
     <div
@@ -263,7 +276,11 @@ export const Controls = ({
           onSeek={onSeek}
         />
       </div>
-      <ControlButton label={CONTROLS_COPY.restart} onClick={onRestart} className={styles.restart}>
+      <ControlButton
+        label={previous == null ? CONTROLS_COPY.restart : CONTROLS_COPY.previous(previous)}
+        onClick={previous == null ? onRestart : onPrevious}
+        className={styles.restart}
+      >
         <Icon name="skipPrevious" size={22} />
       </ControlButton>
       <ControlButton label={CONTROLS_COPY.back} onClick={() => onSkip(-1)} className={styles.back}>
@@ -312,7 +329,7 @@ export const Controls = ({
         )}
       </div>
       <div className={styles.pills}>
-        {Object.values(MENU_SECTIONS).map((section) => (
+        {sections.map((section) => (
           <MenuPill
             key={section}
             section={section}

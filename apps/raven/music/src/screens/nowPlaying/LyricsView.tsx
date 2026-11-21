@@ -1,16 +1,18 @@
-import { LYRICS_KINDS, type LyricLine, type Lyrics, activeLineAt } from '@raven/core'
+import { type LyricLine, activeLineAt } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
+import {
+  LYRIC_TONES,
+  lyricOffsetOf,
+  type LyricTone,
+  lyricToneOf,
+  NOW_PLAYING_COPY,
+  SHOWN_LYRICS_KINDS,
+  type ShownLyrics,
+} from '@raven/wren'
 import { type ComponentType, useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, type ScrollViewInstance, Text, View } from 'react-native'
 import { useReducedMotion } from 'react-native-reanimated'
 
-import { NOW_PLAYING_COPY } from '@/screens/copy'
-import {
-  LYRIC_TONES,
-  type LyricTone,
-  lyricOffsetOf,
-  lyricToneOf,
-} from '@/screens/nowPlaying/nowPlayingModel'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { OPACITIES, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
@@ -108,29 +110,21 @@ function SyncedLines({ lines }: SyncedLinesProps) {
   )
 }
 
-/** What the lyrics pane is showing: lines to follow, words as they are, none, or still reading. */
-const LYRICS_STATES = { ...LYRICS_KINDS, loading: 'loading' } as const
+type LyricsKind = ShownLyrics['kind']
 
-type LyricsState = (typeof LYRICS_STATES)[keyof typeof LYRICS_STATES]
+type LyricsOfProps<K extends LyricsKind> = { lyrics: ShownLyrics & { kind: K } }
 
-type LyricsOfProps = { lyrics: Lyrics | null }
-
-function SyncedLyrics({ lyrics }: LyricsOfProps) {
-  return (
-    lyrics !== null && lyrics.kind === LYRICS_KINDS.synced && <SyncedLines lines={lyrics.lines} />
-  )
+function SyncedLyrics({ lyrics }: LyricsOfProps<typeof SHOWN_LYRICS_KINDS.synced>) {
+  return <SyncedLines lines={lyrics.lines} />
 }
 
 /** The words as they are, with no times to follow. */
-function PlainLyrics({ lyrics }: LyricsOfProps) {
+function PlainLyrics({ lyrics }: LyricsOfProps<typeof SHOWN_LYRICS_KINDS.plain>) {
   const styles = useStyles()
   return (
-    lyrics !== null &&
-    lyrics.kind === LYRICS_KINDS.plain && (
-      <ScrollView contentContainerStyle={styles.lines} style={styles.scroller}>
-        <Text style={styles.plain}>{lyrics.text}</Text>
-      </ScrollView>
-    )
+    <ScrollView contentContainerStyle={styles.lines} style={styles.scroller}>
+      <Text style={styles.plain}>{lyrics.text}</Text>
+    </ScrollView>
   )
 }
 
@@ -149,17 +143,20 @@ function ReadingLyrics() {
   return <View style={styles.scroller} />
 }
 
+type LyricsViews = { [K in LyricsKind]: ComponentType<LyricsOfProps<K>> }
+
 const LYRICS_VIEWS = {
-  [LYRICS_STATES.synced]: SyncedLyrics,
-  [LYRICS_STATES.plain]: PlainLyrics,
-  [LYRICS_STATES.none]: NoLyrics,
-  [LYRICS_STATES.loading]: ReadingLyrics,
-} as const satisfies Record<LyricsState, ComponentType<LyricsOfProps>>
+  [SHOWN_LYRICS_KINDS.synced]: SyncedLyrics,
+  [SHOWN_LYRICS_KINDS.plain]: PlainLyrics,
+  [SHOWN_LYRICS_KINDS.none]: NoLyrics,
+  [SHOWN_LYRICS_KINDS.reading]: ReadingLyrics,
+} as const satisfies LyricsViews
 
-type LyricsViewProps = { lyrics: Lyrics | null }
+// Typed as the mapped type, so a kind looks up the view that takes that kind's lyrics.
+const LYRICS: LyricsViews = LYRICS_VIEWS
 
-/** The song's words: synced lines a press plays from, plain words, or that it has none. */
-export function LyricsView({ lyrics }: LyricsViewProps) {
-  const Shown = LYRICS_VIEWS[lyrics?.kind ?? LYRICS_STATES.loading]
+/** The song's words: synced lines a press plays from, plain words, that it has none, or nothing yet while they are read. */
+export function LyricsView<K extends LyricsKind>({ lyrics }: LyricsOfProps<K>) {
+  const Shown: ComponentType<LyricsOfProps<K>> = LYRICS[lyrics.kind]
   return <Shown lyrics={lyrics} />
 }

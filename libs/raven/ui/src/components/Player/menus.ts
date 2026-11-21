@@ -3,6 +3,7 @@ export const MENU_SECTIONS = {
   subtitles: 'subtitles',
   audio: 'audio',
   playback: 'playback',
+  queue: 'queue',
 } as const
 
 export type MenuSection = (typeof MENU_SECTIONS)[keyof typeof MENU_SECTIONS]
@@ -12,6 +13,7 @@ export const MENU_TITLES = {
   subtitles: 'Subtitles',
   audio: 'Audio',
   playback: 'Playback',
+  queue: 'Queue',
 } as const satisfies Record<MenuSection, string>
 
 export const isMenuSection = (value: unknown): value is MenuSection =>

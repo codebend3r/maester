@@ -6,7 +6,6 @@ import {
   PLAYER_EVENTS,
   PLAYER_REFUSAL_REASONS,
   PLAYER_SOURCE_KINDS,
-  type PlayerCommand,
 } from '@raven/core'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import { containerOf } from '@/e2e/fixtureServer'
@@ -21,15 +20,17 @@ import {
   watchedPercent,
   withApp,
 } from '@/e2e/harness'
-import { postOnPort, tapPlayerPort, trafficOf } from '@/e2e/playerPort'
+import { lastReplyOf, postOnPort, repliesTo, tapPlayerPort, trafficOf } from '@/e2e/playerPort'
 import { episodeGroup, playDownload, seedDownloads } from '@/e2e/seedDownloads'
 import {
+  PLAYER_MENUS,
   clockOf,
   distanceFrom,
   expectButton,
   expectClockAdvancing,
   expectNative,
   expectPlayingNatively,
+  openMenu,
   wake,
 } from '@/e2e/playerView'
 import { mediaPathFor } from '@/main/downloads/space'
@@ -74,21 +75,6 @@ const expectLeftPlayer = async (page: Page) => {
   await expectOffline({ page })
   await expect(page.locator('html')).not.toHaveAttribute('data-surface', 'native')
 }
-
-type RepliesToProps = { page: Page; type: PlayerCommand['type'] }
-
-/** The reply to each request of `type` the page sent, in order; null for one not answered yet. */
-const repliesTo = async ({ page, type }: RepliesToProps) => {
-  const { requests, replies } = await trafficOf({ page })
-  return requests
-    .filter((sent) => sent.command.type === type)
-    .map((sent) => replies.find((reply) => reply.id === sent.id) ?? null)
-}
-
-type LastReplyOfProps = { page: Page; type: PlayerCommand['type'] }
-
-const lastReplyOf = async ({ page, type }: LastReplyOfProps) =>
-  (await repliesTo({ page, type })).at(-1) ?? null
 
 /** The volume, in whole percent, of the last volume command the page sent mpv; null before any. */
 const lastVolumeSent = async (page: Page): Promise<number | null> => {
@@ -141,15 +127,6 @@ const backgroundOf = (app: ElectronApplication): Promise<string | null> =>
 
 const audioGroup = (page: Page) => page.getByRole('group', { name: 'Audio' })
 const subtitleGroup = (page: Page) => page.getByRole('group', { name: 'Subtitles' })
-
-type OpenMenuProps = { page: Page; name: 'Audio' | 'Subtitles' }
-
-/** Opens the menu behind the Audio or Subtitles pill, whose radios are named for it. */
-const openMenu = async ({ page, name }: OpenMenuProps) => {
-  await wake(page)
-  await page.getByRole('button', { name: new RegExp(`^${name}`) }).click()
-  await expect(page.getByRole('group', { name })).toBeVisible()
-}
 
 test.describe.serial('playing a download through mpv', () => {
   let userData = ''
@@ -267,7 +244,7 @@ test.describe.serial('playing a download through mpv', () => {
       run: async ({ page }) => {
         await tapPlayerPort({ page })
         await playNatively({ page, title: LABELS.tracks })
-        await openMenu({ page, name: 'Audio' })
+        await openMenu({ page, menu: PLAYER_MENUS.audio })
         await expect(audioGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
 
         await audioGroup(page).getByRole('radio', { name: 'French' }).check()
@@ -276,7 +253,7 @@ test.describe.serial('playing a download through mpv', () => {
           .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.audio }))
           .toMatchObject({ ok: true })
 
-        await openMenu({ page, name: 'Subtitles' })
+        await openMenu({ page, menu: PLAYER_MENUS.subtitles })
         await expect(subtitleGroup(page).getByRole('radio', { name: 'Off' })).toBeChecked()
         await subtitleGroup(page).getByRole('radio', { name: 'English' }).check()
         await expect(subtitleGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
@@ -312,9 +289,9 @@ test.describe.serial('playing a download through mpv', () => {
           audio: 1,
           subtitle: 'embedded-0',
         })
-        await openMenu({ page, name: 'Audio' })
+        await openMenu({ page, menu: PLAYER_MENUS.audio })
         await expect(audioGroup(page).getByRole('radio', { name: 'French' })).toBeChecked()
-        await openMenu({ page, name: 'Subtitles' })
+        await openMenu({ page, menu: PLAYER_MENUS.subtitles })
         await expect(subtitleGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
       },
     })

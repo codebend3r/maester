@@ -1,15 +1,9 @@
+import { APPEARANCES, RECENT_SORTS, WREN_PREFS_KEY } from '@raven/wren'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
 
-import {
-  APPEARANCES,
-  DEFAULT_WREN_PREFS,
-  RECENT_SORTS,
-  WREN_PREFS_KEY,
-  configureWrenPrefs,
-  useWrenPrefs,
-} from '@/stores/wrenPrefs'
+import { DEFAULT_WREN_PREFS, configureWrenPrefs, useWrenPrefs } from '@/stores/wrenPrefs'
 
 type MemoryStorageProps = { entries?: [string, string][] }
 

@@ -1,37 +1,22 @@
-import {
-  AUDIO_BITRATES,
-  type AudioBitrate,
-  isAudioBitrate,
-  isRecord,
-  nullable,
-  oneOf,
-} from '@raven/core'
+import { AUDIO_BITRATES, type AudioBitrate, isAudioBitrate, isRecord, nullable } from '@raven/core'
 import { loadPersisted } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
+import {
+  APPEARANCES,
+  type Appearance,
+  RECENT_SORTS,
+  type RecentSort,
+  WREN_PREFS_KEY,
+  isAppearance,
+  isRecentSort,
+} from '@raven/wren'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
-
-/** The key Wren's preferences are stored under in AsyncStorage. */
-export const WREN_PREFS_KEY = 'wren.prefs'
 
 /** The storage limits Settings offers, in gigabytes; null is no limit. */
 export const STORAGE_LIMITS_GB = [null, 2, 5, 10, 20] as const
 
 type StorageLimitGb = (typeof STORAGE_LIMITS_GB)[number]
-
-/** How Wren picks its palette: the system's, or always light or dark. */
-export const APPEARANCES = { system: 'system', light: 'light', dark: 'dark' } as const
-
-export type Appearance = (typeof APPEARANCES)[keyof typeof APPEARANCES]
-
-const isAppearance = oneOf(Object.values(APPEARANCES))
-
-/** What makes an album recent on Home: when it was added, or when it came out. */
-export const RECENT_SORTS = { added: 'added', release: 'release' } as const
-
-export type RecentSort = (typeof RECENT_SORTS)[keyof typeof RECENT_SORTS]
-
-const isRecentSort = oneOf(Object.values(RECENT_SORTS))
 
 const isStorageLimitGb = (value: unknown): value is StorageLimitGb =>
   STORAGE_LIMITS_GB.some((limit) => limit === value)

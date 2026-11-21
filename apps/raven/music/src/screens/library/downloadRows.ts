@@ -1,10 +1,9 @@
 import { type Track, artistNames, playlistFactsOf } from '@raven/core'
 import { BROWSE_KINDS, type BrowseTarget, browseIdOf } from '@raven/native/headless'
 
+import { COUNTS_COPY, countsLineOf, factsLineOf } from '@raven/wren'
 import { type DownloadsValues, downloadKeyOf, usedBytesOf } from '@/downloads/downloadStore'
 import { downloadedLibraryOf } from '@/downloads/downloadViews'
-import { countsLineOf, factsLineOf } from '@/ui/counts'
-import { COUNTS_COPY } from '@/ui/copy'
 
 /** One downloaded album or playlist as its row shows it, and what it plays. */
 export type DownloadedRow = {

@@ -10,7 +10,7 @@ import {
   UPCOMING_SHOWS,
 } from '@/e2e/fixtureRequests'
 import { runFixture } from '@/e2e/fixtureRun'
-import { encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
+import { addChapters, encodeClip, encodeRichClip, encodeTrack } from '@/test/clips'
 import { fakeTmdb } from '@/test/fakeTmdb'
 
 /**
@@ -18,7 +18,7 @@ import { fakeTmdb } from '@/test/fakeTmdb'
  * `apps/raven/music/e2e`): an open film library holding a movie, an open series library holding
  * two episodes and an open music library holding a three track FLAC album, with media tickets on. The movie and the first episode are MKVs, which an Apple
  * device plays through the server's HLS remux; the second episode is an MP4 with an English
- * sidecar, which it plays as it is. Both are matched against a fake TMDB, which knows no
+ * and a Spanish sidecar and a chapter naming its intro, which it plays as it is. Both are matched against a fake TMDB, which knows no
  * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
  * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
  * It listens on a fixed port (`runFixture`). The web's browser suite starts it on a port of its
@@ -33,6 +33,7 @@ const FIXTURE = {
     file: 'Lantern Bay - S01E01 - Low Tide.mkv',
     direct: 'Lantern Bay - S01E02 - High Water.mp4',
     sidecar: 'Lantern Bay - S01E02 - High Water.en.srt',
+    secondSidecar: 'Lantern Bay - S01E02 - High Water.es.srt',
   },
   album: {
     folder: join(FIXTURE_SERVER.album.artist, FIXTURE_SERVER.album.title),
@@ -71,7 +72,23 @@ const tmdb = fakeTmdb({
 const CUES = ['1', '00:00:02,000 --> 00:00:05,000', 'The tide is turning.', ''].join('\n')
 
 /** The sidecar's one cue lasts nearly all of the clip, so a player paused anywhere shows it. */
-const SIDECAR_CUES = ['1', '00:00:01,000 --> 00:00:58,000', 'The water is rising.', ''].join('\n')
+const SIDECAR_CUES = [
+  '1',
+  '00:00:01,000 --> 00:00:58,000',
+  FIXTURE_SERVER.show.cues.english,
+  '',
+].join('\n')
+
+/** The same stretch in a second language, so a player has two subtitle tracks to switch between. */
+const SPANISH_CUES = [
+  '1',
+  '00:00:01,000 --> 00:00:58,000',
+  FIXTURE_SERVER.show.cues.spanish,
+  '',
+].join('\n')
+
+/** How long the second episode runs, in seconds. */
+const DIRECT_SECONDS = 60
 
 const fixtureWebDir = process.env[FIXTURE_SERVER.env.webDir]?.trim() ?? ''
 
@@ -86,6 +103,8 @@ await runFixture({
     const shows = join(media, 'shows')
     const music = join(media, 'music')
     const { album } = FIXTURE
+    const direct = join(shows, FIXTURE.show.folder, FIXTURE.show.direct)
+    const { intro } = FIXTURE_SERVER.show
     await Promise.all([
       ...FIXTURE_SERVER.album.tracks.map((title, index) =>
         encodeTrack({
@@ -100,9 +119,21 @@ await runFixture({
         cues: CUES,
       }),
       encodeRichClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.file), cues: CUES }),
-      encodeClip({ path: join(shows, FIXTURE.show.folder, FIXTURE.show.direct), seconds: 60 }),
+      encodeClip({ path: direct, seconds: DIRECT_SECONDS }),
     ])
-    await writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.sidecar), SIDECAR_CUES)
+    // A chapter named for the intro is all the scan needs to offer Skip intro on it.
+    await addChapters({
+      path: direct,
+      chapters: [
+        { start: 0, end: intro.start, title: 'Cold open' },
+        { start: intro.start, end: intro.end, title: 'Intro' },
+        { start: intro.end, end: DIRECT_SECONDS, title: 'Episode' },
+      ],
+    })
+    await Promise.all([
+      writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.sidecar), SIDECAR_CUES),
+      writeFile(join(shows, FIXTURE.show.folder, FIXTURE.show.secondSidecar), SPANISH_CUES),
+    ])
     return [
       {
         name: FIXTURE_SERVER.movie.library,

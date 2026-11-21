@@ -236,6 +236,57 @@
   }
 }
 
+// The session's videos, one a row, in the order they play.
+.queue {
+  display: grid;
+  gap: var(--space-hair);
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--color-on-picture-hairline);
+  list-style: none;
+}
+
+// A row like the options under it: the title over its place in the season.
+.entry {
+  display: grid;
+  grid-template-areas:
+    'label'
+    'detail';
+  width: 100%;
+  padding: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-on-picture);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-on-picture) 10%, transparent);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: -2px;
+  }
+
+  // The one on screen is marked, not pressed.
+  &[aria-current='true'] {
+    background: color-mix(in srgb, var(--color-on-picture) 16%, transparent);
+    cursor: default;
+  }
+}
+
+.entryLabel {
+  grid-area: label;
+}
+
+.entryDetail {
+  grid-area: detail;
+  color: var(--color-on-picture-soft);
+  font-size: var(--font-size-xs);
+}
+
 @media (max-width: 30rem) {
   .layer {
     padding: var(--space-3) var(--space-3) calc(var(--space-9) + var(--space-7));

@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  /*
+   * No `browser` or `node` env on purpose: Wren's phone app and its web app both read this
+   * library, so it may only lean on what every JavaScript runtime has.
+   */
+  "extends": ["../../../tooling/oxlint/base.json"],
+  "rules": {
+    "no-console": "error"
+  },
+  "ignorePatterns": ["dist"],
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

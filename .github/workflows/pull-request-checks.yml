@@ -4,10 +4,11 @@ name: 🧪 Pull request checks
 # on each push to its branch. Each check runs on the projects the PR affects (a
 # change to this workflow runs every check on every project), and beside them the
 # production images are built and health checked. Once the checks pass, the native and
-# desktop builds and flows the PR affects run too (native-checks.yml, shared with
-# main-native-checks.yml) and ✅ Checks waits for them, so a device flow a change
-# breaks is seen on the PR, never first on main. Merges to main are also covered
-# by main-smoke-test.yml.
+# desktop builds the PR affects run too (native-checks.yml's `build` stage) and ✅ Checks
+# waits for them. No end to end suite runs here, so a PR hears back sooner: each build is
+# uploaded as an artifact, and the push to main that merges the PR runs the end to end
+# suites on those builds (main-native-checks.yml), where a failure emails the pusher.
+# Merges to main are also covered by main-smoke-test.yml.
 on:
   pull_request:
 
@@ -25,9 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The checks `bun run verify` runs before the build, and the web's browser end to end
-  # suite, which `verify` leaves out, one target per runner so they execute in parallel and
-  # each has its own named log. Nx Cloud still shares completed tasks between jobs through
+  # The checks `bun run verify` runs before the build, one target per runner so they execute
+  # in parallel and each has its own named log. Nx Cloud still shares completed tasks between jobs through
   # its remote cache.
   checks:
     name: ${{ matrix.check.name }}
@@ -66,17 +66,6 @@ jobs:
           - name: 📸 Screen tests
             target: test:screens
             node: true
-          # raven's web app in Google Chrome, which the runner image has, against the server's
-          # fixture, which encodes its clips with ffmpeg. Run on every PR, not only where
-          # `@raven/web` is affected: the suite drives the server too, which the web does not
-          # depend on in the project graph, and the target's inputs name the server's sources,
-          # so Nx restores it from the cache when neither changed.
-          - name: 🌐 Web end to end
-            target: e2e:browser
-            everywhere: true
-            ffmpeg: true
-            traces: apps/raven/web/test-results
-            artifact: e2e-traces
           # The repository rules a linter cannot hold. lefthook's pre-push runs the first three,
           # which are here so a push without the hooks, or an edit on GitHub, meets them; dead
           # code and dead CSS run only here.
@@ -149,22 +138,12 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           TARGET: ${{ matrix.check.target }}
-          EVERYWHERE: ${{ matrix.check.everywhere == true }}
         run: |
-          if [ "$EVERYWHERE" != true ] && git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
+          if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
             bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t "$TARGET"
           else
             bunx nx run-many --outputStyle=static -t "$TARGET"
           fi
-
-      # Playwright keeps a failed test's trace, which shows each step's page.
-      - name: 📤 Upload the traces
-        if: failure() && matrix.check.traces
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.check.artifact }}-${{ github.sha }}
-          path: ${{ matrix.check.traces }}
-          if-no-files-found: ignore
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.
@@ -285,11 +264,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # The native builds and flows the PR affects, on its head commit. The shared workflow selects
-  # the groups the PR touches against its base (raven's device app, Wren, the desktop) and runs
-  # those alone. It starts after the cheap checks, so a lint or test failure stops the run before
+  # The native builds the PR affects, on its head commit, with no end to end flow: the shared
+  # workflow's `build` stage selects the groups the PR touches against its base (raven's device
+  # app, Wren, the desktop), builds those alone and uploads each build for main's run to test. It starts after the cheap checks, so a lint or test failure stops the run before
   # a macOS runner starts, and so the jobs Nx Cloud counts at once stay within what it includes.
-  # A failing selection or flow cancels the run, as a check does.
+  # A failing selection or build cancels the run, as a check does.
   native:
     name: 🧱 Native apps
     needs: checks
@@ -299,6 +278,7 @@ jobs:
     uses: ./.github/workflows/native-checks.yml
     with:
       sha: ${{ github.event.pull_request.head.sha }}
+      stage: build
       base: ${{ github.event.pull_request.base.sha }}
     secrets: inherit
 

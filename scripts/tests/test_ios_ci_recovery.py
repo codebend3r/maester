@@ -29,8 +29,8 @@ def test_ios_retry_only_recovers_screenshot_driver_crash(
     workflow = (ROOT / ".github/workflows/native-checks.yml").read_text()
     step = workflow.split("      - name: 🎬 Flows on the simulator\n", 1)[1]
     block = step.split("        run: |\n", 1)[1].split("\n      #", 1)[0]
-    # The runner fills the row's flows in before bash reads the script.
-    block = block.replace("${{ matrix.app.flows }}", "bun run app:e2e")
+    # The runner fills the device's flows in before bash reads the script.
+    block = block.replace("${{ env.APP_FLOWS }}", "bun run app:e2e")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     logs = tmp_path / ".maestro/tests"
@@ -54,7 +54,7 @@ def test_ios_retry_only_recovers_screenshot_driver_crash(
             **os.environ,
             "HOME": str(tmp_path),
             "RUNNER_TEMP": str(tmp_path),
-            "SIMULATOR": "raven-phone",
+            "APP_SIMULATOR": "raven-phone",
             "PATH": f"{bin_dir}:/usr/bin:/bin",
         },
         capture_output=True,

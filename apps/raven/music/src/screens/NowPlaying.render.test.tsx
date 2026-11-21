@@ -6,15 +6,14 @@ import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
+import { NOW_PLAYING_COPY, PLAYER_COPY } from '@raven/wren'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
 import { ROW_ACTIONS } from '@/screens/nowPlaying/QueueRow'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, AUDIOBOOKS, LISTENER, PARANOID, musicApi, trackFor } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 const seekTo = jest.fn<ReturnType<typeof useAudioQueue.getState>['seekTo']>()

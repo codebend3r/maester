@@ -1,10 +1,10 @@
 import { Pressable, Text, View } from 'react-native'
 
+import { countsLineOf } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { ArtistAvatar } from '@/ui/ArtistAvatar'
-import { countsLineOf } from '@/ui/counts'
 import { pressedStyleOf } from '@/ui/press'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({

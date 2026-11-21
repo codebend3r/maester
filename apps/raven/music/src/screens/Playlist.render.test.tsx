@@ -4,14 +4,13 @@ import type * as Native from '@raven/native'
 import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
+import { PLAYER_COPY, PLAYLIST_COPY } from '@raven/wren'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { LISTENER, MIXTAPE, MIXTAPE_PAGE, musicApi } from '@/test/music'
 import { WREN_PAGES } from '@/routes'
-import { PLAYLIST_COPY } from '@/screens/copy'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 const playTracks = jest.fn<ReturnType<typeof useAudioQueue.getState>['playTracks']>()

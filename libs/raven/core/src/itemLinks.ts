@@ -10,7 +10,7 @@ import {
 } from '@/contract'
 import { primaryVersion } from '@/items'
 import { toQueryString } from '@/query'
-import { type Infer, object } from '@/schema'
+import { type Infer, object, optional } from '@/schema'
 
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
@@ -180,8 +180,18 @@ export const sessionOf = (media: MediaItem): ViewingSession =>
 /**
  * What a link to the player hands over in router state: the video, the
  * session it plays in, and for a queue the videos a shuffle dealt after it.
+ * A session that keeps no order of its own (a queue, a shuffle) also carries
+ * the videos `played` before this one, oldest first, for Previous to go back
+ * through, and a queue dealt from inside the player the session it was
+ * `shuffledFrom`, for turning the shuffle off again.
  */
-const isWatchState = object({ media: isMediaItem, session: isViewingSession, upNext: isMediaList })
+const isWatchState = object({
+  media: isMediaItem,
+  session: isViewingSession,
+  upNext: isMediaList,
+  played: optional(isMediaList),
+  shuffledFrom: optional(isViewingSession),
+})
 
 export type WatchState = Infer<typeof isWatchState>
 
@@ -195,21 +205,34 @@ type WatchLinkProps = {
   media: MediaItem
   session?: ViewingSession
   upNext?: WatchState['upNext']
+  played?: WatchState['upNext']
+  shuffledFrom?: ViewingSession | null
 }
+
+/** How many videos a link remembers as played, so its router state stays small. */
+const PLAYED_KEPT = 50
 
 /**
  * The link to play a video, with the video riding along in router state so
  * the player starts without fetching it again, and the session it plays in,
  * `sessionOf`'s unless the page names one. A queue's link carries the videos
- * to play after it.
+ * to play after it, and the last `PLAYED_KEPT` it played before it.
  */
 export const watchLink = ({
   media,
   session = sessionOf(media),
   upNext = [],
+  played = [],
+  shuffledFrom = null,
 }: WatchLinkProps): WatchLink => ({
   to: watchPageOf(media.id),
-  state: { media, session, upNext },
+  state: {
+    media,
+    session,
+    upNext,
+    ...(played.length > 0 && { played: played.slice(-PLAYED_KEPT) }),
+    ...(shuffledFrom !== null && { shuffledFrom }),
+  },
 })
 
 type QueueLinkProps = {

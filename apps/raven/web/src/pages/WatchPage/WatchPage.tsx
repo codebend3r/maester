@@ -7,6 +7,7 @@ import {
   SESSION_KINDS,
   SHOW_SESSION,
   type ViewingSession,
+  carriesItsOrder,
   episodePlace,
   mediaLabel,
   playLinkFor,
@@ -56,6 +57,7 @@ import { useBrowserDownloads } from '@/stores/browserDownloads'
 import { useIsDesktop } from '@/stores/desktop'
 import { useServerReach } from '@/stores/serverReach'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
+import { useWatchQueue } from '@/pages/WatchPage/useWatchQueue'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { APP_PATHS } from '@/lib/appPaths'
@@ -213,6 +215,8 @@ const watchViewOf = ({
           media: page.data,
           session: handed?.session ?? sessionOf(page.data),
           upNext: handed?.upNext ?? [],
+          played: handed?.played ?? [],
+          shuffledFrom: handed?.shuffledFrom ?? null,
           backTo: libraryPath(page.data.libraryId),
         },
       },
@@ -231,19 +235,30 @@ type WatchPlayerProps = {
   session: ViewingSession
   /** A queue's videos after this one, as a shuffle dealt them; the server finds any other session's. */
   upNext: readonly MediaItem[]
+  /** The videos a queue or a shuffle played before this one, oldest first. */
+  played: readonly MediaItem[]
+  /** The session a queue was dealt from inside the player; null for any other. */
+  shuffledFrom: ViewingSession | null
   backTo: string
 }
 
 /** The browser host owns server history, links and clipboard behavior. */
-export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps) => {
+export const WatchPlayer = ({
+  media,
+  session,
+  upNext,
+  played,
+  shuffledFrom,
+  backTo,
+}: WatchPlayerProps) => {
   const queryClient = useQueryClient()
   const [copied, setCopied] = useState<string | null>(null)
   const [saver] = useState(() =>
     createProgressSaver({ send: (report) => api.saveProgress({ id: media.id, ...report }) }),
   )
   const opensInRavenPlayer = usePlayerPrefs((prefs) => prefs.opensInRavenPlayer)
-  const isShuffled = session.kind === SESSION_KINDS.queue
-  const queued = isShuffled ? upNext : []
+  const isQueue = session.kind === SESSION_KINDS.queue
+  const queued = isQueue ? upNext : []
   const inSession = useQuery(nextInSessionQuery({ id: media.id, session }))
   const found = inSession.data ?? null
   const [first, ...after] = queued
@@ -256,6 +271,7 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       enabled: isSeasonOver,
     }).data ?? null
   const offered = next ?? (isSeasonOver ? nextSeason : null)
+  const around = useWatchQueue({ media, session, played, upNext: queued, found, shuffledFrom })
   // Playback never waits on these: the chapters and markers show once they come.
   const markers = useQuery(markersQuery(media.id)).data ?? null
   const mediaPlane = useMediaPlane({ api, mediaId: media.id })
@@ -286,14 +302,22 @@ export const WatchPlayer = ({ media, session, upNext, backTo }: WatchPlayerProps
       markers,
       next: offered
         ? {
-            ...watchLink({ media: offered, session, upNext: after }),
+            ...watchLink({
+              media: offered,
+              session,
+              upNext: after,
+              // A session that carries its order remembers this one for Previous.
+              played: carriesItsOrder(session) ? [...played, media] : [],
+              shuffledFrom,
+            }),
             label: mediaLabel(offered),
-            isShuffled,
+            isShuffled: isQueue,
             detail: episodePlace(offered),
             posterUrl: api.thumbnailUrl(offered),
             isNextSeason: next === null,
           }
         : null,
+      ...around,
     },
     progress: {
       started: () => {

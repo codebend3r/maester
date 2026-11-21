@@ -1,22 +1,20 @@
-import { type Artist, plural } from '@raven/core'
-import { useSearch } from '@raven/ui/headless'
+import { type Artist, type Letter, LETTERS, plural } from '@raven/core'
+import { COUNTS_COPY, firstAtLetter, LIBRARY_PAGE_COPY, matchingArtists } from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { INDEX_LETTERS, firstAtLetter } from '@/screens/library/artistIndex'
 import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { useAllArtists } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
+import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { ArtistRow } from '@/ui/ArtistRow'
-import { COUNTS_COPY } from '@/ui/copy'
 
 // Every row is the same height, so the rail jumps by arithmetic rather than by measuring.
 const ROW_HEIGHT = SIZE.artistRow + SIZE.hairline
@@ -44,20 +42,14 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   letterText: { ...TYPE.small, color: colors.accentText, fontFamily: TYPE.metaStrong.fontFamily },
 }))
 
-type MatchesProps = { artist: Artist; needle: string }
-
-/** Whether an artist's name holds what is typed, ignoring case. */
-const matches = ({ artist, needle }: MatchesProps): boolean =>
-  artist.name.toLocaleLowerCase().includes(needle)
-
-type IndexRailProps = { onLetter: (letter: string) => void; top: number; bottom: number }
+type IndexRailProps = { onLetter: (letter: Letter) => void; top: number; bottom: number }
 
 /** The A to Z rail down the right edge: a letter jumps the list to the first artist under it. */
 function IndexRail({ onLetter, top, bottom }: IndexRailProps) {
   const styles = useStyles()
   return (
     <View style={[styles.rail, { top, bottom }]}>
-      {INDEX_LETTERS.map((letter) => (
+      {LETTERS.map((letter) => (
         <Pressable
           accessibilityLabel={LIBRARY_PAGE_COPY.jumpTo(letter)}
           accessibilityRole="button"
@@ -78,15 +70,17 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   const styles = useStyles()
   const router = useRouter()
   const insets = usePageInsets()
-  const search = useSearch()
+  const search = useCollectionSearch({
+    placeholder: LIBRARY_PAGE_COPY.searchArtists,
+    none: LIBRARY_PAGE_COPY.noArtists,
+  })
   const list = useRef<FlatList<Artist>>(null)
   const [headerEnd, setHeaderEnd] = useState(0)
   const { artists, listing } = useAllArtists({ session, search: '' })
   const { artistPhotoOf } = useCovers(session)
-  const needle = search.query.toLocaleLowerCase()
-  const shown = needle === '' ? artists : artists.filter((artist) => matches({ artist, needle }))
+  const shown = matchingArtists({ artists, query: search.query })
   const count = listing.isRead ? plural({ n: shown.length, ...COUNTS_COPY.artists }) : null
-  const jump = (letter: string) => {
+  const jump = (letter: Letter) => {
     const at = firstAtLetter({ names: shown.map(({ sortName }) => sortName), letter })
     if (at === null) return
     list.current?.scrollToOffset({ offset: headerEnd + at * ROW_HEIGHT, animated: false })
@@ -94,12 +88,7 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   return (
     <View style={styles.page}>
       <FlatList
-        ListEmptyComponent={
-          <ListNotice
-            empty={needle === '' ? LIBRARY_PAGE_COPY.noArtists : LIBRARY_PAGE_COPY.noMatches}
-            listing={listing}
-          />
-        }
+        ListEmptyComponent={<ListNotice empty={search.empty} listing={listing} />}
         ListHeaderComponent={
           <View
             onLayout={({ nativeEvent: { layout } }) => setHeaderEnd(layout.y + layout.height)}
@@ -108,11 +97,7 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
             <CollectionHeader
               count={count}
               onBack={onBack}
-              search={{
-                value: search.text,
-                onChangeText: search.setText,
-                placeholder: LIBRARY_PAGE_COPY.searchArtists,
-              }}
+              search={search.field}
               title={LIBRARY_PAGE_COPY.artists}
             />
           </View>

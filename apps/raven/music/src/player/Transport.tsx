@@ -2,11 +2,18 @@ import { REPEAT_MODES } from '@raven/core'
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
 import { StyleSheet, View } from 'react-native'
 
+import {
+  hasTogglesOf,
+  PLAYER_COPY,
+  type Step,
+  STEPS,
+  type TransportKind,
+  TRANSPORTS,
+} from '@raven/wren'
 import { useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SIZE, SPACE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
-import { PLAYER_COPY } from '@/ui/copy'
+import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 type PlayButtonProps = { size: number }
 
@@ -27,35 +34,21 @@ function PlayButton({ size }: PlayButtonProps) {
   )
 }
 
-type StepButtonsProps = { size: number }
+type StepSpec = { icon: WrenIconName; label: string }
 
-/** Previous: back to the song before, or the start of this one. */
-function PreviousButton({ size }: StepButtonsProps) {
-  const { colors } = useWrenTheme()
-  const previous = useAudioQueue((store) => store.previous)
-  return (
-    <IconButton
-      color={colors.text}
-      icon={ICONS.previous}
-      label={PLAYER_COPY.previous}
-      onPress={previous}
-      size={size}
-    />
-  )
-}
+const STEP_SPECS = {
+  [STEPS.previous]: { icon: ICONS.previous, label: PLAYER_COPY.previous },
+  [STEPS.next]: { icon: ICONS.next, label: PLAYER_COPY.next },
+} as const satisfies Record<Step, StepSpec>
 
-function NextButton({ size }: StepButtonsProps) {
+type StepButtonProps = { step: Step; size: number }
+
+/** Previous, back to the song before or the start of this one, or Next. */
+function StepButton({ step, size }: StepButtonProps) {
   const { colors } = useWrenTheme()
-  const next = useAudioQueue((store) => store.next)
-  return (
-    <IconButton
-      color={colors.text}
-      icon={ICONS.next}
-      label={PLAYER_COPY.next}
-      onPress={next}
-      size={size}
-    />
-  )
+  const onPress = useAudioQueue((store) => store[step])
+  const { icon, label } = STEP_SPECS[step]
+  return <IconButton color={colors.text} icon={icon} label={label} onPress={onPress} size={size} />
 }
 
 type ToggleProps = {
@@ -103,52 +96,20 @@ export function RepeatToggle({ size = SIZE.touchTarget, isFilled = false }: Togg
   )
 }
 
-/**
- * Where the transport is drawn: the player's, the lyrics', Up next's, the tablet bar's and the
- * narrow column of the tablet's Now Playing.
- */
-export const TRANSPORTS = {
-  player: 'player',
-  lyrics: 'lyrics',
-  queue: 'queue',
-  bar: 'bar',
-  column: 'column',
-} as const
-
-type TransportKind = (typeof TRANSPORTS)[keyof typeof TRANSPORTS]
-
-type TransportSpec = {
+type TransportSizes = {
   /** Play or Pause's circle. */
   play: number
   /** Previous's and Next's. */
   step: number
-  /** Whether Shuffle and Repeat flank it; Up next's head holds its own. */
-  hasToggles: boolean
 }
 
-const TRANSPORT_SPECS = {
-  [TRANSPORTS.player]: {
-    play: PLAYER_SIZES.playLarge,
-    step: PLAYER_SIZES.transportButton,
-    hasToggles: true,
-  },
-  [TRANSPORTS.lyrics]: {
-    play: PLAYER_SIZES.playCompact,
-    step: PLAYER_SIZES.transportButton,
-    hasToggles: true,
-  },
-  [TRANSPORTS.queue]: {
-    play: PLAYER_SIZES.playQueue,
-    step: PLAYER_SIZES.transportSmall,
-    hasToggles: false,
-  },
-  [TRANSPORTS.bar]: { play: SIZE.playButton, step: SIZE.touchTarget, hasToggles: true },
-  [TRANSPORTS.column]: {
-    play: PLAYER_SIZES.playQueue,
-    step: PLAYER_SIZES.transportSmall,
-    hasToggles: true,
-  },
-} as const satisfies Record<TransportKind, TransportSpec>
+const TRANSPORT_SIZES = {
+  [TRANSPORTS.player]: { play: PLAYER_SIZES.playLarge, step: PLAYER_SIZES.transportButton },
+  [TRANSPORTS.lyrics]: { play: PLAYER_SIZES.playCompact, step: PLAYER_SIZES.transportButton },
+  [TRANSPORTS.queue]: { play: PLAYER_SIZES.playQueue, step: PLAYER_SIZES.transportSmall },
+  [TRANSPORTS.bar]: { play: SIZE.playButton, step: SIZE.touchTarget },
+  [TRANSPORTS.column]: { play: PLAYER_SIZES.playQueue, step: PLAYER_SIZES.transportSmall },
+} as const satisfies Record<TransportKind, TransportSizes>
 
 const spread = {
   alignItems: 'center',
@@ -174,13 +135,14 @@ type TransportProps = { kind: TransportKind }
 
 /** Shuffle, Previous, Play or Pause, Next and Repeat, as large as the place they sit in asks. */
 export function Transport({ kind }: TransportProps) {
-  const { play, step, hasToggles } = TRANSPORT_SPECS[kind]
+  const { play, step } = TRANSPORT_SIZES[kind]
+  const hasToggles = hasTogglesOf(kind)
   return (
     <View style={TRANSPORT_ROWS[kind]}>
       {hasToggles && <ShuffleToggle />}
-      <PreviousButton size={step} />
+      <StepButton size={step} step={STEPS.previous} />
       <PlayButton size={play} />
-      <NextButton size={step} />
+      <StepButton size={step} step={STEPS.next} />
       {hasToggles && <RepeatToggle />}
     </View>
   )

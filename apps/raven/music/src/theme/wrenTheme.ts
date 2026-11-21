@@ -1,3 +1,4 @@
+import { APPEARANCES, type Appearance } from '@raven/wren'
 import {
   type ImageStyle,
   StyleSheet,
@@ -7,7 +8,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 
-import { APPEARANCES, type Appearance, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   BREAKPOINTS,
   COLOR_SCHEMES,

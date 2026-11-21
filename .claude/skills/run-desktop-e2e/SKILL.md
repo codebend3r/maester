@@ -6,7 +6,7 @@ description: >-
 
 # Run the Desktop end to end check locally
 
-The `🎬 E2E Mac` leg of the `desktop-playback` job in `.github/workflows/pull-request-checks.yml`, on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🎬 E2E Mac` job (`desktop-e2e` in `.github/workflows/native-checks.yml`, which CI runs on main once a pull request merges), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:desktop:e2e

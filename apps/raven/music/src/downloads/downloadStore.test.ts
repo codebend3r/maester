@@ -9,12 +9,12 @@ import {
   type Track,
 } from '@raven/core'
 import { DOWNLOADS_FOLDER, type DownloadDisk } from '@raven/native/headless'
+import { DOWNLOAD_COPY } from '@raven/wren'
 import type { StateStorage } from 'zustand/middleware'
 
 import {
   DOWNLOADS_KEY,
   downloadKeyOf,
-  DOWNLOAD_COPY,
   DOWNLOAD_SOURCES,
   DOWNLOAD_STATUSES,
   configureDownloads,

@@ -1,20 +1,7 @@
-import { MUSIC_SORTS } from '@raven/core'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { LIST_SORTS, resultStateOf } from '@raven/wren'
 
-import { nextPageOf } from '@/music/nextPage'
-import { useAllAlbums, useAllArtists } from '@/screens/library/listings'
+import { useAllAlbums, useAllArtists, useAllSongs } from '@/screens/library/listings'
 import type { WrenSession } from '@/useWren'
-
-/** Where a search stands: raven has no music, it failed, it is on its way, nothing matched, or it found some. */
-export const RESULT_STATES = {
-  noMusic: 'noMusic',
-  failed: 'failed',
-  searching: 'searching',
-  empty: 'empty',
-  found: 'found',
-} as const
-
-export type ResultState = (typeof RESULT_STATES)[keyof typeof RESULT_STATES]
 
 type UseSearchResultsProps = { session: WrenSession; query: string }
 
@@ -29,40 +16,28 @@ export const useSearchResults = ({ session, query }: UseSearchResultsProps) => {
     search: query,
     isEnabled: isAsked,
   })
-  const {
-    artists,
-    listing: artistListing,
-    music,
-  } = useAllArtists({
+  const { artists, listing: artistListing } = useAllArtists({
     session,
     search: query,
     isEnabled: isAsked,
   })
-  // A blank search names no library, so it asks for no songs.
-  const songs = useInfiniteQuery(
-    session.queries.songsQuery({
-      libraryIds: isAsked ? music.libraries.map(({ id }) => id) : [],
-      search: query,
-      sort: MUSIC_SORTS.title,
-    }),
-  )
-  const tracks = isAsked ? (songs.data?.pages.flatMap((page) => page.tracks) ?? []) : []
-  const failure = albumListing.failure ?? artistListing.failure ?? songs.error
-  const hasAny = albums.length + artists.length + tracks.length > 0
-  const isRead = albumListing.isRead && artistListing.isRead && songs.isSuccess
-  const state = ((): ResultState => {
-    if (albumListing.hasNoMusic) return RESULT_STATES.noMusic
-    if (failure !== null) return RESULT_STATES.failed
-    if (hasAny) return RESULT_STATES.found
-    return isRead ? RESULT_STATES.empty : RESULT_STATES.searching
-  })()
+  const songs = useAllSongs({
+    session,
+    search: query,
+    sort: LIST_SORTS.title,
+    isEnabled: isAsked,
+  })
   return {
-    state,
-    failure,
+    ...resultStateOf({
+      albums: albumListing,
+      artists: artistListing,
+      songs: songs.listing,
+      hasAny: albums.length + artists.length + songs.tracks.length > 0,
+    }),
     albums,
     artists,
-    songs: tracks,
-    nextSongs: nextPageOf(songs),
+    songs: songs.tracks,
+    nextSongs: songs.nextPage,
   }
 }
 

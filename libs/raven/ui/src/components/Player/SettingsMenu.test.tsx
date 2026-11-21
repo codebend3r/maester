@@ -16,6 +16,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createRef } from 'react'
 import { MENU_SECTIONS } from '@/components/Player/menus'
+import type { PlayerQueue, QueueEntry } from '@/components/Player/PlayerServices'
 import { SettingsMenu } from '@/components/Player/SettingsMenu'
 import { type PlayChoices, PICK_KINDS, choiceGroups } from '@/components/Player/playChoices'
 import type { Rendition } from '@/components/Player/rendition'
@@ -79,6 +80,8 @@ const renderPlayback = ({
       onPickCaption={() => {}}
       onShowInfo={() => {}}
       onClose={() => {}}
+      queue={null}
+      onPlayEntry={() => {}}
     />,
   )
 
@@ -92,6 +95,90 @@ const remuxing = {
   quality: null,
   burn: null,
 } as const satisfies Rendition
+
+describe('SettingsMenu queue section', () => {
+  const entries: PlayerQueue['entries'] = [
+    {
+      key: '0:1',
+      to: '/watch/1',
+      state: null,
+      label: 'Low Tide',
+      detail: 'Season 1, Episode 1',
+      isCurrent: true,
+    },
+    {
+      key: '1:2',
+      to: '/watch/2',
+      state: null,
+      label: 'High Water',
+      detail: 'Season 1, Episode 2',
+      isCurrent: false,
+    },
+  ]
+
+  type RenderQueueProps = {
+    queue: PlayerQueue
+    onPlayEntry?: (entry: QueueEntry) => void
+    onPickAutoplay?: (isOn: boolean) => void
+  }
+
+  const renderQueue = ({
+    queue,
+    onPlayEntry = () => {},
+    onPickAutoplay = () => {},
+  }: RenderQueueProps) =>
+    render(
+      <SettingsMenu
+        section={MENU_SECTIONS.queue}
+        menuRef={createRef<HTMLDialogElement>()}
+        selection={selection}
+        subtitleStatus="off"
+        rate={1}
+        mode={PLAYBACK_MODES.direct}
+        onPickRate={() => {}}
+        autoplay
+        onPickAutoplay={onPickAutoplay}
+        captionStyle={DEFAULT_CAPTION_STYLE}
+        onPickCaption={() => {}}
+        onShowInfo={() => {}}
+        onClose={() => {}}
+        queue={queue}
+        onPlayEntry={onPlayEntry}
+      />,
+    )
+
+  it('lists the session in order, marks the one playing and plays a pick', async () => {
+    const onPlayEntry = jest.fn()
+    renderQueue({ queue: { entries, shuffle: null }, onPlayEntry })
+    const rows = within(screen.getByRole('list', { name: 'Queue' })).getAllByRole('button')
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'Low TideNow playing',
+      'High WaterSeason 1, Episode 2',
+    ])
+    expect(rows[0]).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: /High Water/ }))
+    expect(onPlayEntry).toHaveBeenCalledWith(entries[1])
+  })
+
+  it('switches autoplay and shuffle, and offers no shuffle where the session has none', async () => {
+    const onPickAutoplay = jest.fn()
+    const set = jest.fn()
+    const { unmount } = renderQueue({
+      queue: { entries, shuffle: { isOn: false, set } },
+      onPickAutoplay,
+    })
+    const shuffle = screen.getByRole('group', { name: 'Shuffle' })
+    expect(within(shuffle).getByRole('radio', { name: 'Off' })).toBeChecked()
+    await userEvent.click(within(shuffle).getByRole('radio', { name: 'On' }))
+    expect(set).toHaveBeenCalledWith(true)
+    const autoplay = screen.getByRole('group', { name: 'Autoplay' })
+    await userEvent.click(within(autoplay).getByRole('radio', { name: 'Off' }))
+    expect(onPickAutoplay).toHaveBeenCalledWith(false)
+    unmount()
+    renderQueue({ queue: { entries, shuffle: null } })
+    expect(screen.queryByRole('group', { name: 'Shuffle' })).toBeNull()
+  })
+})
 
 describe('SettingsMenu playback section', () => {
   it('switches autoplay under the speed', async () => {
@@ -217,6 +304,8 @@ describe('SettingsMenu subtitles', () => {
         onPickCaption={onPickCaption}
         onShowInfo={() => {}}
         onClose={() => {}}
+        queue={null}
+        onPlayEntry={() => {}}
       />,
     )
 

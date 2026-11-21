@@ -9,9 +9,9 @@ import {
   type Track,
 } from '@raven/core'
 
+import { COUNTS_COPY, KIT_COPY } from '@raven/wren'
 import { DOWNLOAD_STATUSES, type DownloadEntry, downloadKeyOf } from '@/downloads/downloadStore'
 import { allTracksOf, downloadRowsOf, downloadsSummaryOf } from '@/screens/library/downloadRows'
-import { COUNTS_COPY, KIT_COPY } from '@/ui/copy'
 
 const SERVER_ID = 'raven'
 

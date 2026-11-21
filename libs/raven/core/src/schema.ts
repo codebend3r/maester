@@ -54,6 +54,21 @@ export const isNumber = (value: unknown): value is number =>
 
 export const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean'
 
+type OrElseProps<T> = {
+  guard: Guard<T>
+  /** What it answers for anything the guard refuses. */
+  fallback: T
+}
+
+/**
+ * A reader for a value from outside, such as a path's segment: the value itself when `guard`
+ * passes it, else `fallback`.
+ */
+export const orElse =
+  <T>({ guard, fallback }: OrElseProps<T>) =>
+  (value: unknown): T =>
+    guard(value) ? value : fallback
+
 /** Exactly one of `values`; the union of them is the type. */
 export const oneOf = <const T extends readonly Literal[]>(values: T): OneOfGuard<T> =>
   Object.assign((value: unknown): value is T[number] => values.some((known) => known === value), {

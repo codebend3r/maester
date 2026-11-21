@@ -21,8 +21,10 @@ export type {
   ErrorReporter,
   Handoff,
   HostActions,
+  PlayerQueue,
   PlayerServices,
   PlayerTitle,
+  QueueEntry,
   TitleLogo,
   ProgressSink,
   TrackChoice,
@@ -147,6 +149,14 @@ export type { AudioState } from '@/stores/audioQueue'
 export { useTrackListening } from '@/components/AudioHost/useTrackListening'
 export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
 export { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
+// The player's words, for the hosts' end to end suites, which find its controls by them.
+export {
+  CONTROLS_COPY,
+  SETTINGS_MENU_COPY,
+  SHORTCUTS_TIP_COPY,
+  STAGE_COPY,
+} from '@/components/Player/copy'
+export { MENU_TITLES } from '@/components/Player/menus'
 export {
   UnplayableTrackError,
   failureOf,

@@ -12,7 +12,10 @@ import {
   ITEM_TYPES,
   type Library,
   LIBRARY_KINDS,
+  MARKER_KINDS,
+  MARKER_SOURCES,
   type MediaItem,
+  type MediaMarkers,
   type Saga,
   type SeasonSummary,
 } from '@raven/core'
@@ -276,3 +279,45 @@ export const catalogOf = ({ media }: CatalogOfProps): FixtureCatalog => {
   }
   return { items, libraries, sagas, home }
 }
+
+/** The second episode's intro, in seconds, as a chapter of its file would name it. */
+export const FIXTURE_INTRO = { start: 5, end: 20 } as const
+
+const NO_MARKERS = { intro: null, credits: null, chapters: [] } as const satisfies MediaMarkers
+
+const INTRO_MARKERS = {
+  ...NO_MARKERS,
+  intro: {
+    kind: MARKER_KINDS.intro,
+    ...FIXTURE_INTRO,
+    source: MARKER_SOURCES.chapter,
+    confidence: 1,
+  },
+} as const satisfies MediaMarkers
+
+/** What `GET /api/media/:id/markers` answers: the second episode has an intro, and nothing else has any. */
+export const markersOf = (mediaId: number): MediaMarkers =>
+  mediaId === FIXTURE_MEDIA.secondEpisode ? INTRO_MARKERS : NO_MARKERS
+
+type NextOfProps = MediaOfProps
+
+/** What plays after a title in any session: the show's second episode after its first, else nothing. */
+export const nextOf = ({ media, mediaId }: NextOfProps): MediaItem | null =>
+  mediaId === FIXTURE_MEDIA.firstEpisode ? (media.get(FIXTURE_MEDIA.secondEpisode) ?? null) : null
+
+/** The show and its season, whose episodes a shuffle deals. */
+const SHUFFLED_ITEMS: ReadonlySet<number> = new Set([FIXTURE_ITEMS.show, FIXTURE_ITEMS.season])
+
+type DealtForProps = Pick<MediaOfProps, 'media'> & { itemId: number }
+
+/**
+ * What `GET /api/items/:id/shuffle` deals for the show or its season: its episodes last first, so
+ * a test can tell a shuffle's order from the season's own. Null for any other item.
+ */
+export const dealtFor = ({ media, itemId }: DealtForProps): MediaItem[] | null =>
+  SHUFFLED_ITEMS.has(itemId)
+    ? [FIXTURE_MEDIA.secondEpisode, FIXTURE_MEDIA.firstEpisode].flatMap((mediaId) => {
+        const found = media.get(mediaId)
+        return found === undefined ? [] : [found]
+      })
+    : null

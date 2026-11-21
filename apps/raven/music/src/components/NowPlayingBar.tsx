@@ -1,10 +1,10 @@
 import type { Track } from '@raven/core'
 import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { progressOf } from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { progressOf } from '@/player/playerModel'
 import { useNowPlaying } from '@/player/useNowPlaying'
 import { WREN_ROUTES } from '@/routes'
 import { CHROMES } from '@/shell/chrome'

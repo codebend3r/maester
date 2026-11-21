@@ -1,8 +1,7 @@
+import { LIBRARY_PAGE_COPY, LIST_SORT_LABELS, LIST_SORT_ORDER, type ListSort } from '@raven/wren'
 import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { LIST_SORT_LABELS, LIST_SORT_ORDER, type ListSort } from '@/screens/library/sorts'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { FORM_FACTORS, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'

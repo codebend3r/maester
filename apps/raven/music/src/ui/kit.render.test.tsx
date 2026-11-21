@@ -1,13 +1,13 @@
 import { describe, expect, it, jest } from '@jest/globals'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { SONG_LEADS } from '@raven/wren'
 
 import { AlertDialog } from '@/ui/AlertDialog'
 import { ArtistRow } from '@/ui/ArtistRow'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { Button } from '@/ui/Button'
 import { SegmentedControl } from '@/ui/SegmentedControl'
-import { SONG_LEADS } from '@/ui/songLead'
 import { SongRow } from '@/ui/SongRow'
 import { ICONS } from '@/ui/WrenIcon'
 

@@ -6,6 +6,7 @@ import {
   isPlayerReply,
   isPlayerRequest,
   isRecord,
+  type PlayerCommand,
   type PlayerEvent,
   WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
@@ -110,4 +111,29 @@ export const postOnPort = async ({ page, messages }: PostOnPortProps) => {
     },
     { key: PORT_KEY, sent: messages },
   )
+}
+
+type CommandsOfProps = { page: Page; type: PlayerCommand['type'] }
+
+/** The reply to each request of `type` the page sent, in order; null for one not answered yet. */
+export const repliesTo = async ({ page, type }: CommandsOfProps) => {
+  const { requests, replies } = await trafficOf({ page })
+  return requests
+    .filter((sent) => sent.command.type === type)
+    .map((sent) => replies.find((reply) => reply.id === sent.id) ?? null)
+}
+
+/** The reply to the last request of `type`; null before any, or while it is not answered. */
+export const lastReplyOf = async ({ page, type }: CommandsOfProps) =>
+  (await repliesTo({ page, type })).at(-1) ?? null
+
+/** Every command of `type` the page has sent mpv, in order. */
+export const sentOf = async ({ page, type }: CommandsOfProps): Promise<PlayerCommand[]> => {
+  const { requests } = await trafficOf({ page })
+  return requests.map(({ command }) => command).filter((command) => command.type === type)
+}
+
+/** The last command of `type` was answered, and mpv took it. */
+export const expectTaken = async ({ page, type }: CommandsOfProps) => {
+  await expect.poll(() => lastReplyOf({ page, type })).toMatchObject({ ok: true })
 }

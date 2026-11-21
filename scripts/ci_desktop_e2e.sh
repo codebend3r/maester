@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🎬 E2E Mac check from main-native-checks.yml on this Mac:
+# Runs the 🎬 E2E Mac check, which CI runs on main (main-native-checks.yml), on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
 # from a recent run. `xcodebuild -version` is in the target's Nx cache key, which is
@@ -28,8 +28,9 @@ if [ -f libs/raven/mpv/resources/darwin-arm64/raven_mpv.node ]; then
 else
   brew_install gh gh
   gh auth status > /dev/null || { echo 'Sign in to GitHub first: gh auth login' >&2; exit 1; }
-  # The handoff CI's desktop-native job packs lives one day, so the newest run that has it
-  # wins, among runs whose addon sources match this checkout's.
+  # CI's desktop-native job packs the handoff wherever it builds: in a pull request's checks,
+  # and on main only when no pull request built that commit. The newest run that has it wins,
+  # among runs whose addon sources match this checkout's, main's first.
   found=''
   while read -r id sha; do
     git cat-file -e "$sha^{commit}" 2> /dev/null || git fetch -q origin "$sha" 2> /dev/null || continue
@@ -40,9 +41,13 @@ else
       found=yes
       break
     fi
-  done < <(gh run list --workflow main-native-checks.yml --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"')
+  done < <(
+    for workflow in main-native-checks.yml pull-request-checks.yml; do
+      gh run list --workflow "$workflow" --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"'
+    done
+  )
   if [ -z "$found" ]; then
-    echo 'No run from the last day has a libmpv handoff built from these addon sources. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
+    echo 'No recent run has a libmpv handoff built from these addon sources. Build it with bun run mpv:native (the full native toolchain, see the get-started skill).' >&2
     exit 1
   fi
 fi

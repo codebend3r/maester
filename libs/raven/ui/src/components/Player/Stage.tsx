@@ -41,6 +41,7 @@ import {
   useIdle,
   useNow,
 } from '@/components/Player/useStageChrome'
+import { useQueueMoves } from '@/components/Player/useQueueMoves'
 import { useStageKeys } from '@/components/Player/useStageKeys'
 import { useTouchGestures } from '@/components/Player/useTouchGestures'
 import type { TrackSelection } from '@/components/Player/useTrackSelection'
@@ -164,6 +165,7 @@ export const PlayerChrome = ({
     credits: markers?.credits ?? null,
     seek,
   })
+  const moves = useQueueMoves()
   const intro = useSkipIntro({ time: state.time, intro: markers?.intro ?? null, seek })
   const skipAction = skipActionOf({
     undo: intro.undo,
@@ -339,6 +341,8 @@ export const PlayerChrome = ({
         }}
         menuOpen={isMenuSection(overlay) ? overlay : false}
         settingsButton={menuButton}
+        previous={moves.previous?.label ?? null}
+        hasQueue={moves.queue !== null}
         upNext={upNext.next?.label ?? null}
         countdown={upNext.countdown}
         card={
@@ -348,6 +352,7 @@ export const PlayerChrome = ({
         }
         endsAt={endsAtLabel({ now, time: held.time, duration, rate: state.rate })}
         onRestart={() => controls.act({ type: PLAYER_ACTIONS.seekToEdge, edge: SEEK_EDGES.start })}
+        onPrevious={moves.playPrevious}
         onNext={upNext.playNext}
         onTogglePlay={controls.togglePlay}
         onSeek={seek}
@@ -391,6 +396,8 @@ export const PlayerChrome = ({
           onPickAutoplay={setAutoplay}
           onShowInfo={showInfo}
           onClose={closeMenu}
+          queue={moves.queue}
+          onPlayEntry={moves.play}
           {...(handoff && { onHandoff: () => handOff(handoff), handoffLabel: handoff.label })}
         />
       )}

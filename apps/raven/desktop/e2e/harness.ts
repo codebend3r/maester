@@ -396,3 +396,11 @@ export const signIn = async ({ page }: SignInProps): Promise<void> => {
   await expect(heading({ page, name: 'Home' })).toBeVisible()
   await readySideMenu({ page })
 }
+
+type GoHomeProps = { page: Page }
+
+/** Home, from the side menu. */
+export const goHome = async ({ page }: GoHomeProps) => {
+  await sideLink({ page, name: 'Home' }).click()
+  await expect(heading({ page, name: 'Home' })).toBeVisible()
+}

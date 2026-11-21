@@ -1,28 +1,24 @@
-import { type ArtistCredit, type Track, artistNames } from '@raven/core'
+import { type Track, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
-import type { ComponentProps, ComponentType } from 'react'
+import { type ComponentProps, type ComponentType, useState } from 'react'
 
+import { type MenuPlaces, factsLineOf, menuGroupsOf, TRACK_MENU_COPY } from '@raven/wren'
 import { AddToPlaylist } from '@/components/AddToPlaylist'
-import { TRACK_MENU_COPY } from '@/components/copy'
 import { useCovers } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
-import { useToast } from '@/stores/toast'
+import { toastFailure } from '@/stores/toast'
 import { BottomSheet } from '@/ui/BottomSheet'
-import { factsLineOf } from '@/ui/counts'
-import { type SheetAction, SheetActions } from '@/ui/SheetActions'
+import { SheetActions } from '@/ui/SheetActions'
 import { ICONS } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
 
 /** What the menu shows: its actions, or the listener's playlists to add its tracks to. */
-export const MENU_VIEWS = { actions: 'actions', playlists: 'playlists' } as const
+const MENU_VIEWS = { actions: 'actions', playlists: 'playlists' } as const
 
-export type MenuView = (typeof MENU_VIEWS)[keyof typeof MENU_VIEWS]
+type MenuView = (typeof MENU_VIEWS)[keyof typeof MENU_VIEWS]
 
 type SheetHead = ComponentProps<typeof BottomSheet>['head']
-
-/** Where the menu can go from what it is about: the album, the artist. */
-type MenuPlaces = { albumId?: number; artist?: ArtistCredit }
 
 type TracksMenuProps = {
   session: WrenSession
@@ -32,63 +28,41 @@ type TracksMenuProps = {
   tracksOf: () => Promise<readonly Track[]>
   /** Whether Add to playlist shows: a track's and an album's do, an artist's and a playlist's not. */
   canAddToPlaylist: boolean
-  places?: MenuPlaces
-  view: MenuView
-  /** Shows another of the menu's views, or closes it with null. */
-  onView: (view: MenuView | null) => void
+  /** Where the menu can go from here; `{}` for a menu with nowhere to go. */
+  places: MenuPlaces
+  onClose: () => void
 }
 
-type MenuBodyProps = Omit<TracksMenuProps, 'view'> & { onClose: () => void }
+type MenuBodyProps = TracksMenuProps & {
+  /** Shows the listener's playlists in the actions' place. */
+  onPlaylists: () => void
+}
 
-const NO_PLACES: MenuPlaces = {}
+type TracksAct = (tracks: readonly Track[]) => void
 
 /** Play next, Add to queue and, where it shows, Add to playlist; then where to go from here. */
-function MenuActions({ tracksOf, canAddToPlaylist, places, onView, onClose }: MenuBodyProps) {
+function MenuActions({ tracksOf, canAddToPlaylist, places, onPlaylists, onClose }: MenuBodyProps) {
   const router = useRouter()
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
-  const toast = useToast((state) => state.show)
-  const { albumId, artist } = places ?? NO_PLACES
-  const withTracks = (act: (tracks: readonly Track[]) => void) => () => {
+  const withTracks = (act: TracksAct) => () => {
     onClose()
-    tracksOf().then(act, (error: unknown) => error instanceof Error && toast(error.message))
+    tracksOf().then(act, toastFailure)
   }
-  const goTo = (href: ReturnType<typeof pageHref>) => () => {
+  const goTo = (href: ReturnType<typeof pageHref>) => {
     onClose()
     router.push(href)
   }
-  const playlistAction: SheetAction = {
-    icon: ICONS.playlistAdd,
-    label: TRACK_MENU_COPY.addToPlaylist,
-    onPress: () => onView(MENU_VIEWS.playlists),
-  }
-  const groups: readonly (readonly SheetAction[])[] = [
-    [
-      { icon: ICONS.playNext, label: TRACK_MENU_COPY.playNext, onPress: withTracks(playNext) },
-      { icon: ICONS.queueAdd, label: TRACK_MENU_COPY.addToQueue, onPress: withTracks(addToQueue) },
-      ...(canAddToPlaylist ? [playlistAction] : []),
-    ],
-    [
-      ...(albumId === undefined
-        ? []
-        : [
-            {
-              icon: ICONS.album,
-              label: TRACK_MENU_COPY.goToAlbum,
-              onPress: goTo(pageHref({ page: WREN_PAGES.album, id: albumId })),
-            },
-          ]),
-      ...(artist === undefined
-        ? []
-        : [
-            {
-              icon: ICONS.artist,
-              label: TRACK_MENU_COPY.goToArtist,
-              onPress: goTo(pageHref({ page: WREN_PAGES.artist, id: artist.id })),
-            },
-          ]),
-    ],
-  ]
+  const groups = menuGroupsOf({
+    icons: ICONS,
+    canAddToPlaylist,
+    places,
+    onPlayNext: withTracks(playNext),
+    onAddToQueue: withTracks(addToQueue),
+    onPlaylists,
+    onAlbum: (albumId) => goTo(pageHref({ page: WREN_PAGES.album, id: albumId })),
+    onArtist: (artistId) => goTo(pageHref({ page: WREN_PAGES.artist, id: artistId })),
+  })
   return <SheetActions groups={groups} />
 }
 
@@ -117,23 +91,23 @@ const headOf = ({ view, head }: HeadOfProps): SheetHead =>
 /**
  * A menu over tracks, as one sheet over the page whichever view it shows, so moving to Add to
  * playlist changes what it holds without it rising again: a track's, or an album's, an
- * artist's or a playlist's More.
+ * artist's or a playlist's More. It is drawn only while open, so each opening starts on its actions.
  */
-export function TracksMenu({ view, ...props }: TracksMenuProps) {
+export function TracksMenu(props: TracksMenuProps) {
+  const [view, setView] = useState<MenuView>(MENU_VIEWS.actions)
   const Body = MENU_BODIES[view]
-  const close = () => props.onView(null)
   return (
-    <BottomSheet head={headOf({ view, head: props.head })} isOpen onClose={close}>
-      <Body {...props} onClose={close} />
+    <BottomSheet head={headOf({ view, head: props.head })} isOpen onClose={props.onClose}>
+      <Body {...props} onPlaylists={() => setView(MENU_VIEWS.playlists)} />
     </BottomSheet>
   )
 }
 
-type TrackMenuProps = Pick<TracksMenuProps, 'view' | 'onView'> & { track: Track }
+type TrackMenuProps = Pick<TracksMenuProps, 'onClose'> & { track: Track }
 
 type TrackMenuOfProps = TrackMenuProps & { session: WrenSession }
 
-function TrackMenuOf({ session, track, view, onView }: TrackMenuOfProps) {
+function TrackMenuOf({ session, track, onClose }: TrackMenuOfProps) {
   const { trackCoverOf } = useCovers(session)
   const [artist] = track.artists
   // TODO(redesign): Like and Download once the server keeps a track's favourite and a track downloads alone.
@@ -145,11 +119,10 @@ function TrackMenuOf({ session, track, view, onView }: TrackMenuOfProps) {
         subtitle: factsLineOf([artistNames(track), track.album.title]),
         cover: trackCoverOf(track),
       }}
-      onView={onView}
+      onClose={onClose}
       places={{ albumId: track.albumId, artist }}
       session={session}
       tracksOf={async () => [track]}
-      view={view}
     />
   )
 }

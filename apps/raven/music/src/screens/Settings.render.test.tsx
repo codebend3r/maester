@@ -2,6 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { RAVEN_SERVER } from '@raven/native/headless'
+import {
+  APPEARANCES,
+  KIT_COPY,
+  SETTINGS_COPY,
+  SIGN_IN_COPY,
+  STATUS_COPY,
+  STORAGE_COPY,
+} from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
@@ -14,13 +22,11 @@ import {
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
-import { SETTINGS_COPY, SIGN_IN_COPY, STORAGE_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
-import { APPEARANCES, DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, MUSIC, OK_COMPUTER, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
-import { KIT_COPY, STATUS_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 const removeAll = jest.fn<ReturnType<typeof useDownloads.getState>['removeAll']>()

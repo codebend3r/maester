@@ -1,3 +1,5 @@
+import { oneOf, orElse } from '@raven/core'
+import { LIBRARY_SEGMENTS, type LibrarySegment } from '@raven/wren'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 
@@ -7,13 +9,7 @@ import { ArtistsCollection } from '@/screens/library/ArtistsCollection'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { PlaylistsCollection } from '@/screens/library/PlaylistsCollection'
 import { SongsCollection } from '@/screens/library/SongsCollection'
-import {
-  LIBRARY_SEGMENTS,
-  type LibrarySegment,
-  WREN_ROUTES,
-  WREN_ROUTE_PARAMS,
-  librarySegmentOf,
-} from '@/routes'
+import { WREN_ROUTES, WREN_ROUTE_PARAMS } from '@/routes'
 import { type WrenSession, useWren } from '@/useWren'
 
 /** What is downloaded from this server, which plays with it out of reach. */
@@ -29,6 +25,12 @@ const COLLECTION_PAGES = {
   [LIBRARY_SEGMENTS.playlists]: PlaylistsCollection,
   [LIBRARY_SEGMENTS.downloads]: DownloadsCollection,
 } as const satisfies Record<LibrarySegment, ComponentType<CollectionPageProps>>
+
+/** The segment a Library address names, or Albums when it names none it knows. */
+const librarySegmentOf = orElse<LibrarySegment>({
+  guard: oneOf(Object.values(LIBRARY_SEGMENTS)),
+  fallback: LIBRARY_SEGMENTS.albums,
+})
 
 type CollectionOfProps = { session: WrenSession }
 

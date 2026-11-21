@@ -1,8 +1,8 @@
 import { Text, View } from 'react-native'
 
+import { STATUS_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { STATUS_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   chip: {

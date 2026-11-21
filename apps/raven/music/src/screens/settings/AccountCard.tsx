@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native'
 
-import { SETTINGS_COPY } from '@/screens/copy'
+import { SETTINGS_COPY } from '@raven/wren'
 import { useWrenAccount } from '@/session'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'

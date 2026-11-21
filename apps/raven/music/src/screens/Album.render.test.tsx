@@ -11,7 +11,15 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen, within } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
-import { DOWNLOAD_BUTTON_COPY, TRACK_MENU_COPY } from '@/components/copy'
+import {
+  ALBUM_COPY,
+  DETAIL_COPY,
+  DOWNLOAD_BUTTON_COPY,
+  KIT_COPY,
+  NEW_PLAYLIST_COPY,
+  PLAYER_COPY,
+  TRACK_MENU_COPY,
+} from '@raven/wren'
 import {
   DOWNLOAD_SOURCES,
   DOWNLOAD_STATUSES,
@@ -21,7 +29,6 @@ import {
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
 import { WREN_PAGES } from '@/routes'
-import { ALBUM_COPY, DETAIL_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import {
@@ -35,7 +42,6 @@ import {
 } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { KIT_COPY, PLAYER_COPY, NEW_PLAYLIST_COPY } from '@/ui/copy'
 
 const ROAD_TRIP = { ...MIXTAPE, id: MIXTAPE.id + 10, name: 'Road trip', trackCount: 0, duration: 0 }
 

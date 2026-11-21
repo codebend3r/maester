@@ -1,18 +1,16 @@
-import { type ArtistDetails, QUEUE_SOURCE_KINDS, type Track, routeIdOf } from '@raven/core'
+import { type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { useAudioQueue, useServerArtistFavourite } from '@raven/ui/headless'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useLocalSearchParams } from 'expo-router'
-import { type ReactNode, useState } from 'react'
+import { ARTIST_COPY, artistMetaOf, PLAYER_COPY } from '@raven/wren'
+import { type ComponentType, type ReactNode, useState } from 'react'
 import { ScrollView, View } from 'react-native'
 
 import { ACTION_SHAPES } from '@/components/DetailAction'
 import { FavouriteAction } from '@/components/FavouriteAction'
-import { MENU_VIEWS, type MenuView, TracksMenu } from '@/components/TrackMenu'
+import { Nothing } from '@/components/Nothing'
+import { TracksMenu } from '@/components/TrackMenu'
+import { useAlbumTracks } from '@/music/useAlbumTracks'
 import { useCovers } from '@/music/useCovers'
-import { WREN_ROUTE_PARAMS } from '@/routes'
-import { ARTIST_COPY } from '@/screens/copy'
-import { ArtistHero } from '@/screens/detail/ArtistHero'
-import { artistMetaOf } from '@/screens/detail/detailFacts'
+import { ArtistHero, HeroActions } from '@/screens/detail/ArtistHero'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
 import { usePageInsets } from '@/shell/useShell'
 import { toastFailure } from '@/stores/toast'
@@ -23,8 +21,7 @@ import { AlbumTileOf } from '@/ui/AlbumTile'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
 import { ICONS } from '@/ui/WrenIcon'
-import { type WrenSession, useWren } from '@/useWren'
-import { PLAYER_COPY } from '@/ui/copy'
+import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -34,21 +31,22 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 }))
 
 type ArtistActionsProps = {
+  /** Whether Play and Shuffle share the width they are given. */
+  isStretched: boolean
   onPlay: () => void
   onShuffle: () => void
   isFollowing: boolean
   onFollow: () => void
 }
 
-// Play and Shuffle share a phone's width, and keep their own on a tablet.
-const IS_STRETCHED = {
-  [FORM_FACTORS.phone]: true,
-  [FORM_FACTORS.tablet]: false,
-} as const satisfies Record<FormFactor, boolean>
-
-/** Play, Shuffle and Follow; Play and Shuffle share a phone's width, and keep their own on a tablet. */
-function ArtistActions({ onPlay, onShuffle, isFollowing, onFollow }: ArtistActionsProps) {
-  const isStretched = IS_STRETCHED[useFormFactor()]
+/** Play, Shuffle and Follow. */
+function ArtistActions({
+  isStretched,
+  onPlay,
+  onShuffle,
+  isFollowing,
+  onFollow,
+}: ArtistActionsProps) {
   return (
     <>
       <Button
@@ -74,53 +72,62 @@ function ArtistActions({ onPlay, onShuffle, isFollowing, onFollow }: ArtistActio
   )
 }
 
-/** Where each layout puts the actions: under the hero on a phone, in its foot on a tablet. */
-type ActionsPlacement = { inHero?: ReactNode; below?: ReactNode }
+type ActionsSlotProps = { children: ReactNode }
 
-type PlacementOfProps = { actions: ReactNode }
+/** Play, Shuffle and Follow in a row of their own under the hero, as a phone holds them. */
+function ActionsRow({ children }: ActionsSlotProps) {
+  const styles = useStyles()
+  const { paddingLeft, paddingRight } = usePageInsets()
+  return <View style={[styles.phoneActions, { paddingLeft, paddingRight }]}>{children}</View>
+}
 
-const PLACEMENTS = {
-  [FORM_FACTORS.phone]: ({ actions }: PlacementOfProps): ActionsPlacement => ({ below: actions }),
-  [FORM_FACTORS.tablet]: ({ actions }: PlacementOfProps): ActionsPlacement => ({
-    inHero: actions,
-  }),
-} as const satisfies Record<FormFactor, (props: PlacementOfProps) => ActionsPlacement>
+type ArtistLayout = {
+  /** Whether Play and Shuffle share the width they are given. */
+  isStretched: boolean
+  /** What holds the actions under the hero. */
+  Below: ComponentType<ActionsSlotProps>
+  /** What holds the actions at the hero's foot. */
+  InHero: ComponentType<ActionsSlotProps>
+}
+
+/*
+ * Where each form factor puts the actions, and how wide: under the hero on a phone, Play and
+ * Shuffle sharing its width; in the hero's foot on a tablet, each keeping its own.
+ */
+const ARTIST_LAYOUTS = {
+  [FORM_FACTORS.phone]: { isStretched: true, Below: ActionsRow, InHero: Nothing },
+  [FORM_FACTORS.tablet]: { isStretched: false, Below: Nothing, InHero: HeroActions },
+} as const satisfies Record<FormFactor, ArtistLayout>
 
 type ArtistPageProps = { session: WrenSession; details: ArtistDetails }
 
 function ArtistPage({ session, details }: ArtistPageProps) {
   const styles = useStyles()
-  const queryClient = useQueryClient()
+  const albumTracks = useAlbumTracks(session)
   const { coverOf, artistPhotoOf } = useCovers(session)
   const insets = usePageInsets()
-  const formFactor = useFormFactor()
+  const { isStretched, Below, InHero }: ArtistLayout = ARTIST_LAYOUTS[useFormFactor()]
   const playTracks = useAudioQueue((store) => store.playTracks)
   const { artist, albums, appearsOn, isFavourite } = details
   const favourite = useServerArtistFavourite({ api: session.api, artistId: artist.id })
   const photo = artistPhotoOf(artist)
-  const [menu, setMenu] = useState<MenuView | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const source = { kind: QUEUE_SOURCE_KINDS.artist, id: artist.id } as const
   // The artist's songs are their albums' tracks, read only once something plays them.
-  const tracksOf = async (): Promise<readonly Track[]> => {
-    const pages = await Promise.all(
-      albums.map((album) => queryClient.fetchQuery(session.queries.albumQuery(album.id))),
-    )
-    return pages.flatMap((page) => page.tracks)
-  }
+  const tracksOf = () => albumTracks(albums.map(({ id }) => id))
   const play = (isShuffled: boolean) => () => {
     tracksOf().then((tracks) => playTracks({ tracks, source, isShuffled }), toastFailure)
   }
   const follow = () => favourite.attempt({ variables: !isFavourite, onRefused: toastFailure })
-  const { inHero, below } = PLACEMENTS[formFactor]({
-    actions: (
-      <ArtistActions
-        isFollowing={isFavourite}
-        onFollow={follow}
-        onPlay={play(false)}
-        onShuffle={play(true)}
-      />
-    ),
-  })
+  const actions = (
+    <ArtistActions
+      isFollowing={isFavourite}
+      isStretched={isStretched}
+      onFollow={follow}
+      onPlay={play(false)}
+      onShuffle={play(true)}
+    />
+  )
   const sides = { paddingLeft: insets.paddingLeft, paddingRight: insets.paddingRight }
   // TODO(redesign): Top songs, once the server ranks an artist's tracks by plays.
   return (
@@ -130,14 +137,14 @@ function ArtistPage({ session, details }: ArtistPageProps) {
         style={styles.ground}
       >
         <ArtistHero
-          actions={inHero}
+          actions={<InHero>{actions}</InHero>}
           meta={artistMetaOf({ artist })}
           name={artist.name}
-          onMore={() => setMenu(MENU_VIEWS.actions)}
+          onMore={() => setIsMenuOpen(true)}
           photo={photo}
           sides={insets.paddingLeft}
         />
-        {below !== undefined && <View style={[styles.phoneActions, sides]}>{below}</View>}
+        <Below>{actions}</Below>
         {albums.length > 0 && (
           <View style={[styles.section, sides]}>
             <SectionHeader title={ARTIST_COPY.albums} />
@@ -168,28 +175,17 @@ function ArtistPage({ session, details }: ArtistPageProps) {
           </View>
         )}
       </ScrollView>
-      {menu !== null && (
+      {isMenuOpen && (
         <TracksMenu
           canAddToPlaylist={false}
           head={{ title: artist.name, subtitle: artistMetaOf({ artist }) }}
-          onView={setMenu}
+          onClose={() => setIsMenuOpen(false)}
+          places={{}}
           session={session}
           tracksOf={tracksOf}
-          view={menu}
         />
       )}
     </>
-  )
-}
-
-type ServerArtistProps = { session: WrenSession; id: number | null }
-
-function ServerArtist({ session, id }: ServerArtistProps) {
-  const artist = useQuery(session.queries.artistQuery(id))
-  return (
-    <DetailRoute copy={ARTIST_COPY} id={id} query={artist}>
-      {(details) => <ArtistPage details={details} session={session} />}
-    </DetailRoute>
   )
 }
 
@@ -198,8 +194,7 @@ function ServerArtist({ session, id }: ServerArtistProps) {
  * their albums, and the albums of others they appear on.
  */
 export function Artist() {
-  const session = useWren()
-  const params = useLocalSearchParams()
-  const id = routeIdOf(params[WREN_ROUTE_PARAMS.id])
-  return session !== null && <ServerArtist id={id} session={session} />
+  return (
+    <DetailRoute Page={ArtistPage} copy={ARTIST_COPY} queryOf={(queries) => queries.artistQuery} />
+  )
 }

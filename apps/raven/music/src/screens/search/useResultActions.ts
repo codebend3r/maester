@@ -1,16 +1,11 @@
-import {
-  type AlbumSummary,
-  type Artist,
-  QUEUE_SOURCE_KINDS,
-  type Track,
-  artistNames,
-} from '@raven/core'
+import { type AlbumSummary, type Artist, QUEUE_SOURCE_KINDS, type Track } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { useQueryClient } from '@tanstack/react-query'
+import { RECENT_KINDS, recentOfAlbum, recentOfArtist } from '@raven/wren'
 import { useRouter } from 'expo-router'
 
+import { useAlbumTracks } from '@/music/useAlbumTracks'
 import { WREN_PAGES, pageHref } from '@/routes'
-import { RECENT_KINDS, useRecentSearches } from '@/stores/recentSearches'
+import { useRecentSearches } from '@/stores/recentSearches'
 import { toastFailure } from '@/stores/toast'
 import type { WrenSession } from '@/useWren'
 
@@ -24,22 +19,16 @@ type UseResultActionsProps = { session: WrenSession; query: string }
  */
 export const useResultActions = ({ session, query }: UseResultActionsProps) => {
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const albumTracks = useAlbumTracks(session)
   const playTracks = useAudioQueue((store) => store.playTracks)
   const remember = useRecentSearches((state) => state.remember)
-  const rememberAlbum = (album: AlbumSummary) =>
-    remember({
-      kind: RECENT_KINDS.album,
-      id: album.id,
-      title: album.title,
-      artists: artistNames(album),
-    })
+  const rememberAlbum = (album: AlbumSummary) => remember(recentOfAlbum(album))
   const openAlbum = (album: AlbumSummary) => {
     rememberAlbum(album)
     router.push(pageHref({ page: WREN_PAGES.album, id: album.id }))
   }
   const openArtist = (artist: Artist) => {
-    remember({ kind: RECENT_KINDS.artist, id: artist.id, name: artist.name })
+    remember(recentOfArtist(artist))
     router.push(pageHref({ page: WREN_PAGES.artist, id: artist.id }))
   }
   const playSongs = ({ tracks, startAt }: PlaySongsProps) => {
@@ -48,11 +37,10 @@ export const useResultActions = ({ session, query }: UseResultActionsProps) => {
   }
   const playAlbum = (album: AlbumSummary) => {
     rememberAlbum(album)
-    queryClient
-      .fetchQuery(session.queries.albumQuery(album.id))
-      .then((details) =>
+    albumTracks([album.id])
+      .then((tracks) =>
         playTracks({
-          tracks: details.tracks,
+          tracks,
           source: { kind: QUEUE_SOURCE_KINDS.album, id: album.id },
         }),
       )

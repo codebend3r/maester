@@ -24,6 +24,10 @@ export const FIXTURE_SERVER = {
     library: 'Series',
     title: 'Lantern Bay',
     episodes: ['Low Tide', 'High Water'],
+    /** What the second episode's two sidecars say, each for nearly all of the clip. */
+    cues: { english: 'The water is rising.', spanish: 'El agua está subiendo.' },
+    /** The second episode's intro, in seconds, which a chapter of its file names. */
+    intro: { start: 5, end: 25 },
   },
   album: {
     library: 'Music',

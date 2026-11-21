@@ -36,6 +36,24 @@ export type UpNext = {
   isNextSeason?: boolean
 }
 
+/** One video of the session's queue, as the Queue menu lists it and plays it when picked. */
+export type QueueEntry = Pick<UpNext, 'to' | 'state' | 'label'> & {
+  key: string
+  /** The line under the label: "Season 2, Episode 4". */
+  detail: string | null
+  isCurrent: boolean
+}
+
+/** What is left dealt at random, or put back in its own order. */
+type QueueShuffle = { isOn: boolean; set: (isOn: boolean) => void }
+
+/** The videos of the session in the order they play, the one on screen among them. */
+export type PlayerQueue = {
+  entries: readonly QueueEntry[]
+  /** Null where the session has only its own order. */
+  shuffle: QueueShuffle | null
+}
+
 /** The title's art, drawn in the header in place of its name. */
 export type TitleLogo = {
   url: string
@@ -62,6 +80,11 @@ export type PlayerTitle = {
   backTo: string
   /** What plays after this one. */
   next: UpNext | null
+  /**
+   * The session's videos for the Queue menu, the one playing among them; Previous plays the one
+   * before it. Null for a video that plays on its own, whose Previous starts it over.
+   */
+  queue: PlayerQueue | null
   /** The file's intro, credits and chapters; null while unknown, as for a local file. */
   markers: MediaMarkers | null
 }
@@ -130,4 +153,5 @@ export const NO_TITLE_EXTRAS = {
   homeTo: null,
   context: null,
   markers: null,
+  queue: null,
 } as const satisfies Partial<PlayerTitle>

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router'
 
+import { KIT_COPY } from '@raven/wren'
 import { useWrenTheme } from '@/theme/wrenTheme'
-import { KIT_COPY } from '@/ui/copy'
 import { IconButton } from '@/ui/IconButton'
 import { ICONS } from '@/ui/WrenIcon'
 

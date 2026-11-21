@@ -1,7 +1,7 @@
+import { APPEARANCES, SETTINGS_COPY } from '@raven/wren'
 import { View } from 'react-native'
 
-import { SETTINGS_COPY } from '@/screens/copy'
-import { APPEARANCES, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { GroupedList } from '@/ui/GroupedList'

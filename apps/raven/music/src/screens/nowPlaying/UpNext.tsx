@@ -1,18 +1,21 @@
 import { useAudioQueue } from '@raven/ui/headless'
+import {
+  countsLineOf,
+  NOW_PLAYING_COPY,
+  placesToClearOf,
+  PLAYER_COPY,
+  upNextRowsOf,
+} from '@raven/wren'
 import type { ComponentType } from 'react'
 import { FlatList, Text, View } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
-import { placesToClearOf, upNextRowsOf } from '@/screens/nowPlaying/nowPlayingModel'
 import { QueueRow } from '@/screens/nowPlaying/QueueRow'
 import { RepeatToggle, ShuffleToggle } from '@/player/Transport'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { countsLineOf } from '@/ui/counts'
 import { TextLink } from '@/ui/TextLink'
 import type { WrenSession } from '@/useWren'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   upNext: { flex: 1 },
@@ -35,7 +38,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 /** Where Up next sits: under the phone's player, or along the foot of the tablet's. */
 export const UP_NEXT_PLACES = { sheet: 'sheet', panel: 'panel' } as const
 
-type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]
+export type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]
 
 type HeadEndProps = { onClear: () => void; hasRows: boolean }
 
@@ -68,6 +71,12 @@ const HEAD_ENDS = {
   [UP_NEXT_PLACES.panel]: PanelClear,
 } as const satisfies Record<UpNextPlace, ComponentType<HeadEndProps>>
 
+/** How each place lays its list out: a row's height, and the styles its head and its empty line take. */
+const PLACE_LOOKS = {
+  [UP_NEXT_PLACES.sheet]: { height: SIZE.row, head: 'sheetHead', empty: 'sheetEmpty' },
+  [UP_NEXT_PLACES.panel]: { height: SIZE.navRow, head: 'panelHead', empty: null },
+} as const
+
 type UpNextProps = {
   session: WrenSession
   /** The source's name for the line under the heading, or null when it has none. */
@@ -90,13 +99,12 @@ export function UpNext({ session, sourceName, place }: UpNextProps) {
   const rows = upNextRowsOf({ queue, tracks })
   const first = rows[0]?.place ?? 0
   const last = rows.at(-1)?.place ?? 0
-  const isPanel = place === UP_NEXT_PLACES.panel
-  const height = isPanel ? SIZE.navRow : SIZE.row
+  const { height, head, empty } = PLACE_LOOKS[place]
   const HeadEnd = HEAD_ENDS[place]
   const songs = countsLineOf({ songs: rows.length })
   return (
     <View style={styles.upNext}>
-      <View style={[styles.head, isPanel ? styles.panelHead : styles.sheetHead]}>
+      <View style={[styles.head, styles[head]]}>
         <View style={styles.headText}>
           <Text accessibilityRole="header" style={styles.title}>
             {PLAYER_COPY.upNext}
@@ -116,7 +124,7 @@ export function UpNext({ session, sourceName, place }: UpNextProps) {
         data={rows}
         keyExtractor={(row) => row.key}
         ListEmptyComponent={
-          <Text style={[styles.empty, !isPanel && styles.sheetEmpty]}>
+          <Text style={[styles.empty, empty !== null && styles[empty]]}>
             {NOW_PLAYING_COPY.nothingNext}
           </Text>
         }
@@ -124,11 +132,11 @@ export function UpNext({ session, sourceName, place }: UpNextProps) {
           <QueueRow
             first={first}
             height={height}
-            isPanel={isPanel}
             last={last}
             onJump={jump}
             onMove={move}
             onRemove={remove}
+            place={place}
             row={item}
             trackCoverOf={trackCoverOf}
           />
