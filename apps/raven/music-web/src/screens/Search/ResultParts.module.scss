@@ -1,0 +1,81 @@
+@use '../../styles/mixins';
+
+// The card's main press takes the room Play leaves.
+.card {
+  display: grid;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--size-row-gap);
+  align-items: center;
+  padding: var(--space-3);
+}
+
+.cardMain {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--size-row-gap);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.cardText {
+  display: grid;
+  gap: calc(var(--space-1) / 2);
+  min-inline-size: 0;
+}
+
+.overline,
+.cardTitle,
+.cardSubtitle,
+.circleName {
+  @include mixins.one-line;
+}
+
+.overline {
+  @include mixins.overline;
+}
+
+.cardTitle {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.cardSubtitle {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+.circles {
+  display: grid;
+  grid-auto-columns: var(--size-artist-circle-item);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  justify-content: start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cell {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.circle {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  min-inline-size: 0;
+}
+
+.circleName {
+  max-inline-size: 100%;
+  color: var(--color-text);
+  font: var(--type-meta);
+  text-align: center;
+}
+
+// The scroller clips what is drawn outside a circle, so its ring is drawn inside it.
+.circle:focus-visible {
+  outline-offset: calc(-1 * var(--size-focus-ring));
+}

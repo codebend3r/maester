@@ -2,6 +2,10 @@
 
 `@raven/music` is Wren, raven's music app for iPhone, iPad and Android phones: an Expo app with `expo-router`, touch only, with a look of its own. Its design is `docs/superpowers/specs/2026-10-27-raven-audio-design.md` (PR 8 on), and its plan `docs/superpowers/plans/2026-10-30-raven-music-standalone.md`. The rules that apply to it are in the root `CLAUDE.md` and `apps/raven/CLAUDE.md`; this file holds what only Wren needs.
 
+## Wren on the web
+
+- **Wren also ships on the web, as `@raven/music-web`** (`apps/raven/music-web`), the same app screen for screen. A user-facing change here (a screen, a word, an order, a state, what a press does, a token) needs its counterpart there in the same change, and `.claude/agents/wren-parity.md` checks it. What is allowed to differ is listed in `apps/raven/music-web/CLAUDE.md`, "Differences from the phone and tablet apps".
+
 ## Names
 
 - The app is named Wren, so the Xcode workspace and scheme are `Wren` and the simulator build is `build/ios/Build/Products/Release-iphonesimulator/Wren.app`.

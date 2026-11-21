@@ -1,0 +1,21 @@
+/*
+ * The hero runs to the page's edges and its top, so the page keeps only its foot's padding and
+ * each part under the hero takes the side margins itself.
+ */
+.artist {
+  --page-pad-top: 0;
+  --page-pad-side: 0;
+}
+
+// Play and Shuffle share the row; Follow keeps its circle at the end.
+.actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding-inline: var(--page-gutter);
+}
+
+.section {
+  padding-inline: var(--page-gutter);
+}

@@ -1,0 +1,49 @@
+@use '../../styles/mixins';
+
+// An outlined button on the wide layout, a red link on the narrow.
+.button {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  padding-inline: var(--space-4);
+  border: var(--size-hairline) solid var(--color-line-2);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font: var(--type-row-title);
+  white-space: nowrap;
+
+  @media (max-width: 48rem) {
+    padding-inline: 0;
+    border: 0;
+    color: var(--color-accent-text);
+  }
+}
+
+.options {
+  display: grid;
+  padding-block: var(--space-2);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: var(--size-nav-row);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-item);
+  color: var(--color-text);
+  font: var(--type-row-title);
+
+  @include mixins.press-feedback;
+}
+
+.optionLabel {
+  @include mixins.one-line;
+}
+
+.chosen {
+  color: var(--color-accent-text);
+}

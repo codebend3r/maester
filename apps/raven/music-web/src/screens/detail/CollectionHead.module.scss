@@ -1,0 +1,83 @@
+.head {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+
+  @media (max-width: 48rem) {
+    padding-block-end: var(--space-3);
+  }
+}
+
+.nav {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+// A column from its start on the wide layout; centred under the nav bar on the narrow one.
+.body {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+
+  @media (max-width: 48rem) {
+    gap: 0;
+    justify-items: center;
+  }
+}
+
+.cover {
+  display: grid;
+  inline-size: var(--size-detail-cover-wide);
+  max-inline-size: 100%;
+
+  @media (max-width: 48rem) {
+    inline-size: var(--size-detail-cover);
+  }
+}
+
+.title {
+  padding-block-start: var(--space-4);
+  color: var(--color-text);
+  font: var(--type-large-title);
+  overflow-wrap: anywhere;
+
+  @media (max-width: 48rem) {
+    padding-block-start: var(--space-5);
+    font: var(--type-album-title);
+    text-align: center;
+  }
+}
+
+.meta {
+  color: var(--color-text-3);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+
+  @media (max-width: 48rem) {
+    padding-block-start: var(--space-1);
+    text-align: center;
+  }
+}
+
+.play {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  inline-size: 100%;
+  padding-block-start: var(--space-4);
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  justify-content: start;
+  padding-block-start: var(--space-2);
+
+  @media (max-width: 48rem) {
+    gap: var(--space-6);
+    justify-content: center;
+  }
+}

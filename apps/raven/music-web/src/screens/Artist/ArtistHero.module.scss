@@ -1,0 +1,113 @@
+// The fade to the ground covers this share of the hero, from its foot.
+$fade-share: 47%;
+
+// The fallback's circle, as shares of the hero's height: its size and how far it hangs off.
+$shape-size: 1.2;
+$shape-right: -0.3;
+$shape-top: -0.27;
+
+// The initial is set at this share of its circle, as an artist's avatar sets it.
+$initial-share: 0.42;
+
+.hero {
+  --hero-height: var(--size-detail-hero-wide);
+
+  position: relative;
+  display: grid;
+  grid-template-areas:
+    'bar'
+    'foot';
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: var(--hero-height);
+  overflow: hidden;
+  background: var(--color-surface);
+
+  @media (max-width: 48rem) {
+    --hero-height: var(--size-detail-hero);
+  }
+}
+
+.shape {
+  --shape-size: calc(var(--hero-height) * #{$shape-size});
+
+  position: absolute;
+  inset-block-start: calc(var(--hero-height) * #{$shape-top});
+  inset-inline-end: calc(var(--hero-height) * #{$shape-right});
+  display: grid;
+  place-items: center;
+  inline-size: var(--shape-size);
+  block-size: var(--shape-size);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  font-family: var(--font-display);
+  font-size: calc(var(--shape-size) * #{$initial-share});
+  line-height: var(--line-tight);
+}
+
+.photo {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.fade {
+  position: absolute;
+  inset: auto 0 0;
+  block-size: $fade-share;
+  background: linear-gradient(to bottom, transparent, var(--color-bg));
+}
+
+.bar {
+  position: relative;
+  display: grid;
+  grid-area: bar;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3) 0 var(--space-2);
+
+  @media (max-width: 48rem) {
+    padding-block-start: calc(env(safe-area-inset-top) + var(--space-2));
+  }
+}
+
+// The name lines up with what follows the hero: the page's own side margins.
+.foot {
+  position: relative;
+  display: grid;
+  grid-area: foot;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: end;
+  padding: 0 var(--page-gutter) var(--space-4);
+}
+
+.names {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.name {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text);
+  font: var(--type-artist-name);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.meta {
+  color: var(--color-text-2);
+  font: var(--type-time);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  align-items: center;
+}

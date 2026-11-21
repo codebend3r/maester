@@ -1,0 +1,28 @@
+.split {
+  grid-template-areas: 'head list';
+  // The head is held at its width, so a long title never squeezes the tracklist.
+  grid-template-columns: var(--size-detail-column) minmax(0, 1fr);
+  gap: var(--space-10);
+  align-items: start;
+
+  @media (max-width: 48rem) {
+    grid-template-areas:
+      'head'
+      'list';
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+.head {
+  display: grid;
+  grid-area: head;
+  min-inline-size: 0;
+}
+
+.list {
+  display: grid;
+  grid-area: list;
+  align-content: start;
+  min-inline-size: 0;
+}
