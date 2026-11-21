@@ -1,7 +1,7 @@
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
-import type { Account } from '@raven/core'
+import type { Account, ReadyAuthConfig } from '@raven/core'
 import { AUTH_CONFIG_STATES, AUTH_COOKIE, MEMBER_STATUSES } from '@raven/core'
-import type { AuthClient, ReadyAuthConfig } from '@/lib/authClient'
+import type { AuthClient } from '@/lib/authClient'
 import type { SessionSummary } from '@/stores/authSession'
 
 /** What the server says about accounts when they are on, pointing at the local stack. */
