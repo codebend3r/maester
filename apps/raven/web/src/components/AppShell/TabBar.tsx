@@ -1,4 +1,3 @@
-import { DESKTOP_PATHS } from '@raven/core'
 import { type ComponentType, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
@@ -7,7 +6,6 @@ import { MoreSheet } from '@/components/AppShell/MoreSheet'
 import { NAV_PLACES } from '@/components/AppShell/navPlaces'
 import { Tab, TabButton, TabStrip, type TabTarget } from '@/components/TabStrip/TabStrip'
 import { APP_PATHS } from '@/lib/appPaths'
-import { useComputerName, useIsDesktop } from '@/stores/desktop'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 
@@ -23,21 +21,10 @@ const MANAGE_TABS = [
   { ...NAV_PLACES.reports, label: APP_SHELL_COPY.reports },
 ] as const satisfies readonly TabTarget[]
 
-/*
- * The pages that need no server: Raven's files on this computer, and the downloads wherever the
- * page keeps any, inside Raven or in a browser that can.
- */
+// The pages that need no server: the downloads, wherever the page keeps any, inside Raven or in a browser that can.
 const useHostTabs = (): readonly TabTarget[] => {
-  const isDesktop = useIsDesktop()
   const hasDownloads = useDownloadsHostOrNone() !== null
-  const computer = useComputerName()
-  const local = {
-    to: DESKTOP_PATHS.local,
-    patterns: [DESKTOP_PATHS.local],
-    icon: 'file-play',
-    label: APP_SHELL_COPY.thisComputer(computer),
-  } as const satisfies TabTarget
-  return [...(isDesktop ? [local] : []), ...(hasDownloads ? [NAV_PLACES.downloads] : [])]
+  return hasDownloads ? [NAV_PLACES.downloads] : []
 }
 
 type TabBarProps = {
@@ -128,11 +115,11 @@ const TAB_BARS = {
  * of the screen. Home, Libraries (which any library's pages mark),
  * Favourites, Music while a music library exists or else Binge, then More,
  * which opens a sheet of the rest: Binge when Music took its place, Coming soon, Play
- * history, Notifications, On this Mac in Raven, Downloads wherever the page keeps any, Settings,
+ * history, Notifications, Downloads wherever the page keeps any, Settings,
  * and for whoever may manage, Admin, Streams and Reports. More is marked while its sheet is open
  * or one of its pages is. The sheet closes on a choice, Escape, a tap on the
  * page or a new page. While the server cannot be reached, the bar keeps only
- * On this Mac, Downloads and Settings, with no More.
+ * Downloads and Settings, with no More.
  */
 export const TabBar = ({ hasMusic }: TabBarProps) => {
   const isOffline = useServerReach((state) => state.isOffline)

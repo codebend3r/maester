@@ -2,7 +2,6 @@
 export const DESKTOP_QUERY_KEYS = {
   downloads: ['desktop', 'downloads'],
   space: ['desktop', 'space'],
-  recents: ['desktop', 'recents'],
   updates: ['desktop', 'updates'],
   output: ['desktop', 'output'],
   file: ['desktop', 'file'],

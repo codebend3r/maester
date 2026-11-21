@@ -1,4 +1,4 @@
-import { WATCHED_STATES, type WatchedState } from '@raven/core'
+import { ITEM_TYPES, type MediaItem, WATCHED_STATES, type WatchedState } from '@raven/core'
 
 import {
   DOWNLOAD_ACTIONS,
@@ -21,16 +21,25 @@ export const CARD_MENU_COPY = {
   cancelDownload: 'Cancel download',
   retryDownload: 'Retry download',
   removeDownload: 'Remove download',
+  deleteEpisode: 'Delete this episode',
+  deleteMovie: 'Delete this movie',
+  deleteVideo: 'Delete this video',
+  deleteAsk: (name: string) => `Delete ${name}?`,
+  deleteHint: 'Its file is deleted from the server for good. This cannot be undone.',
+  keep: 'Keep',
+  deleteForGood: 'Delete for good',
+  deleteFailed: (name: string) => `${name} could not be deleted`,
   reading: 'Reading the title',
   failed: 'The title could not be read.',
 } as const
 
-/** What a line of the menu does: a mark, the download, or one of the ways up. */
+/** What a line of the menu does: a mark, the download, the owner's delete, or one of the ways up. */
 const CARD_MENU_ACTIONS = {
   watched: 'watched',
   favourite: 'favourite',
   binge: 'binge',
   download: 'download',
+  delete: 'delete',
   ...LINK_KINDS,
 } as const
 
@@ -42,6 +51,8 @@ export type CardMenuOption = {
   label: string
   /** What blocks the option now, drawn under it faint; null while it can be taken. */
   blockedBy: string | null
+  /** Set on the one line that cannot be undone, which a sheet draws in red. */
+  isDestructive?: boolean
   onPress: () => void
 }
 
@@ -110,6 +121,24 @@ export const downloadOptionOf = ({ control, onPress }: DownloadButton): CardMenu
     },
   ]
 }
+
+/** What the owner's delete line says: an episode and a movie by name, any other file as a video. */
+const deleteLabelOf = (media: MediaItem): string => {
+  const type = media.item?.type ?? null
+  if (type === ITEM_TYPES.episode) return CARD_MENU_COPY.deleteEpisode
+  return type === ITEM_TYPES.movie ? CARD_MENU_COPY.deleteMovie : CARD_MENU_COPY.deleteVideo
+}
+
+type DeleteOptionOfProps = { media: MediaItem; onDelete: () => void }
+
+/** The owner's Delete this episode, or Delete this movie: its press asks first, since the file goes for good. */
+export const deleteOptionOf = ({ media, onDelete }: DeleteOptionOfProps): CardMenuOption => ({
+  key: CARD_MENU_ACTIONS.delete,
+  label: deleteLabelOf(media),
+  blockedBy: null,
+  isDestructive: true,
+  onPress: onDelete,
+})
 
 type LinkOptionOfProps = { link: ItemLink; onOpen: (link: ItemLink) => void }
 

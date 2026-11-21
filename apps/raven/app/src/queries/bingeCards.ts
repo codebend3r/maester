@@ -1,11 +1,13 @@
 import {
   BINGE_STATUS_KINDS,
+  type BingeSeen,
   type BingeStatus,
   ITEM_IMAGE_KINDS,
   type ItemDetails,
   type MediaItem,
   bingeCardFacts,
   episodeCode,
+  mediaLabel,
   pictureParts,
   progressOf,
 } from '@raven/core'
@@ -13,12 +15,16 @@ import {
 import {
   CARD_SHAPES,
   CARD_SUBJECTS,
+  type Picture,
   type Pictures,
   type ShelfCard,
   pictureAt,
 } from '@/queries/cards'
+import { joinedOrNull } from '@/queries/lines'
 import { timeLeftOf } from '@/queries/timeLeft'
 import { ROUTE_TARGETS, type RouteTarget } from '@/routes'
+
+type StartProps = { season: number; episode: number }
 
 export const BINGE_COPY = {
   title: 'Binge',
@@ -26,6 +32,14 @@ export const BINGE_COPY = {
   starring: 'Starring',
   separator: ' · ',
   listSeparator: ', ',
+  play: 'Play',
+  /** What a row says of a show not started, the web's words; a card has room only for the code. */
+  start: ({ season, episode }: StartProps) => `Start season ${season} episode ${episode}`,
+  /** How much of a show is watched, as the web's Binge row words it. */
+  episodesSeen: ({ watched, total }: BingeSeen) =>
+    `${watched} of ${total} ${total === 1 ? 'episode' : 'episodes'}`,
+  percentSeen: (percent: number) => `${percent}%`,
+  seenLabel: ({ watched, total }: BingeSeen) => `${watched} of ${total} episodes watched`,
 } as const
 
 /**
@@ -46,6 +60,14 @@ export type BingeCard = ShelfCard & {
   status: string | null
   /** The show's page, which the title art opens. */
   page: RouteTarget
+  /** The show's poster, which the Binge page's row wears; null with none. */
+  poster: Picture | null
+  /** What a row says of the episode: what is left of it, or "Start season 1 episode 2"; null with none. */
+  rowStatus: string | null
+  /** What the row's resume button is called aloud, "Play" and the episode's own label; null with no episode left. */
+  playLabel: string | null
+  /** How many of the show's episodes on disk are watched, of how many; null with none on disk. */
+  seen: BingeSeen | null
 }
 
 /** "23m left" once started, else the code of the episode it starts on, "S01E02", as a card has room for. */
@@ -63,12 +85,11 @@ const statusWordsOf = (status: BingeStatus | null): string | null => {
   }
 }
 
-type JoinedOrNullProps = { parts: readonly (string | null)[]; separator: string }
-
-const joinedOrNull = ({ parts, separator }: JoinedOrNullProps): string | null => {
-  const words = parts.filter((part): part is string => part !== null && part !== '')
-  return words.length === 0 ? null : words.join(separator)
-}
+/** A row's words for the episode, the web's: "23m left" once started, else "Start season 1 episode 2". */
+const rowStatusOf = (status: BingeStatus | null): string | null =>
+  status !== null && status.kind === BINGE_STATUS_KINDS.start
+    ? BINGE_COPY.start({ season: status.season, episode: status.episode })
+    : statusWordsOf(status)
 
 type BingeCardOfProps = Pictures & {
   show: ItemDetails
@@ -132,8 +153,29 @@ export const bingeCardOf = ({
     synopsis: facts.synopsis,
     status: statusWordsOf(facts.status),
     page,
+    poster: pictureAt({
+      uri: api.itemImageUrl({
+        id: show.id,
+        kind: ITEM_IMAGE_KINDS.poster,
+        version: show.posterVersion,
+      }),
+      headersFor,
+    }),
+    rowStatus: rowStatusOf(facts.status),
+    playLabel: next === null ? null : `${BINGE_COPY.play} ${mediaLabel(next)}`,
+    seen: facts.seen,
   }
 }
+
+/** The share of a show that is watched, from 0 to 1. */
+export const seenShareOf = ({ watched, total }: BingeSeen): number =>
+  total > 0 ? watched / total : 0
+
+/** "3 of 9 episodes · 33%", as the web's Binge row says beside its bar. */
+export const seenWordsOf = (seen: BingeSeen): string =>
+  [BINGE_COPY.episodesSeen(seen), BINGE_COPY.percentSeen(Math.round(seenShareOf(seen) * 100))].join(
+    BINGE_COPY.separator,
+  )
 
 /** What a screen reader says of a binge card's title art, which opens the show's page. */
 export const bingeArtLabelOf = (card: Pick<BingeCard, 'title'>): string =>

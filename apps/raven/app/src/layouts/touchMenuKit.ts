@@ -1,7 +1,8 @@
 import { DOWNLOAD_COPY } from '@/downloads/copy'
 import { BINGE_COPY } from '@/queries/bingeCards'
-import { HOME_NAV_COPY, LIBRARIES_ENTRY } from '@/layouts/copy'
+import { FAVOURITES_ENTRY, HOME_NAV_COPY, LIBRARIES_ENTRY } from '@/layouts/copy'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
+import { COMING_SOON_COPY } from '@/queries/comingSoonCopy'
 import { APP_ROUTES } from '@/routes'
 
 /** What the touch header's buttons and the side menu are called aloud, and the field's button. */
@@ -13,9 +14,10 @@ export const TOUCH_NAV_COPY = {
   sideMenu: 'Menu',
   theme: 'Theme',
   runSearch: 'Search',
-  favourites: 'Favourites',
+  favourites: FAVOURITES_ENTRY.label,
   continueWatching: CONTINUE_WATCHING,
   binge: BINGE_COPY.title,
+  comingSoon: COMING_SOON_COPY.title,
   downloads: DOWNLOAD_COPY.title,
   libraries: LIBRARIES_ENTRY.label,
 } as const

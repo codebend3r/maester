@@ -38,6 +38,8 @@ export const ITEM_COPY = {
   bingeLimit: 'You can binge up to three shows. Remove a show to make room for another.',
 } as const
 
+type FinishedEmptyProps = { name: string; percent: number }
+
 export const LIBRARY_COPY = {
   library: 'Library',
   opening: 'Opening the library',
@@ -48,8 +50,20 @@ export const LIBRARY_COPY = {
     shows: 'Gathering the shows',
     videos: 'Gathering the videos',
     sagas: 'Gathering the sagas',
+    favourites: 'Gathering the favourites',
+    finished: 'Gathering what was finished',
   },
   sagas: 'Sagas',
+  all: 'All',
+  inProgressPage: 'In progress',
+  favourites: 'Favourites',
+  recentlyFinished: 'Recently finished',
+  favourite: { one: 'favourite', many: 'favourites' },
+  finished: { one: 'video finished', many: 'videos finished' },
+  favouritesEmpty: (name: string) =>
+    `No favourites in ${name} yet. Hold a video and choose Add to favourites, or press the heart on a show's page.`,
+  finishedEmpty: ({ name, percent }: FinishedEmptyProps) =>
+    `Nothing finished in ${name} yet. A video counts once playback gets ${percent}% of the way through, or when you mark it watched.`,
   saga: { one: 'saga', many: 'sagas' },
   sagasEmpty: (name: string) =>
     `No sagas in ${name} yet. One shows here once two movies or more from the same TMDB collection are in the library.`,

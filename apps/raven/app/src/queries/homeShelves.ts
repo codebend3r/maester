@@ -46,7 +46,7 @@ export type ShelfView = {
 
 export const CONTINUE_WATCHING = 'Continue watching'
 
-/** How many of the videos in progress Home shows, as the web's: three rows of two. */
+/** How many of the videos in progress Home shows: three rows of two, the app's own count, where the web shows nine. */
 export const HOME_CONTINUE_COUNT = 6
 
 const IN_PROGRESS_KEY = 'in-progress'

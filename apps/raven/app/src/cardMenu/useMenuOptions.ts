@@ -4,15 +4,19 @@ import {
   type ItemDetails,
   type MediaItem,
   episodesOf,
+  mediaLabel,
   seasonsOf,
 } from '@raven/core'
-import { useServerAlbumFavourite } from '@raven/ui/headless'
+import { useServerAlbumFavourite, useServerMediaMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
+import { useOwnerId } from '@/account/useOwnerId'
+import { confirmDeleteVideo } from '@/cardMenu/confirmDeleteVideo'
 import {
   type CardMenuOption,
   bingeOptionOf,
+  deleteOptionOf,
   downloadOptionOf,
   favouriteOptionOf,
   linkOptionOf,
@@ -93,7 +97,8 @@ type UseVideoMenuOptionsProps = MenuOptionsProps & { media: MediaItem }
  * A movie's or an episode's menu: Download for its file (or the server's copy, or why neither),
  * Watched and Favourite unless its library is locked, as its page offers them, then its ways
  * up: an episode's show and season, a movie's saga. A file with no page downloads under its
- * own name and has no way up.
+ * own name and has no way up. The owner's menu ends in Delete this episode, or Delete this
+ * movie, which asks before the file leaves the server.
  */
 export const useVideoMenuOptions = ({
   session,
@@ -118,11 +123,21 @@ export const useVideoMenuOptions = ({
     }),
   })
   const onOpen = (link: ItemLink) => router.push(hrefOf(link.target))
+  const isOwner = useOwnerId(session) !== null
+  const { remove } = useServerMediaMutations({ api, media })
+  // Awaited by the alert, which outlives the menu, so a refusal is still told once the menu is gone.
+  const onDelete = () =>
+    confirmDeleteVideo({
+      name: mediaLabel(media),
+      fileName: media.fileName,
+      onDelete: () => remove.mutateAsync(),
+    })
   return [
     ...downloadOptionsOf({ canDownload, download }),
     watchedOptionOf(marks.watched),
     ...(marks.favourite === null ? [] : [favouriteOptionOf(marks.favourite)]),
     ...links.map((link) => linkOptionOf({ link, onOpen })),
+    ...(isOwner ? [deleteOptionOf({ media, onDelete })] : []),
   ]
 }
 

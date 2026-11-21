@@ -13,7 +13,7 @@ const describeError = (error: unknown): string =>
 
 type CreateRequestHandlerProps = {
   isTrustedSender: (frameUrl: string | null) => boolean
-  handle: (envelope: unknown) => Promise<DesktopReply>
+  handle: (request: unknown) => Promise<DesktopReply>
   warn: (message: string) => void
 }
 

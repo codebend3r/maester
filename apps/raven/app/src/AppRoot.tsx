@@ -177,6 +177,8 @@ const AppRoutes = () => {
               <Stack.Screen name={APP_SCREENS.search} />
               <Stack.Screen name={APP_SCREENS.favourites} />
               <Stack.Screen name={APP_SCREENS.continueWatching} />
+              <Stack.Screen name={APP_SCREENS.comingSoon} />
+              <Stack.Screen name={APP_SCREENS.comingSoonTitle} />
               <Stack.Screen name={APP_SCREENS.libraries} />
               <Stack.Screen name={APP_SCREENS.settings} />
               <Stack.Screen name={APP_SCREENS.downloads} />

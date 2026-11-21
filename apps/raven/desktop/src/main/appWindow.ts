@@ -183,11 +183,11 @@ export const answerRequests = ({ service, grants, appLog: { log, warn } }: Answe
   const answer = createRequestHandler({
     isTrustedSender,
     // The page describes a file as it opens it, so this is where a local open is logged.
-    handle: (envelope) => {
-      const fileId = describedFileId(envelope)
+    handle: (request) => {
+      const fileId = describedFileId(request)
       const file = fileId === null ? null : grants.fileOf(fileId)
       if (file !== null) log.info(openLine({ kind: PLAYER_SOURCE_KINDS.file, path: file.path }))
-      return service.handle(envelope)
+      return service.handle(request)
     },
     warn,
   })

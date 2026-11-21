@@ -8,8 +8,12 @@ type SideMenu = {
   collapsed: boolean
   /** Whether the tip about the B shortcut has done its job. */
   tipSeen: boolean
-  /** Whether the group under Manage (Libraries, Streams and the rest) is folded away. */
-  isManageFolded: boolean
+  /**
+   * Whether the group under Manage (Libraries, Streams and the rest) is
+   * showing. It replaced `isManageFolded`, whose old default of open every
+   * browser had saved, so a new name starts them all closed.
+   */
+  isManageOpen: boolean
   toggle: () => void
   dismissTip: () => void
   toggleManage: () => void
@@ -17,7 +21,7 @@ type SideMenu = {
 
 /**
  * Whether the side menu is down to its icons, and whether its Manage group
- * is folded away, kept across visits. Using the toggle, by key or by click,
+ * is showing, kept across visits. Using the toggle, by key or by click,
  * counts as having seen the tip about it.
  */
 export const useSideMenu = create<SideMenu>()(
@@ -27,11 +31,11 @@ export const useSideMenu = create<SideMenu>()(
     state: (set) => ({
       collapsed: false,
       tipSeen: false,
-      isManageFolded: true,
+      isManageOpen: false,
       toggle: () => set((current) => ({ collapsed: !current.collapsed, tipSeen: true })),
       dismissTip: () => set({ tipSeen: true }),
-      toggleManage: () => set((current) => ({ isManageFolded: !current.isManageFolded })),
+      toggleManage: () => set((current) => ({ isManageOpen: !current.isManageOpen })),
     }),
-    keep: ({ collapsed, tipSeen, isManageFolded }) => ({ collapsed, tipSeen, isManageFolded }),
+    keep: ({ collapsed, tipSeen, isManageOpen }) => ({ collapsed, tipSeen, isManageOpen }),
   }),
 )

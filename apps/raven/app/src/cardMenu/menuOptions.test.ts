@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test'
-import { WATCHED_STATES } from '@raven/core'
+import { ITEM_TYPES, type ItemSummary, WATCHED_STATES } from '@raven/core'
+import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import {
   CARD_MENU_COPY,
   bingeOptionOf,
+  deleteOptionOf,
   downloadOptionOf,
   favouriteOptionOf,
   isOptionBlocked,
@@ -129,5 +131,28 @@ describe('readingNoteOf', () => {
   it('says the title is being read, or that the read failed', () => {
     expect(readingNoteOf(false)).toBe(CARD_MENU_COPY.reading)
     expect(readingNoteOf(true)).toBe(CARD_MENU_COPY.failed)
+  })
+})
+
+describe('deleteOptionOf', () => {
+  const media = mediaItemFor({ id: 4, libraryId: 1, title: 'Clip', fileName: 'Clip.mkv' })
+  const labelOf = (type: ItemSummary['type'] | null): string =>
+    deleteOptionOf({
+      media: { ...media, item: type === null ? null : summaryFor({ id: 9, type, title: 'Clip' }) },
+      onDelete: () => undefined,
+    }).label
+
+  it('names an episode and a movie, and calls any other file a video', () => {
+    expect(labelOf(ITEM_TYPES.episode)).toBe(CARD_MENU_COPY.deleteEpisode)
+    expect(labelOf(ITEM_TYPES.movie)).toBe(CARD_MENU_COPY.deleteMovie)
+    expect(labelOf(null)).toBe(CARD_MENU_COPY.deleteVideo)
+  })
+
+  it('is the one line a sheet marks as what cannot be undone, and asks on its press', () => {
+    const asked: string[] = []
+    const option = deleteOptionOf({ media, onDelete: () => asked.push('ask') })
+    expect(option.isDestructive).toBe(true)
+    option.onPress()
+    expect(asked).toEqual(['ask'])
   })
 })

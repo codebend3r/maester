@@ -26,7 +26,7 @@ const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
  * the page finds no server and opens the offline frame. Never the build's default, which on a
  * developer's Mac may be a real raven.
  */
-const NO_SERVER = 'http://127.0.0.1:9'
+export const NO_SERVER = 'http://127.0.0.1:9'
 
 type ServerEnvProps = { origin: string }
 
@@ -251,18 +251,6 @@ export const withApp = async <T>({ userData, mpv, env, run }: WithAppProps<T>): 
   return result
 }
 
-type OpenFileProps = {
-  app: ElectronApplication
-  path: string
-}
-
-/** The event Finder sends for "Open With" and a double-click, emitted on the running app. */
-export const openFile = async ({ app, path }: OpenFileProps): Promise<void> => {
-  await app.evaluate(({ app: electronApp }, file) => {
-    electronApp.emit('open-file', { preventDefault: () => undefined }, file)
-  }, path)
-}
-
 type OpenUrlProps = { app: ElectronApplication; url: string }
 
 /** The event macOS sends for a `raven://` link, emitted on the running app. */
@@ -338,16 +326,18 @@ type WatchedPercentProps = {
   label: string
 }
 
-/** The share of `label` main has stored as watched, in whole percent, as On this Mac labels it. */
+/**
+ * The share of the download named `label` main has stored as watched, in whole percent, as its
+ * row on Downloads shows it; null until main has read its file.
+ */
 export const watchedPercent = async ({
   page,
   label,
 }: WatchedPercentProps): Promise<number | null> => {
-  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listRecents } })
-  if (reply === null || reply.type !== DESKTOP_REPLIES.recents) return null
-  const recent = reply.recents.find((entry) => entry.label === label)
-  if (recent === undefined || recent.watched === null) return null
-  return Math.round(recent.watched * 100)
+  const reply = await requestFromPage({ page, request: { type: DESKTOP_REQUESTS.listDownloads } })
+  if (reply === null || reply.type !== DESKTOP_REPLIES.downloads) return null
+  const watched = reply.downloads.find((download) => download.label === label)?.watched ?? null
+  return watched === null ? null : Math.round(watched * 100)
 }
 
 type HeadingProps = { page: Page; name: string }

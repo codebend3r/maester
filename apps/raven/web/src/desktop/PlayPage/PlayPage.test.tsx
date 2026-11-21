@@ -52,7 +52,6 @@ const CLIP_A: LocalFile = {
   fileId: A,
   label: 'Clip 01',
   folder: 'Clips',
-  isDownload: false,
   mediaId: null,
   logo: null,
   resumeAt: 0,
@@ -130,7 +129,7 @@ describe('PlayPage', () => {
   })
 
   it('says under the title where a download came from', async () => {
-    const download: LocalFile = { ...CLIP_A, folder: 'Downloaded from raven', isDownload: true }
+    const download: LocalFile = { ...CLIP_A, folder: 'Downloaded from raven' }
     renderPlayers({
       client: playMain({ describeFile: () => ({ type: DESKTOP_REPLIES.file, file: download }) }),
       route: playPathOf(A),
@@ -142,7 +141,7 @@ describe('PlayPage', () => {
     const { menu } = renderPlayers({
       client: playMain(),
       route: playPathOf(A),
-      behind: [DESKTOP_PATHS.local],
+      behind: [DESKTOP_PATHS.downloads],
     })
     await videoOf(A)
     expect(screen.getByRole('link', { name: 'Up next: Clip 02' })).toHaveAttribute(
@@ -153,7 +152,7 @@ describe('PlayPage', () => {
     await screen.findByRole('heading', { name: 'Clip 02' })
     // Replaced: Back leaves the player for the page that opened the first video.
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.local))
+    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.downloads))
   })
 
   it('does nothing for the menu next when no video follows', async () => {
@@ -163,20 +162,9 @@ describe('PlayPage', () => {
     expect(screen.getByRole('heading', { name: 'Clip 02' })).toBeInTheDocument()
   })
 
-  it('goes back to On this Mac with no page behind it', async () => {
+  it('goes back to Downloads with no page behind it', async () => {
     renderPlayers({ client: playMain(), route: playPathOf(A) })
     await videoOf(A)
-    await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.local))
-  })
-
-  it('goes back to Downloads from a download with no page behind it', async () => {
-    const download: LocalFile = { ...CLIP_A, isDownload: true }
-    renderPlayers({
-      client: playMain({ describeFile: () => ({ type: DESKTOP_REPLIES.file, file: download }) }),
-      route: playPathOf(A),
-    })
-    await screen.findByRole('heading', { name: 'Clip 01' })
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
     await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.downloads))
   })
@@ -246,7 +234,7 @@ describe('PlayPage', () => {
     })
     expect(await screen.findByRole('alert')).toHaveTextContent('That video is gone.')
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.local))
+    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.downloads))
   })
 
   it('goes back to the page that opened a video it cannot open, as Downloads', async () => {
@@ -283,7 +271,7 @@ describe('PlayPage', () => {
     })
     await settled()
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.local))
+    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.downloads))
   })
 
   it('says it cannot open an answer that is no file', async () => {
@@ -305,7 +293,6 @@ describe('PlayPage title art', () => {
     ...CLIP_A,
     label: 'Busboys',
     folder: 'Downloaded from raven',
-    isDownload: true,
     mediaId: 7,
   }
   const describeDownload = () => ({ type: DESKTOP_REPLIES.file, file: DOWNLOAD }) as const
@@ -398,7 +385,7 @@ describe('PlayPage title art', () => {
     expect(getMarkers).not.toHaveBeenCalled()
   })
 
-  it('spells a local file out, asking the server nothing', async () => {
+  it('spells out a download with no media on the server, asking it nothing', async () => {
     const { getMedia, getMarkers } = stubServer()
     signIn()
     renderPlayers({ client: playMain(), route: playPathOf(A) })
@@ -512,7 +499,7 @@ describe('PlayPage engines', () => {
     await screen.findByRole('heading', { name: 'Clip 01' })
     await settled()
     await userEvent.click(screen.getByRole('button', { name: 'Back' }))
-    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.local))
+    await waitFor(() => expect(where()).toBe(DESKTOP_PATHS.downloads))
     expect(fake.send).toHaveBeenLastCalledWith({ type: PLAYER_COMMANDS.stop })
     expect(sentOfType({ client, type: DESKTOP_REQUESTS.windowButtons })).toContainEqual({
       type: DESKTOP_REQUESTS.windowButtons,

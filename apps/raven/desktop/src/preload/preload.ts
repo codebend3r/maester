@@ -1,37 +1,20 @@
 import {
-  ENVELOPE_KINDS,
-  type InvokeEnvelope,
   PAGE_ORIGIN,
   RAVEN_DESKTOP_BRIDGE_KEY,
   type RavenDesktopBridge,
   WINDOW_MESSAGE_TYPES,
 } from '@raven/core'
 import { desktopPlatformFor } from '@/shared/platform'
-import { contextBridge, type IpcRendererEvent, ipcRenderer, webUtils } from 'electron'
-import { dropPaths } from '@/preload/dropPaths'
+import { contextBridge, type IpcRendererEvent, ipcRenderer } from 'electron'
 import { forwardPlayerPort } from '@/preload/playerPort'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
-// The page's request goes on unchecked: main narrows the whole envelope at its boundary.
-type Envelope =
-  | Extract<InvokeEnvelope, { kind: typeof ENVELOPE_KINDS.drop }>
-  | { kind: typeof ENVELOPE_KINDS.page; request: unknown }
-
-const invoke = (envelope: Envelope): Promise<unknown> =>
-  ipcRenderer.invoke(IPC_CHANNELS.request, envelope)
-
 /*
- * The preload builds the envelope, so the page can ask for things but never hand main a path:
- * only a drop carries paths, and those come from `webUtils`, not from the page.
+ * The page's request goes on unchecked: main narrows it at its boundary. No request carries a
+ * path, so the page can never hand main one.
  */
 const bridge = {
-  request: (request) => invoke({ kind: ENVELOPE_KINDS.page, request }),
-  // Typed as what it is: whatever the page passed, which `dropPaths` checks itself.
-  dropFiles: (files: unknown) =>
-    invoke({
-      kind: ENVELOPE_KINDS.drop,
-      paths: dropPaths({ files, pathOf: (file) => webUtils.getPathForFile(file) }),
-    }),
+  request: (request: unknown) => ipcRenderer.invoke(IPC_CHANNELS.request, request),
   subscribe: (listener) => {
     const handler = (_event: IpcRendererEvent, payload: unknown) => listener(payload)
     ipcRenderer.on(IPC_CHANNELS.event, handler)

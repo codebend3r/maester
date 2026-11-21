@@ -76,23 +76,13 @@ describe('logsDirFor', () => {
 
 describe('describedFileId', () => {
   it('is the file a page asks to describe', () => {
-    expect(
-      describedFileId({
-        kind: 'page',
-        request: { type: 'describeFile', fileId: FILE_ID, queue: [] },
-      }),
-    ).toBe(FILE_ID)
+    expect(describedFileId({ type: 'describeFile', fileId: FILE_ID, queue: [] })).toBe(FILE_ID)
   })
 
   it('is null for any other request, a drop or something that is not a request', () => {
-    expect(describedFileId({ kind: 'page', request: { type: 'listRecents' } })).toBeNull()
+    expect(describedFileId({ type: 'ready' })).toBeNull()
     expect(describedFileId({ kind: 'drop', paths: ['/a.mkv'] })).toBeNull()
-    expect(
-      describedFileId({
-        kind: 'page',
-        request: { type: 'describeFile', fileId: 'nope', queue: [] },
-      }),
-    ).toBeNull()
+    expect(describedFileId({ type: 'describeFile', fileId: 'nope', queue: [] })).toBeNull()
     expect(describedFileId(null)).toBeNull()
     expect(describedFileId('describeFile')).toBeNull()
   })

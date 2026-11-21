@@ -4,9 +4,10 @@ import { type Route, ROUTES } from '@/routes'
 export type AppClientCall = Pick<Route, 'method' | 'path'>
 
 /**
- * The routes the server keeps for the owner that the app's Settings call, and only for the
- * signed-in account `GET /api/me` names the owner: the web's Admin page, as the owner asked for
- * it on every device. The server stays the authority: each answers 403 to anyone else.
+ * The routes the server keeps for the owner that the app calls, and only for the signed-in
+ * account `GET /api/me` names the owner: the web's Admin page, as the owner asked for it on
+ * every device, and a video's Delete on its card's menu. The server stays the authority: each
+ * answers 403 to anyone else.
  */
 export const APP_OWNER_CALLS = {
   setPlaybackSettings: ROUTES.setPlaybackSettings,
@@ -23,13 +24,15 @@ export const APP_OWNER_CALLS = {
   updateLibraryRatings: ROUTES.updateLibraryRatings,
   cancelLibraryRatings: ROUTES.cancelLibraryRatings,
   matchLibrary: ROUTES.matchLibrary,
+  listEveryonesRequests: ROUTES.listEveryonesRequests,
+  deleteMedia: ROUTES.deleteMedia,
 } as const satisfies Record<string, AppClientCall>
 
 /**
  * Every route raven's device app may ask a server for, through PR 10's screens: the
  * `@Public()` and viewer reads, the writes the spec allows (progress, plays, watched, the
- * favourites, the account's playlists, their sharing and copies, scrobbling links and the binge
- * list), the mixes and radio, the admin lock's unlock, the PIN's unlock and lock (only the owner
+ * favourites, the account's playlists, their sharing and copies, scrobbling links, the binge
+ * list and a Coming soon title's request), the mixes and radio, the admin lock's unlock, the PIN's unlock and lock (only the owner
  * unlocks; the server answers anyone else's PIN with its refusal), the media ticket, the MP4 copy
  * a download asks for when the device cannot play the original, and the media plane.
  * A call the `ApiClient` makes is named after its method; the rest are the URLs the native
@@ -61,6 +64,8 @@ export const APP_CLIENT_CALLS = {
   listSagas: ROUTES.listSagas,
   listInProgress: ROUTES.listInProgress,
   listLibraryFavourites: ROUTES.listLibraryFavourites,
+  listLibraryFavouriteTitles: ROUTES.listLibraryFavouriteTitles,
+  listHistory: ROUTES.listHistory,
   listArtists: ROUTES.listArtists,
   listAlbums: ROUTES.listAlbums,
   listTracks: ROUTES.listTracks,
@@ -79,6 +84,13 @@ export const APP_CLIENT_CALLS = {
   getMix: ROUTES.getMix,
   getRadio: ROUTES.getRadio,
   getRecentAlbums: ROUTES.getRecentAlbums,
+
+  getUpcoming: ROUTES.getUpcoming,
+  getUpcomingDetails: ROUTES.getUpcomingDetails,
+  listRequests: ROUTES.listRequests,
+  getRequestHolding: ROUTES.getRequestHolding,
+  requestDownload: ROUTES.requestDownload,
+  cachedImage: ROUTES.cachedImage,
 
   getItem: ROUTES.getItem,
   nextEpisode: ROUTES.nextEpisode,

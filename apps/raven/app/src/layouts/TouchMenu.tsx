@@ -69,8 +69,8 @@ const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryPro
 type MenuContentProps = { session: AppQueries }
 
 /**
- * What the menu holds, in the web's side menu's order: Home, Favourites, Continue watching,
- * Binge, Downloads (which opens with the server out of reach) and Libraries, the pinned libraries
+ * What the menu holds, in the web's side menu's order: Home, Continue watching, Binge,
+ * Coming soon, Favourites, Downloads (which opens with the server out of reach) and Libraries, the pinned libraries
  * under their heading, a rule, then Settings. Choosing an entry shuts the menu and goes there.
  */
 const MenuContent = ({ session: { queries } }: MenuContentProps) => {
@@ -98,11 +98,6 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
         onPress={() => go({ pathname: APP_ROUTES.home, params: {} })}
       />
       <MenuEntry
-        icon={APP_ICONS.heart}
-        label={TOUCH_NAV_COPY.favourites}
-        onPress={() => go({ pathname: APP_ROUTES.favourites, params: {} })}
-      />
-      <MenuEntry
         icon={APP_ICONS.continue}
         label={TOUCH_NAV_COPY.continueWatching}
         onPress={() => go({ pathname: APP_ROUTES.continueWatching, params: {} })}
@@ -111,6 +106,16 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
         icon={APP_ICONS.popcorn}
         label={TOUCH_NAV_COPY.binge}
         onPress={() => go({ pathname: APP_ROUTES.binge, params: {} })}
+      />
+      <MenuEntry
+        icon={APP_ICONS.calendar}
+        label={TOUCH_NAV_COPY.comingSoon}
+        onPress={() => go({ pathname: APP_ROUTES.comingSoon, params: {} })}
+      />
+      <MenuEntry
+        icon={APP_ICONS.heart}
+        label={TOUCH_NAV_COPY.favourites}
+        onPress={() => go({ pathname: APP_ROUTES.favourites, params: {} })}
       />
       <MenuEntry
         icon={APP_ICONS.download}
@@ -259,7 +264,7 @@ type TouchMenuProps = { session: AppQueries }
 /**
  * The side menu of a phone or tablet, mounted once above the routes: out from a menu button in
  * a page's header, or from a swipe in from Home's left edge; the web's side menu's content,
- * Home, Favourites, Continue watching, Binge, Downloads, Libraries, the pinned libraries and, below a rule,
+ * Home, Continue watching, Binge, Coming soon, Favourites, Downloads, Libraries, the pinned libraries and, below a rule,
  * Settings. It
  * stays off the video player, whose screen is its own, and shuts itself when the player opens.
  */

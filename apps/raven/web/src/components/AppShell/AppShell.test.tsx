@@ -4,7 +4,6 @@ import {
   ADMIN_LOCK_STATES,
   type AdminLock,
   DESKTOP_PATHS,
-  DESKTOP_PLATFORMS,
   DOWNLOAD_STATUS_KINDS,
   isLibraryKind,
   KINDS,
@@ -96,7 +95,7 @@ describe('AppShell', () => {
   // Manage opens folded; the tests that read its links start with it open.
   beforeEach(() => {
     spies.media.mockImplementation(screenOf(SCREEN_SIZES.wide))
-    useSideMenu.setState({ isManageFolded: false })
+    useSideMenu.setState({ isManageOpen: true })
   })
 
   afterEach(() => {
@@ -473,14 +472,14 @@ describe('AppShell', () => {
     expect(within(nav()).queryByRole('link', { name: 'Libraries' })).toBeNull()
     expect(within(nav()).queryByRole('link', { name: 'Settings' })).toBeNull()
     expect(within(nav()).getByRole('link', { name: 'Movies' })).toBeInTheDocument()
-    expect(useSideMenu.getState().isManageFolded).toBe(true)
+    expect(useSideMenu.getState().isManageOpen).toBe(false)
 
     await userEvent.click(toggle())
     const folded = within(nav()).getByRole('button', { name: 'Manage' })
     expect(folded).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(folded)
     expect(within(nav()).getByRole('link', { name: 'Settings' })).toBeInTheDocument()
-    expect(useSideMenu.getState().isManageFolded).toBe(false)
+    expect(useSideMenu.getState().isManageOpen).toBe(true)
     await userEvent.click(toggle())
   })
 
@@ -671,7 +670,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('adds On this Mac and Downloads over Settings inside Raven, the downloads under way counted', async () => {
+  it('adds Downloads over Settings inside Raven, the downloads under way counted', async () => {
     spies.list.mockImplementation(async () => [])
     asDesktop(downloadsMain({ downloads: [viewOf(), viewOf({ downloadId: DL_2 })] }))
     renderShell({ route: '/' })
@@ -692,7 +691,6 @@ describe('AppShell', () => {
       '/history/everyone',
       '/history',
       '/notifications',
-      DESKTOP_PATHS.local,
       DESKTOP_PATHS.downloads,
       PAGE_PATHS.settings,
       PAGE_PATHS.shortcuts,
@@ -707,7 +705,6 @@ describe('AppShell', () => {
       'Coming soon',
       'Play history',
       'Notifications',
-      'This Mac',
       'Downloads',
       'Settings',
       'Admin',
@@ -730,7 +727,7 @@ describe('AppShell', () => {
     expect(within(nav()).queryByRole('link', { name: 'Downloads' })).toBeNull()
   })
 
-  it('offers Downloads, and no On this Mac, in a browser that keeps downloads', async () => {
+  it('offers Downloads in a browser that keeps downloads', async () => {
     spies.list.mockImplementation(async () => [])
     const { engine } = await fakeEngine()
     asBrowserDownloads(engine)
@@ -739,11 +736,9 @@ describe('AppShell', () => {
       'href',
       DESKTOP_PATHS.downloads,
     )
-    expect(within(nav()).queryByRole('link', { name: 'On this Mac' })).toBeNull()
     await userEvent.click(within(tabs()).getByRole('button', { name: 'More' }))
     const sheet = within(screen.getByRole('dialog', { name: 'More' }))
     expect(sheet.getByRole('link', { name: 'Downloads' })).toBeInTheDocument()
-    expect(sheet.queryByRole('link', { name: 'This Mac' })).toBeNull()
   })
 
   it('keeps only Downloads and what needs no server in a browser that cannot reach it', async () => {
@@ -760,22 +755,6 @@ describe('AppShell', () => {
     expect(within(nav()).queryByRole('link', { name: 'Home' })).toBeNull()
   })
 
-  it('names the files on this PC on Windows', () => {
-    asDesktop({ ...downloadsMain(), platform: DESKTOP_PLATFORMS.windows })
-    useServerReach.setState({ isOffline: true })
-    renderShell({ route: '/libraries' })
-    expect(
-      within(nav())
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['Raven', 'On this PC', 'Downloads', 'Settings', 'Shortcuts', 'Design'])
-    expect(
-      within(tabs())
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['This PC', 'Downloads', 'Settings'])
-  })
-
   it('keeps only what needs no server while Raven cannot reach it', () => {
     asDesktop(downloadsMain())
     useServerReach.setState({ isOffline: true })
@@ -784,12 +763,12 @@ describe('AppShell', () => {
       within(nav())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Raven', 'On this Mac', 'Downloads', 'Settings', 'Shortcuts', 'Design'])
+    ).toEqual(['Raven', 'Downloads', 'Settings', 'Shortcuts', 'Design'])
     expect(
       within(tabs())
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['This Mac', 'Downloads', 'Settings'])
+    ).toEqual(['Downloads', 'Settings'])
     expect(screen.queryByRole('combobox')).toBeNull()
     expect(
       within(screen.getByRole('main')).getByRole('button', { name: 'Theme' }),

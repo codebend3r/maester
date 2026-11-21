@@ -35,6 +35,7 @@ const CardMenuView = ({ title, options, onClose }: CardMenuViewProps) => {
       message: messageOf(options),
       options: offered,
       onChoose: (key) => offered.find((option) => option.key === key)?.onPress(),
+      destructiveKey: offered.find((option) => !!option.isDestructive)?.key ?? null,
       anchor,
     })
     onClose()

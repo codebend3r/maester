@@ -53,16 +53,17 @@ describe('the side menu of a phone or tablet', () => {
     expect(screen.queryByLabelText(TOUCH_NAV_COPY.closeMenu)).toBeNull()
   })
 
-  it("holds the web's menu: Home, Favourites, Continue watching, Binge, Downloads, Libraries, the pinned libraries, Settings, no theme row", async () => {
+  it("holds the web's menu: Home, Continue watching, Binge, Coming soon, Favourites, Downloads, Libraries, the pinned libraries, Settings, no theme row", async () => {
     await openMenu()
     expect(await screen.findByRole('link', { name: 'Films' })).toBeTruthy()
     expect(screen.queryByLabelText('Search every library')).toBeNull()
     expect(screen.getByRole('header', { name: 'Pinned' })).toBeTruthy()
     expect(screen.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([
       'Home',
-      'Favourites',
       'Continue watching',
       'Binge',
+      'Coming soon',
+      'Favourites',
       'Downloads',
       'Libraries',
       'Films',

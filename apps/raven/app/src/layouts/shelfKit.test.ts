@@ -21,6 +21,10 @@ const binge = (key: string): BingeCard => ({
   synopsis: null,
   status: null,
   page: { kind: ROUTE_TARGETS.play, mediaId: 1, at: 0 },
+  poster: null,
+  rowStatus: null,
+  playLabel: null,
+  seen: null,
 })
 
 const keysOf = (rows: ReturnType<typeof bingeRowsOf>) =>

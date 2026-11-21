@@ -1,11 +1,6 @@
 import { parseJson } from '@/main/parseJson'
 import type { Timers } from '@/main/timers'
-import {
-  EMPTY_STATE,
-  isStoredPlayerState,
-  type PlayerState,
-  upgradeState,
-} from '@/main/playerState'
+import { EMPTY_STATE, isPlayerState, type PlayerState, upgradeState } from '@/main/playerState'
 
 type WriteFileProps = { path: string; data: string }
 
@@ -99,7 +94,7 @@ type LoadStateProps = {
 }
 
 export const loadState = async ({ fs, file, now }: LoadStateProps): Promise<PlayerState> =>
-  upgradeState(await loadJson({ fs, file, now, guard: isStoredPlayerState, empty: EMPTY_STATE }))
+  upgradeState(await loadJson({ fs, file, now, guard: isPlayerState, empty: EMPTY_STATE }))
 
 export const createJsonStore = <T>({
   fs,

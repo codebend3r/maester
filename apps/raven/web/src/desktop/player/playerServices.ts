@@ -1,5 +1,4 @@
 import {
-  DESKTOP_PATHS,
   DESKTOP_REQUESTS,
   isOpaqueId,
   listOf,
@@ -95,8 +94,8 @@ type FileProgressForProps = {
 }
 
 /**
- * Progress for a file main granted: positions go to main, which keeps a local file's resume point
- * and sends a download's to its server under the account it was opened with. Main counts a
+ * Progress for a file main granted: positions go to main, which keeps the download's resume point
+ * and sends it to its server under the account it was opened with. Main counts a
  * download's first position after an open as a play, so a file left while it loads says nothing.
  */
 export const fileProgressFor = ({ client, fileId }: FileProgressForProps): ProgressSink => {
@@ -136,7 +135,7 @@ type FileServicesForProps = {
   downloadsPage: DownloadsPage
 }
 
-/** A local file's or a download's services, as main described the file. */
+/** A download's services, as main described its file. */
 export const fileServicesFor = ({
   file,
   client,
@@ -148,11 +147,10 @@ export const fileServicesFor = ({
   title: {
     ...NO_TITLE_EXTRAS,
     label: file.label,
-    // Only a download's folder says where it came from; any other file's is just its folder.
-    context: file.isDownload ? file.folder : null,
+    context: file.folder,
     duration: null,
     resumeAt: file.resumeAt,
-    backTo: file.isDownload ? downloadsPage : DESKTOP_PATHS.local,
+    backTo: downloadsPage,
     next:
       file.next === null
         ? null

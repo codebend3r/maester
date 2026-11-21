@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router'
 
-import { BingeShelf, ShelfPage } from '@/layouts'
+import { BingeRows, ShelfPage } from '@/layouts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { useBingeIds } from '@/queries/useBinge'
 import { useBingeCards } from '@/queries/useBingeCards'
@@ -23,16 +23,17 @@ const ServerBinge = ({ session }: ServerBingeProps) => {
       title={BINGE_PAGE_COPY.title}
     >
       {cards.length > 0 && (
-        <BingeShelf cards={cards} isFirst onOpen={(target) => router.push(hrefOf(target))} />
+        <BingeRows cards={cards} isFirst onOpen={(target) => router.push(hrefOf(target))} />
       )}
     </ShelfPage>
   )
 }
 
 /**
- * `/binge`: the shows the account binges, at most `BINGE_LIMIT`, as Home's Binge section draws
- * them, or a word in Young Serif that none is set. A card plays the episode it is on and its
- * title art opens the show's page. Each server gets a page of its own.
+ * `/binge`: the shows the account binges, at most `BINGE_LIMIT`, as the web's Binge page lists
+ * them, a row a show: its poster and title, which open its page, the episode it is on, how much
+ * of the show is watched, and a button that resumes it; or a word in Young Serif that none is
+ * set. Each server gets a page of its own.
  */
 export const Binge = () => {
   const session = useAppQueries()

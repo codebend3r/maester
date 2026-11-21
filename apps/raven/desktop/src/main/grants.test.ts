@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
 import { isOpaqueId } from '@raven/core'
-import { grantNext } from '@/main/folder'
 import { createGrants, type GrantFs } from '@/main/grants'
 
 type Entry = { real: string; isFile: boolean; size: number; mtimeMs: number }
@@ -49,31 +48,34 @@ describe('grant', () => {
     const { grants } = setup({ entries: { '/m/Film.mkv': { size: 5, mtimeMs: 7 } } })
     const result = await grants.grant('/m/Film.mkv')
     expect(result).toEqual({
-      ok: true,
-      file: { fileId: 'id-1', path: '/m/Film.mkv', name: 'Film.mkv', size: 5, mtimeMs: 7 },
+      fileId: 'id-1',
+      path: '/m/Film.mkv',
+      name: 'Film.mkv',
+      size: 5,
+      mtimeMs: 7,
     })
-    expect(grants.fileOf('id-1')).toEqual(result.ok ? result.file : null)
+    expect(grants.fileOf('id-1')).toEqual(result)
     expect(grants.fileOf('unknown')).toBeNull()
   })
 
-  it('refuses a relative path as missing', async () => {
+  it('refuses a relative path', async () => {
     const { grants } = setup({ entries: { 'relative/Film.mkv': {} } })
-    expect(await grants.grant('relative/Film.mkv')).toEqual({ ok: false, reason: 'missing' })
+    expect(await grants.grant('relative/Film.mkv')).toBeNull()
   })
 
-  it('refuses a path that does not exist as missing', async () => {
+  it('refuses a path that does not exist', async () => {
     const { grants } = setup({ entries: {} })
-    expect(await grants.grant('/m/gone.mkv')).toEqual({ ok: false, reason: 'missing' })
+    expect(await grants.grant('/m/gone.mkv')).toBeNull()
   })
 
-  it('refuses a non-video as not-a-video', async () => {
+  it('refuses a non-video', async () => {
     const { grants } = setup({ entries: { '/m/notes.txt': {} } })
-    expect(await grants.grant('/m/notes.txt')).toEqual({ ok: false, reason: 'not-a-video' })
+    expect(await grants.grant('/m/notes.txt')).toBeNull()
   })
 
-  it('refuses a directory named like a video as not-a-file', async () => {
+  it('refuses a directory named like a video', async () => {
     const { grants } = setup({ entries: { '/m/Season 1.mkv': { isFile: false } } })
-    expect(await grants.grant('/m/Season 1.mkv')).toEqual({ ok: false, reason: 'not-a-file' })
+    expect(await grants.grant('/m/Season 1.mkv')).toBeNull()
   })
 
   it('judges a symlink by its real path: a link to a video plays', async () => {
@@ -84,8 +86,8 @@ describe('grant', () => {
       },
     })
     const result = await grants.grant('/m/link.mp4')
-    expect(result.ok && result.file.path).toBe('/m/Film.mp4')
-    expect(result.ok && result.file.name).toBe('Film.mp4')
+    expect(result?.path).toBe('/m/Film.mp4')
+    expect(result?.name).toBe('Film.mp4')
   })
 
   it('refuses a symlink named like a video that points at a non-video', async () => {
@@ -95,14 +97,14 @@ describe('grant', () => {
         '/home/me/.ssh/id_rsa': {},
       },
     })
-    expect(await grants.grant('/m/trailer.mp4')).toEqual({ ok: false, reason: 'not-a-video' })
+    expect(await grants.grant('/m/trailer.mp4')).toBeNull()
   })
 
   it('refuses a symlink to a video when its own name is not a video', async () => {
     const { grants } = setup({
       entries: { '/m/link.txt': { real: '/m/Film.mp4' }, '/m/Film.mp4': {} },
     })
-    expect(await grants.grant('/m/link.txt')).toEqual({ ok: false, reason: 'not-a-video' })
+    expect(await grants.grant('/m/link.txt')).toBeNull()
   })
 
   it('returns the same id for the same real path, with the size refreshed', async () => {
@@ -119,16 +121,16 @@ describe('grant', () => {
       entry.mtimeMs = 9
     }
     const second = await grants.grant('/m/link.mkv')
-    expect(first.ok && second.ok && second.file.fileId).toBe(first.ok ? first.file.fileId : '')
-    expect(second.ok && second.file.size).toBe(2)
-    expect(second.ok && second.file.mtimeMs).toBe(9)
+    expect(second?.fileId).toBe(first?.fileId)
+    expect(second?.size).toBe(2)
+    expect(second?.mtimeMs).toBe(9)
     expect(grants.fileOf('id-1')!.size).toBe(2)
   })
 
   it('grants a unicode name with spaces and parentheses', async () => {
     const { grants } = setup({ entries: { '/m/Été 02 (1080p).mkv': {} } })
     const result = await grants.grant('/m/Été 02 (1080p).mkv')
-    expect(result.ok && result.file.name).toBe('Été 02 (1080p).mkv')
+    expect(result?.name).toBe('Été 02 (1080p).mkv')
   })
 })
 
@@ -140,8 +142,8 @@ describe('grant ids', () => {
     })
     const first = await grants.grant('/m/A.mkv')
     const second = await grants.grant('/m/B.mkv')
-    expect(first.ok && first.file.fileId).toBe('dup')
-    expect(second.ok && second.file.fileId).toBe('fresh')
+    expect(first?.fileId).toBe('dup')
+    expect(second?.fileId).toBe('fresh')
     expect(grants.fileOf('dup')!.path).toBe('/m/A.mkv')
     expect(grants.fileOf('fresh')!.path).toBe('/m/B.mkv')
   })
@@ -165,27 +167,6 @@ describe('grant ids', () => {
       file.path = '/etc/passwd'
     }).toThrow()
     expect(grants.fileOf('id-1')!.path).toBe('/m/A.mkv')
-  })
-})
-
-describe('grantNext with real grants', () => {
-  it('skips a sibling that links to a non-video and grants the next real video', async () => {
-    const { grants } = setup({
-      entries: {
-        '/m/Show/E1.mkv': {},
-        '/m/Show/E2.mkv': { real: '/Users/me/.ssh/id_rsa' },
-        '/Users/me/.ssh/id_rsa': {},
-        '/m/Show/E3.mkv': {},
-      },
-    })
-    const next = await grantNext({
-      path: '/m/Show/E1.mkv',
-      readdir: async () => ['E1.mkv', 'E2.mkv', 'E3.mkv'],
-      grants,
-    })
-    expect(next!.path).toBe('/m/Show/E3.mkv')
-    expect(grants.fileOf('id-1')!.path).toBe('/m/Show/E3.mkv')
-    expect(grants.fileOf('id-2')).toBeNull()
   })
 })
 

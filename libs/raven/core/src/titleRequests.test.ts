@@ -6,7 +6,15 @@ import {
   type TitleRequests,
   isTitleRequests,
 } from '@/contract/requests'
-import { addedRequestsOf, myRequestsOf, pendingRequestsOf } from '@/titleRequests'
+import {
+  REQUEST_STATES,
+  addedRequestsOf,
+  myRequestsOf,
+  pendingRequestsOf,
+  requestOf,
+  requestStandingOf,
+  requestStateOf,
+} from '@/titleRequests'
 
 type RequestProps = Pick<TitleRequest, 'tmdbId' | 'isMine' | 'libraryItemId'> &
   Partial<Pick<TitleRequest, 'isHeld' | 'status'>>
@@ -98,5 +106,46 @@ describe('title requests', () => {
     expect(isTitleRequests(older)).toBe(true)
     expect(idsOf(pendingRequestsOf(older))).toEqual(['1', '2'])
     expect(addedRequestsOf(older)).toEqual([])
+  })
+})
+
+describe('a title’s request', () => {
+  const asked = { type: ITEM_TYPES.movie, tmdbId: '1' } as const
+  const free = { type: ITEM_TYPES.movie, tmdbId: '99' } as const
+
+  it('finds the request by its type and TMDB id, none while the list is read', () => {
+    expect(requestOf({ list: LIST, ask: asked })?.tmdbId).toBe('1')
+    expect(requestOf({ list: LIST, ask: { type: ITEM_TYPES.show, tmdbId: '1' } })).toBeNull()
+    expect(requestOf({ list: undefined, ask: asked })).toBeNull()
+  })
+
+  it('stands where raven’s request does, else where its arr holds it, else nowhere', () => {
+    const holding = { status: REQUEST_STATUSES.downloading }
+    expect(requestStandingOf({ list: LIST, ask: asked, holding })).toEqual({
+      status: REQUEST_STATUSES.searching,
+      request: LIST.requests[0] ?? null,
+    })
+    expect(requestStandingOf({ list: LIST, ask: free, holding })).toEqual({
+      status: REQUEST_STATUSES.downloading,
+      request: null,
+    })
+    expect(requestStandingOf({ list: LIST, ask: free, holding: { status: null } })).toBeNull()
+    expect(requestStandingOf({ list: LIST, ask: free, holding: undefined })).toBeNull()
+  })
+
+  it('shows nothing while read, then the standing, requests off, the budget spent, or the button', () => {
+    const standing = requestStandingOf({ list: LIST, ask: asked, holding: undefined })
+    const stateOf = (props: Partial<Parameters<typeof requestStateOf>[0]>) =>
+      requestStateOf({ ask: free, list: LIST, standing: null, isReading: false, ...props })
+    expect(stateOf({ list: undefined })).toBe(REQUEST_STATES.loading)
+    expect(stateOf({ isReading: true })).toBe(REQUEST_STATES.loading)
+    expect(stateOf({ ask: asked, standing })).toBe(REQUEST_STATES.requested)
+    expect(stateOf({ list: { ...LIST, kinds: { movie: false, show: true } } })).toBe(
+      REQUEST_STATES.off,
+    )
+    expect(stateOf({ list: { ...LIST, budget: { ...LIST.budget, left: 0 } } })).toBe(
+      REQUEST_STATES.spent,
+    )
+    expect(stateOf({})).toBe(REQUEST_STATES.open)
   })
 })

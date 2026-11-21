@@ -3,11 +3,10 @@ import { expect, test } from '@playwright/test'
 import {
   DESKTOP_PATHS,
   DESKTOP_REPLIES,
-  isDesktopReply,
   PAGE_ORIGIN,
+  RAVEN_DESKTOP_BRIDGE_KEY,
   WEB_HOST_PORT,
 } from '@raven/core'
-import { type Clips, makeClips } from '@/e2e/clips'
 import {
   browserOpens,
   closeApp,
@@ -32,6 +31,19 @@ const INLINE_HASH = /^script-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
 const STYLE_SOURCES = /style-src [^;]+/u
 const INLINE_STYLE_HASH = /^style-src 'self'( 'sha256-[A-Za-z0-9+/=]+')+$/u
 
+// All the preload hands the page: no `dropFiles`, and nothing else that could carry a path.
+const BRIDGE_KEYS = ['platform', 'request', 'subscribe']
+// The requests that opened a file from this computer, which main no longer knows.
+const REMOVED_REQUESTS = [
+  'openDialog',
+  'listRecents',
+  'openRecent',
+  'removeRecent',
+  'clearRecents',
+] as const
+// A request main never knew, which a removed one must be refused exactly as.
+const UNKNOWN_REQUEST = { type: 'readFile', path: '/etc/hosts' } as const
+
 const NAVIGATION_KEY = 'ravenE2eNavigation'
 const ELSEWHERE = 'https://example.com/'
 
@@ -53,7 +65,6 @@ const statusFor = ({ host }: StatusForProps) =>
 
 test.describe('the security baseline', () => {
   let userData = ''
-  let clips: Clips = { folder: '', first: '', second: '' }
   let launched: Launched | null = null
 
   const running = (): Launched => {
@@ -63,14 +74,13 @@ test.describe('the security baseline', () => {
 
   test.beforeAll(async () => {
     userData = await freshUserData()
-    clips = await makeClips()
     launched = await launchApp({ userData })
     await expectOffline({ page: running().page })
   })
 
   test.afterAll(async () => {
     const quit = launched === null ? Promise.resolve() : closeApp({ app: launched.app })
-    await quit.finally(() => Promise.all([removeDir(userData), removeDir(clips.folder)]))
+    await quit.finally(() => removeDir(userData))
   })
 
   test('leaves require and process undefined in the page', async () => {
@@ -138,40 +148,24 @@ test.describe('the security baseline', () => {
   })
 
   test('refuses a request off the bridge list', async () => {
-    const reply = await requestFromPage({
-      page: running().page,
-      request: { type: 'readFile', path: '/etc/hosts' },
-    })
+    const reply = await requestFromPage({ page: running().page, request: UNKNOWN_REQUEST })
     expect(reply?.type ?? null).toBe(DESKTOP_REPLIES.refused)
   })
 
-  test('opens nothing from a forged drop', async () => {
+  test('hands the page no way to drop a file, and refuses the requests that opened one', async () => {
     const { page } = running()
-    // Each names a real video, so a path that got through would play it.
-    const replies = await page.evaluate(async (path) => {
-      if (!('ravenDesktop' in window)) return null
-      const bridge = window.ravenDesktop
-      if (typeof bridge !== 'object' || bridge === null || !('dropFiles' in bridge)) return null
-      const drop = bridge.dropFiles
-      if (typeof drop !== 'function') return null
-      const forgeries: unknown[] = [
-        [path],
-        [{ name: 'Clip 01.mp4', path, type: 'video/mp4' }],
-        { length: 1, 0: new File(['x'], path, { type: 'video/mp4' }) },
-        { filter: () => [path], map: () => [path], reduce: () => [path] },
-        [new File(['x'], path, { type: 'video/mp4' })],
-      ]
-      return Promise.all(forgeries.map(async (files): Promise<unknown> => drop(files)))
-    }, clips.first)
+    const keys = await page.evaluate((bridgeKey) => {
+      const bridge: unknown = Reflect.get(window, bridgeKey)
+      return typeof bridge === 'object' && bridge !== null ? Object.keys(bridge).toSorted() : null
+    }, RAVEN_DESKTOP_BRIDGE_KEY)
+    expect(keys).toEqual(BRIDGE_KEYS)
 
-    expect(replies).toHaveLength(5)
-    const refusals = (replies ?? []).map((reply) => (isDesktopReply(reply) ? reply : null))
-    expect(refusals).toEqual(
-      Array.from({ length: 5 }, () => ({
-        type: DESKTOP_REPLIES.refused,
-        message: 'Drop a video file to play it.',
-      })),
+    const unknown = await requestFromPage({ page, request: UNKNOWN_REQUEST })
+    expect(unknown?.type ?? null).toBe(DESKTOP_REPLIES.refused)
+    const replies = await Promise.all(
+      REMOVED_REQUESTS.map((type) => requestFromPage({ page, request: { type } })),
     )
+    expect(replies).toEqual(REMOVED_REQUESTS.map(() => unknown))
     expect(page.url()).toBe(`${PAGE_ORIGIN}${DESKTOP_PATHS.downloads}`)
   })
 

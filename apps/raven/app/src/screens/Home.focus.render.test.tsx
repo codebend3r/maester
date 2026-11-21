@@ -271,6 +271,26 @@ describe('Home on a TV', () => {
     expect(askedFor()).toEqual(['Continue watching', 'Continue watching'])
   })
 
+  it.each([
+    { name: 'Favourites', route: APP_ROUTES.favourites },
+    { name: 'Binge', route: APP_ROUTES.binge },
+    { name: 'Coming soon', route: APP_ROUTES.comingSoon },
+  ])(
+    'offers $name in the side menu, and takes the focus back to it on return',
+    async ({ name, route }) => {
+      await renderHome()
+      await screen.findByRole('header', { name: 'Films' })
+      const entry = screen.getByRole('link', { name })
+
+      await fireEvent(entry, NATIVE_EVENTS.focus)
+      await fireEvent.press(entry)
+      expect(mockPush).toHaveBeenCalledWith(route)
+      await leaveTestScreen()
+      await returnToTestScreen()
+      expect(askedFor()).toEqual([name, name])
+    },
+  )
+
   it('offers every library in the side menu, and takes the focus back to it on return', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })

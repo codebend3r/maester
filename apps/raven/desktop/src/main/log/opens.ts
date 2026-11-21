@@ -3,8 +3,7 @@ import {
   DESKTOP_PLATFORMS,
   DESKTOP_REQUESTS,
   type DesktopPlatform,
-  ENVELOPE_KINDS,
-  isInvokeEnvelope,
+  isDesktopRequest,
   PLAYER_SOURCE_KINDS,
 } from '@raven/core'
 import { SERVER_NAME } from '@/main/desktopConfig'
@@ -55,8 +54,7 @@ export const logsDirFor = ({
     : join(userData, 'logs')
 
 /** The file a page asks to describe, which it does as it opens one; null for anything else. */
-export const describedFileId = (envelope: unknown): string | null => {
-  if (!isInvokeEnvelope(envelope) || envelope.kind !== ENVELOPE_KINDS.page) return null
-  const { request } = envelope
+export const describedFileId = (request: unknown): string | null => {
+  if (!isDesktopRequest(request)) return null
   return request.type === DESKTOP_REQUESTS.describeFile ? request.fileId : null
 }

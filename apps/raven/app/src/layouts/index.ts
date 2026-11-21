@@ -65,7 +65,7 @@ export const { DownloadsLayout, canDownload } = byInput({
 })
 
 /** Home's shelves: rows the remote moves along on a TV, rows under the thumb everywhere else. */
-export const { Shelves, Shelf, BingeShelf, ShelfPage } = byInput({
+export const { Shelves, Shelf, BingeShelf, BingeRows, ShelfPage } = byInput({
   [INPUT_KINDS.focus]: focusShelf,
   [INPUT_KINDS.touch]: touchShelf,
 })

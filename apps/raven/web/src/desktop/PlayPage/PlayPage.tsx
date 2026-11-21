@@ -1,5 +1,4 @@
 import {
-  DESKTOP_PATHS,
   DESKTOP_REQUESTS,
   fileUrlFor,
   isOpaqueId,
@@ -48,12 +47,6 @@ import type { DownloadsHost } from '@/downloads/host'
 import { useDownloadsHost } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 
-/**
- * Where a file that is not playing goes back to when no page of the app is behind it: Back
- * otherwise returns to the page that opened it, Downloads or On this Mac.
- */
-const OPENED_FROM = DESKTOP_PATHS.local
-
 type EngineUseForProps = { isNative: boolean; isLost: boolean }
 
 const engineUseFor = ({ isNative, isLost }: EngineUseForProps): EngineUse => {
@@ -81,7 +74,7 @@ const HtmlPlaying = ({ services, fileId }: HtmlPlayingProps) => {
 type EngineViewProps = {
   services: PlayerServices
   file: LocalFile
-  /** The download's media on the server, for the header; null for a plain local file. */
+  /** The download's media on the server, for the header; null until it is read, and when it cannot be. */
   playback: PlaybackFile | null
   player: NativePlayer | null
   onLost: (at: number) => void
@@ -138,7 +131,7 @@ type DownloadMedia = {
  * heads it and Skip intro offers itself as the server's player does: a download is the library
  * file byte for byte, so the server's markers fit it. The art is the one saved with the download
  * whenever there is one, so it is there with no server; without one the server's is asked for.
- * Offline, signed out or for a plain local file nothing is asked, and with no saved art the
+ * Offline or signed out nothing is asked, and with no saved art the
  * header spells the title out.
  */
 const useDownloadMedia = ({ mediaId, logo }: UseDownloadMediaProps): DownloadMedia => {
@@ -247,8 +240,9 @@ const ReadyFile = ({ file, chosen, isOutputFixed, downloadsPage }: ReadyFileProp
 
 type FileMessageProps = PageViewProps
 
-const FileMessage = ({ message }: FileMessageProps) => (
-  <PlayerMessage message={message} fallback={OPENED_FROM} />
+/** A file that is not playing goes back to Downloads when no page of the app is behind it. */
+const FileMessage = ({ message, downloadsPage }: FileMessageProps) => (
+  <PlayerMessage message={message} fallback={downloadsPage} />
 )
 
 const PAGE_VIEWS = {
@@ -275,7 +269,7 @@ const PlayPage = ({ fileId, queue, downloadsPage }: PlayPageProps) => {
       return reply.file
     },
     /*
-     * Opening a file also records it as recent and reads its resume point: asking again while it
+     * Opening a file also reads its resume point and starts its play: asking again while it
      * plays (focus, remount, a page reading everything again after a PIN) would move both.
      */
     staleTime: 'static',
@@ -315,8 +309,10 @@ const GrantedFile = ({ fileId, queue, downloadsPage }: GrantedFileProps) =>
     <PlayPage key={fileId} fileId={fileId} queue={queue} downloadsPage={downloadsPage} />
   )
 
-const InvalidFile = () => (
-  <PlayerMessage message={PLAY_PAGE_COPY.notOpenable} fallback={OPENED_FROM} />
+type InvalidFileProps = RouteViewProps
+
+const InvalidFile = ({ downloadsPage }: InvalidFileProps) => (
+  <PlayerMessage message={PLAY_PAGE_COPY.notOpenable} fallback={downloadsPage} />
 )
 
 const ROUTE_VIEWS = {
@@ -325,7 +321,7 @@ const ROUTE_VIEWS = {
 } as const satisfies Record<RouteKind, ComponentType<RouteViewProps>>
 
 /**
- * A local file or a download, by the id main granted for it. Keyed by file, so a new file
+ * A download, by the id main granted for its file. Keyed by file, so a new file
  * remounts the Player and its unmount saves the old position first.
  */
 export const PlayRoute = () => {

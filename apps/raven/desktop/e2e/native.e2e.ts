@@ -9,6 +9,7 @@ import {
   type PlayerCommand,
 } from '@raven/core'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
+import { containerOf } from '@/e2e/fixtureServer'
 import {
   closeApp,
   expectOffline,
@@ -16,12 +17,12 @@ import {
   heading,
   launchApp,
   markWithin,
-  openFile,
   removeDir,
   watchedPercent,
   withApp,
 } from '@/e2e/harness'
 import { postOnPort, tapPlayerPort, trafficOf } from '@/e2e/playerPort'
+import { episodeGroup, playDownload, seedDownloads } from '@/e2e/seedDownloads'
 import {
   clockOf,
   distanceFrom,
@@ -31,6 +32,7 @@ import {
   expectPlayingNatively,
   wake,
 } from '@/e2e/playerView'
+import { mediaPathFor } from '@/main/downloads/space'
 
 // Twice the 20 ms main thread budget (spec section 8), as P4 does for launch.
 const LOOP_LAG_LIMIT_MS = 40
@@ -53,16 +55,17 @@ const NIGHT = '#15201E'
 const CLEAR = '#000000'
 const ERROR_CODES = { eperm: 'EPERM' } as const
 
-type PlayNativelyProps = {
-  app: ElectronApplication
-  page: Page
-  path: string
-  title: string
-}
+// The seeded downloads, by the title each row and the player's heading carry.
+const LABELS = { first: 'Clip 01', second: 'Clip 02 Été', tracks: 'Tracks 01' } as const
+const MEDIA = { first: 1, second: 2, tracks: 3 } as const
+// The show the two clips are episodes of, so the second follows the first.
+const SHOW = { id: 10, title: 'Clips' } as const
 
-/** Plays `path` through mpv and waits until its clock is moving. */
-const playNatively = async ({ app, page, path, title }: PlayNativelyProps) => {
-  await openFile({ app, path })
+type PlayNativelyProps = { page: Page; title: string }
+
+/** Plays the download named `title` from Downloads through mpv and waits until its clock is moving. */
+const playNatively = async ({ page, title }: PlayNativelyProps) => {
+  await playDownload({ page, label: title })
   await expectPlayingNatively({ page, title })
 }
 
@@ -148,16 +151,42 @@ const openMenu = async ({ page, name }: OpenMenuProps) => {
   await expect(page.getByRole('group', { name })).toBeVisible()
 }
 
-test.describe.serial('playing a local file through mpv', () => {
+test.describe.serial('playing a download through mpv', () => {
   let userData = ''
   let clips: Clips = { folder: '', first: '', second: '' }
   let tracks = { folder: '', path: '' }
+  // Where main keeps the first download's video: a real file for a forged command to name.
+  let firstVideo = ''
 
   test.beforeAll(async () => {
     userData = await freshUserData()
     const [made, track] = await Promise.all([makeClips(), makeTrackClip()])
     clips = made
     tracks = track
+    const { serverId } = await seedDownloads({
+      userData,
+      clips: [
+        {
+          path: clips.first,
+          label: LABELS.first,
+          mediaId: MEDIA.first,
+          group: episodeGroup({ showId: SHOW.id, title: SHOW.title, episode: 1 }),
+        },
+        {
+          path: clips.second,
+          label: LABELS.second,
+          mediaId: MEDIA.second,
+          group: episodeGroup({ showId: SHOW.id, title: SHOW.title, episode: 2 }),
+        },
+        { path: tracks.path, label: LABELS.tracks, mediaId: MEDIA.tracks },
+      ],
+    })
+    firstVideo = mediaPathFor({
+      userData,
+      serverId,
+      mediaId: MEDIA.first,
+      container: containerOf(clips.first),
+    })
   })
 
   test.afterAll(async () => {
@@ -168,9 +197,9 @@ test.describe.serial('playing a local file through mpv', () => {
     await withApp({
       userData,
       run: async (launched) => {
-        const { app, page } = launched
+        const { page } = launched
         await tapPlayerPort({ page })
-        await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
+        await playNatively({ page, title: LABELS.first })
 
         // Read from what mpv is sent, since the slider hides on a window as narrow as CI's.
         await expect.poll(() => lastVolumeSent(page)).not.toBeNull()
@@ -183,7 +212,7 @@ test.describe.serial('playing a local file through mpv', () => {
         await expectButton({ page, name: 'Play (k)' })
         await page.keyboard.press('5')
         await expect.poll(() => distanceFrom({ page, seconds: 15 })).toBeLessThanOrEqual(1)
-        await expect.poll(() => watchedPercent({ page, label: 'Clip 01' })).toBe(50)
+        await expect.poll(() => watchedPercent({ page, label: LABELS.first })).toBe(50)
 
         const firstFrame = await markWithin({
           launched,
@@ -196,8 +225,9 @@ test.describe.serial('playing a local file through mpv', () => {
 
     await withApp({
       userData,
-      run: async ({ app, page }) => {
-        await openFile({ app, path: clips.first })
+      run: async ({ page }) => {
+        await expectOffline({ page })
+        await playDownload({ page, label: LABELS.first })
         await expect(page.getByText('Resumed at 0:15')).toBeVisible()
         await expectNative(page)
         await expect.poll(async () => (await clockOf(page)) ?? 0).toBeGreaterThanOrEqual(14)
@@ -210,21 +240,21 @@ test.describe.serial('playing a local file through mpv', () => {
     await withApp({
       userData,
       run: async (launched) => {
-        const { app, page } = launched
-        await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
+        const { page } = launched
+        await playNatively({ page, title: LABELS.first })
         const lag = await markWithin({ launched, name: 'loop-lag-p99-ms', ms: LOOP_MARK_WAIT_MS })
         expect(lag).toBeLessThan(LOOP_LAG_LIMIT_MS)
       },
     })
   })
 
-  test('plays the next video in the folder when one ends', async () => {
+  test('plays the next of its group when one ends', async () => {
     await withApp({
       userData,
-      run: async ({ app, page }) => {
-        await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
+      run: async ({ page }) => {
+        await playNatively({ page, title: LABELS.first })
         await page.keyboard.press('End')
-        await expect(heading({ page, name: 'Clip 02 Été' })).toBeVisible({ timeout: NEXT_WAIT_MS })
+        await expect(heading({ page, name: LABELS.second })).toBeVisible({ timeout: NEXT_WAIT_MS })
         await expectNative(page)
         await expectClockAdvancing(page)
       },
@@ -234,9 +264,9 @@ test.describe.serial('playing a local file through mpv', () => {
   test('switches audio and subtitles and remembers the pick', async () => {
     await withApp({
       userData,
-      run: async ({ app, page }) => {
+      run: async ({ page }) => {
         await tapPlayerPort({ page })
-        await playNatively({ app, page, path: tracks.path, title: 'Tracks 01' })
+        await playNatively({ page, title: LABELS.tracks })
         await openMenu({ page, name: 'Audio' })
         await expect(audioGroup(page).getByRole('radio', { name: 'English' })).toBeChecked()
 
@@ -266,10 +296,10 @@ test.describe.serial('playing a local file through mpv', () => {
 
     await withApp({
       userData,
-      run: async ({ app, page }) => {
+      run: async ({ page }) => {
         await tapPlayerPort({ page })
-        await openFile({ app, path: tracks.path })
-        await expect(heading({ page, name: 'Tracks 01' })).toBeVisible()
+        await playDownload({ page, label: LABELS.tracks })
+        await expect(heading({ page, name: LABELS.tracks })).toBeVisible()
         await expect
           .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.load }))
           .toMatchObject({ ok: true })
@@ -293,9 +323,9 @@ test.describe.serial('playing a local file through mpv', () => {
   test('offers video info', async () => {
     await withApp({
       userData,
-      run: async ({ app, page }) => {
+      run: async ({ page }) => {
         await tapPlayerPort({ page })
-        await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
+        await playNatively({ page, title: LABELS.second })
         await page.keyboard.press('?')
         await expect(page.getByText('Video info')).toBeVisible()
         await page.keyboard.press('Escape')
@@ -317,7 +347,7 @@ test.describe.serial('playing a local file through mpv', () => {
       userData,
       run: async ({ app, page }) => {
         await tapPlayerPort({ page })
-        await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
+        await playNatively({ page, title: LABELS.second })
         await page.keyboard.press('Escape')
         await expectLeftPlayer(page)
         await expect
@@ -326,7 +356,7 @@ test.describe.serial('playing a local file through mpv', () => {
         expect(await backgroundOf(app)).toBe(NIGHT)
 
         const stops = (await repliesTo({ page, type: PLAYER_COMMANDS.stop })).length
-        await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
+        await playNatively({ page, title: LABELS.second })
         await wake(page)
         await page.getByRole('button', { name: 'Back', exact: true }).click()
         await expectLeftPlayer(page)
@@ -346,7 +376,7 @@ test.describe.serial('playing a local file through mpv', () => {
       userData,
       run: async ({ app, page }) => {
         await tapPlayerPort({ page })
-        await playNatively({ app, page, path: clips.second, title: 'Clip 02 Été' })
+        await playNatively({ page, title: LABELS.second })
 
         /*
          * A second `ready`: main closes the old port, which stops mpv, and hands over a new
@@ -354,7 +384,7 @@ test.describe.serial('playing a local file through mpv', () => {
          */
         await page.reload()
         await expect.poll(async () => (await trafficOf({ page })).ports).toBe(1)
-        await expectPlayingNatively({ page, title: 'Clip 02 Été' })
+        await expectPlayingNatively({ page, title: LABELS.second })
         expect(await backgroundOf(app)).toBe(CLEAR)
         await expect
           .poll(() => lastReplyOf({ page, type: PLAYER_COMMANDS.load }))
@@ -370,8 +400,8 @@ test.describe.serial('playing a local file through mpv', () => {
     await withApp({
       userData,
       run: async ({ app, page }) => {
-        // A granted file, so a forgery has a real grant beside it to reach for.
-        await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
+        // A granted download, so a forgery has a real grant and a real file to reach for.
+        await playNatively({ page, title: LABELS.first })
         expect(await backgroundOf(app)).toBe(CLEAR)
         await page.keyboard.press('Escape')
         await expectLeftPlayer(page)
@@ -381,24 +411,24 @@ test.describe.serial('playing a local file through mpv', () => {
         const load = { type: PLAYER_COMMANDS.load, start: 0, audio: null, subtitle: null }
         const forgeries = [
           { id: 'one', command: { type: PLAYER_COMMANDS.play } },
-          { id: 9001, command: { type: 'run', args: ['loadfile', clips.first] } },
-          { id: 9002, command: ['loadfile', clips.first, 'replace'] },
-          { id: 9003, command: { type: 'loadfile', url: clips.first } },
-          { id: 9004, command: { ...load, source: { kind: 'path', path: clips.first } } },
+          { id: 9001, command: { type: 'run', args: ['loadfile', firstVideo] } },
+          { id: 9002, command: ['loadfile', firstVideo, 'replace'] },
+          { id: 9003, command: { type: 'loadfile', url: firstVideo } },
+          { id: 9004, command: { ...load, source: { kind: 'path', path: firstVideo } } },
           {
             id: 9005,
             command: { ...load, source: { kind: PLAYER_SOURCE_KINDS.file, fileId: ungranted } },
           },
           {
             id: 9006,
-            command: { ...load, source: { kind: PLAYER_SOURCE_KINDS.file, fileId: clips.first } },
+            command: { ...load, source: { kind: PLAYER_SOURCE_KINDS.file, fileId: firstVideo } },
           },
           {
             id: 9007,
             command: {
               ...load,
-              source: { kind: PLAYER_SOURCE_KINDS.file, fileId: ungranted, path: clips.first },
-              path: clips.first,
+              source: { kind: PLAYER_SOURCE_KINDS.file, fileId: ungranted, path: firstVideo },
+              path: firstVideo,
               options: { 'access-references': 'yes' },
             },
           },
@@ -413,8 +443,7 @@ test.describe.serial('playing a local file through mpv', () => {
 
         const { replies, events, strays } = await trafficOf({ page })
         const unknown = 'Raven does not understand that command.'
-        const notOpen =
-          'That video is no longer open. Open it again from the files on this computer or from Downloads.'
+        const notOpen = 'That video is no longer open. Open it again from Downloads.'
         expect(replies).toEqual([
           { id: 9001, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
           { id: 9002, ok: false, reason: PLAYER_REFUSAL_REASONS.refused, message: unknown },
@@ -441,7 +470,7 @@ test.describe.serial('playing a local file through mpv', () => {
     const launched = await launchApp({ userData })
     const { app, page } = launched
     try {
-      await playNatively({ app, page, path: clips.first, title: 'Clip 01' })
+      await playNatively({ page, title: LABELS.first })
       const pid = app.process().pid
       if (pid === undefined) throw new Error('Raven has no process id.')
       const tree = await processTree({ pid })

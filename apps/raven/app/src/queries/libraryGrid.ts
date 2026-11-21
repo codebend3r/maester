@@ -40,6 +40,8 @@ export type GridSection = {
   count: string | null
   shape: CardShape
   cards: ShelfCard[]
+  /** Whether a titled section starts open, as Coming soon's shelves do; a library's buckets start shut. */
+  isOpenFirst?: boolean
 }
 
 /**

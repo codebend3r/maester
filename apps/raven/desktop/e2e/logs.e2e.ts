@@ -1,17 +1,17 @@
-import { chmod, stat, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, stat, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { playLinkFor } from '@raven/core'
 import { type Clips, makeClips, makeTrackClip } from '@/e2e/clips'
 import { FIXTURE_ACCOUNT } from '@/e2e/fixtureAuth'
 import { FIXTURE_MEDIA, FIXTURE_MOVIE_NAMES } from '@/e2e/fixtureLibrary'
-import { type FixtureServer, startWebFixture } from '@/e2e/fixtureServer'
+import { containerOf, type FixtureServer, startWebFixture } from '@/e2e/fixtureServer'
 import {
   expectOffline,
   freshUserData,
   heading,
   logPathFor,
-  openFile,
   openUrl,
   readLog,
   removeDir,
@@ -20,9 +20,14 @@ import {
   withApp,
 } from '@/e2e/harness'
 import { clockOf, expectButton, expectNative } from '@/e2e/playerView'
+import { playDownload, seedDownloads } from '@/e2e/seedDownloads'
+import { entryDirFor, mediaPathFor } from '@/main/downloads/space'
 
 // What the fixture's title plays for before the app quits.
 const PLAY_SECONDS = 3
+// The seeded downloads' titles and the one media id each test files its own under.
+const LABELS = { clip: 'Clip 01', broken: 'Broken Secret' } as const
+const MEDIA_ID = 1
 
 type ExpectLoggedProps = { userData: string; text: string }
 
@@ -66,14 +71,18 @@ test.describe.serial('the Raven log', () => {
   test('writes the launch, the engine and the budget marks to its log', async () => {
     const userData = await freshUserData()
     try {
+      const { serverId } = await seedDownloads({
+        userData,
+        clips: [{ path: clips.first, label: LABELS.clip, mediaId: MEDIA_ID }],
+      })
       await withApp({
         userData,
-        run: async ({ app, page }) => {
+        run: async ({ page }) => {
           await expectOffline({ page })
-          // The engine opens beside the window; the open comes after it, as a person's would.
+          // The engine opens beside the window; the play comes after it, as a person's would.
           await expectLogged({ userData, text: 'video engine ready: ' })
-          await openFile({ app, path: clips.first })
-          await expect(heading({ page, name: 'Clip 01' })).toBeVisible()
+          await playDownload({ page, label: LABELS.clip })
+          await expect(heading({ page, name: LABELS.clip })).toBeVisible()
           await expectNative(page)
           await expectButton({ page, name: 'Pause (k)' })
           await expectLogged({ userData, text: 'raven-first-frame-ms ' })
@@ -97,7 +106,15 @@ test.describe.serial('the Raven log', () => {
       expect(firstFrame).toBeGreaterThan(opened)
       expect(quit).toBeGreaterThan(firstFrame)
 
-      const names = [clips.folder, basename(clips.folder), basename(clips.first), 'Clip 01']
+      // Neither where the clip came from, nor where the download sits, nor its title.
+      const names = [
+        clips.folder,
+        basename(clips.folder),
+        basename(clips.first),
+        entryDirFor({ userData, serverId, mediaId: MEDIA_ID }),
+        serverId,
+        LABELS.clip,
+      ]
       expect(lines.filter((line) => names.some((name) => line.includes(name)))).toEqual([])
 
       const file = logPathFor({ userData })
@@ -154,31 +171,44 @@ test.describe.serial('the Raven log', () => {
     }
   })
 
-  test('keeps the folder and file name of a file mpv cannot open out of its log', async () => {
+  test('keeps the folder and file name of a download mpv cannot open out of its log', async () => {
     const userData = await freshUserData()
-    const own = await makeClips()
-    // Granted, since a stat needs no read access, and then refused to mpv's open.
-    const broken = join(own.folder, 'Broken Secret.mp4')
-    await writeFile(broken, 'not a video at all')
-    await chmod(broken, 0o000)
+    const folder = await mkdtemp(join(tmpdir(), 'raven-e2e-broken-'))
+    const source = join(folder, `${LABELS.broken}.mp4`)
     try {
+      await writeFile(source, 'not a video at all')
+      const { serverId } = await seedDownloads({
+        userData,
+        clips: [{ path: source, label: LABELS.broken, mediaId: MEDIA_ID }],
+      })
+      const container = containerOf(source)
+      const video = mediaPathFor({ userData, serverId, mediaId: MEDIA_ID, container })
+      // Granted, since a stat needs no read access, and then refused to mpv's open.
+      await chmod(video, 0o000)
       await withApp({
         userData,
-        run: async ({ app, page }) => {
+        run: async ({ page }) => {
           await expectOffline({ page })
           await expectLogged({ userData, text: 'video engine ready: ' })
           // mpv names the file it cannot read in its own warnings.
-          await openFile({ app, path: broken })
+          await playDownload({ page, label: LABELS.broken })
           await expectLogged({ userData, text: 'mpv could not open the file' })
         },
       })
 
       const lines = await readLog({ userData })
       expect(lines.some((line) => line.includes('<file>'))).toBe(true)
-      const names = [own.folder, basename(own.folder), 'Broken Secret']
+      const names = [
+        entryDirFor({ userData, serverId, mediaId: MEDIA_ID }),
+        serverId,
+        basename(video),
+        folder,
+        basename(folder),
+        LABELS.broken,
+      ]
       expect(lines.filter((line) => names.some((name) => line.includes(name)))).toEqual([])
     } finally {
-      await Promise.all([removeDir(userData), removeDir(own.folder)])
+      await Promise.all([removeDir(userData), removeDir(folder)])
     }
   })
 })

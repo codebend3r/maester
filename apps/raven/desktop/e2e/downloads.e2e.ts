@@ -1,10 +1,7 @@
-import { randomUUID } from 'node:crypto'
-import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, type Page, test } from '@playwright/test'
 import {
-  DEFAULT_OUTPUT_SETTINGS,
-  DOWNLOAD_KINDS,
   DOWNLOAD_STATUS_KINDS,
   DOWNLOAD_TARGET_KINDS,
   downloadLinkFor,
@@ -36,15 +33,10 @@ import {
   withApp,
 } from '@/e2e/harness'
 import { expectButton, expectClockAdvancing, expectPlayingNatively } from '@/e2e/playerView'
-import {
-  CONFIG_FILE,
-  DEFAULT_UPDATE_SETTINGS,
-  type DesktopConfig,
-  isDesktopConfig,
-} from '@/main/desktopConfig'
+import { playDownload, rowOf, seedDownloads } from '@/e2e/seedDownloads'
+import { CONFIG_FILE, isDesktopConfig } from '@/main/desktopConfig'
 import {
   DOWNLOADS_FILE,
-  DOWNLOADS_VERSION,
   type DownloadsState,
   isDownloadsState,
 } from '@/main/downloads/downloadState'
@@ -231,12 +223,6 @@ const openTitle = async ({ page, title }: OpenTitleProps) => {
   await page.getByRole('link', { name: title, exact: true }).click()
   await expect(heading({ page, name: title })).toBeVisible()
 }
-
-type RowOfProps = { page: Page; label: string }
-
-/** A download's own row: the innermost item naming it, inside its title's group. */
-const rowOf = ({ page, label }: RowOfProps) =>
-  page.getByRole('listitem').filter({ hasText: label, hasNot: page.getByRole('listitem') })
 
 type ExpectReadyProps = { page: Page; label: string; size: number }
 
@@ -480,9 +466,7 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
       },
       run: async ({ page }) => {
         await expectOffline({ page })
-        await rowOf({ page, label })
-          .getByRole('button', { name: `Play ${label}` })
-          .click()
+        await playDownload({ page, label })
         await expectPlayingNatively({ page, title: label })
         /*
          * Paused, so the position main keeps for the server stays put. Even with no server the
@@ -526,59 +510,22 @@ test.describe.serial('downloading from the web pages, and playing offline', () =
 test('deletes at launch a download watched eleven minutes ago, and says so', async () => {
   const userData = await freshUserData()
   const fixture = await startAccountsFixture()
-  const serverId = randomUUID()
-  const at = Date.now()
-  const container = containerOf(fixtureClips.tracks)
-  const config: DesktopConfig = {
-    version: 5,
-    output: DEFAULT_OUTPUT_SETTINGS,
-    server: { id: serverId, origin: fixture.origin },
-    updates: { ...DEFAULT_UPDATE_SETTINGS },
-    lastAccountId: null,
-  }
-  const seeded: DownloadsState = {
-    version: DOWNLOADS_VERSION,
-    entries: [
-      {
-        downloadId: randomUUID(),
-        serverId,
-        mediaId: FIXTURE_MEDIA.first,
-        label: FIXTURE_TITLES.first,
-        group: {
-          kind: DOWNLOAD_KINDS.movie,
-          key: 'movie:1',
-          title: FIXTURE_TITLES.first,
-          order: 0,
-        },
-        container,
-        size: sizeOf(FIXTURE_MEDIA.first),
-        duration: 30,
-        watchedPercent: 90,
-        sidecars: [],
-        status: { kind: DOWNLOAD_STATUS_KINDS.ready },
-        autoDelete: true,
-        watchedAt: at - 11 * MINUTE_MS,
-        serverPosition: 0,
-        pending: { play: false, position: null, furthest: null, at: 0, accountId: null },
-        createdAt: at - 60 * MINUTE_MS,
-        track: undefined,
-      },
-    ],
-    autoDeleteDefault: false,
-    owed: [],
-  }
-  if (!isDownloadsState(seeded)) throw new Error('The seeded downloads are not what main reads.')
-  const folder = entryDirFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first })
   try {
-    await mkdir(folder, { recursive: true })
-    await copyFile(
-      fixtureClips.tracks,
-      mediaPathFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first, container }),
-    )
-    await Promise.all([
-      writeFile(join(userData, CONFIG_FILE), JSON.stringify(config)),
-      writeFile(join(userData, DOWNLOADS_FILE), JSON.stringify(seeded)),
-    ])
+    const { serverId } = await seedDownloads({
+      userData,
+      origin: fixture.origin,
+      clips: [
+        {
+          path: fixtureClips.tracks,
+          label: FIXTURE_TITLES.first,
+          mediaId: FIXTURE_MEDIA.first,
+          shouldAutoDelete: true,
+          watchedAt: Date.now() - 11 * MINUTE_MS,
+        },
+      ],
+    })
+    const folder = entryDirFor({ userData, serverId, mediaId: FIXTURE_MEDIA.first })
+    expect(await isPresent(folder)).toBe(true)
     await withApp({
       userData,
       env: serverEnv({ origin: fixture.origin }),

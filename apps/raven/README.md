@@ -439,7 +439,7 @@ Each release (`vX.Y.Z`) on the repo's [Releases page](https://github.com/codeben
 
 If you would rather use Terminal for step 3, `xattr -dr com.apple.quarantine "/Applications/Raven.app"` removes the download's quarantine, and the app then opens without asking.
 
-The app keeps its settings, recents, resume points and downloads in `~/Library/Application Support/raven`.
+The app keeps its settings, resume points and downloads in `~/Library/Application Support/raven`.
 
 ### Using it
 
@@ -447,16 +447,7 @@ The app keeps its settings, recents, resume points and downloads in `~/Library/A
 - **Sign in** with the web app's own sign-in, which asks Supabase directly. The page hands its session to the app, which keeps it in memory only, so playback and downloads act as your account. After a relaunch the page signs in again by itself while its session lasts.
 - **Locked libraries** stay unavailable. No client asks for the PIN: the page says a library is locked and offers nothing to open it, and Raven's own server calls carry whatever unlock cookie the page already holds.
 - **Every title plays in mpv.** Play on a movie or an episode opens the native player, and prefers a finished download over the server. The player shows why a title will not play (signed out, waiting for approval, a locked library, gone from the server, server out of reach) instead of a blank window.
-- **Without the server** the app shows Downloads, On this Mac, anything already playing and Settings, and goes back to the page you were on when the server answers again.
-
-### On this Mac
-
-**On this Mac**, from the side menu, plays a video from your own disk:
-
-- **Open** (Command O), or the button there, picks a video. **Drop** one or more videos on the window: the first plays and the rest follow it, in the order dropped.
-- **From Finder:** Open With, Raven, or drop a video on the Dock icon. Raven registers for movie types at `Alternate` rank, so installing it changes nothing Finder does until you say so: hold Option in Finder's Open With menu for Always Open With, or use Get Info, Open with, Raven, Change All.
-- **Open Recent** in the File menu, and the recents on the page (the last 50, each with how far you got; Clear recents empties the list). A local file resumes where it stopped.
-- **Next in folder:** when a local video ends, the next one in its folder (by natural order, so `Episode 2` before `Episode 10`) plays, and Next shows it as soon as playback starts.
+- **Without the server** the app shows Downloads, a download already playing and Settings, and goes back to the page you were on when the server answers again.
 
 ### Links
 
@@ -476,7 +467,7 @@ The app keeps its settings, recents, resume points and downloads in `~/Library/A
 - **Download:** inside the app every movie, episode, season, show and saga page offers it beside Play. Raven asks first: what you are downloading, how many files and how big, and how much the disk has free. A title in a locked library says so and is not downloaded. Raven leaves at least 2 GB of the disk free, and says so instead of offering Download when the files will not fit. Nothing is queued before you choose **Download**, and a file already on the Downloads page is skipped.
 - **What is kept:** the server's original file, the same bytes Raven streams, and its subtitle files. They live in `~/Library/Application Support/raven/downloads`, a folder per title, and the list of them in `downloads.json` beside it. Settings, Downloads, **Show in Finder** opens the folder; you cannot pick another one yet.
 - **The Downloads page**, from the side menu (its badge counts what is queued or downloading), lists every file, newest first, with a show's or saga's files together in play order, and the disk's free space. Each row offers **Play** once the file is whole, **Pause** or **Resume**, **Retry** after a failure, a **Delete once watched** switch and **Delete**; the header has **Pause all** and **Resume all**. Two files download at a time. A download picks up where it stopped after a quit, a sleep or a dropped connection: when the server cannot be reached, its files wait, and Raven tries again every five minutes, at launch and after a sleep.
-- **Playing a download** works as for a file of your own: the native engine, resume, track picks, and Next for the rest of its show or saga. The player and the recents say "Downloaded from raven". A title you streamed partway opens where the server had it when you downloaded it.
+- **Playing a download** uses the native engine, with resume, track picks, and Next for the rest of its show or saga. The player says "Downloaded from raven". A title you streamed partway opens where the server had it when you downloaded it.
 - **Delete once watched** deletes a download ten minutes after it counts as watched (the library's **Watched at**), and the row counts down: "Deletes in 7 minutes". Quit before then and the clock carries on at the next launch, or deletes at once when the ten minutes have passed. It never deletes a title while it plays, or while you are in the middle of it. Turned on for a title already watched, it starts the ten minutes then. The ask's checkbox starts from your last choice, which Settings, Downloads also sets.
 - **What reaches the server:** that you played a download and where you stopped, as plays and progress reports, as streaming sends them, so Continue watching, History and the watched marks come out right. Raven sends them a couple of seconds after each save while the server answers, at launch, whenever the app reads the list of downloads (Downloads, Settings and the badge) or an account signs in, and every five minutes while anything waits. Before it deletes a download it gives the server two seconds to hear what was watched, and what the server has not heard yet is kept until it does, unless the server no longer has the title. History dates the play when the server hears of it, not when you watched.
 - **Where the bytes come from:** when the server lists media origins (`RAVEN_MEDIA_ORIGINS`), Raven fetches 256 KB from each and picks the one that answers best, preferring `lan` over `public` when they are close, as the browser does; it then fetches with a media ticket for that one file. When it lists none, or none answers, Raven fetches from the server's own address with an account ticket. The page never sees a media origin or a ticket.

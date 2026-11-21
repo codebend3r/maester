@@ -36,6 +36,10 @@ const CARD: BingeCard = {
   synopsis: SYNOPSIS,
   status: 'S01E02',
   page: { kind: ROUTE_TARGETS.item, itemId: 4, libraryId: null, fileId: null },
+  poster: null,
+  rowStatus: null,
+  playLabel: null,
+  seen: null,
 }
 
 const renderCard = (hasSynopsis: boolean) =>

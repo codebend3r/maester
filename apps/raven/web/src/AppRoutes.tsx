@@ -168,9 +168,6 @@ const DesignPage = lazyPage(() =>
 const loadDownloadsPage = () =>
   import('@/desktop/DownloadsPage/DownloadsPage').then((page) => page.DownloadsPage)
 const DownloadsPage = lazyPage(loadDownloadsPage)
-const LocalPage = lazyPage(() =>
-  import('@/desktop/LocalPage/LocalPage').then((page) => page.LocalPage),
-)
 const PlayRoute = lazyPage(() =>
   import('@/desktop/PlayPage/PlayPage').then((page) => page.PlayRoute),
 )
@@ -221,8 +218,7 @@ const useKeepOfflinePages = (engine: BrowserDownloads | null): void => {
  * and the music mode's under `/music`, which shows the same album, artist,
  * playlist and Now Playing pages. Where the page keeps downloads, inside
  * Raven or in a browser that can, the frame adds Downloads and the host's
- * own part of the page runs over every route; Raven adds On this Mac and
- * its player of a file, a browser its player of a download.
+ * own part of the page runs over every route, and its player of a download.
  */
 export const AppRoutes = () => {
   const isDesktop = useIsDesktop()
@@ -299,7 +295,6 @@ export const AppRoutes = () => {
                 {host !== null && (
                   <Route path={DESKTOP_PATHS.downloads} element={<DownloadsPage />} />
                 )}
-                {isDesktop && <Route path={DESKTOP_PATHS.local} element={<LocalPage />} />}
                 <Route path={NOT_FOUND_ROUTE} element={<NotFoundPage />} />
               </Route>
               <Route path={MUSIC_PATHS.root} element={<MusicShell />}>

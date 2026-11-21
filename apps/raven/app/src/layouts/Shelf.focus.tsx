@@ -42,6 +42,7 @@ import {
   type ShelfPageProps,
 } from '@/layouts/shelfKit'
 import { BingeCardFocus } from '@/layouts/BingeCard.focus'
+import { BingeRowFocus } from '@/layouts/BingeRow.focus'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { Logo } from '@/layouts/Logo'
@@ -244,7 +245,7 @@ const CardsRow = ({ shelf, onOpen, isFirst = false }: CardsRowProps) => {
   )
 }
 
-/** The columns of Continue watching's grid on a TV, as on the web: three rows of two. */
+/** The columns of Continue watching's grid on a TV: three rows of two. */
 const GRID_COLUMNS = 2
 
 /**
@@ -416,11 +417,41 @@ const ShelfPage = ({ title, note, children }: ShelfPageProps) => {
 }
 
 /**
+ * The Binge page's list on a TV: a row a show down the screen, one band the remote comes into
+ * on the first row.
+ */
+const BingeRows = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
+  const { isOpening } = useOpeningFocus()
+  const band = useShelfBand(HOME_BANDS.binge)
+  const styles = useStyles()
+  return (
+    cards.length > 0 && (
+      <View onLayout={band.onLayout}>
+        <FocusBand>
+          <View style={styles.bingeRows}>
+            {cards.map((card, index) => (
+              <BingeRowFocus
+                key={card.key}
+                card={card}
+                isPreferred={isOpening && isFirst && index === 0}
+                onPress={() => onOpen(card.target)}
+                place={`${HOME_BANDS.binge}/${card.key}`}
+                shelf={HOME_BANDS.binge}
+              />
+            ))}
+          </View>
+        </FocusBand>
+      </View>
+    )
+  )
+}
+
+/**
  * Home on a TV: shelves down the screen, each a row the remote moves along, never the touch
  * layout made larger. The rows run to the screen's edges, past the title-safe margin the
  * titles keep, and leave room above and below for a card grown by focus.
  */
-export const focusShelf: ShelfKit = { Shelves, Shelf, BingeShelf, ShelfPage }
+export const focusShelf: ShelfKit = { Shelves, Shelf, BingeShelf, BingeRows, ShelfPage }
 
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
@@ -461,6 +492,7 @@ const useStyles = themedStyles((colours) =>
       paddingHorizontal: TV_GUTTER,
       paddingVertical: TV_SIZES.space4,
     },
+    bingeRows: { gap: TV_SIZES.space4, marginHorizontal: TV_GUTTER, paddingTop: TV_SIZES.space1 },
     bingeGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',

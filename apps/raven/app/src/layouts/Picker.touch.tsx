@@ -17,7 +17,7 @@ type OpenPickerSheetProps<K extends string> = Pick<
 > & {
   anchor: SheetAnchor
   /** The option drawn in red, as the sheet marks what cannot be undone. */
-  destructiveKey?: K
+  destructiveKey?: K | null
   /** A line under the title: why an action is not offered. */
   message?: string | null
 }

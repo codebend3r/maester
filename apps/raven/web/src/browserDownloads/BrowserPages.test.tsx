@@ -20,6 +20,7 @@ import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { DownloadsPage } from '@/desktop/DownloadsPage/DownloadsPage'
 import { DOWNLOADS_PAGE_COPY } from '@/desktop/DownloadsPage/copy'
 import { api } from '@/lib/api'
+import { MUSIC_PATHS } from '@/lib/music'
 import { ravenPlayer } from '@/lib/ravenPlayer'
 import { HostSettings } from '@/pages/SettingsPage/HostSettings'
 import { WatchPage } from '@/pages/WatchPage/WatchPage'
@@ -109,7 +110,7 @@ describe('AppRoutes in a browser that keeps downloads', () => {
 
   afterEach(() => list.mockReset())
 
-  it('opens Downloads, with no On this Mac and no music Downloads', async () => {
+  it('opens Downloads, with no music Downloads', async () => {
     list.mockImplementation(async () => [])
     const { engine } = await fakeEngine({ server: serverOf() })
     asBrowserDownloads(engine)
@@ -118,7 +119,7 @@ describe('AppRoutes in a browser that keeps downloads', () => {
     expect(await screen.findByText(DOWNLOADS_PAGE_COPY.empty.browser)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Show in Finder' })).toBeNull()
     unmount()
-    renderWithProviders({ ui: <AppRoutes />, route: DESKTOP_PATHS.local })
+    renderWithProviders({ ui: <AppRoutes />, route: MUSIC_PATHS.downloads })
     expect(
       await screen.findByRole('heading', { name: 'Nothing lives at this address' }),
     ).toBeInTheDocument()

@@ -36,11 +36,8 @@ describe('allowlistedFetch', () => {
   it('throws on a call the app may not make, before the server hears of it', async () => {
     const { asked, fetch } = answering()
     const api = createApiClient({ baseUrl: ORIGIN, fetch: allowlistedFetch({ fetch }) })
-    await expect(api.deleteMedia(3)).rejects.toThrow(
-      "raven's app does not call DELETE http://nas.local:8484/api/media/3",
-    )
     await expect(api.deleteLibrary(1)).rejects.toThrow(
-      'DELETE http://nas.local:8484/api/libraries/1',
+      "raven's app does not call DELETE http://nas.local:8484/api/libraries/1",
     )
     await expect(api.browse('/volume1')).rejects.toThrow('GET http://nas.local:8484/api/fs/browse')
     await expect(api.lockAdmin()).rejects.toThrow('POST http://nas.local:8484/api/admin/lock')

@@ -62,7 +62,7 @@ describe('appClientCallOf', () => {
   })
 
   it('is no call for a route the app has no business with', () => {
-    expect(callOf({ method: remove, url: '/api/media/4' })).toBeNull()
+    expect(callOf({ method: remove, url: '/api/media/4' })).toBe(APP_OWNER_CALLS.deleteMedia)
     expect(callOf({ method: remove, url: '/api/playlists/4' })).toBe(
       APP_CLIENT_CALLS.deletePlaylist,
     )

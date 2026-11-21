@@ -107,13 +107,11 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     | 'labelOf'
     | 'mediaIdOf'
     | 'logoOf'
-    | 'isStaleDownload'
     | 'serverPositionOf'
     | 'noteOpened'
     | 'notePosition'
     | 'notePlaying'
     | 'playbackLeft'
-    | 'isWatched'
   > & {
     list: () => DesktopReply
     /** A saved picture's file, for the `raven-picture:` scheme. */
@@ -596,13 +594,11 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     labelOf: playback.labelOf,
     mediaIdOf: playback.mediaIdOf,
     logoOf: playback.logoOf,
-    isStaleDownload: playback.isStaleDownload,
     serverPositionOf: playback.serverPositionOf,
     noteOpened: playback.noteOpened,
     notePosition: playback.notePosition,
     notePlaying: playback.notePlaying,
     playbackLeft: playback.playbackLeft,
-    isWatched: playback.isWatched,
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
     accessEnded: queue.accessEnded,

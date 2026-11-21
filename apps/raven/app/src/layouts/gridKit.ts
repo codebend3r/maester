@@ -19,6 +19,12 @@ export type GridProps = {
   toolbar: ReactNode
   sections: GridSection[]
   view: LibraryView
+  /**
+   * Whether a poster keeps its words under it on a TV, where a library's posters are the picture
+   * alone: Coming soon's, whose words say what the poster does not, when it comes and where its
+   * request stands.
+   */
+  hasPosterCaptions?: boolean
   /** The strip that jumps through the order, as the web's; null for an order with none. */
   jump: JumpScale | null
   onOpen: (card: ShelfCard) => void

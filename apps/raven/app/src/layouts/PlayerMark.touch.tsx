@@ -113,11 +113,14 @@ export const HoldMark = ({ side, sides }: HoldMarkProps) => (
 /** How strongly the wash over a tapped half shows at its brightest, 0 to 1. */
 const AREA_WASH = 0.16
 
+/** What a test finds the wash over a tapped half by. */
+export const TAP_AREA_TEST_ID = 'tap-area-flash'
+
 type TapAreaFlashProps = { side: TouchSide }
 
 /**
- * The half of the picture a double tap landed on, washed in the on-picture colour for a second
- * and fading, so the viewer sees where each way's taps go. It says nothing aloud: the skip's
+ * The half of the picture a double tap landed on, washed in the on-picture colour and gone 0.3
+ * seconds after the tap, so the viewer sees where each way's taps go. It says nothing aloud: the skip's
  * mark does. Key it by the tap, so each starts afresh.
  */
 export const TapAreaFlash = ({ side }: TapAreaFlashProps) => {
@@ -135,6 +138,7 @@ export const TapAreaFlash = ({ side }: TapAreaFlashProps) => {
         importantForAccessibility="no-hide-descendants"
         pointerEvents="none"
         style={[styles.area, halves[side], { opacity }]}
+        testID={TAP_AREA_TEST_ID}
       >
         <View style={styles.wash} />
       </Animated.View>

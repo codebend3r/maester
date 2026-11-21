@@ -13,7 +13,6 @@ import { useDownloadAsk } from '@/stores/downloadAsk'
 import { useDownloadNotes } from '@/stores/downloadNotes'
 import { useDownloadPreparing } from '@/stores/downloadPreparing'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
-import { useDragging } from '@/stores/dragging'
 import { useSeasonView } from '@/stores/seasonView'
 import { useSelectionScopes } from '@/stores/selectionScope'
 import { useServerReach } from '@/stores/serverReach'
@@ -43,7 +42,6 @@ const initialDownloadAsk = useDownloadAsk.getInitialState()
 const initialDownloadNotes = useDownloadNotes.getInitialState()
 const initialDownloadPreparing = useDownloadPreparing.getInitialState()
 const initialDownloadsHost = useDownloadsHostStore.getInitialState()
-const initialDragging = useDragging.getInitialState()
 const initialServerReach = useServerReach.getInitialState()
 const initialToasts = useToasts.getInitialState()
 const initialSeasonView = useSeasonView.getInitialState()
@@ -72,7 +70,6 @@ afterEach(() => {
   useDownloadNotes.setState(initialDownloadNotes, true)
   useDownloadPreparing.setState(initialDownloadPreparing, true)
   useDownloadsHostStore.setState(initialDownloadsHost, true)
-  useDragging.setState(initialDragging, true)
   useServerReach.setState(initialServerReach, true)
   useToasts.setState(initialToasts, true)
   useSeasonView.setState(initialSeasonView, true)

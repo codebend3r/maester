@@ -141,7 +141,7 @@ describe('TabBar', () => {
     ])
   })
 
-  it('adds This Mac and Downloads before Settings inside Raven', async () => {
+  it('adds Downloads before Settings inside Raven', async () => {
     asDesktop(downloadsMain())
     renderBar()
     expect(slots()).toHaveLength(5)
@@ -151,7 +151,6 @@ describe('TabBar', () => {
       ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
-      ['This Mac', DESKTOP_PATHS.local],
       ['Downloads', DESKTOP_PATHS.downloads],
       ['Settings', '/settings'],
     ])
@@ -202,12 +201,11 @@ describe('TabBar', () => {
     expect(more()).toHaveFocus()
   })
 
-  it('keeps only This Mac, Downloads and Settings, with no More, while Raven cannot reach its server', () => {
+  it('keeps only Downloads and Settings, with no More, while Raven cannot reach its server', () => {
     asDesktop(downloadsMain())
     useServerReach.setState({ isOffline: true })
     renderBar({ hasMusic: true })
     expect(slots()).toEqual([
-      ['This Mac', DESKTOP_PATHS.local],
       ['Downloads', DESKTOP_PATHS.downloads],
       ['Settings', '/settings'],
     ])

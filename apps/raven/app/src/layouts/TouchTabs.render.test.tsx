@@ -119,7 +119,7 @@ describe('the More sheet', () => {
     expect(screen.queryByRole('header', { name: TOUCH_TABS_COPY.more })).toBeNull()
   })
 
-  it('holds Search, Binge, Downloads, Settings and the pinned libraries under their heading, More lit and expanded', async () => {
+  it('holds Search, Binge, Coming soon, Downloads, Settings and the pinned libraries under their heading, More lit and expanded', async () => {
     await openMore()
     expect(await screen.findByRole('link', { name: 'Films' })).toBeTruthy()
     expect(screen.getByRole('header', { name: TOUCH_TABS_COPY.more })).toBeTruthy()
@@ -127,6 +127,7 @@ describe('the More sheet', () => {
     expect(screen.getAllByRole('link').map((link) => link.props.accessibilityLabel)).toEqual([
       'Search',
       'Binge',
+      'Coming soon',
       'Downloads',
       'Settings',
       'Films',

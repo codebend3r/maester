@@ -3,6 +3,7 @@ import {
   type UpcomingShelf,
   type UpcomingTitle,
   formatAirDate,
+  requestOf,
 } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { useQuery } from '@tanstack/react-query'
@@ -13,7 +14,6 @@ import { requestHoldingQuery, requestsQuery } from '@/lib/queries'
 import { comingSoonTitlePath } from '@/lib/appPaths'
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { REQUEST_COPY, REQUEST_STATUS_COPY } from '@/pages/ComingSoonPage/requestCopy'
-import { requestOf } from '@/pages/ComingSoonPage/titleRequests'
 import styles from '@/pages/ComingSoonPage/UpcomingCard.module.scss'
 
 /** Whether a shelf's cards say if each is a movie or a show: only where it holds both. */

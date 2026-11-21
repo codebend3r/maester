@@ -254,6 +254,11 @@ const Hero = ({ hero, actions, links, file, onOpen }: HeroProps) => {
         )}
         {actions !== null && <ActionRow actions={actions} isFirstRow />}
         {actions !== null && links.length > 0 && <ActionRow actions={links} isFirstRow={false} />}
+        {hero.notes.map((note) => (
+          <Text key={note} style={styles.note}>
+            {note}
+          </Text>
+        ))}
         {file.length > 0 && (
           <View style={styles.file}>
             {file.map((fact) => {
@@ -482,6 +487,7 @@ const useStyles = themedStyles((colours) =>
       fontWeight: 'bold',
     },
     byline: { color: colours.text, fontSize: TV_SIZES.textLg },
+    note: { color: colours.muted, fontSize: TV_SIZES.text },
     line: { color: colours.muted, fontSize: TV_SIZES.text, lineHeight: TV_SIZES.text * LINE_RATIO },
     // The file's facts as a two column list: a quiet label beside each value, values on their own.
     file: { gap: TV_SIZES.space2, paddingTop: TV_SIZES.space2 },

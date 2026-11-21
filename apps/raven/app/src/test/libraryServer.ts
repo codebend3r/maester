@@ -5,6 +5,8 @@ import {
   ITEM_TYPES,
   LIBRARY_VIEWS,
   DEFAULT_SAGA_BACKDROP,
+  type HistoryEntry,
+  type ItemSummary,
   type Library,
   MATCH_STATES,
   MEDIA_GROUPINGS,
@@ -107,8 +109,17 @@ export const libraryPath = ({ call, library, sort, search }: LibraryPathProps): 
 /** What a viewer types in Films' search box to find Busboys, and to find nothing. */
 export const FILM_SEARCHES = { busboys: 'bus', nothing: 'zzz' } as const
 
-const { getLibrary, listInProgress, listLibraries, listMedia, listSagas, listShows } =
-  APP_CLIENT_CALLS
+const {
+  getLibrary,
+  listHistory,
+  listInProgress,
+  listLibraries,
+  listLibraryFavourites,
+  listLibraryFavouriteTitles,
+  listMedia,
+  listSagas,
+  listShows,
+} = APP_CLIENT_CALLS
 
 /** Ashfall Gate, watched, then Night Train: one TMDB collection, oldest first. */
 export const NIGHT_SAGA: Saga = {
@@ -174,6 +185,17 @@ export const NIGHT_TRAIN_IN_PROGRESS: PosterEntry = {
   poster: null,
 }
 
+/** Busboys, watched to the end once, as Films' history lists it. */
+export const BUSBOYS_FINISHED: HistoryEntry = {
+  media: { ...BUSBOYS, watched: true },
+  lastPlayedAt: '2026-11-01T20:00:00.000Z',
+  plays: 1,
+  furthest: 5400,
+  watched: true,
+  marked: false,
+  poster: null,
+}
+
 /** Films as it would be once a viewer on the web groups it by match. */
 export const GROUPED_FILMS: Library = {
   ...FILMS,
@@ -191,6 +213,12 @@ type LibraryApiProps = {
   inProgress?: () => PosterEntry[]
   /** Films' sagas; `NIGHT_SAGA` unless a test says. */
   sagas?: () => Saga[]
+  /** Films' favourite videos; none unless a test says. */
+  favourites?: () => PosterEntry[]
+  /** Films' favourite shows and seasons; none unless a test says. */
+  favouriteTitles?: () => ItemSummary[]
+  /** What was finished in Films; nothing unless a test says. */
+  finished?: () => HistoryEntry[]
 }
 
 /**
@@ -203,10 +231,18 @@ export const libraryApi = ({
   reads = async () => undefined,
   inProgress = () => [],
   sagas = () => [NIGHT_SAGA],
+  favourites = () => [],
+  favouriteTitles = () => [],
+  finished = () => [],
 }: LibraryApiProps = {}): ApiClient => {
   const bodyFor = (path: string): unknown => {
     if (path === libraryPath({ call: listInProgress, library: FILMS })) return inProgress()
     if (path === libraryPath({ call: listSagas, library: FILMS })) return sagas()
+    if (path === libraryPath({ call: listLibraryFavourites, library: FILMS })) return favourites()
+    if (path === libraryPath({ call: listLibraryFavouriteTitles, library: FILMS }))
+      return favouriteTitles()
+    // The history is asked with a limit, which the answer here does not depend on.
+    if (path.startsWith(`${libraryPath({ call: listHistory, library: FILMS })}?`)) return finished()
     return ANSWERS[path]
   }
   return createApiClient({
