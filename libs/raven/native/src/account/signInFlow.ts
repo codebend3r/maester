@@ -1,4 +1,4 @@
-import type { ApiClient } from '@raven/core'
+import { AUTH_ERROR_CODES, type ApiClient, SIGN_IN_ERRORS } from '@raven/core'
 import { useState } from 'react'
 
 import type { AccountSessionStore } from '@/account/accountSession'
@@ -8,7 +8,6 @@ import {
   type SignInStep,
   finishSignIn,
 } from '@/account/signInSteps'
-import { AUTH_ERROR_CODES, SIGN_IN_ERRORS } from '@/account/signInErrors'
 import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
 import { useSubmit } from '@/account/useSubmit'
 import type { ActiveServerStore } from '@/servers/activeServerStore'

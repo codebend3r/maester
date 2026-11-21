@@ -1,7 +1,5 @@
-import { ApiError } from '@raven/core'
+import { ApiError, SIGN_IN_ERRORS, type SignInError } from '@raven/core'
 import { useRef, useState } from 'react'
-
-import { SIGN_IN_ERRORS, type SignInError } from '@/account/signInErrors'
 
 const SERVER_ERROR = 500
 

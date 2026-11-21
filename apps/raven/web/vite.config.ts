@@ -1,34 +1,25 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_SERVER_ORIGIN, SERVICE_WORKER, URL_PROTOCOLS } from '@raven/core'
+import { DEFAULT_SERVER_ORIGIN, SERVICE_WORKER } from '@raven/core'
 import { type Plugin, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import {
+  IS_NETLIFY,
+  NETLIFY_IMAGE_CDN,
+  devApiOrigin,
+  vendorChunkGroups,
+} from '@tooling/web/viteRaven'
 
-/** The environment variables the build and the dev server read. */
+/** The environment variables only this build and its dev server read. */
 const ENV = {
-  devApiOrigin: 'RAVEN_DEV_API_ORIGIN',
   homeContinueCount: 'RAVEN_HOME_CONTINUE_COUNT',
-  netlify: 'NETLIFY',
 } as const
 
 /** raven's own folder, whose `.env` (beside the compose file) the dev server reads too. */
 const RAVEN_DIR = fileURLToPath(new URL('..', import.meta.url))
 
-/** Where the dev server proxies /api without RAVEN_DEV_API_ORIGIN: the local server (`nx run @raven/server:dev`). */
-const LOCAL_API_ORIGIN = 'http://localhost:8484'
-
-/** What Netlify sets `NETLIFY` to in its builds. */
-const NETLIFY_VALUES = { on: 'true' } as const
-
-/**
- * Netlify's Image CDN on the site's own origin. It fetches a relative
- * picture through the `/api` proxy below, with no cookie or token, so only
- * raven's capability pictures (`/api/pictures`) go through it.
- */
-const NETLIFY_IMAGE_CDN = '/.netlify/images'
-
-/** Whether this is a Netlify build, which `netlify.toml` serves with /api proxied to raven. */
-const IS_NETLIFY = process.env[ENV.netlify] === NETLIFY_VALUES.on
+/** Vhagar, the raven this app's developers point it at most. */
+const DEV_API_ORIGIN_EXAMPLE = 'http://192.168.50.6:8484'
 
 /**
  * Where /api goes on Netlify, where the app is served apart from raven and
@@ -38,25 +29,6 @@ const IS_NETLIFY = process.env[ENV.netlify] === NETLIFY_VALUES.on
  * fails when the proxy names any other; '' when /api is raven itself.
  */
 const PROXIED_API_ORIGIN = IS_NETLIFY ? DEFAULT_SERVER_ORIGIN : ''
-
-/**
- * The raven the dev server proxies /api to: RAVEN_DEV_API_ORIGIN from the
- * shell, else from raven's `.env`, else the local server. An http or https
- * origin with no path, such as http://192.168.50.6:8484 for Vhagar.
- */
-const devApiOrigin = (mode: string): string => {
-  const origin =
-    process.env[ENV.devApiOrigin] ?? loadEnv(mode, RAVEN_DIR, '')[ENV.devApiOrigin] ?? ''
-  if (!origin) return LOCAL_API_ORIGIN
-  const url = URL.canParse(origin) ? new URL(origin) : null
-  const isWeb = url?.protocol === URL_PROTOCOLS.http || url?.protocol === URL_PROTOCOLS.https
-  if (!url || !isWeb || url.origin !== origin.replace(/\/+$/, '')) {
-    throw new Error(
-      `RAVEN_DEV_API_ORIGIN must be an http or https origin with no path, such as http://192.168.50.6:8484, not ${origin}`,
-    )
-  }
-  return url.origin
-}
 
 /**
  * Restarts the dev server when raven's `.env` changes, so editing
@@ -216,15 +188,6 @@ type EntryChunk = { name: string }
 const entryFileName = ({ name }: EntryChunk) =>
   name === SERVICE_WORKER.entry ? SERVICE_WORKER.file : HASHED_ENTRY
 
-/** Above rolldown's own chunking, which decides what is left. */
-const VENDOR_PRIORITY = 10
-
-/** A module's id with `/` between folders, whatever the build machine writes. */
-const posixId = (id: string) => id.replaceAll('\\', '/')
-
-const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
-  packages.some((name) => posixId(id).includes(`/node_modules/${name}/`))
-
 export default defineConfig(({ mode }) => ({
   plugins: [react(), restartOnRavenEnv(), inlineRavenMark(), preloadStylesheets(), preloadFonts()],
   define: {
@@ -244,7 +207,10 @@ export default defineConfig(({ mode }) => ({
      * The Host header follows the target, as a raven behind a name expects.
      */
     proxy: {
-      '/api': { target: devApiOrigin(mode), changeOrigin: true },
+      '/api': {
+        target: devApiOrigin({ mode, ravenDir: RAVEN_DIR, example: DEV_API_ORIGIN_EXAMPLE }),
+        changeOrigin: true,
+      },
     },
   },
   build: {
@@ -261,11 +227,7 @@ export default defineConfig(({ mode }) => ({
       output: {
         entryFileNames: entryFileName,
         codeSplitting: {
-          groups: VENDOR_CHUNKS.map(({ name, packages }) => ({
-            name,
-            test: vendorChunkTest(packages),
-            priority: VENDOR_PRIORITY,
-          })),
+          groups: vendorChunkGroups(VENDOR_CHUNKS),
         },
       },
     },

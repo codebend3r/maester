@@ -1,6 +1,6 @@
 import { artistNames, formatDuration, type Track } from '@raven/core'
 import { BUTTON_TONES, Button } from '@raven/ui'
-import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { AUDIO_STATES, hasPlayingTrackOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Equalizer } from '@/components/Equalizer/Equalizer'
@@ -131,7 +131,7 @@ export const NowPlayingBar = () => {
 
 /** Whether the bar shows: while a track is queued, anywhere but Now Playing. */
 export const useIsBarShown = (): boolean => {
-  const isQueued = useAudioQueue((store) => playingTrackOf(store) !== null)
+  const isQueued = useAudioQueue(hasPlayingTrackOf)
   const { pathname } = useLocation()
   const { nowPlaying } = useMusicLinks()
   return isQueued && pathname !== nowPlaying

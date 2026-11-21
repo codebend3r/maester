@@ -1,12 +1,12 @@
 ---
 name: run-ios-e2e
 description: >-
-  Use when running the `📱 App on iPhone and iPad` PR check locally on a Mac, or `app:e2e`: "run the iPhone CI locally", "run the iOS e2e", "run the app e2e on the simulator", "reproduce the app-ios job", "the iPhone and iPad check failed, run it here", "run ci:app:ios". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+  Use when running the `🏗️ Build iPhone` and `🎬 E2E iPhone` PR checks locally on a Mac, or `app:e2e`: "run the iPhone CI locally", "run the iOS e2e", "run the app e2e on the simulator", "reproduce the iPhone build and E2E jobs", "the iPhone and iPad check failed, run it here", "run ci:app:ios". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the iPhone and iPad check locally
 
-The `app-ios` job in `.github/workflows/pull-request-checks.yml`, on macOS with Apple silicon. One command runs every step, from the repo root:
+The iPhone rows of the `app-build` and `app-e2e` jobs in `.github/workflows/native-checks.yml` (CI builds on one runner and runs the flows on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:app:ios

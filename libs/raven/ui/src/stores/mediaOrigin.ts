@@ -1,4 +1,4 @@
-import type { MediaOrigin } from '@raven/core'
+import { MEDIA_ORIGIN_KINDS, type MediaOrigin } from '@raven/core'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 
@@ -28,3 +28,26 @@ export const useMediaOrigin = create<MediaOriginState>()(
     { name: 'raven/mediaOrigin' },
   ),
 )
+
+type MediaOriginOfProps = {
+  /** raven's origin when the page's `/api` is a proxy to it; '' when `/api` is raven itself. */
+  apiOrigin: string
+}
+
+/**
+ * Where a page's video and music come from: raven's public origin when its `/api` is a proxy, so
+ * media never travels through the proxy (whose host bills it as bandwidth), and null, the page's
+ * own `/api`, when that is raven itself.
+ */
+export const mediaOriginOf = ({ apiOrigin }: MediaOriginOfProps): MediaOrigin | null =>
+  apiOrigin === '' ? null : { kind: MEDIA_ORIGIN_KINDS.public, url: apiOrigin }
+
+/**
+ * Names a page's media origin before anything plays, with no request: nothing is probed and
+ * nothing falls back to the proxy. A page whose `/api` is raven itself names none.
+ */
+export const startMediaOrigin = ({ apiOrigin }: MediaOriginOfProps): void => {
+  const origin = mediaOriginOf({ apiOrigin })
+  if (origin === null) return
+  useMediaOrigin.getState().setPick({ origin, at: Date.now() })
+}

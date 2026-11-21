@@ -1,6 +1,8 @@
+import { AUTH_ERROR_CODES } from '@raven/core'
+
 /** The `code`s of the Supabase auth errors raven tells apart. */
 export const AUTH_ERRORS = {
-  invalidCredentials: 'invalid_credentials',
+  ...AUTH_ERROR_CODES,
   emailNotConfirmed: 'email_not_confirmed',
   userAlreadyExists: 'user_already_exists',
   otpExpired: 'otp_expired',

@@ -45,6 +45,7 @@ export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
 export { usePictureCues } from '@/lib/usePictureCues'
 export { useClock } from '@/lib/useClock'
+export { lazyPage } from '@/lib/lazyPage'
 export { useSkipIntro } from '@/components/Player/useSkipIntro'
 export {
   CAPTION_COLOUR_NAMES,
@@ -102,6 +103,7 @@ export {
 } from '@/query/edits'
 export { HISTORY_SHOWS, ravenQueriesFor } from '@/query/ravenQueries'
 export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
+export { shuffledTracksOf } from '@/query/shuffledTracks'
 export { itemFavouriteFor, useServerItemFavourite } from '@/query/useItemFavourite'
 export { mediaMutationsFor, useServerMediaMutations } from '@/query/useMediaMutations'
 export {
@@ -134,8 +136,10 @@ export { useServerLibraryActions } from '@/query/useServerLibraryActions'
 export { useServerSettingsSaves } from '@/query/useServerSettingsSaves'
 export {
   AUDIO_STATES,
+  hasPlayingTrackOf,
   isPlayingOf,
   nextTrackOf,
+  playingIdOf,
   playingTrackOf,
   useAudioQueue,
 } from '@/stores/audioQueue'
@@ -158,4 +162,5 @@ export { KeyedView } from '@/components/KeyedView/KeyedView'
 export type { ViewOf, ViewsOf } from '@/components/KeyedView/KeyedView'
 export { QueryView, isNone, keptRead } from '@/components/QueryView/QueryView'
 export { UNCONFIGURED_STORAGE } from '@/stores/storage'
+export { classNames } from '@/lib/classNames'
 export type { QueryEmpty, QueryRead } from '@/components/QueryView/QueryView'

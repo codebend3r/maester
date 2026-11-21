@@ -12,16 +12,25 @@ DESKTOP_JOBS = {"desktop-native", "desktop-app", "desktop-playback"}
 # Each job that opens a group, and the group it runs for; Windows is part of the desktop.
 GROUP_JOBS = {
     "windows-native": "desktop",
-    "app-tvos": "app",
-    "app-ios": "app",
-    "app-android-tv": "app",
-    "app-android": "app",
-    "music-ios": "music",
-    "music-android": "music",
+    "app-build": "app",
+    "music-build": "music",
     "desktop-native": "desktop",
 }
+# Each end to end matrix, the build matrix it waits for, and the devices it runs the flows of.
+E2E_JOBS = {
+    "app-e2e": ("app-build", ["iPhone", "Apple TV", "Android TV"]),
+    "music-e2e": ("music-build", ["Wren iPhone"]),
+}
+# Every row a build matrix builds, the devices with no flows yet among them.
+BUILD_ROWS = {
+    "app-build": ["iPhone", "Apple TV", "Android TV", "Android phone"],
+    "music-build": ["Wren iPhone", "Wren Android"],
+}
+HANDOFF = "${{ matrix.app.artifact }}-${{ inputs.sha }}"
+END_TO_END_TARGETS = ("app:e2e", "@raven/music:e2e")
 # Each job that continues a group's native build, and the job it waits for.
 FOLLOW_ON_JOBS = {
+    **{job_name: build_job for job_name, (build_job, _) in E2E_JOBS.items()},
     "windows-app": "windows-native",
     "desktop-app": "desktop-native",
     "desktop-playback": "desktop-native",
@@ -43,7 +52,15 @@ def load_workflow(name: str) -> dict:
 def test_pull_requests_run_the_native_checks_and_wait_for_them():
     workflow = load_workflow("pull-request-checks.yml")
     jobs = workflow["jobs"]
-    assert set(jobs) == {"checks", "build", "native", "checks-complete", "supabase", "smoke"}
+    assert set(jobs) == {
+        "checks",
+        "lighthouse",
+        "build",
+        "native",
+        "checks-complete",
+        "supabase",
+        "smoke",
+    }
     # Selection lives in the shared workflow; the caller passes the commits and nothing else.
     assert SELECT_SCRIPT not in str(jobs)
     native = jobs["native"]
@@ -58,8 +75,15 @@ def test_pull_requests_run_the_native_checks_and_wait_for_them():
     assert native["secrets"] == "inherit"
     complete = jobs["checks-complete"]
     assert complete["name"] == "✅ Checks"
-    assert complete["needs"] == ["checks", "build", "native"]
+    assert complete["needs"] == ["checks", "lighthouse", "build", "native"]
     gate = complete["steps"][-1]["run"]
+    # Lighthouse runs beside the matrix, so the build and the native apps never wait for it,
+    # and the gate does.
+    assert "needs" not in jobs["lighthouse"]
+    assert all(
+        check["target"] != "lighthouse" for check in jobs["checks"]["strategy"]["matrix"]["check"]
+    )
+    assert 'test "$LIGHTHOUSE_RESULT" = success' in gate
     # Native apps runs on every PR, so a skipped result means the checks failed, never a pass.
     assert 'test "$NATIVE_RESULT" = success' in gate
     assert "skipped" not in gate
@@ -149,6 +173,65 @@ def test_every_native_job_cancels_a_failing_pull_request_run(job_name: str):
     job = load_workflow("native-checks.yml")["jobs"][job_name]
     assert job["steps"][-1] == CANCEL_STEP
     assert sum(step.get("name") == CANCEL_STEP["name"] for step in job["steps"]) == 1
+
+
+def runs_of(job: dict) -> str:
+    return "\n".join(
+        step.get("run", "") + step.get("with", {}).get("script", "") for step in job["steps"]
+    )
+
+
+def rows_of(job: dict) -> list[dict]:
+    return job["strategy"]["matrix"]["app"]
+
+
+@pytest.mark.parametrize(("job_name", "names"), sorted(BUILD_ROWS.items()))
+def test_build_matrices_name_every_row_for_its_device(job_name: str, names: list[str]):
+    job = load_workflow("native-checks.yml")["jobs"][job_name]
+    assert job["name"] == "🏗️ Build ${{ matrix.app.name }}"
+    assert [row["name"] for row in rows_of(job)] == names
+    # On main nothing cancels the run, so one failing row must not end the others.
+    assert job["strategy"]["fail-fast"] == "false"
+
+
+@pytest.mark.parametrize(("job_name", "handoff"), sorted(E2E_JOBS.items()))
+def test_end_to_end_jobs_run_the_flows_on_the_build_job_s_artifact(
+    job_name: str, handoff: tuple[str, list[str]]
+):
+    jobs = load_workflow("native-checks.yml")["jobs"]
+    build_job, names = handoff
+    assert any(
+        step.get("uses") == "actions/upload-artifact@v7" and step["with"]["name"] == HANDOFF
+        for step in jobs[build_job]["steps"]
+    )
+    job = jobs[job_name]
+    assert job["name"] == "🎬 E2E ${{ matrix.app.name }}"
+    assert job["strategy"]["fail-fast"] == "false"
+    assert any(
+        step.get("uses") == "actions/download-artifact@v8" and step["with"]["name"] == HANDOFF
+        for step in job["steps"]
+    )
+    assert job["steps"][0]["with"]["ref"] == "${{ inputs.sha }}"
+    # Each end to end row is the build row itself, so the two jobs agree on the artifact.
+    rows = rows_of(job)
+    assert [row["name"] for row in rows] == names
+    assert all(row in rows_of(jobs[build_job]) for row in rows)
+    # The flows run here and nowhere in the build job, and nothing compiles here.
+    assert all(any(target in row["flows"] for target in END_TO_END_TARGETS) for row in rows)
+    assert "matrix.app.flows" in runs_of(job)
+    assert "matrix.app.flows" not in runs_of(jobs[build_job])
+    assert all(":e2e" not in row["build"] for row in rows_of(jobs[build_job]))
+    assert "matrix.app.build" not in runs_of(job)
+    setup = next(
+        step for step in job["steps"] if step.get("uses") == "./.github/actions/raven-app-setup"
+    )
+    assert setup["with"]["compiles"] == "false"
+
+
+def test_wren_builds_and_runs_its_flows_by_the_app_s_steps():
+    jobs = load_workflow("native-checks.yml")["jobs"]
+    assert jobs["music-build"]["steps"] == jobs["app-build"]["steps"]
+    assert jobs["music-e2e"]["steps"] == jobs["app-e2e"]["steps"]
 
 
 @pytest.mark.parametrize("job_name", sorted(DESKTOP_JOBS))

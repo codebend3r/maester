@@ -1,10 +1,6 @@
-import {
-  type FetchInit,
-  AUTH_HEADERS,
-  AUTH_REFUSALS,
-  AUTH_SCHEME,
-  isAuthRefusal,
-} from '@raven/core'
+import { HTTP_STATUSES } from '@shared/http'
+import { type FetchInit, type FetchResponse } from '@/apiClient'
+import { AUTH_HEADERS, AUTH_REFUSALS, AUTH_SCHEME, isAuthRefusal } from '@/contract'
 
 export const REFRESH_OUTCOMES = {
   refreshed: 'refreshed',
@@ -18,10 +14,16 @@ export type RefreshOutcome =
   | { kind: typeof REFRESH_OUTCOMES.rejected }
   | { kind: typeof REFRESH_OUTCOMES.unreachable }
 
-const SIGNED_OUT_STATUS = 401
+/**
+ * What the refreshing fetch reads of an answer: its status, and a copy whose body it may read
+ * while the caller still reads the answer's own. A browser's `Response` is one.
+ */
+type RefusableResponse = Pick<FetchResponse, 'status'> & {
+  clone: () => Pick<FetchResponse, 'json'>
+}
 
-const isSignedOutRefusal = async (response: Response): Promise<boolean> => {
-  if (response.status !== SIGNED_OUT_STATUS) return false
+const isSignedOutRefusal = async (response: RefusableResponse): Promise<boolean> => {
+  if (response.status !== HTTP_STATUSES.unauthorized) return false
   const body: unknown = await response
     .clone()
     .json()
@@ -42,8 +44,8 @@ const shared = <T>(task: () => Promise<T>): (() => Promise<T>) => {
 
 const bearer = (token: string): string => `${AUTH_SCHEME} ${token}`
 
-type RefreshingFetchProps = {
-  fetch: (url: string, init?: FetchInit) => Promise<Response>
+type RefreshingFetchProps<Answer extends RefusableResponse> = {
+  fetch: (url: string, init?: FetchInit) => Promise<Answer>
   accessToken: () => string | null
   refresh: () => Promise<RefreshOutcome>
   signOut: () => Promise<void>
@@ -58,7 +60,12 @@ type RefreshingFetchProps = {
  * with that token. A repeat refused again, or a refresh Supabase rejects,
  * signs out; a refresh that cannot reach Supabase leaves the session alone.
  */
-export const refreshingFetch = ({ fetch, accessToken, refresh, signOut }: RefreshingFetchProps) => {
+export const refreshingFetch = <Answer extends RefusableResponse>({
+  fetch,
+  accessToken,
+  refresh,
+  signOut,
+}: RefreshingFetchProps<Answer>) => {
   const refreshOnce = shared(refresh)
   const signOutOnce = shared(signOut)
 
@@ -82,17 +89,18 @@ export const refreshingFetch = ({ fetch, accessToken, refresh, signOut }: Refres
     }
   }
 
-  return async (url: string, init?: FetchInit): Promise<Response> => {
+  return async (url: string, init?: FetchInit): Promise<Answer> => {
     const response = await fetch(url, init)
-    const sent = init?.headers?.[AUTH_HEADERS.authorization]
-    if (sent === undefined || !(await isSignedOutRefusal(response))) return response
+    const sent = init?.headers?.[AUTH_HEADERS.authorization] ?? null
+    if (sent === null || !(await isSignedOutRefusal(response))) return response
 
     const token = await tokenAfterRefusal(sent)
     if (token === null) return response
 
+    const headers = init?.headers ?? {}
     const repeated = await fetch(url, {
       ...init,
-      headers: { ...init?.headers, [AUTH_HEADERS.authorization]: bearer(token) },
+      headers: { ...headers, [AUTH_HEADERS.authorization]: bearer(token) },
     })
     if (await isSignedOutRefusal(repeated)) await signOutOnce()
     return repeated

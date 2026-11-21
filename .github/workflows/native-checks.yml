@@ -5,7 +5,11 @@ name: 🧱 Native app checks
 # Windows desktop.
 # Called by pull-request-checks.yml for every pull request and by main-native-checks.yml for
 # every push to main; its first job selects the groups the commit affects and the rest run
-# only when theirs was selected. A manual run of main-native-checks.yml runs every group.
+# only when theirs was selected. A job's name starts with what it does: 🏗️ Build, 🎬 E2E or
+# 🧪 Test. The device app's and Wren's builds are one matrix each, a row per device, and their
+# end to end flows a second matrix that waits for it: a build row uploads the app as an
+# artifact and its end to end row runs the flows on it. A manual run of
+# main-native-checks.yml runs every group.
 on:
   workflow_call:
     inputs:
@@ -84,7 +88,7 @@ jobs:
   # resources/win32-x64, audits the DLL (x64, self-contained, the exports the addon
   # calls), builds the addon against it with MSVC and runs the headless libmpv tests.
   windows-native:
-    name: 🪟 Windows native
+    name: 🏗️ Build Windows native
     needs: select
     if: needs.select.outputs.desktop == 'true'
     runs-on: windows-2025
@@ -154,7 +158,7 @@ jobs:
 
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the Windows native build.
   windows-app:
-    name: 🪟 Windows app
+    name: 🏗️ Build Windows app
     needs: windows-native
     runs-on: windows-2025
     timeout-minutes: 30
@@ -223,109 +227,164 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # raven's device app on Apple TV: the simulator build and an XCUITest that drives it
-  # with the Siri Remote against a real raven server. It runs beside app-ios, on its own
-  # runner, since the two builds share nothing.
-  app-tvos:
-    name: 📺 App on Apple TV
+  # raven's device app, one row per device: the Release build for its simulator or emulator,
+  # uploaded as an artifact, which app-e2e then runs the flows on. The rows build beside each
+  # other, each on its own runner, since they share nothing. A row describes its device once,
+  # for both jobs: what builds it, where the build lands and, where it has flows, what drives
+  # them. Android builds on Linux (Ruling 20): GitHub's macOS arm64 runners cannot run the
+  # Android emulator.
+  app-build:
+    name: 🏗️ Build ${{ matrix.app.name }}
     needs: select
     if: needs.select.outputs.app == 'true'
-    runs-on: macos-26
-    # One Release build of React Native, its compile cached by ccache, and the remote flow.
+    runs-on: ${{ matrix.app.runner }}
+    # One Release build of React Native, its compile cached by ccache, and by Gradle on Android.
     timeout-minutes: 60
+    strategy:
+      # A pull request's failing row cancels the run itself; on main the other rows finish.
+      fail-fast: false
+      matrix:
+        app:
+          - &iphone
+            name: iPhone
+            runner: macos-26
+            setup: ios
+            project: apps/raven/app
+            # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates
+            # ios/ and installs the pods. Nx caches only the app and the two lockfiles.
+            build: bunx nx run @raven/app:build:ios --excludeTaskDependencies
+            artifact: raven-app-ios-simulator
+            bundle: build/ios/Build/Products/Release-iphonesimulator/Raven.app
+            simulator: raven-phone
+            sdk: iphonesimulator
+            runtime: iOS
+            device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
+            # Every flow in `apps/raven/app/e2e` but the remote's (`dpad`), each opening on the
+            # accountless fixture's Home.
+            driver: maestro
+            flows: bun run app:e2e
+            logs: raven-app-e2e-logs
+            # The simulator's boot and the flows, twice over when Maestro's driver is retried.
+            timeout: 45
+          - &apple-tv
+            name: Apple TV
+            runner: macos-26
+            setup: tvos
+            project: apps/raven/app
+            # Runs `prebuild:tvos` first. Nx caches only what the steps below and the flow
+            # read: the app, the two lockfiles, the Xcode project, the remote test target and
+            # the pods' support files. Pods/ and DerivedData are left out, since they ran Nx
+            # Cloud's upload out of open files (EMFILE).
+            build: bun run ci:app:tvos:build
+            artifact: raven-app-tvos-simulator
+            bundle: build/tvos/Build/Products/Release-appletvsimulator/Raven.app
+            simulator: raven-tv
+            sdk: appletvsimulator
+            runtime: tvOS
+            device-type: com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K
+            # The XCUITests the tvOS prebuild added (`tvos-e2e/`) open on Home, play the film,
+            # leave with Menu and find it under Continue watching, all with the Siri Remote.
+            driver: xcuitest
+            flows: bun run app:e2e:tvos
+            logs: raven-app-tvos-e2e-logs
+            # The simulator's boot, the test target's compile and the remote flow.
+            timeout: 30
+          - &android-tv
+            name: Android TV
+            runner: ubuntu-24.04
+            setup: android-tv
+            project: apps/raven/app
+            # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
+            # launcher, then Gradle's Release APK.
+            build: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
+            artifact: raven-app-android-tv
+            # Every flow the remote drives (`e2e:android-tv`, all but the touch ones), which
+            # first point the emulator's 127.0.0.1:8490 at the runner's with `adb reverse`, so
+            # the app signs in to the address the iPhone uses.
+            driver: maestro
+            flows: bun run app:e2e:android-tv
+            logs: raven-app-android-tv-e2e-logs
+            # The emulator's boot, made afresh when its snapshot is not cached, and the flows.
+            timeout: 45
+          # No flows yet: the touch flows need a phone emulator of their own. The phone
+          # prebuild (no leanback launcher, the music service kept) on the Android TV setup,
+          # its caches and its x86_64-only build among them.
+          - name: Android phone
+            runner: ubuntu-24.04
+            setup: android-tv
+            project: apps/raven/app
+            build: bunx nx run @raven/app:build:android --excludeTaskDependencies
+            artifact: raven-app-android
     env:
       # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
-      # build, and the flows' pass with it, instead of running them.
+      # build instead of compiling it.
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
-      # The PR's head commit, so the artifact name below matches the commit that was built.
+      &build-steps # The PR's head commit, so the artifact names below match the commit that was built.
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
 
-      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
-      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
-      # the fixture server and the app build below skip their own).
+      # Bun, Node, JDK 17 on Android (Gradle runs on it; the runner's Android SDK is
+      # ANDROID_HOME already), the build caches restored from what app-caches.yml saved on
+      # main, ffmpeg, ccache, the build environment (an x86_64-only APK on Android), the
+      # install and the libraries (built once, so the app build below skips its own).
       - name: 🧰 Set up the app build
         uses: ./.github/actions/raven-app-setup
         with:
-          platform: tvos
+          platform: ${{ matrix.app.setup }}
           node-version: ${{ env.APP_NODE_VERSION }}
 
-      # A real, accountless raven server with open film, series and music libraries, started
-      # while the app builds. It prints its ready line once its libraries are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
-      # ios/ and installs the pods, so the pods are checked right after. Nx caches only what
-      # the steps below read: the app, the two lockfiles, the Xcode project, the remote test
-      # target and the pods' support files. Pods/ and DerivedData are left out, since they ran
-      # Nx Cloud's upload out of open files (EMFILE).
-      - name: 📺 Build for the Apple TV simulator
-        run: bun run ci:app:tvos:build
+      - name: 🏗️ Build
+        run: ${{ matrix.app.build }}
 
       # How much of the compile ccache served, to tell a warm cache from a cold one.
       - name: 📊 ccache
         run: ccache --show-stats
 
+      - name: 🔎 Check the project targets Apple TV
+        if: matrix.app.runtime == 'tvOS'
+        working-directory: ${{ matrix.app.project }}/ios
+        run: grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
+
       # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
       # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
-      - name: 🔎 Check the Apple TV pods
-        working-directory: apps/raven/app/ios
-        run: |
-          grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
-          cmp Podfile.lock Pods/Manifest.lock
-
-      - name: 🗄️ Wait for the fixture server
-        uses: ./.github/actions/raven-fixture-ready
-
-      # A fresh Apple TV 4K on the tvOS runtime of the selected Xcode's SDK, booted, with the
-      # build on it. A runner with no such runtime fails here rather than testing on another.
-      - name: 📺 Boot the Apple TV simulator
-        uses: ./.github/actions/raven-simulator
-        with:
-          sdk: appletvsimulator
-          runtime: tvOS
-          name: raven-tv
-          device-type: com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K
-          app: apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
-
-      # The XCUITests the tvOS prebuild added (`tvos-e2e/`) open on Home, play the film, leave
-      # with Menu and find it under Continue watching, all with the Siri Remote. The screen
-      # they end on goes up with the app.
-      - name: 🎬 Apple TV end to end
-        env:
-          TVOS_SIMULATOR: raven-tv
-        run: |
-          bun run app:e2e:tvos
-          xcrun simctl io raven-tv screenshot "$RUNNER_TEMP/raven-tv.png"
-          xcrun simctl shutdown raven-tv
-
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-tvos-e2e-logs-${{ inputs.sha }}
-          path: |
-            apps/raven/app/build/tvos-e2e/Logs/Test
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
+      - name: 🔎 Check the pods
+        if: matrix.app.bundle
+        working-directory: ${{ matrix.app.project }}/ios
+        run: cmp Podfile.lock Pods/Manifest.lock
 
       # The build zipped as Finder would, which keeps the execute bits an artifact drops,
       # so the unzipped app still launches.
       - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app "$RUNNER_TEMP/raven-appletvsimulator.zip"
+        if: matrix.app.bundle
+        working-directory: ${{ matrix.app.project }}
+        run: ditto -c -k --keepParent "${{ matrix.app.bundle }}" "$RUNNER_TEMP/simulator-app.zip"
 
-      # The build, for trying the PR's app by hand on a simulator, and the flow's screenshot.
-      - name: 📤 Simulator app
+      # The build, for the end to end job and for trying the PR's app by hand: the zipped
+      # simulator app, or Gradle's Release APK, signed with the debug key Expo's template sets
+      # up. The APK holds only x86_64 code, so it installs on an x86_64 emulator, not a device.
+      - name: 📤 The build
         uses: actions/upload-artifact@v7
         with:
-          name: raven-app-tvos-simulator-${{ inputs.sha }}
-          path: |
-            ${{ runner.temp }}/raven-appletvsimulator.zip
-            ${{ runner.temp }}/raven-tv.png
+          name: ${{ matrix.app.artifact }}-${{ inputs.sha }}
+          path: ${{ matrix.app.bundle && format('{0}/simulator-app.zip', runner.temp) || format('{0}/android/app/build/outputs/apk/release', matrix.app.project) }}
+          if-no-files-found: error
+
+      # What `e2e:tvos` reads beside the app, the build target's other Nx outputs: the Xcode
+      # project, the remote test target, the pods' support files and the two lockfiles.
+      - name: 📦 Pack the remote test project
+        if: matrix.app.driver == 'xcuitest'
+        working-directory: ${{ matrix.app.project }}
+        run: tar -czf "$RUNNER_TEMP/remote-test-project.tgz" ios/Podfile.lock ios/Pods/Manifest.lock 'ios/Pods/Target Support Files/Pods-raven' ios/Raven.xcodeproj ios/RavenRemoteTests
+
+      - name: 📤 Remote test project
+        if: matrix.app.driver == 'xcuitest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.app.artifact }}-test-project-${{ inputs.sha }}
+          path: ${{ runner.temp }}/remote-test-project.tgz
           if-no-files-found: error
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
@@ -338,111 +397,121 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # raven's device app on iPhone and iPad: the simulator build and the Maestro flows on
-  # the iPhone simulator against a real raven server.
-  app-ios:
-    name: 📱 App on iPhone and iPad
-    needs: select
-    if: needs.select.outputs.app == 'true'
-    runs-on: macos-26
-    # One Release build of React Native, its compile cached by ccache, and the flows.
-    timeout-minutes: 60
+  # The flows of every device that has them, each row on a runner of its own once app-build
+  # has built, against a real raven server: Maestro on the iPhone simulator and on an Android
+  # TV emulator, driven by the remote's keys, and an XCUITest that drives the Apple TV with the
+  # Siri Remote.
+  app-e2e:
+    name: 🎬 E2E ${{ matrix.app.name }}
+    needs: app-build
+    runs-on: ${{ matrix.app.runner }}
+    timeout-minutes: ${{ matrix.app.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [*iphone, *apple-tv, *android-tv]
     env:
-      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
-      # build, and the flows' pass with it, instead of running them.
+      # Nx Cloud's remote cache: a commit that leaves the app's and the server's inputs alone
+      # restores the flows' pass instead of running them.
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
-      # The PR's head commit, so the artifact names below match the commit that was built.
+      &e2e-steps # The commit the build job built, so the flows and the build are of one commit.
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.sha }}
 
-      # Bun, Node, the build caches restored from what app-caches.yml saved on main,
-      # ffmpeg, ccache, the build environment, the install and the libraries (built once, so
-      # the fixture server and the app build below skip their own).
-      - name: 🧰 Set up the app build
+      # The build job's setup without the compile's caches and the NDK: Bun, Node, JDK 17 on
+      # Android (Maestro runs on it), ffmpeg, the build environment (an Nx input of the
+      # flows), the install and the libraries the fixture server runs on.
+      - name: 🧰 Set up the app tools
         uses: ./.github/actions/raven-app-setup
         with:
-          platform: ios
+          platform: ${{ matrix.app.setup }}
           node-version: ${{ env.APP_NODE_VERSION }}
+          compiles: false
 
-      # The fixture server and Maestro's download do not depend on the build, so they start
-      # before it and finish while it compiles. Each runs in the background; the steps after
-      # the build wait for them. The fixture server prints its ready line once its libraries
-      # are scanned.
+      # A real, accountless raven server with open film, series and music libraries, started
+      # in the background while the tools and the build download. It prints its ready line
+      # once its libraries are scanned.
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
       # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
-      # checksum. It runs on the runner's Java. The download runs in the background and
-      # leaves `maestro.ok` or `maestro.failed` for the wait step.
+      # checksum. It runs on the runner's Java.
       - name: 🎭 Install Maestro
+        if: matrix.app.driver == 'maestro'
         uses: ./.github/actions/raven-maestro
+
+      # The zipped simulator app, or the APK back where the build job built it.
+      - name: 📥 The build
+        uses: actions/download-artifact@v8
         with:
-          background: true
+          name: ${{ matrix.app.artifact }}-${{ inputs.sha }}
+          path: ${{ matrix.app.bundle && runner.temp || format('{0}/android/app/build/outputs/apk/release', matrix.app.project) }}
 
-      # Runs `prebuild:ios` first (bun runs it before `build:ios`), which regenerates ios/
-      # and installs the pods, so the pods are checked right after. Nx caches only the app
-      # and the two lockfiles, so a PR that leaves the app's inputs alone restores the build.
-      - name: 📱 Build for the iPhone and iPad simulator
-        run: bunx nx run @raven/app:build:ios --excludeTaskDependencies
+      # Back where the build job built it, with the execute bits the zip kept.
+      - name: 📦 Unpack the simulator app
+        if: matrix.app.bundle
+        working-directory: ${{ matrix.app.project }}
+        run: |
+          products="$(dirname "${{ matrix.app.bundle }}")"
+          mkdir -p "$products"
+          ditto -x -k "$RUNNER_TEMP/simulator-app.zip" "$products"
 
-      # How much of the compile ccache served, to tell a warm cache from a cold one.
-      - name: 📊 ccache
-        run: ccache --show-stats
+      - name: 📥 Remote test project
+        if: matrix.app.driver == 'xcuitest'
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.app.artifact }}-test-project-${{ inputs.sha }}
+          path: ${{ runner.temp }}
 
-      - name: 🔎 Check the iPhone and iPad pods
-        working-directory: apps/raven/app/ios
-        run: cmp Podfile.lock Pods/Manifest.lock
+      # Back where the build job built it, which is where `e2e:tvos` reads it.
+      - name: 📦 Unpack the remote test project
+        if: matrix.app.driver == 'xcuitest'
+        working-directory: ${{ matrix.app.project }}
+        run: tar -xzf "$RUNNER_TEMP/remote-test-project.tgz"
 
-      # A fresh iPhone 16 on the iOS runtime of the selected Xcode's SDK, booted, with the
-      # build on it. A runner with no such runtime fails here rather than testing on another.
-      # It boots after the build, as the Apple TV does: booted during the compile, it shared
-      # the runner's three cores and its memory, and the build took twice the Apple TV's.
-      # A new simulator shows the keyboard's slide to type tutorial the second time the keyboard
-      # comes up, and it held the app's main thread for 30 s under the search flow, so the
-      # simulator is told it has shown it.
-      - name: 📱 Boot the iPhone simulator
+      # The Android TV emulator's settings and KVM, and the AVD with its booted snapshot,
+      # restored from what app-caches.yml saved on main (a PR's own 2.7 GB copy would be its
+      # alone), or made and booted once on a miss.
+      - name: 📺 Android TV AVD
+        if: ${{ !matrix.app.bundle }}
+        id: avd
+        uses: ./.github/actions/raven-android-avd
+
+      # A fresh simulator on the runtime of the selected Xcode's SDK, booted, with the build
+      # on it. A runner with no such runtime fails here rather than testing on another. A new
+      # iPhone simulator shows the keyboard's slide to type tutorial the second time the
+      # keyboard comes up, and it held the app's main thread for 30 s under the search flow,
+      # so the simulator is told it has shown it.
+      - name: 📱 Boot the simulator
+        if: matrix.app.bundle
         uses: ./.github/actions/raven-simulator
         with:
-          sdk: iphonesimulator
-          runtime: iOS
-          name: raven-phone
-          device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
-          app: apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
-          skip-keyboard-intro: true
+          sdk: ${{ matrix.app.sdk }}
+          runtime: ${{ matrix.app.runtime }}
+          name: ${{ matrix.app.simulator }}
+          device-type: ${{ matrix.app.device-type }}
+          app: ${{ matrix.app.project }}/${{ matrix.app.bundle }}
+          skip-keyboard-intro: ${{ matrix.app.runtime == 'iOS' }}
 
-      # A real, accountless raven server with open film, series and music libraries, started
-      # above for the flows.
       - name: 🗄️ Wait for the fixture server
         uses: ./.github/actions/raven-fixture-ready
 
-      - name: 🎭 Wait for Maestro
-        run: |
-          for _ in $(seq 1 90); do
-            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
-            if test -f "$RUNNER_TEMP/maestro.failed"; then
-              cat "$RUNNER_TEMP/maestro.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/maestro.log"
-          exit 1
-
-      # Every flow in `apps/raven/app/e2e` but the remote's (`dpad`), each opening on the
-      # accountless fixture's Home. A fresh runner can start Maestro's XCTest driver slower
-      # than it waits by default, so it waits five minutes (in milliseconds). A busy macOS
-      # runner can still miss even that, before any flow runs, so a driver that never came up
-      # is retried once as a dead screenshot service is.
-      - name: 🎬 App end to end
+      # A fresh runner can start Maestro's XCTest driver slower than it waits by default, so
+      # it waits five minutes (in milliseconds). A busy macOS runner can still miss even that,
+      # before any flow runs, so a driver that never came up is retried once as a dead
+      # screenshot service is.
+      - name: 🎬 Flows on the simulator
+        if: matrix.app.bundle && matrix.app.driver == 'maestro'
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
+          SIMULATOR: ${{ matrix.app.simulator }}
         run: |
           set -o pipefail
-          first="$RUNNER_TEMP/app-e2e-first.log"
-          if bun run app:e2e 2>&1 | tee "$first"; then
+          first="$RUNNER_TEMP/e2e-first.log"
+          if ${{ matrix.app.flows }} 2>&1 | tee "$first"; then
             exit 0
           fi
           # Maestro's XCTest server dies on a screenshot timeout (upstream #3538).
@@ -453,122 +522,26 @@ jobs:
           else
             exit 1
           fi
-          xcrun simctl shutdown raven-phone
-          xcrun simctl boot raven-phone
-          xcrun simctl bootstatus raven-phone -b
-          bun run app:e2e
+          xcrun simctl shutdown "$SIMULATOR"
+          xcrun simctl boot "$SIMULATOR"
+          xcrun simctl bootstatus "$SIMULATOR" -b
+          ${{ matrix.app.flows }}
 
-      # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-e2e-logs-${{ inputs.sha }}
-          path: |
-            ~/.maestro/tests
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
-
-      # The build zipped as Finder would, which keeps the execute bits an artifact drops,
-      # so the unzipped app still launches.
-      - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app "$RUNNER_TEMP/raven-iphonesimulator.zip"
-
-      # The build, for trying the PR's app by hand on a simulator.
-      - name: 📤 Simulator app
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-ios-simulator-${{ inputs.sha }}
-          path: ${{ runner.temp }}/raven-iphonesimulator.zip
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure() && github.event_name == 'pull_request'
-        continue-on-error: true
-        shell: bash
+      # The screen the flow ends on goes up as an artifact.
+      - name: 🎬 Flow with the Siri Remote
+        if: matrix.app.driver == 'xcuitest'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+          TVOS_SIMULATOR: ${{ matrix.app.simulator }}
+        run: |
+          ${{ matrix.app.flows }}
+          xcrun simctl io "$TVOS_SIMULATOR" screenshot "$RUNNER_TEMP/$TVOS_SIMULATOR.png"
+          xcrun simctl shutdown "$TVOS_SIMULATOR"
 
-  # raven's device app for Android TV, on Linux (Ruling 20): GitHub's macOS arm64 runners
-  # cannot run the Android emulator. The Release APK, then, against a real raven server, the
-  # Maestro flows on an Android TV emulator, driven by the remote's keys.
-  app-android-tv:
-    name: 📺 App on Android TV
-    needs: select
-    if: needs.select.outputs.app == 'true'
-    runs-on: ubuntu-24.04
-    # A Release build of React Native, its compile cached by ccache and Gradle, the
-    # emulator's boot and the flows.
-    timeout-minutes: 60
-    env:
-      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
-      # build, and the flows' pass with it, instead of running them.
-      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-    steps:
-      # The PR's head commit, so the artifact name below matches the commit that was built.
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.sha }}
-
-      # Bun, Node, JDK 17 (Gradle and Maestro run on it; the runner's Android SDK is
-      # ANDROID_HOME already), the build caches restored from what app-caches.yml saved on
-      # main, ffmpeg, ccache, the build environment (an x86_64-only APK), the install and
-      # the libraries.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Runs `prebuild:android-tv` first, which regenerates android/ with the leanback
-      # launcher, then Gradle's Release APK.
-      - name: 📺 Build the Android TV APK
-        run: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
-
-      # How much of the compile ccache served, to tell a warm cache from a cold one.
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # The Release APK, signed with the debug key Expo's template sets up. It holds only
-      # x86_64 code, so it installs on an x86_64 emulator, not on a TV.
-      - name: 📤 Android TV APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-android-tv-${{ inputs.sha }}
-          path: apps/raven/app/android/app/build/outputs/apk/release
-          if-no-files-found: error
-
-      # The Android TV emulator's settings and KVM, and the AVD with its booted snapshot,
-      # restored from what app-caches.yml saved on main (a PR's own 2.7 GB copy would be its
-      # alone), or made and booted once on a miss.
-      - name: 📺 Android TV AVD
-        id: avd
-        uses: ./.github/actions/raven-android-avd
-
-      # A real, accountless raven server with open film, series and music libraries, in the
-      # background for the flows. It prints its ready line once its libraries are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      - name: 🗄️ Wait for the fixture server
-        uses: ./.github/actions/raven-fixture-ready
-
-      # Maestro's own release, the zip its Homebrew formula installs, pinned by version and
-      # checksum, as the Apple job installs it.
-      - name: 🎭 Install Maestro
-        uses: ./.github/actions/raven-maestro
-
-      # Boots the AVD from its snapshot, installs the APK and runs the flows the remote drives
-      # (`e2e:android-tv`, every flow but the touch ones), which first point the emulator's
-      # 127.0.0.1:8490 at the runner's with `adb reverse`, so the app signs in to the address
-      # the iPhone uses. The runner runs each line of the script as its own command. Maestro's
-      # driver can start slower on a fresh emulator than it waits by default, so it waits five
-      # minutes (in milliseconds).
-      - name: 🎬 App end to end
+      # Boots the AVD from its snapshot, installs the APK and runs the flows. The runner runs
+      # each line of the script as its own command. Maestro's driver can start slower on a
+      # fresh emulator than it waits by default, so it waits five minutes (in milliseconds).
+      - name: 🎬 Flows on the emulator
+        if: ${{ !matrix.app.bundle }}
         # reactivecircus/android-emulator-runner v2.38.0
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         env:
@@ -586,190 +559,38 @@ jobs:
           disable-animations: true
           disable-spellchecker: true
           script: |
-            adb install apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
-            bun run app:e2e:android-tv
+            adb install ${{ matrix.app.project }}/android/app/build/outputs/apk/release/app-release.apk
+            ${{ matrix.app.flows }}
 
-      # Maestro's screenshots and logs and the fixture server's log, only when a step failed.
-      - name: 📤 End to end logs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-android-tv-e2e-logs-${{ inputs.sha }}
-          path: |
-            ~/.maestro/tests
-            ${{ runner.temp }}/fixture.log
-          if-no-files-found: ignore
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure() && github.event_name == 'pull_request'
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # raven's device app for Android phones, built on Linux beside the Android TV job: the phone
-  # prebuild (no leanback launcher, the music service kept) and its Release APK. No flows yet;
-  # the touch flows need a phone emulator of their own.
-  app-android:
-    name: 📱 App on Android phones
-    needs: select
-    if: needs.select.outputs.app == 'true'
-    runs-on: ubuntu-24.04
-    # A Release build of React Native, its compile cached by ccache and Gradle.
-    timeout-minutes: 60
-    env:
-      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the APK
-      # instead of building it.
-      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-    steps:
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.sha }}
-
-      # The Android TV job's setup, its caches and its x86_64-only build among them.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Runs `prebuild:android` first, which regenerates android/ for a phone, then Gradle's
-      # Release APK.
-      - name: 📱 Build the Android phone APK
-        run: bunx nx run @raven/app:build:android --excludeTaskDependencies
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # The Release APK, signed with the debug key Expo's template sets up. It holds only
-      # x86_64 code, so it installs on an x86_64 emulator, not on a phone.
-      - name: 📤 Android phone APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-app-android-${{ inputs.sha }}
-          path: apps/raven/app/android/app/build/outputs/apk/release
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure() && github.event_name == 'pull_request'
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
-
-  # Wren, raven's music app, on the iPhone: its simulator build and its Maestro flows against
-  # the fixture server's music library, on a simulator of its own, as app-ios runs the app's.
-  music-ios:
-    name: 🎵 Wren on iPhone
-    needs: select
-    if: needs.select.outputs.music == 'true'
-    runs-on: macos-26
-    # One Release build of React Native, its compile cached by ccache, and the flows.
-    timeout-minutes: 60
-    steps:
-      # The PR's head commit, so the artifact names below match the commit that was built.
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.sha }}
-
-      # The app's setup, iOS caches and all: Wren builds on the same React Native and pods.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: ios
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # In the background while Wren builds; it prints its ready line once its libraries,
-      # the music library among them, are scanned.
-      - name: 🗄️ Start the fixture server
-        run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
-
-      # Maestro's own release, pinned by version and checksum, as app-ios installs it.
-      - name: 🎭 Install Maestro
-        uses: ./.github/actions/raven-maestro
-        with:
-          background: true
-
-      # Runs `prebuild:ios` first, which regenerates ios/ and installs the pods.
-      - name: 🎵 Build Wren for the iPhone simulator
-        run: bunx nx run @raven/music:build:ios --excludeTaskDependencies
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # `expo prebuild` exits 0 when `pod install` fails.
-      - name: 🔎 Check Wren's pods
-        working-directory: apps/raven/music/ios
-        run: cmp Podfile.lock Pods/Manifest.lock
-
-      # A fresh iPhone 16 named wren-phone, as `ci:wren` makes one, on the iOS runtime of the
-      # selected Xcode's SDK, booted after the build, with Wren on it.
-      - name: 📱 Boot the iPhone simulator
-        uses: ./.github/actions/raven-simulator
-        with:
-          sdk: iphonesimulator
-          runtime: iOS
-          name: wren-phone
-          device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
-          app: apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
-          skip-keyboard-intro: true
-
-      - name: 🗄️ Wait for the fixture server
-        uses: ./.github/actions/raven-fixture-ready
-
-      - name: 🎭 Wait for Maestro
-        run: |
-          for _ in $(seq 1 90); do
-            test -f "$RUNNER_TEMP/maestro.ok" && exit 0
-            if test -f "$RUNNER_TEMP/maestro.failed"; then
-              cat "$RUNNER_TEMP/maestro.log"
-              exit 1
-            fi
-            sleep 2
-          done
-          cat "$RUNNER_TEMP/maestro.log"
-          exit 1
-
-      # Every flow in `apps/raven/music/e2e`: open on Home, play the fixture's album, and
-      # download it.
-      - name: 🎬 Wren end to end
-        env:
-          MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
-        run: bunx nx run @raven/music:e2e
-
-      # What Wren and the system logged on the simulator, only when a step failed.
+      # What the app and the system logged on the simulator, only when a step failed.
       - name: 🪵 Simulator log
-        if: failure()
-        run: xcrun simctl spawn wren-phone log show --last 30m --style compact --predicate 'process == "Wren"' > "$RUNNER_TEMP/wren-simulator.log" || true
+        if: failure() && matrix.app.bundle
+        env:
+          SIMULATOR: ${{ matrix.app.simulator }}
+          BUNDLE: ${{ matrix.app.bundle }}
+        run: xcrun simctl spawn "$SIMULATOR" log show --last 30m --style compact --predicate "process == \"$(basename "$BUNDLE" .app)\"" > "$RUNNER_TEMP/simulator.log" || true
 
+      # Maestro's screenshots and logs or the XCUITest's, the simulator's log and the fixture
+      # server's, only when a step failed.
       - name: 📤 End to end logs
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: raven-music-e2e-logs-${{ inputs.sha }}
+          name: ${{ matrix.app.logs }}-${{ inputs.sha }}
           path: |
             ~/.maestro/tests
+            ${{ matrix.app.project }}/build/tvos-e2e/Logs/Test
             ${{ runner.temp }}/fixture.log
-            ${{ runner.temp }}/wren-simulator.log
+            ${{ runner.temp }}/simulator.log
           if-no-files-found: ignore
 
-      # Zipped as Finder would, which keeps the execute bits an artifact drops.
-      - name: 📦 Pack the simulator app
-        run: ditto -c -k --keepParent apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app "$RUNNER_TEMP/wren-iphonesimulator.zip"
-
-      - name: 📤 Simulator app
+      # The screen the Siri Remote's flow ended on.
+      - name: 📤 End to end screen
+        if: matrix.app.driver == 'xcuitest'
         uses: actions/upload-artifact@v7
         with:
-          name: raven-music-ios-simulator-${{ inputs.sha }}
-          path: ${{ runner.temp }}/wren-iphonesimulator.zip
+          name: ${{ matrix.app.logs }}-screen-${{ inputs.sha }}
+          path: ${{ runner.temp }}/${{ matrix.app.simulator }}.png
           if-no-files-found: error
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
@@ -782,56 +603,63 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # Wren for Android phones, built on Linux beside the Android TV job; it has no flows yet.
-  music-android:
-    name: 🎵 Wren for Android
+  # Wren, raven's music app, built as app-build builds the app, by the same steps: Wren builds
+  # on the same React Native and pods, so each row takes the app's setup. A matrix of its own,
+  # so the app's flows never wait for Wren's builds, nor Wren's for the app's. Neither Wren job
+  # carries the Nx Cloud token, so Nx caches on the runner only.
+  music-build:
+    name: 🏗️ Build ${{ matrix.app.name }}
     needs: select
     if: needs.select.outputs.music == 'true'
-    runs-on: ubuntu-24.04
-    # A Release build of React Native, its compile cached by ccache and Gradle.
+    runs-on: ${{ matrix.app.runner }}
     timeout-minutes: 60
-    steps:
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - &wren-iphone
+            name: Wren iPhone
+            runner: macos-26
+            setup: ios
+            project: apps/raven/music
+            build: bunx nx run @raven/music:build:ios --excludeTaskDependencies
+            artifact: raven-music-ios-simulator
+            bundle: build/ios/Build/Products/Release-iphonesimulator/Wren.app
+            # A simulator of Wren's own, as `ci:wren` makes one.
+            simulator: wren-phone
+            sdk: iphonesimulator
+            runtime: iOS
+            device-type: com.apple.CoreSimulator.SimDeviceType.iPhone-16
+            # Every flow in `apps/raven/music/e2e`: open on Home, play the fixture's album,
+            # and download it.
+            driver: maestro
+            flows: bunx nx run @raven/music:e2e
+            logs: raven-music-e2e-logs
+            timeout: 45
+          # No flows yet.
+          - name: Wren Android
+            runner: ubuntu-24.04
+            setup: android-tv
+            project: apps/raven/music
+            build: bunx nx run @raven/music:build:android --excludeTaskDependencies
+            artifact: raven-music-android
+    steps: *build-steps
 
-      # The Android TV job's setup, its caches and its x86_64-only build among them.
-      - name: 🧰 Set up the app build
-        uses: ./.github/actions/raven-app-setup
-        with:
-          platform: android-tv
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      # Runs `prebuild:android` first, which regenerates android/, then Gradle's Release APK.
-      - name: 🎵 Build the Wren APK
-        run: bunx nx run @raven/music:build:android --excludeTaskDependencies
-
-      - name: 📊 ccache
-        run: ccache --show-stats
-
-      # The Release APK, signed with the debug key Expo's template sets up. It holds only
-      # x86_64 code, so it installs on an x86_64 emulator, not on a phone.
-      - name: 📤 Wren APK
-        uses: actions/upload-artifact@v7
-        with:
-          name: raven-music-android-${{ inputs.sha }}
-          path: apps/raven/music/android/app/build/outputs/apk/release
-          if-no-files-found: error
-
-      # A failure anywhere ends the whole run, so no other job keeps burning minutes.
-      # A fork's read-only token can't cancel, which is why this never fails the job.
-      - name: 🛑 Cancel the run
-        if: failure() && github.event_name == 'pull_request'
-        continue-on-error: true
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
+  # Wren's flows, by app-e2e's steps: Maestro against the fixture server's music library.
+  music-e2e:
+    name: 🎬 E2E ${{ matrix.app.name }}
+    needs: music-build
+    runs-on: ${{ matrix.app.runner }}
+    timeout-minutes: ${{ matrix.app.timeout }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [*wren-iphone]
+    steps: *e2e-steps
 
   # One native build feeds packaging and both playback checks through an artifact.
   desktop-native:
-    name: 🎞️ Desktop native
+    name: 🏗️ Build Mac native
     needs: select
     if: needs.select.outputs.desktop == 'true'
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
@@ -900,7 +728,7 @@ jobs:
 
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
-    name: 📦 Desktop app
+    name: 🏗️ Build Mac app
     needs: desktop-native
     runs-on: macos-26
     timeout-minutes: 30
@@ -973,11 +801,12 @@ jobs:
       fail-fast: false
       matrix:
         check:
-          - name: 🧪 Desktop player against headless libmpv
+          # The desktop player against headless libmpv.
+          - name: 🧪 Test Mac player
             target: test:native
           # Runs `electron .`, never the packaged app, whose fuses turn off the inspector
           # Playwright needs. The target's `install:electron` step fetches the binary.
-          - name: 🎬 Desktop end to end
+          - name: 🎬 E2E Mac
             target: e2e
             traces: true
     env:

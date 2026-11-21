@@ -8,8 +8,10 @@ import {
 import { beforeEach, describe, expect, it } from 'bun:test'
 import {
   AUDIO_STATES,
+  hasPlayingTrackOf,
   isPlayingOf,
   nextTrackOf,
+  playingIdOf,
   playingTrackOf,
   useAudioQueue,
 } from '@/stores/audioQueue'
@@ -223,6 +225,23 @@ describe('useAudioQueue', () => {
       id: 2,
       seed: RADIO_SEED_KINDS.track,
     })
+  })
+})
+
+describe('playingIdOf and hasPlayingTrackOf', () => {
+  beforeEach(() => store().clear())
+
+  it('name the playing track by its id and say one is queued', () => {
+    store().playTracks({ tracks: ALBUM, startAt: 1 })
+    expect(playingIdOf(store())).toBe(2)
+    expect(hasPlayingTrackOf(store())).toBe(true)
+    store().next()
+    expect(playingIdOf(store())).toBe(3)
+  })
+
+  it('answer null and false for an empty queue', () => {
+    expect(playingIdOf(store())).toBeNull()
+    expect(hasPlayingTrackOf(store())).toBe(false)
   })
 })
 

@@ -10,7 +10,7 @@ timeout = 20000
 # through, and scss-modules registers its loader ahead of any component import.
 preload = [
   "./src/test/happy-dom.ts",
-  "./src/test/network.ts",
+  "../../../tooling/web/network.ts",
   "./src/test/eventSource.ts",
   "./src/test/mediaError.ts",
   "./src/test/viewport.ts",
