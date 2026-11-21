@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🎬 E2E Mac check, which CI runs on main (main-native-checks.yml), on this Mac:
+# Runs the 🎬 E2E Mac check, which CI runs on main (native-checks.yml), on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
 # from a recent run. `xcodebuild -version` is in the target's Nx cache key, which is
@@ -42,7 +42,7 @@ else
       break
     fi
   done < <(
-    for workflow in main-native-checks.yml pull-request-checks.yml; do
+    for workflow in native-checks.yml pull-request-checks.yml; do
       gh run list --workflow "$workflow" --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"'
     done
   )

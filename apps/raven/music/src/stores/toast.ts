@@ -1,6 +1,5 @@
+import { TOAST_MS } from '@raven/wren'
 import { create } from 'zustand'
-
-import { MOTION } from '@/theme/wrenTokens'
 
 type ToastState = {
   /** What the toast says, or null while none shows. */
@@ -12,17 +11,21 @@ type ToastState = {
 
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 
+const stopTimer = (): void => {
+  if (hideTimer !== null) clearTimeout(hideTimer)
+  hideTimer = null
+}
+
 /** The one toast every screen raises: "Added to Road trip". `ToastHost` draws it. */
 export const useToast = create<ToastState>()((set) => ({
   message: null,
   show: (message) => {
-    if (hideTimer !== null) clearTimeout(hideTimer)
-    hideTimer = setTimeout(() => set({ message: null }), MOTION.toast)
+    stopTimer()
+    hideTimer = setTimeout(() => set({ message: null }), TOAST_MS)
     set({ message })
   },
   hide: () => {
-    if (hideTimer !== null) clearTimeout(hideTimer)
-    hideTimer = null
+    stopTimer()
     set({ message: null })
   },
 }))

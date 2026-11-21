@@ -1,0 +1,476 @@
+/*
+ * Wren's design tokens and the few true primitives, translated from the redesign handoff
+ * (apps/raven/music/design/redesign/tokens/tokens.css) and the phone and tablet apps'
+ * apps/raven/music/src/theme/wrenTokens.ts, value for value. Component styles live beside their
+ * component as *.module.scss and use only these values.
+ */
+
+// The light palette, worn by the system's light scheme and by Settings' Light alike.
+@mixin light-palette {
+  --color-bg: #f4efe6;
+  --color-surface: #fbf8f2;
+  --color-surface-2: #e9e3d7;
+  --color-raised: #ffffff;
+  --color-field: #ffffff;
+  --color-line: rgb(19 20 22 / 8%);
+  --color-line-2: rgb(19 20 22 / 14%);
+  --color-text: #131416;
+  --color-text-2: #474a47;
+  --color-text-3: #5f615c;
+  --color-accent: #a8262f;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #a8262f;
+  --color-accent-soft: rgb(168 38 47 / 8%);
+  --color-ok: #2f7a57;
+  --color-scrim: rgb(19 20 22 / 36%);
+  --color-shadow: rgb(40 30 20 / 14%);
+  // The bird's and the name's ink on this ground.
+  --color-brand-ink: var(--color-ink);
+
+  color-scheme: light;
+}
+
+:root {
+  // The logo's own colours, fixed in every theme. The eye red is the logo's alone, never UI.
+  --color-night: #15201e;
+  --color-bark: #e6e1d6;
+  --color-ink: #131416;
+  --color-eye-red: #c41725;
+  --color-leaf: #a8262f;
+  --color-paper: #f1ece2;
+
+  // What sits on a picture, the same in both themes: the dark palette's text on its scrim.
+  --color-picture-ink: #efebe3;
+  --color-picture-veil: rgb(4 8 7 / 66%);
+
+  // The handoff's art colours, fixed in every theme: Search's Browse tiles wear them in pairs.
+  --color-art-ink: #1e1f22;
+  --color-art-ochre: #d9a43f;
+  --color-art-dusk: #3a3e57;
+  --color-art-blush: #e0b8a0;
+  --color-art-slate: #4d6c8c;
+  --color-art-cream: #efe7d8;
+  --color-art-pine: #2e4a44;
+  --color-art-sand: #e8dcc4;
+
+  // The dark palette, Wren's default.
+  --color-bg: #101816;
+  --color-surface: #17211e;
+  --color-surface-2: #1f2b27;
+  --color-raised: #1b2622;
+  --color-field: #17211e;
+  --color-line: rgb(230 225 214 / 8%);
+  --color-line-2: rgb(230 225 214 / 15%);
+  --color-text: #efebe3;
+  --color-text-2: #b3b8b1;
+  --color-text-3: #89928d;
+  --color-accent: #b8323b;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #f2858a;
+  --color-accent-soft: rgb(242 133 138 / 13%);
+  --color-ok: #7fc4a4;
+  --color-scrim: rgb(4 8 7 / 66%);
+  --color-shadow: rgb(0 0 0 / 45%);
+  --color-brand-ink: var(--color-bark);
+
+  // Young Serif for identity, Instrument Sans for everything else.
+  --font-display: 'Young Serif', georgia, serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  // The type scale's sizes and line heights, one pair per entry of the apps' `TYPE`.
+  --font-size-large-title: 2.125rem;
+  --line-large-title: 2.5rem;
+  --font-size-tablet-title: 2.375rem;
+  --line-tablet-title: 2.75rem;
+  --font-size-album-title: 1.625rem;
+  --line-album-title: 2rem;
+  --font-size-artist-name: 2.75rem;
+  --line-artist-name: 3.125rem;
+  --font-size-lyric: 1.6875rem;
+  --line-lyric: 2.1875rem;
+  --font-size-player-artist: 1.0625rem;
+  --line-player-artist: 1.375rem;
+  --font-size-compact-title: 1.0625rem;
+  --line-compact-title: 1.375rem;
+  --font-size-pane-title: 1.125rem;
+  --line-pane-title: 1.5rem;
+  --font-size-control: 0.8125rem;
+  --line-control: 1.125rem;
+  --font-size-empty-title: 1.5rem;
+  --line-empty-title: 1.875rem;
+  --font-size-dialog-title: 1.4375rem;
+  --line-dialog-title: 1.8125rem;
+  --font-size-section: 1.25rem;
+  --line-section: 1.625rem;
+  --font-size-row-title: 1rem;
+  --line-row-title: 1.3125rem;
+  --font-size-row-large: 1.0625rem;
+  --line-row-large: 1.3125rem;
+  --font-size-link: 0.9375rem;
+  --line-link: 1.3125rem;
+  --font-size-card-title: 1.25rem;
+  --line-card-title: 1.625rem;
+  --font-size-row-strong: 0.9375rem;
+  --line-row-strong: 1.25rem;
+  --font-size-button: 0.9375rem;
+  --line-button: 1.25rem;
+  --font-size-body: 0.9375rem;
+  --line-body: 1.375rem;
+  --font-size-input: 1rem;
+  --line-input: 1.3125rem;
+  --font-size-meta: 0.8125rem;
+  --line-meta: 1.125rem;
+  --font-size-tile-title: 0.875rem;
+  --line-tile-title: 1.1875rem;
+  --font-size-time: 0.875rem;
+  --line-time: 1.125rem;
+  --font-size-small: 0.75rem;
+  --line-small: 1rem;
+  --font-size-overline: 0.75rem;
+  --line-overline: 1rem;
+  --font-size-tab: 0.6875rem;
+  --line-tab: 0.875rem;
+  // A lone initial set as tall as its own size, the web's alone: the apps centre theirs in a box.
+  --line-tight: 1;
+
+  /*
+   * Each entry of the type scale as one `font` value: `font: var(--type-row-title)`. The time,
+   * small and action-label entries set their figures in columns, which the shorthand resets, so
+   * they add `font-variant-numeric: tabular-nums` after it; section and overline add their
+   * `letter-spacing` (`--tracking-*`), and overline its `text-transform: uppercase`.
+   */
+  --type-large-title: var(--font-weight-regular)
+    var(--font-size-large-title) / var(--line-large-title) var(--font-display);
+  --type-tablet-title: var(--font-weight-regular)
+    var(--font-size-tablet-title) / var(--line-tablet-title) var(--font-display);
+  --type-album-title: var(--font-weight-regular)
+    var(--font-size-album-title) / var(--line-album-title) var(--font-display);
+  --type-artist-name: var(--font-weight-regular)
+    var(--font-size-artist-name) / var(--line-artist-name) var(--font-display);
+  --type-lyric: var(--font-weight-regular) var(--font-size-lyric) / var(--line-lyric)
+    var(--font-display);
+  // Now Playing's artist link, and the compact head's title.
+  --type-player-artist: var(--font-weight-regular)
+    var(--font-size-player-artist) / var(--line-player-artist) var(--font-body);
+  --type-compact-title: var(--font-weight-semibold)
+    var(--font-size-compact-title) / var(--line-compact-title) var(--font-body);
+  --type-pane-title: var(--font-weight-semibold)
+    var(--font-size-pane-title) / var(--line-pane-title) var(--font-body);
+  // Now Playing's bottom bar: the Output pill's words.
+  --type-control: var(--font-weight-medium) var(--font-size-control) / var(--line-control)
+    var(--font-body);
+  --type-empty-title: var(--font-weight-regular)
+    var(--font-size-empty-title) / var(--line-empty-title) var(--font-display);
+  --type-dialog-title: var(--font-weight-regular)
+    var(--font-size-dialog-title) / var(--line-dialog-title) var(--font-display);
+  --type-section: var(--font-weight-semibold) var(--font-size-section) / var(--line-section)
+    var(--font-body);
+  --type-row-title: var(--font-weight-medium) var(--font-size-row-title) / var(--line-row-title)
+    var(--font-body);
+  // Library's categories and an album's artist links.
+  --type-row-large: var(--font-weight-medium) var(--font-size-row-large) / var(--line-row-large)
+    var(--font-body);
+  // A link in words beside a heading or in a card: See all, Clear, Manage.
+  --type-link: var(--font-weight-medium) var(--font-size-link) / var(--line-link) var(--font-body);
+  // Continue listening's album title on a phone.
+  --type-card-title: var(--font-weight-regular) var(--font-size-card-title) / var(--line-card-title)
+    var(--font-display);
+  --type-row-strong: var(--font-weight-semibold)
+    var(--font-size-row-strong) / var(--line-row-strong) var(--font-body);
+  --type-button: var(--font-weight-semibold) var(--font-size-button) / var(--line-button)
+    var(--font-body);
+  --type-body: var(--font-weight-regular) var(--font-size-body) / var(--line-body) var(--font-body);
+  --type-input: var(--font-weight-regular) var(--font-size-input) / var(--line-input)
+    var(--font-body);
+  --type-meta: var(--font-weight-regular) var(--font-size-meta) / var(--line-meta) var(--font-body);
+  --type-meta-strong: var(--font-weight-semibold) var(--font-size-meta) / var(--line-meta)
+    var(--font-body);
+  --type-tile-title: var(--font-weight-semibold)
+    var(--font-size-tile-title) / var(--line-tile-title) var(--font-body);
+  --type-time: var(--font-weight-regular) var(--font-size-time) / var(--line-time) var(--font-body);
+  --type-small: var(--font-weight-regular) var(--font-size-small) / var(--line-small)
+    var(--font-body);
+  // The word under an album's or a playlist's action on a phone.
+  --type-action-label: var(--font-weight-medium) var(--font-size-small) / var(--line-small)
+    var(--font-body);
+  --type-overline: var(--font-weight-semibold) var(--font-size-overline) / var(--line-overline)
+    var(--font-body);
+  --type-tab: var(--font-weight-medium) var(--font-size-tab) / var(--line-tab) var(--font-body);
+  --type-tab-active: var(--font-weight-semibold) var(--font-size-tab) / var(--line-tab)
+    var(--font-body);
+
+  --tracking-section: -0.015em;
+  --tracking-overline: 0.06em;
+
+  --radius-xs: 6px;
+  --radius-thumb: 8px;
+  --radius-sm: 10px;
+  --radius-item: 12px;
+  --radius-md: 14px;
+  --radius-lg: 16px;
+  // Now Playing's large cover.
+  --radius-art: 18px;
+  // Home's Continue listening card.
+  --radius-feature: 20px;
+  --radius-xl: 26px;
+  --radius-sheet: 28px;
+  --radius-pill: 999px;
+  // A segment inside its track: the track's radius less its inset.
+  --radius-segment: 9px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+
+  // The kit's fixed sizes: its controls, rows, icons, art and lines (the apps' `SIZE`).
+  --size-touch-target: 2.75rem;
+  --size-button: 3rem;
+  --size-button-large: 3.25rem;
+  --size-field: 3.25rem;
+  --size-search-field: 2.875rem;
+  --size-row: 3.75rem;
+  --size-nav-row: 3.5rem;
+  --size-artist-row: 4rem;
+  --size-tab-bar: 5.25rem;
+  --size-mini-player: 3.75rem;
+  --size-gutter: 1.25rem;
+  --size-icon: 1.375rem;
+  --size-small-icon: 1.125rem;
+  --size-nav-icon: 1.25rem;
+  --size-large-icon: 1.625rem;
+  --size-empty-icon: 2.125rem;
+  --size-check: 1rem;
+  --size-hairline: 1px;
+  --size-focus-ring: 2px;
+  --size-progress-line: 2px;
+  --size-small-button: 2.25rem;
+  --size-play-button: 2.75rem;
+  --size-segment: 1.875rem;
+  --size-segment-inset: 3px;
+  --size-segment-gap: 2px;
+  --size-chip: 2.125rem;
+  // The narrowest a chip is, which decides how many share a row.
+  --size-status-chip: 2rem;
+  --size-status-dot: 0.5rem;
+  --size-icon-tile: 2rem;
+  --size-dialog-icon: 3rem;
+  --size-dialog: 22.5rem;
+  --size-dialog-inset: 1.75rem;
+  --size-empty-tile: 5rem;
+  --size-empty-measure: 18.75rem;
+  // The most of a window a collection's search field takes, the web's alone: a window can be narrow.
+  --size-search-measure-max: 40vw;
+  --size-row-gap: 0.875rem;
+  --size-row-art: 2.75rem;
+  --size-track-number: 1.5rem;
+  --size-avatar: 3rem;
+  --size-mini-art: 2.5rem;
+  --size-sheet-art: 3.25rem;
+  // An album tile on a shelf that scrolls sideways: Home's Recently added and Search's albums.
+  --size-shelf-tile: 9.25rem;
+  --size-float-inset: 0.625rem;
+  --size-tab-pill-width: 3.25rem;
+  --size-tab-pill-height: 1.875rem;
+  --size-grabber-width: 2.5rem;
+  --size-grabber-height: 5px;
+  --size-lockup: 2.125rem;
+  --size-scrub-track: 5px;
+  --size-scrub-thumb: 0.875rem;
+  --size-equalizer: 0.875rem;
+  --size-equalizer-bar: 3px;
+  --size-equalizer-gap: 2px;
+  --size-equalizer-radius: 2px;
+  // The spinner a waiting button shows in its label's place.
+  --size-spinner: 1.25rem;
+  // How wide the centred dialog a sheet becomes at 48rem and wider grows.
+  --size-sheet-dialog: 26.25rem;
+
+  // The wide shell: the sidebar, its rail, the player bar and the pages' margins (`SHELL_SIZES`).
+  --size-sidebar: 16rem;
+  --size-rail: 4.75rem;
+  --size-sidebar-item: 2.625rem;
+  --size-player-bar: 5.25rem;
+  --size-bar-art: 3.25rem;
+  // The player bar's middle: its transport over its scrubber.
+  --size-bar-scrubber: 26.25rem;
+  --size-page-pad-top: 2.25rem;
+  --size-page-pad-side: 2.5rem;
+  // The volume line at the player bar's end.
+  --size-bar-volume: 7rem;
+
+  // Now Playing: its gutter, covers, transport and Up next's head (`PLAYER_SIZES`).
+  --size-player-gutter: 1.75rem;
+  --size-player-art: 20.875rem;
+  --size-player-art-wide: 21.875rem;
+  --size-player-compact-art: 3.5rem;
+  --size-play-large: 4.75rem;
+  --size-play-compact: 4rem;
+  --size-play-queue: 3.75rem;
+  --size-transport-button: 3.5rem;
+  --size-transport-small: 3rem;
+  --size-toggle-circle: 2.5rem;
+  --size-up-next-head-top: 0.375rem;
+  --size-up-next-head-bottom: 0.625rem;
+
+  // Search: its Browse tiles, the top result's art and the artists' circles (`SEARCH_SIZES`).
+  --size-browse-tile: 5.25rem;
+  --size-top-result-art: 4rem;
+  --size-artist-circle: 4.75rem;
+  --size-artist-circle-item: 5.5rem;
+
+  // An album's, an artist's and a playlist's pages (`DETAIL_SIZES`).
+  --size-detail-column: 18.75rem;
+  --size-detail-cover: 14.75rem;
+  --size-detail-cover-wide: 18.75rem;
+  --size-detail-hero: 18.75rem;
+  --size-detail-hero-wide: 15.625rem;
+  // How tall Add to playlist's list grows before it scrolls: six rows.
+  --size-playlist-list: 22.5rem;
+
+  // Home: the Continue listening card's art on each layout (`HOME_SIZES`).
+  --size-continue-art: 6rem;
+  --size-continue-art-wide: 8.25rem;
+
+  // Sign-in, from the handoff's P01 and T01 (`SIGN_IN_SIZES`).
+  --size-sign-in-mark: 4.75rem;
+  --size-sign-in-hero-mark: 18.75rem;
+  --size-sign-in-lockup: 2.75rem;
+  --size-sign-in-form: 25rem;
+  --size-sign-in-tagline: 26.25rem;
+  --size-sign-in-inset: 3.5rem;
+
+  // How faint a control is while pressed and while off, and a lyric line once sung.
+  --opacity-pressed: 0.85;
+  // A control under the pointer, the web's own.
+  --opacity-hover: 0.92;
+  --opacity-disabled: 0.4;
+  --opacity-sung: 0.55;
+
+  // A sheet's or Now Playing's rise.
+  --duration-sheet: 320ms;
+  // One turn of a waiting button's spinner.
+  --duration-spin: 800ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  // The mini player's and a toast's lift, a page's large cover, a picked segment, and a dialog.
+  --shadow-card: 0 var(--space-2) var(--space-5) var(--color-shadow);
+  --shadow-raised: 0 var(--space-6) var(--space-8) var(--color-shadow);
+  --shadow-segment: 0 var(--size-hairline) var(--size-hairline) var(--color-shadow);
+  --shadow-dialog: 0 0.625rem 1.875rem var(--color-shadow);
+
+  // The shell's bars, over the page that scrolls under them.
+  --layer-chrome: 10;
+
+  --focus-ring: var(--size-focus-ring) solid var(--color-accent-text);
+  --focus-offset: 2px;
+
+  color-scheme: dark;
+}
+
+// The system's light scheme, unless Settings' Appearance keeps the dark one.
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    @include light-palette;
+  }
+}
+
+// Settings' Light, whatever the system's scheme.
+:root[data-theme='light'] {
+  @include light-palette;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-inline-size: 20rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+p,
+ul {
+  margin: 0;
+}
+
+h1,
+h2 {
+  font: inherit;
+}
+
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: start;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+img,
+svg {
+  display: block;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+// The backstop behind each component's own `prefers-reduced-motion: no-preference` guard.
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms;
+    animation-duration: 0.01ms;
+  }
+}

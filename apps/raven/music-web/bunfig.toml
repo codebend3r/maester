@@ -1,0 +1,12 @@
+[test]
+# The default 5s is too tight for a typing-heavy page test on a small CI runner.
+timeout = 20000
+# happy-dom must register the DOM before test-setup imports Testing Library,
+# network replaces its fetch so no test reaches for a server, and scss-modules
+# registers its loader ahead of any component import.
+preload = [
+  "./src/test/happy-dom.ts",
+  "../../../tooling/web/network.ts",
+  "../../../tooling/web/scss-modules.ts",
+  "./src/test-setup.ts",
+]

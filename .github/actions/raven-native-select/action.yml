@@ -1,0 +1,116 @@
+name: 🗺️ Select and plan the native groups
+description: >-
+  Selects the native groups a commit affects (raven's device app, Wren, the desktop) and plans
+  each one: whether the commit selected it, whether to build it in this run, and which run and
+  commit hold its builds. The caller checks out the commit with its whole history first.
+
+# Shared by the 🔎 Select affected native checks job of pull-request-checks.yml and of
+# native-checks.yml, whose native jobs read this plan and nothing else. A pull request diffs
+# against the base it names; a push to main against its last green run; a manual run, or a push
+# with no green ancestor, selects every group. A change to a shared file, a workflow or a script
+# selects every group too.
+#
+# On a push to main it looks for the pull request the pushed commit merged, that pull request's
+# head commit and its passing checks run, whose artifacts are named for the head commit. A group
+# is found only when every build main's flows read is among them and has not expired; a group not
+# found is built in this run. A lookup that fails finds nothing, so it never fails the run, and a
+# pull request, which is no push, finds nothing and builds everything it selected.
+inputs:
+  sha:
+    description: The commit this run builds, which its own artifacts are named for.
+    required: true
+  base:
+    description: A pull request's base commit, which the selection diffs against. Empty, a push to main diffs against its last green run and a manual run selects every group.
+    required: false
+    default: ''
+
+# Per group: `true` when the commit selected it, `true` to build it in this run, and the run and
+# the commit its builds are read from.
+outputs:
+  app_selected:
+    description: "`true` when the commit affects raven's device app."
+    value: ${{ steps.plan.outputs.app_selected }}
+  app_build:
+    description: '`true` to build the device app in this run.'
+    value: ${{ steps.plan.outputs.app_build }}
+  app_run:
+    description: The run that holds the device app's builds.
+    value: ${{ steps.plan.outputs.app_run }}
+  app_sha:
+    description: The commit the device app's builds are named for.
+    value: ${{ steps.plan.outputs.app_sha }}
+  music_selected:
+    description: '`true` when the commit affects Wren.'
+    value: ${{ steps.plan.outputs.music_selected }}
+  music_build:
+    description: '`true` to build Wren in this run.'
+    value: ${{ steps.plan.outputs.music_build }}
+  music_run:
+    description: The run that holds Wren's builds.
+    value: ${{ steps.plan.outputs.music_run }}
+  music_sha:
+    description: The commit Wren's builds are named for.
+    value: ${{ steps.plan.outputs.music_sha }}
+  desktop_selected:
+    description: '`true` when the commit affects the desktop.'
+    value: ${{ steps.plan.outputs.desktop_selected }}
+  desktop_build:
+    description: "`true` to build the desktop's native pieces in this run."
+    value: ${{ steps.plan.outputs.desktop_build }}
+  desktop_run:
+    description: The run that holds the Mac's native pieces.
+    value: ${{ steps.plan.outputs.desktop_run }}
+  desktop_sha:
+    description: The commit the Mac's native pieces are named for.
+    value: ${{ steps.plan.outputs.desktop_sha }}
+
+runs:
+  using: composite
+  steps:
+    - name: 🍞 Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
+
+    - name: 📦 Install
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    # The token is for the lookup of main's last green run; a pull request's base skips it.
+    - name: 🔎 Select the affected groups
+      id: select
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        NATIVE_BASE: ${{ inputs.base }}
+        NX_DAEMON: 'false'
+      run: python3 scripts/select_native_checks.py
+
+    # The script finds something on a push alone: a pull request builds everything it selected.
+    - name: 🔎 Find the merged pull request's builds
+      id: find
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ inputs.sha }}
+        EVENT: ${{ github.event_name }}
+      run: bash scripts/find_pr_builds.sh >> "$GITHUB_OUTPUT"
+
+    # A group found is not built again, and its builds are read from the pull request's run
+    # under its head commit; any other selected group is built here and read from this run.
+    - name: 🗺️ Plan each group
+      id: plan
+      shell: bash
+      env:
+        THIS_RUN: ${{ github.run_id }}
+        THIS_SHA: ${{ inputs.sha }}
+        FOUND_RUN: ${{ steps.find.outputs.run_id }}
+        FOUND_SHA: ${{ steps.find.outputs.sha }}
+        SELECTED_app: ${{ steps.select.outputs.app }}
+        SELECTED_music: ${{ steps.select.outputs.music }}
+        SELECTED_desktop: ${{ steps.select.outputs.desktop }}
+        FOUND_app: ${{ steps.find.outputs.app }}
+        FOUND_music: ${{ steps.find.outputs.music }}
+        FOUND_desktop: ${{ steps.find.outputs.desktop }}
+      run: bash scripts/plan_native_builds.sh >> "$GITHUB_OUTPUT"

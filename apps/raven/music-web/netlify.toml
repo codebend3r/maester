@@ -1,0 +1,43 @@
+# Wren's web app on Netlify, with its API on Vhagar at raven's public origin
+# (apps/raven/README.md, "Remote access"), as raven's own web app is served.
+# The site's package directory is apps/raven/music-web and its base directory
+# the repo root, where bun.lock is: Netlify installs and builds there, so the
+# paths below are from the root. raven's public origin is core's
+# DEFAULT_SERVER_ORIGIN: the build (vite.config.ts) reads it there, and
+# src/netlifyToml.test.ts checks the /api proxy below names it.
+
+[build]
+command = "bun run build:wren:web"
+publish = "apps/raven/music-web/dist"
+# Production builds only on release, through a build hook; previews only when
+# something the site bundles changed (netlify-ignore.sh).
+ignore = "bash apps/raven/netlify-ignore.sh apps/raven/music-web libs/raven/core libs/raven/ui libs/raven/wren libs/shared/http"
+
+[build.environment]
+BUN_VERSION = "1.4.2"
+BUN_FLAGS = "--frozen-lockfile"
+NX_DAEMON = "false"
+
+# Vite hashes every file under assets/.
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+# /api goes to raven's public origin (core's DEFAULT_SERVER_ORIGIN; a test
+# checks they match), signed: Netlify adds an x-nf-sign JWS keyed with the
+# site's RAVEN_PROXY_SECRET (scoped to Runtime), which raven checks before it
+# believes the visitor address Netlify passes on, so its rate limits count
+# each visitor apart. Only netlify.toml can sign a proxy, not _redirects.
+[[redirects]]
+from = "/api/*"
+to = "https://raven-player.synology.me:8443/api/:splat"
+status = 200
+force = true
+signed = "RAVEN_PROXY_SECRET"
+
+# The single-page app's fallback, after the /api proxy, so /api never lands here.
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

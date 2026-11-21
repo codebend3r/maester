@@ -1,0 +1,41 @@
+.bar {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  align-items: start;
+  min-block-size: var(--size-tab-bar);
+  padding-block: var(--space-2) env(safe-area-inset-bottom);
+  border-block-start: var(--size-hairline) solid var(--color-line);
+  background: var(--color-bg);
+}
+
+.item {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  min-block-size: var(--size-touch-target);
+}
+
+.pill {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-tab-pill-width);
+  block-size: var(--size-tab-pill-height);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-3);
+}
+
+.activePill {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}
+
+.label {
+  color: var(--color-text-3);
+  font: var(--type-tab);
+}
+
+.activeLabel {
+  color: var(--color-text);
+  font: var(--type-tab-active);
+}

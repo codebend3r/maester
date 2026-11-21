@@ -1,0 +1,17 @@
+.spinner {
+  inline-size: var(--size-spinner);
+  block-size: var(--size-spinner);
+  border: var(--size-focus-ring) solid currentcolor;
+  border-block-start-color: transparent;
+  border-radius: var(--radius-pill);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin var(--duration-spin) linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

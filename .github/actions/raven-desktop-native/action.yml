@@ -4,13 +4,16 @@ description: >-
   toolchain, the install, the Nx cached libmpv and MoltenVK source build and the N-API
   addon. The caller audits them.
 
-# Shared by the 🎞️ Desktop native job (native-checks.yml, on pull requests and main) and the
-# release build (desktop-release.yml), so a release builds exactly as the checks did. A composite
-# action reads no secrets: the calling workflow sets DEVELOPER_DIR, HOMEBREW_NO_AUTO_UPDATE
-# and NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
+# Shared by the 🏗️ Build Mac native job (the raven-mac-native action, on pull requests and main)
+# and the release build (desktop-release.yml), so a release builds exactly as the checks did. It
+# selects Xcode for the rest of the job. A composite action reads no secrets: the calling workflow
+# sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 runs:
   using: composite
   steps:
+    - name: 🛠️ Xcode
+      uses: ./.github/actions/raven-xcode
+
     # Bun's version comes from `packageManager` in package.json.
     - name: 🍞 Set up Bun
       uses: oven-sh/setup-bun@v2
@@ -19,6 +22,8 @@ runs:
 
     - name: 🛠️ Prepare disposable native toolchain
       shell: bash
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: '1'
       run: |
         test "$(uname -m)" = arm64
         xcodebuild -version

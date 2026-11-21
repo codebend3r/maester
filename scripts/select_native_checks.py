@@ -54,7 +54,7 @@ def main() -> None:
             output(
                 "gh",
                 "api",
-                f"repos/{repository}/actions/workflows/main-native-checks.yml/runs"
+                f"repos/{repository}/actions/workflows/native-checks.yml/runs"
                 "?branch=main&event=push&status=success&per_page=100",
             )
         )["workflow_runs"]

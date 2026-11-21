@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Runs the 🏗️ Build Apple TV job and its end to end job, which native-checks.yml runs on
-# two runners, on this Mac: the
-# libraries, the fixture server, the Release build for the Apple TV simulator through
+# Runs the 🏗️ Build Apple TV job and its end to end job, which CI runs on two runners, on this
+# Mac: the libraries, the fixture server, the Release build for the Apple TV simulator through
 # ccache, the pods check, the simulator and the XCUITest the Siri Remote drives.
 #
 #   bun run ci:app:tvos                         every step

@@ -1,0 +1,89 @@
+name: 🏗️ Build a device app
+description: >-
+  Builds raven's device app or Wren for one device, the Release build for its simulator or
+  emulator, and uploads it as an artifact named for the commit. The caller checks out that
+  commit first and names the device in its job's `APP_*` variables.
+
+# Shared by every 🏗️ Build job of a device, in pull-request-checks.yml and in native-checks.yml:
+# one list of steps, and what a device needs is its job's `APP_*` variables. A composite action
+# reads no secrets: the workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
+# One Release build of React Native takes up to an hour cold, its compile cached by ccache, and by
+# Gradle on Android; Nx Cloud's remote cache restores a build whose inputs a commit left alone.
+inputs:
+  sha:
+    description: The commit that was checked out, which the artifacts are named for.
+    required: true
+  node-version:
+    description: The Node the app's setup installs.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Bun, Node, JDK 17 on Android (Gradle runs on it; the runner's Android SDK is
+    # ANDROID_HOME already), the build caches restored from what app-caches.yml saved on
+    # main, ffmpeg, ccache, the build environment (an x86_64-only APK on Android), the
+    # install and the libraries (built once, so the app build below skips its own).
+    - name: 🧰 Set up the app build
+      uses: ./.github/actions/raven-app-setup
+      with:
+        platform: ${{ env.APP_SETUP }}
+        project: ${{ env.APP_PROJECT }}
+        node-version: ${{ inputs.node-version }}
+
+    - name: 🏗️ Build
+      shell: bash
+      run: ${{ env.APP_BUILD }}
+
+    # How much of the compile ccache served, to tell a warm cache from a cold one.
+    - name: 📊 ccache
+      shell: bash
+      run: ccache --show-stats
+
+    - name: 🔎 Check the project targets Apple TV
+      if: env.APP_RUNTIME == 'tvOS'
+      shell: bash
+      working-directory: ${{ env.APP_PROJECT }}/ios
+      run: grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
+
+    # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
+    # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
+    - name: 🔎 Check the pods
+      if: env.APP_BUNDLE != ''
+      shell: bash
+      working-directory: ${{ env.APP_PROJECT }}/ios
+      run: cmp Podfile.lock Pods/Manifest.lock
+
+    # The build zipped as Finder would, which keeps the execute bits an artifact drops,
+    # so the unzipped app still launches.
+    - name: 📦 Pack the simulator app
+      if: env.APP_BUNDLE != ''
+      shell: bash
+      working-directory: ${{ env.APP_PROJECT }}
+      run: ditto -c -k --keepParent "${{ env.APP_BUNDLE }}" "$RUNNER_TEMP/simulator-app.zip"
+
+    # The build, for main's flows and for trying the PR's app by hand: the zipped
+    # simulator app, or Gradle's Release APK, signed with the debug key Expo's template sets
+    # up. The APK holds only x86_64 code, so it installs on an x86_64 emulator, not a device.
+    - name: 📤 The build
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.APP_ARTIFACT }}-${{ inputs.sha }}
+        path: ${{ env.APP_BUNDLE != '' && format('{0}/simulator-app.zip', runner.temp) || format('{0}/android/app/build/outputs/apk/release', env.APP_PROJECT) }}
+        if-no-files-found: error
+
+    # What the Siri Remote's flow reads beside the app, the build target's other Nx outputs: the
+    # Xcode project, the remote test target, the pods' support files and the two lockfiles.
+    - name: 📦 Pack the remote test project
+      if: env.APP_TEST_PROJECT == 'true'
+      shell: bash
+      working-directory: ${{ env.APP_PROJECT }}
+      run: tar -czf "$RUNNER_TEMP/remote-test-project.tgz" ios/Podfile.lock ios/Pods/Manifest.lock 'ios/Pods/Target Support Files/Pods-raven' ios/Raven.xcodeproj ios/RavenRemoteTests
+
+    - name: 📤 Remote test project
+      if: env.APP_TEST_PROJECT == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.APP_ARTIFACT }}-test-project-${{ inputs.sha }}
+        path: ${{ runner.temp }}/remote-test-project.tgz
+        if-no-files-found: error

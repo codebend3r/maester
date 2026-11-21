@@ -40,7 +40,7 @@ If the user asked only for **builds**, without the tests, steps 2 and 5 drop out
 `desktop:make` runs `stage:mpv`, which copies libmpv and the addon from `libs/raven/mpv/resources/darwin-arm64`. Get them first:
 
 1. If `libs/raven/mpv/resources/darwin-arm64/raven_mpv.node` exists, use it.
-2. Otherwise run step 5 (`bun run ci:desktop:e2e`) **first**: it downloads CI's native handoff from a recent `main-native-checks.yml` run whose addon sources match this checkout, and unpacks it in place. It needs `gh auth login`.
+2. Otherwise run step 5 (`bun run ci:desktop:e2e`) **first**: it downloads CI's native handoff from a recent `native-checks.yml` run whose addon sources match this checkout, and unpacks it in place. It needs `gh auth login`.
 3. If no run has a matching handoff, build them from source as the `raven-desktop-native` action does: `brew install cmake ninja meson pkgconf`, `xcodebuild -downloadComponent MetalToolchain` when `xcrun metal --version` fails, then `bunx nx run @raven/mpv:fetch:libmpv` and `bunx nx run @raven/mpv:build:native`. The `get-started` skill covers this toolchain.
 
 Then `bun run mpv:native` audits them and runs the headless libmpv tests, as CI does.
@@ -61,7 +61,7 @@ bun run desktop:smoke:packaged
 
 `mpv:native:windows` places the pinned libmpv DLL under `libs/raven/mpv/resources/win32-x64` and tests it; the installer lands in `apps/raven/desktop/out/make`.
 
-From the Mac, the only way is CI: a manual run of `🧱 Main native checks` on the branch runs every job, Windows included. Starting it publishes a run on GitHub, so do it only when the user asks: `gh workflow run main-native-checks.yml --ref <branch>`, then `gh run watch`.
+From the Mac, the only way is CI: a manual run of `🧱 Native checks` on the branch runs every job, Windows included. Starting it publishes a run on GitHub, so do it only when the user asks: `gh workflow run native-checks.yml --ref <branch>`, then `gh run watch`.
 
 ## On screen
 

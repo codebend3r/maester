@@ -1,0 +1,16 @@
+name: 🛠️ raven Xcode
+description: >-
+  Selects the Xcode every Apple job of raven builds and tests with, for the rest of the job, by
+  writing DEVELOPER_DIR to its environment.
+
+# The one place the Xcode version is named. Every Apple build, and the Nx cache keys that run
+# `xcodebuild -version`, read it from here: the device app's setup (raven-app-setup), the Mac's
+# native pieces (raven-desktop-native, and so the release), its app (raven-mac-app) and its
+# playback checks (raven-mac-playback). A cached result is keyed on the Xcode it was made with,
+# so a job on another Xcode would miss every one.
+runs:
+  using: composite
+  steps:
+    - name: 🛠️ Select Xcode
+      shell: bash
+      run: echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer" >> "$GITHUB_ENV"

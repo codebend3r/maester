@@ -1,0 +1,57 @@
+@use '../../styles/mixins';
+
+.row {
+  display: grid;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  min-block-size: var(--size-row);
+  border-block-end: var(--size-hairline) solid var(--color-line);
+}
+
+.main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--size-row-gap);
+  align-items: center;
+  min-block-size: var(--size-row);
+  padding-block: var(--space-2);
+}
+
+.lead {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-track-number);
+}
+
+.text {
+  @include mixins.stacked-lines;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-title);
+}
+
+.playing {
+  color: var(--color-accent-text);
+}
+
+.subtitle {
+  @include mixins.meta-line;
+}
+
+.number,
+.duration {
+  color: var(--color-text-3);
+  font: var(--type-time);
+  font-variant-numeric: tabular-nums;
+}
+
+.more {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-small-button);
+  block-size: var(--size-touch-target);
+}

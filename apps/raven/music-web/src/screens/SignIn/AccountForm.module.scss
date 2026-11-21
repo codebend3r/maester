@@ -1,0 +1,16 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font: var(--type-body);
+}

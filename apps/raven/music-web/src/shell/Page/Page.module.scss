@@ -1,0 +1,18 @@
+.page {
+  --page-gutter: var(--size-page-pad-side);
+  --page-pad-end: var(--space-10);
+
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  min-inline-size: 0;
+  padding: var(--page-pad-top, var(--size-page-pad-top)) var(--page-pad-side, var(--page-gutter))
+    var(--page-pad-end);
+
+  @media (max-width: 48rem) {
+    --page-gutter: var(--size-gutter);
+    --page-pad-end: var(--space-6);
+
+    padding-block-start: var(--page-pad-top, calc(env(safe-area-inset-top) + var(--space-2)));
+  }
+}

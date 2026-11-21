@@ -1,4 +1,5 @@
 import { INTERSECTION_REPORTING, watchIntersections } from '@tooling/web/intersection'
+import { sizeWindow } from '@tooling/web/viewport'
 
 export { moveOnScreen, reported, startOnScreen } from '@tooling/web/intersection'
 
@@ -9,15 +10,6 @@ export { moveOnScreen, reported, startOnScreen } from '@tooling/web/intersection
  */
 watchIntersections({ reporting: INTERSECTION_REPORTING.onObserve })
 
-/** What happy-dom's window adds for a test to size the window. */
-type HappyDomViewport = { setViewport: (size: { width: number; height: number }) => void }
-
-const isHappyDomViewport = (value: unknown): value is HappyDomViewport =>
-  typeof value === 'object' &&
-  value !== null &&
-  'setViewport' in value &&
-  typeof value.setViewport === 'function'
-
 /**
  * Makes the window `width` pixels wide, so media queries answer as a phone's
  * would, and returns what puts it back. happy-dom lays nothing out, so a
@@ -25,9 +17,7 @@ const isHappyDomViewport = (value: unknown): value is HappyDomViewport =>
  * is checked in a browser.
  */
 export const atViewportWidth = (width: number): (() => void) => {
-  const happyDom: unknown = Reflect.get(window, 'happyDOM')
-  if (!isHappyDomViewport(happyDom)) throw new Error('happy-dom cannot size this window')
   const before = { width: window.innerWidth, height: window.innerHeight }
-  happyDom.setViewport({ width, height: before.height })
-  return () => happyDom.setViewport(before)
+  sizeWindow({ width, height: before.height })
+  return () => sizeWindow(before)
 }

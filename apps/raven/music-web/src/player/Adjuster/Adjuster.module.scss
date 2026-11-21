@@ -1,0 +1,53 @@
+// The line: the part up to the thumb filled, the rest quiet.
+@mixin line {
+  block-size: var(--size-scrub-track);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--color-text) var(--filled),
+    var(--color-line-2) var(--filled)
+  );
+}
+
+@mixin thumb {
+  inline-size: var(--size-scrub-thumb);
+  block-size: var(--size-scrub-thumb);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-text);
+}
+
+.adjuster {
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--size-touch-target);
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+
+  &::-webkit-slider-runnable-track {
+    @include line;
+  }
+
+  &::-moz-range-track {
+    @include line;
+  }
+
+  &::-webkit-slider-thumb {
+    @include thumb;
+
+    // stylelint-disable-next-line declaration-property-value-allowed-list -- WebKit sets the thumb's top on the line's; only a margin centres it
+    margin-block-start: calc((var(--size-scrub-track) - var(--size-scrub-thumb)) / 2);
+    appearance: none;
+  }
+
+  &::-moz-range-thumb {
+    @include thumb;
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+}

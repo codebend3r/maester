@@ -1,0 +1,26 @@
+name: 🔩 raven Windows native build
+description: >-
+  Places the pinned prebuilt libmpv under resources/win32-x64 on a Windows x64 runner, audits
+  the DLL, builds the N-API addon against it with MSVC, runs the headless libmpv tests and
+  uploads the resources as an artifact named for the commit.
+
+# Shared by the 🏗️ Build Windows native job of pull-request-checks.yml and of native-checks.yml.
+# The workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
+inputs:
+  sha:
+    description: The commit the artifact is named for.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: 🔩 Fetch libmpv, build the addon, audit and test them
+      uses: ./.github/actions/raven-windows-mpv
+
+    # The DLL, the addon, the headers and the provenance the audit wrote.
+    - name: 📤 Windows native resources
+      uses: actions/upload-artifact@v7
+      with:
+        name: raven-native-win32-x64-${{ inputs.sha }}
+        path: libs/raven/mpv/resources/win32-x64
+        if-no-files-found: error

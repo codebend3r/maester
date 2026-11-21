@@ -1,0 +1,8 @@
+.link {
+  display: grid;
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-accent-text);
+  font: var(--type-link);
+  white-space: nowrap;
+}

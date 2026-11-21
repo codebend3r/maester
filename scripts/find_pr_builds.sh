@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Finds the builds a push to main can run its end to end jobs on, for native-checks.yml's selection
-# job: the pull request the pushed commit merged, that pull request's head commit, and its passing
+# Finds the builds a push to main can run its end to end jobs on, for the raven-native-select
+# action: the pull request the pushed commit merged, that pull request's head commit, and its passing
 # pull request checks run, whose artifacts are named for the head commit. Run from a checkout of the
 # pushed commit.
 #

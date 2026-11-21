@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Runs the 🏗️ Build Android TV job and its end to end job, which native-checks.yml runs
-# on two runners, on this Mac: the
-# libraries, the fixture server, the Android TV emulator, the Release APK through
-# ccache, the install and the Maestro flows the remote drives. The emulator is arm64
-# here, where CI's is x86_64 on KVM, and is left running so a rerun skips its boot. Each
-# step is a root script of its own, which the whole job runs in order:
+# Runs the 🏗️ Build Android TV job and its end to end job, which CI runs on two runners, on
+# this Mac: the libraries, the fixture server, the Android TV emulator, the Release APK through
+# ccache, the install and the Maestro flows the remote drives. The emulator is arm64 here, where
+# CI's is x86_64 on KVM, and is left running so a rerun skips its boot. Each step is a root
+# script of its own, which the whole job runs in order:
 #
 #   bun run ci:app:android-tv                         every step
 #   bun run ci:app:android-tv -- --skip-nx-cache      the flows for real, even on a cached pass

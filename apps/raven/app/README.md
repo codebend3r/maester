@@ -47,7 +47,7 @@ xcrun simctl launch booted io.github.codebend3r.raven.app
   ```
 
 - **Release builds.** `build:ios`, `build:tvos` and `build:android-tv` carry their own bundle, so they run with no Metro. `APP_VARIANT=development` before one lets it reach the fixture server or a LAN server over plain http; without it the build is the one a device gets.
-- **Tests.** `test` and `test:screens` run in `verify` and in every PR's checks, and need no simulator.
+- **Tests.** `test` and `test:screens` run in `verify` and need no simulator. A PR's checks run `test`; `test:screens` runs on each push to main (`native-checks.yml`).
 - **End to end.** `bunx nx run @raven/server:serve:fixture` starts a real server on `http://127.0.0.1:8490`. Against it, on a development-variant build, `bun run app:e2e` runs the iPhone's Maestro flows, `bun run app:e2e:tvos` the Apple TV's XCUITest and `bun run app:e2e:android-tv` the Android TV's Maestro flows, as [End to end](docs/end-to-end.md) says.
 
 ## More

@@ -1,0 +1,21 @@
+.choice {
+  position: relative;
+  display: grid;
+}
+
+// The radio itself covers its choice, unseen, so the whole choice is its press.
+.input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.label {
+  .input:focus-visible + & {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-offset);
+  }
+}

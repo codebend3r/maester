@@ -1,0 +1,23 @@
+@use '../../styles/mixins';
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: var(--size-artist-row);
+}
+
+.text {
+  @include mixins.stacked-lines;
+}
+
+.name {
+  color: var(--color-text);
+  font: var(--type-row-title);
+}
+
+.counts {
+  @include mixins.meta-line;
+}

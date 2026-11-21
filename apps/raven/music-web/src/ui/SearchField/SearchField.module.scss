@@ -1,0 +1,64 @@
+@use '../../styles/mixins';
+
+.row {
+  display: grid;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.box {
+  display: grid;
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  block-size: var(--size-search-field);
+  padding-inline-start: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+
+  @include mixins.field-box;
+}
+
+.input {
+  block-size: 100%;
+  appearance: none;
+
+  @include mixins.field-input;
+
+  // The kit draws its own clear button.
+  &::-webkit-search-cancel-button {
+    appearance: none;
+  }
+}
+
+// The clear button and Cancel show only while the search holds the focus.
+.clear {
+  display: none;
+  place-items: center;
+  inline-size: var(--size-touch-target);
+
+  .row:focus-within & {
+    display: grid;
+  }
+}
+
+.cancel {
+  display: none;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-accent-text);
+  font: var(--type-row-title);
+
+  .row:focus-within & {
+    display: block;
+  }
+
+  &:active {
+    opacity: var(--opacity-pressed);
+  }
+}

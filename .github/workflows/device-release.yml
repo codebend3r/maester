@@ -30,7 +30,7 @@ concurrency:
 
 env:
   TAG: ${{ inputs.tag || github.ref_name }}
-  # Keep this the same as APP_NODE_VERSION in native-checks.yml.
+  # `test_native_ci.py` holds every workflow's APP_NODE_VERSION to the same version.
   APP_NODE_VERSION: 24.21.0
 
 jobs:
@@ -96,6 +96,7 @@ jobs:
         uses: ./.github/actions/raven-app-setup
         with:
           platform: android-tv
+          project: ${{ matrix.apk.folder }}
           node-version: ${{ env.APP_NODE_VERSION }}
 
       # The setup writes the e2e build's environment: the development variant, the fixture

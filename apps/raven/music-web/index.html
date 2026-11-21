@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101816" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4efe6" media="(prefers-color-scheme: light)" />
+    <meta
+      name="description"
+      content="Wren plays the music library on your own raven server. Sign in with your raven account to listen anywhere."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Wren</title>
+    <script>
+      /*
+       * The kept appearance goes on before first paint, so a light or dark choice never
+       * flashes the system's; stores/wrenPrefs.ts takes over once the app loads.
+       */
+      try {
+        const appearance = JSON.parse(localStorage.getItem('wren.prefs') ?? '{}')?.state?.appearance
+        if (appearance === 'light' || appearance === 'dark') {
+          document.documentElement.dataset.theme = appearance
+        }
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

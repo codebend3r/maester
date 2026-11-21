@@ -1,14 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { DEFAULT_SERVER_ORIGIN, SERVICE_WORKER } from '@raven/core'
+import { SERVICE_WORKER } from '@raven/core'
 import { type Plugin, defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import {
-  IS_NETLIFY,
-  NETLIFY_IMAGE_CDN,
-  devApiOrigin,
-  vendorChunkGroups,
-} from '@tooling/web/viteRaven'
+import { NETLIFY_DEFINES, VENDOR_GROUPS, apiProxy } from '@tooling/web/viteRaven'
 
 /** The environment variables only this build and its dev server read. */
 const ENV = {
@@ -20,15 +15,6 @@ const RAVEN_DIR = fileURLToPath(new URL('..', import.meta.url))
 
 /** Vhagar, the raven this app's developers point it at most. */
 const DEV_API_ORIGIN_EXAMPLE = 'http://192.168.50.6:8484'
-
-/**
- * Where /api goes on Netlify, where the app is served apart from raven and
- * `netlify.toml` proxies /api, signed, to raven's public origin, so the app
- * still calls its own origin and the PIN and admin lock cookies stay first
- * party. core's `DEFAULT_SERVER_ORIGIN` is that origin, and `netlifyToml.test.ts`
- * fails when the proxy names any other; '' when /api is raven itself.
- */
-const PROXIED_API_ORIGIN = IS_NETLIFY ? DEFAULT_SERVER_ORIGIN : ''
 
 /**
  * Restarts the dev server when raven's `.env` changes, so editing
@@ -154,20 +140,6 @@ const homeContinueCount = (mode: string): string => {
 }
 
 /**
- * The dependencies that change on their own schedule, each in a chunk of its
- * own, so a release of the app leaves their cached chunks as they were and no
- * chunk nears Vite's 500 kB warning. Everything else, raven's own libraries
- * included, is rolldown's to split, so the sign-in page a first visit lands on
- * brings none of the pages behind it.
- */
-const VENDOR_CHUNKS = [
-  { name: 'react', packages: ['react', 'react-dom', 'scheduler'] },
-  { name: 'router', packages: ['react-router', 'react-router-dom'] },
-  { name: 'query', packages: ['@tanstack/react-query', '@tanstack/query-core'] },
-  { name: 'supabase', packages: ['@supabase'] },
-] as const
-
-/**
  * The build's two entries: the page, and the service worker (`src/serviceWorker/sw.ts`), which
  * nothing on the page imports, so it bundles alone into one classic script with no imports.
  */
@@ -192,8 +164,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), restartOnRavenEnv(), inlineRavenMark(), preloadStylesheets(), preloadFonts()],
   define: {
     'import.meta.env.VITE_HOME_CONTINUE_COUNT': JSON.stringify(homeContinueCount(mode)),
-    'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(IS_NETLIFY ? NETLIFY_IMAGE_CDN : ''),
-    'import.meta.env.VITE_API_ORIGIN': JSON.stringify(PROXIED_API_ORIGIN),
+    ...NETLIFY_DEFINES,
   },
   resolve: {
     alias: {
@@ -201,17 +172,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
-    /*
-     * The server runs on its own port in development, or on another machine
-     * (`devApiOrigin`); in Docker it serves this app itself and nothing is proxied.
-     * The Host header follows the target, as a raven behind a name expects.
-     */
-    proxy: {
-      '/api': {
-        target: devApiOrigin({ mode, ravenDir: RAVEN_DIR, example: DEV_API_ORIGIN_EXAMPLE }),
-        changeOrigin: true,
-      },
-    },
+    // In Docker the server serves this app itself and nothing is proxied.
+    proxy: apiProxy({ mode, ravenDir: RAVEN_DIR, example: DEV_API_ORIGIN_EXAMPLE }),
   },
   build: {
     /*
@@ -227,7 +189,7 @@ export default defineConfig(({ mode }) => ({
       output: {
         entryFileNames: entryFileName,
         codeSplitting: {
-          groups: vendorChunkGroups(VENDOR_CHUNKS),
+          groups: VENDOR_GROUPS,
         },
       },
     },
