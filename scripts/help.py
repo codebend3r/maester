@@ -177,11 +177,21 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "app:prebuild:android-tv", "Generates the Android TV native project.", "Android SDK"
             ),
+            Command(
+                "app:prebuild:android",
+                "Generates the Android phone native project.",
+                "Android SDK",
+            ),
             Command("app:build:ios", "A Release build for the iPhone simulator.", "Xcode"),
             Command("app:build:tvos", "A Release build for the Apple TV simulator.", "Xcode"),
             Command(
                 "app:build:android-tv",
                 "A Release APK for Android TV, to install on the emulator or a TV.",
+                "Android SDK",
+            ),
+            Command(
+                "app:build:android",
+                "A Release APK for Android phones, to install on the emulator or a phone.",
                 "Android SDK",
             ),
             Command(
@@ -192,6 +202,11 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "app:deploy:android-tv",
                 "Builds the Release APK and puts it on the Android TV over adb, found over mDNS.",
+                "Android SDK",
+            ),
+            Command(
+                "app:deploy:android",
+                "Builds the Release APK and puts it on the Android phone or emulator adb sees.",
                 "Android SDK",
             ),
             Command(

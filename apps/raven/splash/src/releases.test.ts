@@ -143,6 +143,8 @@ describe('parseReleases with the device catalog', () => {
       assets: [
         ...latest.assets,
         asset({ name: 'raven-app-0.8.0-android-tv.apk', size: 87_000_000 }),
+        asset({ name: 'raven-app-0.8.0-android.apk', size: 91_000_000 }),
+        asset({ name: 'wren-0.8.0-android.apk', size: 64_000_000 }),
       ],
     }
     expect(parseReleases({ releases: [release, older], catalogs: [CATALOGS.devices] })).toEqual([
@@ -157,6 +159,12 @@ describe('parseReleases with the device catalog', () => {
             url: url('raven-app-0.8.0-android-tv.apk'),
             bytes: 87_000_000,
           },
+          {
+            platform: PLATFORMS.androidPhone,
+            label: 'Android phones, APK',
+            url: url('raven-app-0.8.0-android.apk'),
+            bytes: 91_000_000,
+          },
         ],
       },
     ])
@@ -168,11 +176,44 @@ describe('parseReleases with the device catalog', () => {
   })
 })
 
+describe('parseReleases with the Wren catalog', () => {
+  test("keeps Wren's APK and leaves raven's files out", () => {
+    const release = {
+      ...latest,
+      assets: [
+        ...latest.assets,
+        asset({ name: 'raven-app-0.8.0-android.apk' }),
+        asset({ name: 'wren-0.8.0-android.apk', size: 64_000_000 }),
+      ],
+    }
+    expect(parseReleases({ releases: [release], catalogs: [CATALOGS.wren] })).toEqual([
+      {
+        version: '0.8.0',
+        date: '2026-10-29T18:00:00Z',
+        notesUrl: 'https://github.com/codebend3r/maester/releases/tag/v0.8.0',
+        files: [
+          {
+            platform: PLATFORMS.androidPhone,
+            label: 'Wren for Android phones, APK',
+            url: url('wren-0.8.0-android.apk'),
+            bytes: 64_000_000,
+          },
+        ],
+      },
+    ])
+  })
+})
+
 describe('parseReleases with every catalog', () => {
   test('keeps the desktop and device files of a release together', () => {
     const release = {
       ...latest,
-      assets: [...latest.assets, asset({ name: 'raven-app-0.8.0-android-tv.apk' })],
+      assets: [
+        ...latest.assets,
+        asset({ name: 'raven-app-0.8.0-android-tv.apk' }),
+        asset({ name: 'raven-app-0.8.0-android.apk' }),
+        asset({ name: 'wren-0.8.0-android.apk' }),
+      ],
     }
     const [first] = parseReleases({ releases: [release, older], catalogs: Object.values(CATALOGS) })
     expect(first?.files.map((file) => file.label)).toEqual([
@@ -180,6 +221,8 @@ describe('parseReleases with every catalog', () => {
       'Windows, installer',
       'Windows, zip archive',
       'Android TV, APK',
+      'Android phones, APK',
+      'Wren for Android phones, APK',
     ])
   })
 })

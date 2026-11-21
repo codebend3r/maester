@@ -16,7 +16,7 @@ BUN_FLAGS = "--frozen-lockfile"
 NX_DAEMON = "false"
 
 # A short address to type into a TV's Downloader app: the dev builds page, which lists the
-# APK device-release.yml attaches to each release. GitHub's releases/latest is no use here,
+# APKs device-release.yml attaches to each release. GitHub's releases/latest is no use here,
 # since the newest release is often a build tag (vX.Y.Z.N), which carries no APK.
 [[redirects]]
 from = "/tv"

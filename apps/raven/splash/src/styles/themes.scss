@@ -1,0 +1,38 @@
+/*
+ * Ultraviolet: the same tokens as `globals.scss`, given violet values. A page
+ * opts in with `theme-ultraviolet` on its body, so Raven's and Wren's pages
+ * keep the green until they add the class too.
+ *
+ * The tokens built from other tokens (the lines, the focus ring) are set again
+ * here: a custom property resolves its `var()` where it is declared, so the
+ * ones on `:root` would keep the green's bark.
+ */
+.theme-ultraviolet {
+  --color-night: #0f0a1f;
+  --color-canopy: #170f2e;
+  --color-canopy-hi: #1f1440;
+  --color-deep: #090614;
+  --color-moss: #2a1d52;
+  --color-moss-hi: #352566;
+  --color-bark: #f0ecff;
+  --color-lichen: #a99fd6;
+  --color-birch: #d9d2f7;
+  --color-leaf: #8b2cf5;
+  --color-leaf-hi: #9a44ff;
+  --color-on-leaf: #ffffff;
+  --color-leaf-bright: #c084fc;
+  --color-fern: #67e8f9;
+  --color-amber: #67e8f9;
+  --color-amber-hi: #a5f3fc;
+  --color-bezel: #06040e;
+  --color-sand: #5b2ca0;
+  --color-pine: #2d3a8c;
+  --color-wine: #6a1d7a;
+  --color-sun: #f0abfc;
+  --color-dusk: #4c2f7a;
+  --color-faint: #8a82b5;
+  --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
+  --color-bark-faint: rgb(240 236 255 / 22%);
+  --focus-ring: 2px solid var(--color-bark);
+}
