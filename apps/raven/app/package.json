@@ -158,6 +158,31 @@
       "deploy:android-tv",
       "deploy:android"
     ],
+    "namedInputs": {
+      "nativeApp": [
+        "{workspaceRoot}/patches/react-native-video@*.patch",
+        {
+          "env": "APP_VARIANT"
+        },
+        {
+          "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+        },
+        "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+      ],
+      "xcode": [
+        {
+          "env": "DEVELOPER_DIR"
+        },
+        {
+          "runtime": "xcodebuild -version"
+        }
+      ],
+      "gradle": [
+        {
+          "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
+        }
+      ]
+    },
     "targets": {
       "test": {
         "inputs": [
@@ -190,20 +215,8 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
@@ -219,20 +232,8 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
@@ -251,20 +252,11 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "gradle"
         ],
         "outputs": [
-          "{projectRoot}/android"
+          "{projectRoot}/android/app/build/outputs/apk/release"
         ],
         "cache": true
       },
@@ -275,20 +267,11 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "gradle"
         ],
         "outputs": [
-          "{projectRoot}/android"
+          "{projectRoot}/android/app/build/outputs/apk/release"
         ],
         "cache": true
       },
@@ -300,20 +283,8 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios"
@@ -328,20 +299,8 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp",
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios"
@@ -356,14 +315,7 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp"
         ],
         "outputs": [
           "{projectRoot}/android"
@@ -378,14 +330,7 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/patches/react-native-video@*.patch",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*"
+          "nativeApp"
         ],
         "outputs": [
           "{projectRoot}/android"
@@ -396,19 +341,8 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "nativeApp",
+          "xcode",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true
@@ -417,16 +351,8 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "nativeApp",
+          "gradle",
           "{workspaceRoot}/.github/actions/raven-android-avd/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
@@ -436,22 +362,11 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
+          "nativeApp",
+          "xcode",
           {
             "env": "TVOS_SIMULATOR"
           },
-          {
-            "runtime": "xcodebuild -version"
-          },
-          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
           "{workspaceRoot}/apps/raven/server/src/**/*"
         ],
         "cache": true

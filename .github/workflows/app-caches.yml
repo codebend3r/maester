@@ -4,7 +4,7 @@ name: 🗃️ App build caches
 # objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
 # packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
 # to its own ref, so when each PR saved its own the repo's cache filled with copies;
-# main's are readable by every PR, whose app jobs in pull-request-checks.yml only
+# main's are readable by every PR, whose app jobs in native-checks.yml only
 # restore. The two set up through the same actions, raven-app-setup and
 # raven-android-avd, so the caches match. It runs when what the native projects or those
 # actions are made from changes, weekly so the compile caches follow the sources and are

@@ -1,7 +1,7 @@
 name: 🧠 Sparrow evals
 
 # Nightly, and on demand from the Actions tab. The evals run sparrow's agent with
-# the real model against fake services, so they take about five minutes and
+# the real model against fake services, so they take about three minutes and
 # spend Anthropic credits. They stay out of the pull request checks for that
 # reason. A failed run emails whoever last touched the schedule.
 on:
@@ -28,6 +28,8 @@ jobs:
       # uv runs against the committed lockfiles, never re-resolving them.
       UV_FROZEN: '1'
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Nx Cloud's remote cache, which the nightly run reads and writes.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -51,5 +53,9 @@ jobs:
       - name: 🔑 Require the API key
         run: test -n "$ANTHROPIC_API_KEY" || { echo "Add the ANTHROPIC_API_KEY repository secret."; exit 1; }
 
+      # The nightly run restores the last pass while the target's inputs (sparrow's sources,
+      # the evals, the lockfile and SPARROW_MODEL) are unchanged, and spends nothing; a failed
+      # run is never cached, so it runs again the next night. A run from the Actions tab
+      # always runs for real.
       - name: 🧠 Run the evals
-        run: bunx nx run @sparrow/api:eval --skip-nx-cache
+        run: bunx nx run @sparrow/api:eval ${{ github.event_name == 'workflow_dispatch' && '--skip-nx-cache' || '' }}

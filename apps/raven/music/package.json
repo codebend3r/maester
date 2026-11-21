@@ -182,7 +182,7 @@
           }
         ],
         "outputs": [
-          "{projectRoot}/android"
+          "{projectRoot}/android/app/build/outputs/apk/release"
         ],
         "cache": true
       },

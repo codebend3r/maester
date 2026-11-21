@@ -5,7 +5,7 @@ description: >-
   Restores only; its outputs are each cache's key and path, for app-caches.yml to save.
 
 # The single definition of how the app is built, shared by the app jobs in
-# pull-request-checks.yml and by app-caches.yml, which builds on main and saves the
+# native-checks.yml, by device-release.yml and by app-caches.yml, which builds on main and saves the
 # caches: ccache hashes the compiler and its flags, so a setting either side changed
 # alone would leave every PR compiling cold. A pull request's caches are scoped to its
 # own ref, so each PR saving its own copy filled the repo's cache with duplicates; main's

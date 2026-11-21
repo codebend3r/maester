@@ -31,7 +31,7 @@ import { HEADERS } from '@shared/http'
  *   sends AVIF or WebP, so they weigh more here than in production.
  *
  * The sign-in page's performance floor in lighthouserc.json is 0.90, set from CI's runner: its
- * warm runs score 0.94 to 0.95 there, on mobile and desktop alike, and the first of the three is
+ * warm runs score 0.94 to 0.95 there, on mobile and desktop alike, and the first of the five is
  * a cold outlier (0.62 to 0.68 on mobile), so a floor of 0.95 failed whenever the median landed
  * on 0.94. It holds the page where it is; raise it as the page gets faster.
  *
