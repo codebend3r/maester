@@ -141,21 +141,11 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
+          "expoVariant",
           {
             "env": "WREN_CARPLAY"
           },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          }
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
@@ -171,18 +161,11 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
-          }
+          "expoVariant",
+          "gradle"
         ],
         "outputs": [
-          "{projectRoot}/android"
+          "{projectRoot}/android/app/build/outputs/apk/release"
         ],
         "cache": true
       },
@@ -193,21 +176,11 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
+          "expoVariant",
           {
             "env": "WREN_CARPLAY"
           },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          }
+          "xcode"
         ],
         "outputs": [
           "{projectRoot}/ios"
@@ -221,12 +194,7 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          }
+          "expoVariant"
         ],
         "outputs": [
           "{projectRoot}/android"
@@ -237,20 +205,10 @@
         "inputs": [
           "default",
           "^production",
-          {
-            "env": "APP_VARIANT"
-          },
-          {
-            "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
-          },
-          {
-            "env": "DEVELOPER_DIR"
-          },
-          {
-            "runtime": "xcodebuild -version"
-          },
+          "expoVariant",
+          "xcode",
           "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
-          "{workspaceRoot}/apps/raven/server/src/**/*"
+          "againstServer"
         ],
         "cache": true
       },

@@ -44,6 +44,9 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
+      # Nx Cloud's remote cache. A release's version is new, so its first build always runs
+      # and is stored; a rerun of the same tag restores the APK instead of building it again.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     strategy:
       # One APK failing still ships the others.
       fail-fast: false

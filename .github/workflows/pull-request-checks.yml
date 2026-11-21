@@ -2,9 +2,9 @@ name: 🧪 Pull request checks
 
 # Every pull request, into any base branch: runs when it opens or reopens and
 # on each push to its branch. Each check runs on the projects the PR affects (a
-# change to this workflow runs every check on every project), then the production
-# images are built and health checked. Once those pass, the native and desktop
-# builds and flows the PR affects run too (native-checks.yml, shared with
+# change to this workflow runs every check on every project), and beside them the
+# production images are built and health checked. Once the checks pass, the native and
+# desktop builds and flows the PR affects run too (native-checks.yml, shared with
 # main-native-checks.yml) and ✅ Checks waits for them, so a device flow a change
 # breaks is seen on the PR, never first on main. Merges to main are also covered
 # by main-smoke-test.yml.
@@ -26,9 +26,9 @@ concurrency:
 
 jobs:
   # The checks `bun run verify` runs before the build, and the web's browser end to end
-  # suite, which `verify` leaves out, one target per runner so they execute in parallel and
-  # each has its own named log. Nx Cloud still shares
-  # completed tasks between jobs through its remote cache.
+  # suite and Lighthouse, which `verify` leaves out, one target per runner so they execute
+  # in parallel and each has its own named log. Nx Cloud still shares completed tasks
+  # between jobs through its remote cache.
   checks:
     name: ${{ matrix.check.name }}
     runs-on: ubuntu-24.04
@@ -80,14 +80,17 @@ jobs:
           # raven's web build in Google Chrome on simulated mobile and desktop, served over HTTP/2
           # with Brotli as Netlify serves it: the sign-in page, and Home against the server's
           # Lighthouse fixture, which encodes its pictures and clip with ffmpeg. Fails below the
-          # floors in its lighthouserc.json.
+          # floors in its lighthouserc.json. It runs where `@raven/web` is affected, and there Nx
+          # restores a pass when its inputs, which name the server's sources as the browser
+          # suite's do, are unchanged. A server-only change does not run it.
           - name: 🔦 Lighthouse
             target: lighthouse
             ffmpeg: true
             traces: apps/raven/web/.lighthouseci
             artifact: lighthouse-reports
-          # The repository rules a linter cannot hold, which lefthook's pre-push runs too; here
-          # so a push without the hooks, or an edit on GitHub, meets them.
+          # The repository rules a linter cannot hold. lefthook's pre-push runs the first three,
+          # which are here so a push without the hooks, or an edit on GitHub, meets them; dead
+          # code and dead CSS run only here.
           - name: 🟦 TypeScript only
             target: typescript-only
           - name: 🧩 One command per script
@@ -294,16 +297,17 @@ jobs:
         run: bunx nx run @raven/supabase:check:functions
       - name: Test Edge Functions
         run: bunx nx run @raven/supabase:test:functions
-      # No Mailpit: the checks send no mail, and its port 54324 sits in the runner's
-      # ephemeral range, where a stray connection can hold it and fail the bind.
-      - name: Start local auth and database
-        run: bunx nx run @raven/supabase:db:start:ci
-      - name: Test membership authorization
-        run: bunx nx run @raven/supabase:test:db
-      - name: Lint database
-        run: bunx nx run @raven/supabase:lint:db
+      # One cached target starts local auth and the database, runs the membership
+      # authorization tests and lints the database, so a PR that leaves `@raven/supabase` alone
+      # restores the pass and starts no containers. No Mailpit: the checks send no mail, and its
+      # port 54324 sits in the runner's ephemeral range, where a stray connection can hold it
+      # and fail the bind.
+      - name: Start the local stack, test membership authorization and lint the database
+        run: bunx nx run @raven/supabase:test:db:ci
+      # `supabase stop` fails without the signing keys the start writes, so a run restored
+      # from the cache, which started nothing, has nothing to stop.
       - name: Stop local stack
-        if: always()
+        if: always() && hashFiles('apps/raven/supabase/signing_keys.json') != ''
         run: bunx nx run @raven/supabase:db:stop
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.

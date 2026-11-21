@@ -9,7 +9,8 @@ name: 🖥️ Desktop release
 # vX.Y.Z.N build tag never builds the app.
 #
 # A run from the Actions tab is the dry run: it builds and uploads the assets as
-# an artifact, and never publishes. Pull requests never run native builds.
+# an artifact, and never publishes. This workflow never runs on a pull request;
+# native-checks.yml builds the app there.
 on:
   push:
     tags:
@@ -29,13 +30,14 @@ jobs:
     name: 🖥️ Build Raven for macOS arm64
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
-    # Room for a cold libmpv source build when no cache holds it.
+    # Room for the libmpv source build, which runs cold whenever Nx Cloud holds no result
+    # for its inputs.
     timeout-minutes: 150
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       HOMEBREW_NO_AUTO_UPDATE: '1'
-      # Only this job runs Nx. Nx Cloud's remote cache restores the libmpv source build a
-      # run on the same inputs already did; unset (no secret, a fork's PR), nothing does.
+      # Nx Cloud's remote cache, which restores the libmpv source build a run on the same
+      # inputs already did. Unset, every run builds it from source.
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       # Keep this release build separate from PR checks on the same branch in Nx Cloud.
       NX_BRANCH: desktop-release-${{ github.head_ref || github.ref_name }}
