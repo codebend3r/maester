@@ -1,0 +1,29 @@
+.header {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.titleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-tablet-title);
+  overflow-wrap: anywhere;
+
+  @media (max-width: 48rem) {
+    font: var(--type-large-title);
+  }
+}
+
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  align-items: center;
+}

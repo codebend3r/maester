@@ -1,0 +1,75 @@
+@use '../../styles/mixins';
+
+.bar {
+  display: grid;
+  grid-template-areas: 'playing centre end';
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--size-bar-scrubber)) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: center;
+  min-block-size: var(--size-player-bar);
+  padding-inline: var(--space-6);
+  border-block-start: var(--size-hairline) solid var(--color-line);
+  background: var(--color-raised);
+}
+
+.nowPlaying {
+  display: grid;
+  grid-area: playing;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title,
+.line,
+.error {
+  @include mixins.one-line;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.line {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+.error {
+  color: var(--color-accent-text);
+  font: var(--type-meta);
+}
+
+.centre {
+  display: grid;
+  grid-area: centre;
+  justify-items: center;
+  min-inline-size: 0;
+}
+
+.end {
+  display: grid;
+  grid-area: end;
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: end;
+  min-inline-size: 0;
+}
+
+.volume {
+  display: grid;
+  inline-size: var(--size-bar-volume);
+
+  // The rail's width leaves the bar's end room for its buttons alone.
+  @media (max-width: 64rem) {
+    display: none;
+  }
+}

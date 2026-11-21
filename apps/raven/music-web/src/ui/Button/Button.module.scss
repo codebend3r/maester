@@ -1,0 +1,71 @@
+@use '../../styles/mixins';
+
+.button {
+  display: grid;
+  grid-template-areas: 'content';
+  place-items: center;
+  min-inline-size: 0;
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-pill);
+  font: var(--type-button);
+
+  @include mixins.press-feedback(':hover:enabled');
+
+  &:disabled {
+    opacity: var(--opacity-disabled);
+  }
+
+  // Waiting, it is off but not dimmed: the spinner says why.
+  &[aria-busy='true'] {
+    opacity: 1;
+  }
+}
+
+.regular {
+  min-block-size: var(--size-button);
+}
+
+.large {
+  min-block-size: var(--size-button-large);
+}
+
+.stretched {
+  inline-size: 100%;
+}
+
+.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.secondary {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.ghost {
+  @include mixins.hairline-ring;
+  color: var(--color-text);
+}
+
+.content {
+  display: grid;
+  grid-area: content;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  place-items: center;
+  min-inline-size: 0;
+}
+
+.label {
+  @include mixins.one-line;
+}
+
+.hidden {
+  opacity: 0;
+}
+
+// The spinner sits where the label does.
+.spinner {
+  grid-area: content;
+}

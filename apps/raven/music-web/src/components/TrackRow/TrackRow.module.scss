@@ -1,0 +1,14 @@
+.track {
+  display: grid;
+  min-inline-size: 0;
+}
+
+// The wide layout's tracklist sets its rows in from the edges, room for the playing row's fill.
+.inset {
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-item);
+}
+
+.highlighted {
+  background: var(--color-accent-soft);
+}

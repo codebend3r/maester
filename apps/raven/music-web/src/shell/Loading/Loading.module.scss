@@ -1,0 +1,15 @@
+.loading {
+  display: grid;
+  place-items: center;
+  min-block-size: 100dvh;
+}
+
+// Read by screen readers, never shown.
+.label {
+  position: absolute;
+  inline-size: var(--size-hairline);
+  block-size: var(--size-hairline);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

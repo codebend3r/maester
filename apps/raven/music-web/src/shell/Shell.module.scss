@@ -1,0 +1,63 @@
+// The narrow layout: the page over its foot, which holds the mini player and the tab bar.
+.phone {
+  // How tall the foot stands: the mini player's room, and the tab bar's or, with none, the home indicator's.
+  --shell-player: 0rem;
+  --shell-tabs: env(safe-area-inset-bottom, 0rem);
+  --shell-foot: calc(var(--shell-player) + var(--shell-tabs));
+
+  display: grid;
+  grid-template-areas:
+    'page'
+    'foot';
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-block-size: 100dvh;
+}
+
+// The mini player floats 8 above what is under it.
+.queued {
+  --shell-player: calc(var(--size-mini-player) + var(--space-2));
+}
+
+.tabbed {
+  --shell-tabs: var(--size-tab-bar);
+}
+
+// The wide layout: the sidebar beside the page, the player bar under both.
+.wide {
+  // How tall the foot stands, which the sidebar and a list's A to Z rail leave room for.
+  --shell-foot: 0rem;
+
+  display: grid;
+  grid-template-areas:
+    'sidebar page'
+    'foot foot';
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-block-size: 100dvh;
+}
+
+.playing {
+  --shell-foot: var(--size-player-bar);
+}
+
+.page {
+  display: grid;
+  grid-area: page;
+  min-inline-size: 0;
+}
+
+// The foot keeps to the screen's foot while the page scrolls under it, and takes its own room at the page's end.
+.foot {
+  position: sticky;
+  inset-block-end: 0;
+  z-index: var(--layer-chrome);
+  display: grid;
+  grid-area: foot;
+  min-inline-size: 0;
+}
+
+// With no tab bar to count the home indicator, the foot clears it itself.
+.clearsHome {
+  padding-block-end: env(safe-area-inset-bottom);
+  background: var(--color-bg);
+}

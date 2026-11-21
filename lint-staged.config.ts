@@ -15,6 +15,7 @@ export default {
   '*.{json,md,yml,yaml,toml,html}': oxfmt,
   // gale is a dependency of each project with styles, not of the root.
   'apps/raven/web/**/*.scss': ['bun --cwd apps/raven/web gale --fix', oxfmt],
+  'apps/raven/music-web/**/*.scss': ['bun --cwd apps/raven/music-web gale --fix', oxfmt],
   'apps/raven/splash/**/*.scss': ['bun --cwd apps/raven/splash gale --fix', oxfmt],
   'apps/rookery/web/**/*.scss': ['bun --cwd apps/rookery/web gale --fix', oxfmt],
   'apps/sparrow/web/**/*.scss': ['bun --cwd apps/sparrow/web gale --fix', oxfmt],

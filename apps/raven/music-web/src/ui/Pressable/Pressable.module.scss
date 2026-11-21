@@ -1,0 +1,13 @@
+@use '../../styles/mixins';
+
+.pressable {
+  cursor: pointer;
+
+  @include mixins.press-feedback;
+
+  // Dimmed last, so neither a press nor the pointer over it lifts it.
+  &:disabled {
+    opacity: var(--opacity-disabled);
+    cursor: default;
+  }
+}

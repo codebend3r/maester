@@ -1,0 +1,28 @@
+@use '../../styles/mixins';
+
+.tile {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-inline-size: 0;
+}
+
+.text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title,
+.subtitle {
+  @include mixins.one-line;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-tile-title);
+}
+
+.subtitle {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}

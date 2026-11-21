@@ -1,0 +1,29 @@
+.art {
+  // The fallback's note is drawn at this share of the square.
+  --icon-size: 40%;
+
+  display: grid;
+  grid-template-areas: 'art';
+  place-items: center;
+  inline-size: var(--art-size, 100%);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--art-radius, var(--radius-sm));
+  background: var(--color-surface-2);
+  color: var(--color-text-3);
+
+  > * {
+    grid-area: art;
+  }
+}
+
+// A raised cover lifts off the ground on a soft shadow.
+.raised {
+  box-shadow: var(--shadow-raised);
+}
+
+.image {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}

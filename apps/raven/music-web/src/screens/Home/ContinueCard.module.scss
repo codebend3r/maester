@@ -1,0 +1,63 @@
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  min-inline-size: 0;
+  padding: var(--space-6);
+  border-radius: var(--radius-feature);
+
+  @media (max-width: 48rem) {
+    padding: var(--space-3);
+  }
+}
+
+.open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  min-inline-size: 0;
+  border-radius: var(--radius-item);
+}
+
+.text {
+  display: grid;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.overline {
+  color: var(--color-text-3);
+  font: var(--type-overline);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+}
+
+// Two lines of the album's title on the wide layout, one on the narrow.
+.album,
+.line {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.album {
+  color: var(--color-text);
+  font: var(--type-album-title);
+
+  @media (max-width: 48rem) {
+    font: var(--type-card-title);
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+  }
+}
+
+.line {
+  color: var(--color-text-2);
+  font: var(--type-time);
+  font-variant-numeric: tabular-nums;
+}

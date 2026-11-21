@@ -1,0 +1,6 @@
+// The control it sits in sizes it through `--icon-size`; alone, it is the kit's 22.
+.icon {
+  inline-size: var(--icon-size, var(--size-icon));
+  block-size: auto;
+  aspect-ratio: 1;
+}
