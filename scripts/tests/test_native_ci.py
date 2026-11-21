@@ -15,6 +15,7 @@ GROUP_JOBS = {
     "app-tvos": "app",
     "app-ios": "app",
     "app-android-tv": "app",
+    "app-android": "app",
     "music-ios": "music",
     "music-android": "music",
     "desktop-native": "desktop",

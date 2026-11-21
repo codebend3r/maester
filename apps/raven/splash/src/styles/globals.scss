@@ -20,6 +20,7 @@
   --color-leaf-bright: #d8414a;
   --color-fern: #8fcf9f;
   --color-amber: #e3b45f;
+  --color-amber-hi: #f0c97a;
   --color-stage: #000000;
   --color-bezel: #0b0f0e;
   --color-sand: #756941;
@@ -27,6 +28,7 @@
   --color-wine: #5e3334;
   --color-sun: #e7c78a;
   --color-dusk: #636145;
+  --color-faint: #84998f;
   --color-line: color-mix(in srgb, var(--color-bark) 10%, transparent);
   --color-line-strong: color-mix(in srgb, var(--color-bark) 16%, transparent);
   --color-bark-faint: rgb(241 236 226 / 22%);
@@ -92,6 +94,9 @@
 
   --tracking-display: -0.02em;
   --tracking-tight: -0.01em;
+  // Small capitals: an eyebrow above a heading, a label over a name or a table.
+  --tracking-eyebrow: 0.14em;
+  --tracking-label: 0.12em;
 
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 

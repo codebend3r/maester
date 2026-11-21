@@ -1,17 +1,75 @@
 /*
- * Maester's home: the mark and the name, then one card for each app, raven
- * and Wren, which lead to their own pages.
+ * Maester's home, built on an app page's frame (`landing.scss`): the hero over
+ * a wall of posters and album covers, three features, a card for each app,
+ * the screens each one plays on, then a closing call to start with Raven.
  */
 
-.home-pitch {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-9);
-  padding-top: var(--space-11);
-  text-align: center;
+/*
+ * The home has four sections where an app's page has two. Doubled, since the
+ * app pages' styles load as their own file and can land after these.
+ */
+.landing-main.home-main {
+  grid-template-areas:
+    'features'
+    'apps'
+    'screens'
+    'start';
+  gap: var(--space-14);
+  padding-bottom: 0;
 }
 
-.products {
+// Album covers among the posters, since the home is for both apps.
+.wall .square {
+  --wall-tile: 1;
+}
+
+.eyebrow {
+  color: var(--color-amber);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+// The Maester mark in a ring, where an app's page has its play badge.
+.home-badge {
+  display: grid;
+  place-items: center;
+  width: 5.25rem;
+  aspect-ratio: 1;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 50%;
+  background: var(--color-canopy);
+  box-shadow:
+    0 0 0 var(--space-5) color-mix(in srgb, var(--color-amber) 10%, transparent),
+    var(--shadow-lift);
+}
+
+.section-head {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+  text-align: center;
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: var(--font-size-section);
+    font-weight: 400;
+    line-height: var(--line-tight);
+    text-wrap: balance;
+  }
+}
+
+.apps {
+  grid-area: apps;
+  display: grid;
+  gap: var(--space-11);
+  width: 100%;
+  max-width: 76rem;
+  padding: 0 var(--inset);
+}
+
+.app-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-9);
@@ -19,15 +77,17 @@
   @media (max-width: 48rem) {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  > li {
+    display: grid;
+  }
 }
 
-.product {
+.app-card {
   display: grid;
-  justify-items: start;
-  align-content: start;
-  gap: var(--space-7);
-  height: 100%;
-  padding: clamp(2rem, 4.5vw, 3.5rem) clamp(1.5rem, 4vw, 3rem);
+  grid-template-rows: auto auto auto auto 1fr;
+  gap: var(--space-9);
+  padding: clamp(1.75rem, 4vw, 3rem);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: radial-gradient(
@@ -41,9 +101,245 @@
     transition: border-color 150ms var(--ease-out);
   }
 
-  &:hover {
+  &:any-link:hover {
     border-color: var(--color-line-strong);
   }
+
+  &:any-link:hover .app-more {
+    color: var(--color-amber-hi);
+  }
+}
+
+// A small picture of each app at work, drawn in the palette until real screenshots replace it.
+.app-shot {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 8px solid var(--color-bezel);
+  border-radius: var(--radius-poster);
+  box-shadow: var(--shadow-device);
+}
+
+.app-shot-film {
+  display: grid;
+  align-items: end;
+}
+
+.app-shot-chrome {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-13) var(--space-7) var(--space-6);
+  background: var(--fade-from-bottom);
+  color: var(--color-on-picture);
+}
+
+.app-shot-title {
+  color: var(--color-on-picture);
+  font-family: var(--font-display);
+  font-size: var(--font-size-screen);
+}
+
+.timeline-full {
+  width: 100%;
+}
+
+.app-shot-music {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(var(--space-6), 2.4vw, var(--space-10));
+  padding: clamp(var(--space-6), 2.4vw, var(--space-10));
+  background: var(--color-deep);
+}
+
+.app-shot-cover {
+  height: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-poster);
+}
+
+.app-shot-track {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.app-shot-line {
+  width: 70%;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
+}
+
+.app-shot-line-short {
+  width: 45%;
+  background: var(--color-line);
+}
+
+.app-shot-controls {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-1);
+}
+
+.app-shot-skip {
+  width: 1.125rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-line-strong);
+}
+
+.app-shot-play {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+  font-size: var(--font-size-xs);
+
+  .icon {
+    fill: currentcolor;
+    stroke: none;
+  }
+}
+
+.app-name {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-6);
+
+  h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--font-size-section);
+    font-weight: 400;
+    line-height: var(--line-tight);
+  }
+}
+
+.app-heading {
+  display: grid;
+}
+
+.app-kind {
+  color: var(--color-lichen);
+  font-size: var(--font-size-micro);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.app-summary {
+  color: var(--color-birch);
+  font-size: var(--font-size-body-lg);
+  text-wrap: pretty;
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--space-3);
+
+  li {
+    text-align: center;
+    padding: var(--space-2) var(--space-5);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-night);
+    color: var(--color-birch);
+    font-size: var(--font-size-xs);
+  }
+}
+
+.app-more {
+  align-self: end;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-amber);
+  font-size: var(--font-size-ui);
+  font-weight: 600;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: color 150ms var(--ease-out);
+  }
+}
+
+// The home's screens card holds a table where an app's page draws its devices.
+.platform-table-scroll {
+  overflow-x: auto;
+}
+
+.platform-table {
+  width: 100%;
+  min-width: 18rem;
+  border-collapse: collapse;
+  font-size: var(--font-size-ui);
+
+  th,
+  td {
+    padding: var(--space-5) 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  thead th {
+    padding-top: 0;
+    border-bottom-color: var(--color-line-strong);
+    color: var(--color-lichen);
+    font-size: var(--font-size-micro);
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  thead th:first-child,
+  tbody th {
+    text-align: start;
+  }
+
+  thead th:not(:first-child),
+  td {
+    width: 6rem;
+    text-align: center;
+
+    @media (max-width: 30rem) {
+      width: 3.75rem;
+    }
+  }
+
+  tbody th {
+    font-weight: 500;
+  }
+
+  td .icon {
+    color: var(--color-amber);
+    font-size: var(--font-size-screen);
+    vertical-align: middle;
+  }
+}
+
+.none {
+  color: var(--color-faint);
+  font-size: var(--font-size-xs);
+}
+
+.start {
+  grid-area: start;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  max-width: 76rem;
+  padding: var(--space-6) var(--gutter) var(--space-14);
+  text-align: center;
 
   h2 {
     font-family: var(--font-display);
@@ -52,19 +348,30 @@
     line-height: var(--line-tight);
   }
 
-  p {
-    color: var(--color-birch);
-    font-size: var(--font-size-body-lg);
-    text-wrap: pretty;
+  .actions {
+    @media (max-width: 30rem) {
+      width: 100%;
+    }
   }
 }
 
-.product-more {
-  display: grid;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--color-amber);
+// The colophon sits on a rule, as on the plain pages.
+.theme-ultraviolet > .colophon {
+  border-top: 1px solid var(--color-line);
+}
+
+// Wren's card until it ships: an article, not a link, with a muted summary and a badge where "See Wren" would be.
+.app-card-soon .app-summary {
+  color: var(--color-lichen);
+}
+
+.app-badge {
+  align-self: end;
+  justify-self: start;
+  padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-lichen);
   font-size: var(--font-size-ui);
   font-weight: 600;
 }

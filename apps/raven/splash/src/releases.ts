@@ -22,7 +22,12 @@ const releasesUrl = ({ page }: ReleasesUrlProps): string =>
 // A version's tag, vX.Y.Z; the build tags CI puts on each merge have a fourth number.
 const VERSION_TAG = /^v\d+\.\d+\.\d+$/
 
-export const PLATFORMS = { mac: 'mac', windows: 'windows', androidTv: 'androidTv' } as const
+export const PLATFORMS = {
+  mac: 'mac',
+  windows: 'windows',
+  androidTv: 'androidTv',
+  androidPhone: 'androidPhone',
+} as const
 type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS]
 
 /** What the button calls each platform, and what the line under it calls its computers. */
@@ -30,6 +35,7 @@ const PLATFORM_COPY = {
   mac: { name: 'Mac', computers: 'Macs with Apple silicon' },
   windows: { name: 'Windows', computers: 'Windows PCs' },
   androidTv: { name: 'Android TV', computers: 'Android TV' },
+  androidPhone: { name: 'Android phones', computers: 'Android phones' },
 } as const satisfies Record<Platform, { name: string; computers: string }>
 
 type Download = { platform: Platform; label: string }
@@ -40,7 +46,8 @@ export type Catalog = { fileName: RegExp; downloads: Readonly<Record<string, Dow
 /**
  * The files each release workflow ships, one row per download. desktop-release.yml names
  * Raven's raven-player-<version>-<download>; Intel Macs are not built, so x64 is always
- * Windows. device-release.yml names the device app's raven-app-<version>-<download>.
+ * Windows. device-release.yml names the device app's raven-app-<version>-<download> and
+ * Wren's wren-<version>-<download>.
  */
 export const CATALOGS = {
   desktop: {
@@ -56,6 +63,13 @@ export const CATALOGS = {
     fileName: /^raven-app-\d+\.\d+\.\d+-(.+)$/,
     downloads: {
       'android-tv.apk': { platform: PLATFORMS.androidTv, label: 'Android TV, APK' },
+      'android.apk': { platform: PLATFORMS.androidPhone, label: 'Android phones, APK' },
+    },
+  },
+  wren: {
+    fileName: /^wren-\d+\.\d+\.\d+-(.+)$/,
+    downloads: {
+      'android.apk': { platform: PLATFORMS.androidPhone, label: 'Wren for Android phones, APK' },
     },
   },
 } as const satisfies Record<string, Catalog>

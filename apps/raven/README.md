@@ -584,7 +584,7 @@ xcrun simctl install booted apps/raven/app/build/ios/Build/Products/Release-ipho
 bun run app:e2e
 ```
 
-Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app's end to end notes](app/docs/end-to-end.md) have its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps there). In the PR checks, three jobs run on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and runs its remote flow against a fixture server, `📱 App on iPhone and iPad` builds the iPhone app and runs its flows against another fixture server, and `📺 App on Android TV` builds the APK and runs the remote flows on an emulator against its own fixture server. All three stand behind `🖥️ Desktop`.
+Maestro's driver installs only on iPhone and iPad simulators, so those flows run on an iPhone, while an XCUITest presses the Siri Remote's buttons on Apple TV (the [app's end to end notes](app/docs/end-to-end.md) have its steps). On Android TV Maestro drives the emulator with the remote's keys (`bun run app:e2e:android-tv`, with steps there). In the PR checks, four jobs run on their own runners: `📺 App on Apple TV` builds the Apple TV simulator app and runs its remote flow against a fixture server, `📱 App on iPhone and iPad` builds the iPhone app and runs its flows against another fixture server, `📺 App on Android TV` builds the APK and runs the remote flows on an emulator against its own fixture server, and `📱 App on Android phones` builds the phone APK, with no flows yet. All four stand behind `🖥️ Desktop`.
 
 ## Layout
 
