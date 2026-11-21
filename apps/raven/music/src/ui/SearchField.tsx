@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { KIT_COPY } from '@/ui/copy'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'

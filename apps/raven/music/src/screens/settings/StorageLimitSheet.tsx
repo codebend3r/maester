@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native'
 
-import { SETTINGS_COPY, STORAGE_COPY } from '@/screens/copy'
+import { SETTINGS_COPY, STORAGE_COPY } from '@raven/wren'
 import { STORAGE_LIMITS_GB, useWrenPrefs } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'

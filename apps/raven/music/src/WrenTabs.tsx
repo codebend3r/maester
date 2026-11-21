@@ -1,10 +1,10 @@
 import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs'
 import { View } from 'react-native'
 
+import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
 import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { WREN_TABS } from '@/routes'
-import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@/screens/copy'
 import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { TabBar } from '@/ui/TabBar'
 import { ICONS, type WrenIconName } from '@/ui/WrenIcon'

@@ -1,8 +1,13 @@
-import { ROUTE_STATES, type RouteQuery, routeState } from '@raven/core'
-import type { ComponentType, ReactNode } from 'react'
+import { ROUTE_STATES, type RouteQuery, routeIdOf, routeState } from '@raven/core'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { detailNoticeOf } from '@raven/wren'
+import { type QueryKey, type UseQueryOptions, useQuery } from '@tanstack/react-query'
+import { useLocalSearchParams } from 'expo-router'
+import type { ReactNode } from 'react'
 import { ScrollView, View } from 'react-native'
 
 import { Notice } from '@/components/Notice'
+import { WREN_ROUTE_PARAMS } from '@/routes'
 import { BackButton } from '@/screens/detail/BackButton'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
@@ -29,72 +34,69 @@ function DetailNotice({ text }: DetailNoticeProps) {
   )
 }
 
-/** What a page says while it has nothing of its own to show. */
-type DetailCopy = { opening: string; missing: string }
-
-/** What each view of a page that reads one thing from its address is handed. */
-type DetailViewProps = {
-  page: RouteQuery<unknown>
-  copy: DetailCopy
+type DetailReadyProps = {
   /** The page itself, drawn once it is read. */
-  ready: () => ReactNode
+  render: () => ReactNode
 }
 
-type DetailMissingProps = DetailViewProps
-
-/** The address names nothing the server has. */
-function DetailMissing({ copy }: DetailMissingProps) {
-  return <DetailNotice text={copy.missing} />
+function DetailReady({ render }: DetailReadyProps) {
+  return render()
 }
 
-type DetailErrorProps = DetailViewProps
+const DETAIL_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
 
-/** The server could not say, in its own words. */
-function DetailError({ page }: DetailErrorProps) {
-  return page.state === ROUTE_STATES.error && <DetailNotice text={page.message} />
+type DetailViewsProps = {
+  [DETAIL_VIEW_KEYS.pending]: DetailNoticeProps
+  [DETAIL_VIEW_KEYS.ready]: DetailReadyProps
 }
 
-type DetailLoadingProps = DetailViewProps
-
-/** The page is on its way. */
-function DetailLoading({ copy }: DetailLoadingProps) {
-  return <DetailNotice text={copy.opening} />
-}
-
-type DetailReadyProps = DetailViewProps
-
-function DetailReady({ ready }: DetailReadyProps) {
-  return ready()
-}
-
-/** What a page reading one thing draws in each state its read is in. */
+/** What a page reading one thing draws: what it says while it has nothing to show, else itself. */
 const DETAIL_VIEWS = {
-  [ROUTE_STATES.missing]: DetailMissing,
-  [ROUTE_STATES.error]: DetailError,
-  [ROUTE_STATES.loading]: DetailLoading,
-  [ROUTE_STATES.ready]: DetailReady,
-} as const satisfies Record<RouteQuery<unknown>['state'], ComponentType<DetailViewProps>>
+  [DETAIL_VIEW_KEYS.pending]: DetailNotice,
+  [DETAIL_VIEW_KEYS.ready]: DetailReady,
+} as const satisfies ViewsOf<DetailViewsProps>
 
-type DetailRouteProps<T> = {
-  /** The id the address names, or null when it names none. */
-  id: number | null
-  query: Parameters<typeof routeState<T>>[0]['query']
+/** What a page says while it has nothing of its own to show. */
+type DetailCopy = Parameters<typeof detailNoticeOf>[0]['copy']
+
+type DetailViewOfProps<T> = {
+  page: RouteQuery<T>
   copy: DetailCopy
   children: (data: T) => ReactNode
+}
+
+const detailViewOf = <T,>({
+  page,
+  copy,
+  children,
+}: DetailViewOfProps<T>): ViewOf<DetailViewsProps> => {
+  if (page.state !== ROUTE_STATES.ready)
+    return { key: DETAIL_VIEW_KEYS.pending, props: { text: detailNoticeOf({ page, copy }) } }
+  const { data } = page
+  return { key: DETAIL_VIEW_KEYS.ready, props: { render: () => children(data) } }
+}
+
+type DetailRouteProps<T, Key extends QueryKey> = Pick<DetailViewOfProps<T>, 'copy' | 'children'> & {
+  /** The query for the thing the address names by `id`, which is null when it names none. */
+  queryOf: (id: number | null) => UseQueryOptions<T, Error, T, Key>
 }
 
 /**
  * A page reading one thing from its address: the page once it is read, else that it is
  * opening, missing from the server, or could not be read, with the way back.
  */
-export function DetailRoute<T>({ id, query, copy, children }: DetailRouteProps<T>) {
+export function DetailRoute<T, Key extends QueryKey>({
+  queryOf,
+  copy,
+  children,
+}: DetailRouteProps<T, Key>) {
+  const id = routeIdOf(useLocalSearchParams()[WREN_ROUTE_PARAMS.id])
+  const query = useQuery(queryOf(id))
   const page = routeState({ id, query })
-  const StateView = DETAIL_VIEWS[page.state]
   return (
-    <StateView
-      copy={copy}
-      page={page}
-      ready={() => page.state === ROUTE_STATES.ready && children(page.data)}
+    <KeyedView<DetailViewsProps>
+      view={detailViewOf({ page, copy, children })}
+      views={DETAIL_VIEWS}
     />
   )
 }

@@ -1,16 +1,25 @@
-import { MUSIC_PAGE, MUSIC_SORTS, randomMusicSeed } from '@raven/core'
-import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { hasPlayingTrackOf, shuffledTracksOf, useAudioQueue } from '@raven/ui/headless'
+import {
+  countsLineOf,
+  greetingOf,
+  HOME_COPY,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  lineValueOf,
+  OFFLINE_COPY,
+  RECENT_SORTS,
+  type RecentSort,
+} from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { type ComponentType, useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
 
+import { Nothing } from '@/components/Nothing'
 import { Notice } from '@/components/Notice'
 import { WrenLockup } from '@/components/WrenLockup'
 import { useMusicLibraries } from '@/music/musicLibraries'
 import { type CoverOf, useCovers } from '@/music/useCovers'
-import { HOME_COPY, LIBRARY_PAGE_COPY, OFFLINE_COPY } from '@/screens/copy'
 import { ContinueCard } from '@/screens/home/ContinueCard'
-import { greetingOf } from '@/screens/home/greeting'
 import { ShortcutCard } from '@/screens/home/ShortcutCard'
 import {
   useDownloadsSummary,
@@ -19,16 +28,15 @@ import {
   useSongCount,
 } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
-import { LIBRARY_SEGMENTS, libraryHref } from '@/routes'
+import { libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { toastFailure } from '@/stores/toast'
-import { RECENT_SORTS, type RecentSort, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { AlbumTileOf } from '@/ui/AlbumTile'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { Card } from '@/ui/Card'
-import { countsLineOf } from '@/ui/counts'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { type Choice, SegmentedControl } from '@/ui/SegmentedControl'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
@@ -56,18 +64,6 @@ const RECENT_TITLES = {
   [RECENT_SORTS.added]: LIBRARY_PAGE_COPY.recent,
   [RECENT_SORTS.release]: HOME_COPY.latestReleases,
 } as const satisfies Record<RecentSort, string>
-
-type ValueOfProps = {
-  /** What it holds as a line, or null while that is on its way or could not be read. */
-  line: string | null
-  none: string
-}
-
-/** A shortcut's value: what it holds, what none reads as, or nothing while it is not known. */
-const valueOf = ({ line, none }: ValueOfProps): string | undefined => {
-  if (line === null) return undefined
-  return line === '' ? none : line
-}
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -141,16 +137,13 @@ function PlaylistsShortcut({ session }: PlaylistsShortcutProps) {
       icon={ICONS.playlist}
       onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.playlists))}
       title={LIBRARY_PAGE_COPY.playlists}
-      value={valueOf({
+      value={lineValueOf({
         line: playlists.isSuccess ? countsLineOf({ playlists: playlists.data.length }) : null,
         none: HOME_COPY.firstPlaylist,
       })}
     />
   )
 }
-
-// What a form factor shows where the other has a piece of its own.
-const Nothing = () => null
 
 const MORE_SHORTCUTS = {
   [FORM_FACTORS.phone]: Nothing,
@@ -174,26 +167,12 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
   const songs = useSongCount({ session, search: '' })
   const downloads = useDownloadsSummary(session.server.id)
   const playTracks = useAudioQueue((store) => store.playTracks)
-  const isBesideContinue = useAudioQueue((store) => playingTrackOf(store) !== null)
+  const isBesideContinue = useAudioQueue(hasPlayingTrackOf)
   const MoreShortcut = MORE_SHORTCUTS[formFactor]
-  /*
-   * A random page of each library, shuffled: every song at once would be too many to queue. The
-   * seed is new each press, so each press deals other songs; with none the server's is always 0.
-   */
+  // A random page of each library, dealt anew each press: every song at once would be too many to queue.
   const shuffleAll = async () => {
-    const seed = randomMusicSeed()
-    const pages = await Promise.all(
-      music.libraries.map((library) =>
-        session.api.listTracks({
-          libraryId: library.id,
-          sort: MUSIC_SORTS.random,
-          seed,
-          limit: MUSIC_PAGE.most,
-          offset: 0,
-        }),
-      ),
-    )
-    playTracks({ tracks: pages.flatMap((page) => page.tracks), isShuffled: true })
+    const tracks = await shuffledTracksOf({ api: session.api, libraries: music.libraries })
+    playTracks({ tracks, isShuffled: true })
   }
   return (
     <View style={isBesideContinue ? besideStyles[formFactor] : styles.shortcuts}>
@@ -205,7 +184,7 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
           shuffleAll().catch(toastFailure)
         }}
         title={HOME_COPY.shuffleAll}
-        value={valueOf({
+        value={lineValueOf({
           line: songs === null ? null : countsLineOf({ songs }),
           none: LIBRARY_PAGE_COPY.noneYet,
         })}
@@ -214,7 +193,7 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
         icon={ICONS.downloads}
         onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
         title={LIBRARY_PAGE_COPY.downloads}
-        value={valueOf({
+        value={lineValueOf({
           line: countsLineOf({ albums: downloads.albums }),
           none: LIBRARY_PAGE_COPY.noneYet,
         })}

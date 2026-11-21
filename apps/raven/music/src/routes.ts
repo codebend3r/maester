@@ -1,3 +1,5 @@
+import type { LibrarySegment } from '@raven/wren'
+
 /** Wren's route paths, one per file under `app/`. */
 export const WREN_ROUTES = {
   home: '/',
@@ -22,24 +24,6 @@ type WrenPage = (typeof WREN_PAGES)[keyof typeof WREN_PAGES]
 
 /** The params a page reads from its path, or Library from its query. */
 export const WREN_ROUTE_PARAMS = { id: 'id', segment: 'segment', kind: 'kind' } as const
-
-/** Library's lists, each a category page of its own and named in its path. */
-export const LIBRARY_SEGMENTS = {
-  albums: 'albums',
-  artists: 'artists',
-  songs: 'songs',
-  playlists: 'playlists',
-  downloads: 'downloads',
-} as const
-
-export type LibrarySegment = (typeof LIBRARY_SEGMENTS)[keyof typeof LIBRARY_SEGMENTS]
-
-const isLibrarySegment = (value: unknown): value is LibrarySegment =>
-  Object.values<unknown>(LIBRARY_SEGMENTS).includes(value)
-
-/** The segment a Library address names, or Albums when it names none it knows. */
-export const librarySegmentOf = (value: unknown): LibrarySegment =>
-  isLibrarySegment(value) ? value : LIBRARY_SEGMENTS.albums
 
 /** Where one of Library's lists is: its category page, `/collection/albums`. */
 export const libraryHref = (segment: LibrarySegment) => ({

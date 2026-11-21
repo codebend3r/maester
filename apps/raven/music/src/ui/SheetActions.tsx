@@ -20,7 +20,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 }))
 
 /** One of a sheet's actions: its icon and what it does. */
-export type SheetAction = { icon: WrenIconName; label: string; onPress: () => void }
+type SheetAction = { icon: WrenIconName; label: string; onPress: () => void }
 
 type SheetActionsProps = {
   /** The actions in groups, a line between each: the queue's, the library's, where to go. */

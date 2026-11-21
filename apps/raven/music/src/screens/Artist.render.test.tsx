@@ -5,16 +5,14 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
-import { TRACK_MENU_COPY } from '@/components/copy'
+import { ARTIST_COPY, DETAIL_COPY, KIT_COPY, PLAYER_COPY, TRACK_MENU_COPY } from '@raven/wren'
 import { queryClient } from '@/queryClient'
 import { WREN_PAGES } from '@/routes'
-import { ARTIST_COPY, DETAIL_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { LISTENER, OK_COMPUTER, OK_COMPUTER_PAGE, RADIOHEAD, musicApi } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { PLAYER_COPY, KIT_COPY } from '@/ui/copy'
 
 const mockApi = { ...musicApi(), artistPhotoUrl: (): string | null => null }
 const playTracks = jest.fn<ReturnType<typeof useAudioQueue.getState>['playTracks']>()

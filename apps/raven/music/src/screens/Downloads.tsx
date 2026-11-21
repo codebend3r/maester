@@ -4,11 +4,11 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
+import { LIBRARY_PAGE_COPY } from '@raven/wren'
 import { PlayButtons } from '@/components/PlayButtons'
 import { useDownloads } from '@/downloads/downloadStore'
 import { deviceDisk } from '@/downloads/downloader'
 import { useStorageMeter } from '@/downloads/storageMeter'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import { type DownloadedRow, allTracksOf, downloadRowsOf } from '@/screens/library/downloadRows'
 import { WREN_ROUTES } from '@/routes'
@@ -137,7 +137,7 @@ export function DownloadsList({ serverId, onBack }: DownloadsListProps) {
     <FlatList
       ListEmptyComponent={<NothingDownloaded />}
       ListHeaderComponent={
-        <CollectionHeader onBack={onBack} title={LIBRARY_PAGE_COPY.downloads}>
+        <CollectionHeader count={null} onBack={onBack} title={LIBRARY_PAGE_COPY.downloads}>
           {rows.length > 0 && <StorageCard />}
           {rows.length > 0 && (
             <View style={styles.actions}>

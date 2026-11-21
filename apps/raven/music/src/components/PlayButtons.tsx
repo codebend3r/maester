@@ -1,6 +1,6 @@
+import { PLAYER_COPY } from '@raven/wren'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { ICONS } from '@/ui/WrenIcon'
-import { PLAYER_COPY } from '@/ui/copy'
 
 type PlayButtonsProps = { onPlay: () => void; onShuffle: () => void }
 

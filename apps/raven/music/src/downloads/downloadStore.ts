@@ -33,6 +33,7 @@ import {
   savedOwnerOf,
 } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
+import { DOWNLOAD_COPY } from '@raven/wren'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 
@@ -69,13 +70,6 @@ const BYTES_PER_KBPS_SECOND = 125
 
 /** A storage limit counts decimal gigabytes, as `formatBytes` does. */
 export const BYTES_PER_GB = 1_000_000_000
-
-/** What Wren says when a download cannot start. */
-export const DOWNLOAD_COPY = {
-  full: (limitGb: number) =>
-    `Downloads would pass the ${limitGb} GB limit. Remove some, or raise the limit in Settings.`,
-  unreachable: 'The server this track is on is not signed in.',
-} as const
 
 const isDownloadEntry = object({
   mediaId: isNumber,

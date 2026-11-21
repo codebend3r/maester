@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  /*
+   * No DOM, no Node and no React Native types: Wren's phone app and its web app both read
+   * this library, so a slip towards either one's platform fails the typecheck.
+   */
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": []
+  },
+  "include": ["src"]
+}

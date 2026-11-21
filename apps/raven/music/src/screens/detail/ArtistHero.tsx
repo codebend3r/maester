@@ -3,8 +3,8 @@ import { Image, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
+import { DETAIL_COPY } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
-import { DETAIL_COPY } from '@/screens/copy'
 import { BackButton } from '@/screens/detail/BackButton'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
@@ -66,10 +66,18 @@ type ArtistHeroProps = {
   /** The artist's photo, or null for the fallback: a shape holding their initial. */
   photo: Cover | null
   onMore: () => void
-  /** Play, Shuffle and Follow, at the hero's foot on a tablet; a phone draws them below it. */
-  actions?: ReactNode
+  /** What sits at the foot's end: `HeroActions` on a tablet, nothing on a phone. */
+  actions: ReactNode
   /** The page's side margins, so the name lines up with what follows. */
   sides: number
+}
+
+type HeroActionsProps = { children: ReactNode }
+
+/** Play, Shuffle and Follow at the hero's foot, as a tablet holds them. */
+export function HeroActions({ children }: HeroActionsProps) {
+  const styles = useStyles()
+  return <View style={styles.actions}>{children}</View>
 }
 
 /**
@@ -123,7 +131,7 @@ export function ArtistHero({ name, meta, photo, onMore, actions, sides }: Artist
           </Text>
           {meta !== '' && <Text style={styles.meta}>{meta}</Text>}
         </View>
-        {actions !== undefined && <View style={styles.actions}>{actions}</View>}
+        {actions}
       </View>
     </View>
   )

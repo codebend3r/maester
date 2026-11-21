@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
 import type * as Native from '@raven/native'
+import { LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS } from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
 import { queryClient } from '@/queryClient'
-import { LIBRARY_SEGMENTS, WREN_ROUTES, collectionPathOf } from '@/routes'
+import { WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 
 const mockApi = musicApi()
 

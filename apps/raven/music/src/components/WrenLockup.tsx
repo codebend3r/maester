@@ -1,6 +1,6 @@
 import Svg, { Circle, Path } from 'react-native-svg'
 
-import { WREN_LOCKUP_COPY } from '@/components/copy'
+import { WREN_LOCKUP_COPY } from '@raven/wren'
 import { BRAND_INKS, LOCKUP_DRAWING, LOCKUP_VIEW_BOX } from '@/theme/wrenBrand'
 import { useColorSchemeOf } from '@/theme/wrenTheme'
 import { BRAND } from '@/theme/wrenTokens'

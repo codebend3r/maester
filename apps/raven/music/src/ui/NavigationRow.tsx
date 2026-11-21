@@ -1,9 +1,9 @@
 import type { ComponentType } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, Text } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { KIT_COPY } from '@/ui/copy'
 import { IconTile } from '@/ui/IconTile'
 import { pressedStyleOf } from '@/ui/press'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
@@ -13,7 +13,8 @@ export const NAVIGATION_ROW_VARIANTS = { library: 'library', settings: 'settings
 
 type NavigationRowVariant = (typeof NAVIGATION_ROW_VARIANTS)[keyof typeof NAVIGATION_ROW_VARIANTS]
 
-const useStyles = themedStyles(({ colors }: WrenTheme) => ({
+/** The row's own styles, which a `FactRow` wears too. */
+export const useRowStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s4, minHeight: SIZE.navRow },
   [NAVIGATION_ROW_VARIANTS.library]: { ...TYPE.rowLarge, color: colors.text, flex: 1 },
   [NAVIGATION_ROW_VARIANTS.settings]: { ...TYPE.rowTitle, color: colors.text, flex: 1 },
@@ -33,27 +34,19 @@ const ICON_LEADS = {
   [NAVIGATION_ROW_VARIANTS.settings]: IconTile,
 } as const satisfies Record<NavigationRowVariant, ComponentType<IconLeadProps>>
 
-type NavigationRowProps = {
+type RowBodyProps = {
   label: string
   /** Its lead; left out, the label starts the row: Licenses. */
   icon?: WrenIconName
-  /** What a press opens; left out, the row is a fact read, not a link: Version. */
-  onPress?: () => void
-  variant?: NavigationRowVariant
-  /** What it holds or is set to, quiet before the chevron: "1,980", "Off". */
+  variant: NavigationRowVariant
+  /** What it holds or is set to, quiet at the row's end: "1,980", "Off". */
   value?: string
+  hasChevron: boolean
 }
 
-type RowBodyProps = Omit<NavigationRowProps, 'onPress'> & { hasChevron: boolean }
-
-function RowBody({
-  label,
-  icon,
-  variant = NAVIGATION_ROW_VARIANTS.library,
-  value,
-  hasChevron,
-}: RowBodyProps) {
-  const styles = useStyles()
+/** What a row holds, whether it opens something or reads a fact: its lead, label, value and chevron. */
+export function RowBody({ label, icon, variant, value, hasChevron }: RowBodyProps) {
+  const styles = useRowStyles()
   const { colors } = useWrenTheme()
   const Lead = ICON_LEADS[variant]
   return (
@@ -70,14 +63,21 @@ function RowBody({
   )
 }
 
-type RowOfProps = NavigationRowProps & { spoken: string }
+type NavigationRowProps = Omit<RowBodyProps, 'hasChevron'> & {
+  /** What a press opens. */
+  onPress: () => void
+}
 
-/** A row with something to open: pressed, it opens it. */
-function LinkRow({ onPress, spoken, ...body }: RowOfProps) {
-  const styles = useStyles()
+/**
+ * A row that opens a page or a picker: its icon, its label, its value and a chevron. A row with
+ * nothing to open is a `FactRow`.
+ */
+export function NavigationRow({ onPress, ...body }: NavigationRowProps) {
+  const styles = useRowStyles()
+  const { label, value } = body
   return (
     <Pressable
-      accessibilityLabel={spoken}
+      accessibilityLabel={value === undefined ? label : KIT_COPY.labelled({ label, value })}
       accessibilityRole="button"
       onPress={onPress}
       style={pressedStyleOf({ style: styles.row })}
@@ -85,35 +85,4 @@ function LinkRow({ onPress, spoken, ...body }: RowOfProps) {
       <RowBody {...body} hasChevron />
     </Pressable>
   )
-}
-
-/** A row with nothing to open: its label and value read together. */
-function FactRow({ spoken, ...body }: RowOfProps) {
-  const styles = useStyles()
-  return (
-    <View accessibilityLabel={spoken} accessible style={styles.row}>
-      <RowBody {...body} hasChevron={false} />
-    </View>
-  )
-}
-
-/** Whether a row opens something or reads a fact. */
-const ROW_KINDS = { link: 'link', fact: 'fact' } as const
-
-type RowKind = (typeof ROW_KINDS)[keyof typeof ROW_KINDS]
-
-const ROW_VIEWS = {
-  [ROW_KINDS.link]: LinkRow,
-  [ROW_KINDS.fact]: FactRow,
-} as const satisfies Record<RowKind, ComponentType<RowOfProps>>
-
-/**
- * A row that opens a page or a picker: its icon, its label, its value and a chevron. With
- * nothing to open it reads a fact, its label and value said together, and has no chevron.
- */
-export function NavigationRow(props: NavigationRowProps) {
-  const { label, value, onPress } = props
-  const spoken = value === undefined ? label : KIT_COPY.labelled({ label, value })
-  const Row = ROW_VIEWS[onPress === undefined ? ROW_KINDS.fact : ROW_KINDS.link]
-  return <Row {...props} spoken={spoken} />
 }

@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from 'react'
 import { ScrollView, View } from 'react-native'
 
-import { SETTINGS_COPY } from '@/screens/copy'
+import { SETTINGS_COPY } from '@raven/wren'
 import { AboutGroup } from '@/screens/settings/AboutGroup'
 import { AccountCard } from '@/screens/settings/AccountCard'
 import { AppearanceGroup } from '@/screens/settings/AppearanceGroup'

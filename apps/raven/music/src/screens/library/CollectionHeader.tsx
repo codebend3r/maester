@@ -1,9 +1,9 @@
+import type { ListSort } from '@raven/wren'
 import type { ComponentType, ReactNode } from 'react'
 import { Text, View } from 'react-native'
 
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { LIBRARY_PAGE_COPY } from '@raven/wren'
 import { SortButton } from '@/screens/library/SortButton'
-import type { ListSort } from '@/screens/library/sorts'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { PageHeader } from '@/ui/PageHeader'
@@ -25,7 +25,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 }))
 
 /** A list's search box: what is typed and what it asks for. */
-type CollectionSearch = {
+export type CollectionSearch = {
   value: string
   onChangeText: (text: string) => void
   placeholder: string
@@ -42,7 +42,7 @@ type CollectionHeaderProps = {
   actions?: ReactNode
   search?: CollectionSearch
   /** How many the list holds, "1,980 albums", or null until it is known. */
-  count?: string | null
+  count: string | null
   sort?: CollectionSort
   /** What sits between the title and the list's tools: Play and Shuffle, the storage card. */
   children?: ReactNode
@@ -67,7 +67,7 @@ function PhoneHeader({
   onBack,
   actions,
   search,
-  count = null,
+  count,
   sort,
   children,
 }: CollectionHeaderProps) {
@@ -92,14 +92,7 @@ function PhoneHeader({
 }
 
 /** A tablet's header: the title with the search and sort at its end, the count under it. */
-function TabletHeader({
-  title,
-  actions,
-  search,
-  count = null,
-  sort,
-  children,
-}: CollectionHeaderProps) {
+function TabletHeader({ title, actions, search, count, sort, children }: CollectionHeaderProps) {
   const styles = useStyles()
   const tools = (
     <View style={styles.tools}>

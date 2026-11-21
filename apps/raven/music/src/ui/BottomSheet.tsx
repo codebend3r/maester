@@ -15,11 +15,11 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
+import { KIT_COPY } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { MOTION, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
-import { KIT_COPY } from '@/ui/copy'
 import { ICON_BUTTON_VARIANTS, IconButton } from '@/ui/IconButton'
 import { ICONS } from '@/ui/WrenIcon'
 

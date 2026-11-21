@@ -1,21 +1,26 @@
 import { plural } from '@raven/core'
-import { useSearch } from '@raven/ui/headless'
+import {
+  COUNTS_COPY,
+  LIBRARY_PAGE_COPY,
+  LIST_SORTS,
+  type ListSort,
+  matchingAlbums,
+  sortedAlbums,
+} from '@raven/wren'
 import { useState } from 'react'
 import { FlatList } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { AlbumTileOf } from '@/ui/AlbumTile'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { GRID_GAP, useGrid } from '@/ui/TileGrid'
 import { useAllAlbums } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
-import { LIST_SORTS, type ListSort, matchingAlbums, sortedAlbums } from '@/screens/library/sorts'
+import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
-import { COUNTS_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -31,7 +36,10 @@ export function AlbumsCollection({ session, onBack }: CollectionPageProps) {
   const styles = useStyles()
   const insets = usePageInsets()
   const { coverOf } = useCovers(session)
-  const search = useSearch()
+  const search = useCollectionSearch({
+    placeholder: LIBRARY_PAGE_COPY.searchAlbums,
+    none: LIBRARY_PAGE_COPY.noAlbums,
+  })
   const [sort, setSort] = useState<ListSort>(LIST_SORTS.title)
   const { columns, tileWidth, onLayout } = useGrid()
   const { albums, listing } = useAllAlbums({ session, search: '' })
@@ -39,21 +47,12 @@ export function AlbumsCollection({ session, onBack }: CollectionPageProps) {
   const count = listing.isRead ? plural({ n: shown.length, ...COUNTS_COPY.albums }) : null
   return (
     <FlatList
-      ListEmptyComponent={
-        <ListNotice
-          empty={search.query === '' ? LIBRARY_PAGE_COPY.noAlbums : LIBRARY_PAGE_COPY.noMatches}
-          listing={listing}
-        />
-      }
+      ListEmptyComponent={<ListNotice empty={search.empty} listing={listing} />}
       ListHeaderComponent={
         <CollectionHeader
           count={count}
           onBack={onBack}
-          search={{
-            value: search.text,
-            onChangeText: search.setText,
-            placeholder: LIBRARY_PAGE_COPY.searchAlbums,
-          }}
+          search={search.field}
           sort={{ sort, onSort: setSort }}
           title={LIBRARY_PAGE_COPY.albums}
         />
