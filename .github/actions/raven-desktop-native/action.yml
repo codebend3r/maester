@@ -4,8 +4,8 @@ description: >-
   toolchain, the install, the Nx cached libmpv and MoltenVK source build and the N-API
   addon. The caller audits them.
 
-# Shared by main's 🎞️ Desktop native job (main-native-checks.yml) and the release
-# build (desktop-release.yml), so a release builds exactly as main did. A composite
+# Shared by the 🎞️ Desktop native job (native-checks.yml, on pull requests and main) and the
+# release build (desktop-release.yml), so a release builds exactly as the checks did. A composite
 # action reads no secrets: the calling workflow sets DEVELOPER_DIR, HOMEBREW_NO_AUTO_UPDATE
 # and NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 runs:
@@ -33,7 +33,7 @@ runs:
       run: bun install --frozen-lockfile
 
     # fetch:libmpv is an Nx cached task, so Nx Cloud restores the source build for any
-    # run with the same inputs. With no token (a fork's PR) it builds cold: Nx 23 ties
+    # run with the same inputs. With no token (a fork's PR) it builds cold: Nx ties
     # .nx/cache to a per-machine database, so restoring it on a fresh runner never hits.
     - name: 🎞️ Build self-contained libmpv and MoltenVK from source
       shell: bash
