@@ -2,10 +2,11 @@ import { useRouter } from 'expo-router'
 import type { ComponentType, ReactNode } from 'react'
 import { type StyleProp, Text, type TextStyle, View, type ViewStyle } from 'react-native'
 
+import { DETAIL_COPY } from '@raven/wren'
 import { DetailAction } from '@/components/DetailAction'
+import { Nothing } from '@/components/Nothing'
 import { PlayButtons } from '@/components/PlayButtons'
 import type { Cover } from '@/music/useCovers'
-import { DETAIL_COPY } from '@/screens/copy'
 import { BackButton } from '@/screens/detail/BackButton'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
@@ -94,10 +95,8 @@ function TabletMore({ onMore }: MoreActionProps) {
   )
 }
 
-const NoMore = () => null
-
 const MORE_ACTIONS = {
-  [FORM_FACTORS.phone]: NoMore,
+  [FORM_FACTORS.phone]: Nothing,
   [FORM_FACTORS.tablet]: TabletMore,
 } as const satisfies Record<FormFactor, ComponentType<MoreActionProps>>
 

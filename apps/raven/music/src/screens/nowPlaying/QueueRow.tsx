@@ -1,3 +1,4 @@
+import { NOW_PLAYING_COPY, type UpNextRow } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 import { GestureDetector, useCompetingGestures, usePanGesture } from 'react-native-gesture-handler'
 import Animated, {
@@ -8,8 +9,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import type { Covers } from '@/music/useCovers'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
-import { type UpNextRow, dropPlaceOf } from '@/screens/nowPlaying/nowPlayingModel'
+import { dropPlaceOf } from '@/screens/nowPlaying/dropPlace'
+import type { UpNextPlace } from '@/screens/nowPlaying/UpNext'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { MOTION, PLAYER_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
@@ -53,6 +54,8 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     flexDirection: 'row',
     gap: SIZE.rowGap,
   },
+  // Under the phone's player: inside the player's gutters.
+  sheet: { paddingLeft: PLAYER_SIZES.gutter, paddingRight: SIZE.gutter },
   panel: { backgroundColor: colors.surface },
   main: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: SIZE.rowGap, height: '100%' },
   text: { flex: 1 },
@@ -67,8 +70,8 @@ type QueueRowProps = {
   first: number
   last: number
   height: number
-  /** Whether the row sits on the tablet's panel, which has its own ground and margins. */
-  isPanel: boolean
+  /** Where Up next sits; the tablet's panel has its own ground and margins. */
+  place: UpNextPlace
   onJump: (place: number) => void
   onMove: (move: RowMove) => void
   onRemove: (place: number) => void
@@ -85,7 +88,7 @@ export function QueueRow({
   first,
   last,
   height,
-  isPanel,
+  place: upNextPlace,
   onJump,
   onMove,
   onRemove,
@@ -152,15 +155,13 @@ export function QueueRow({
     [ROW_ACTIONS.remove]: () => onRemove(place),
   } as const satisfies Record<RowAction, () => void>
 
-  const inset = isPanel ? null : { paddingLeft: PLAYER_SIZES.gutter, paddingRight: SIZE.gutter }
-
   return (
     <View style={[styles.holder, { height }]}>
       <View style={styles.underlay}>
         <WrenIcon color={colors.accentText} name={ICONS.trash} />
       </View>
       <GestureDetector gesture={gestures}>
-        <Animated.View style={[styles.row, isPanel && styles.panel, inset, { height }, moved]}>
+        <Animated.View style={[styles.row, styles[upNextPlace], { height }, moved]}>
           <Pressable
             accessibilityActions={actions}
             accessibilityLabel={row.label}

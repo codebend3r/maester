@@ -1,13 +1,12 @@
 import { formatDuration } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
+import { PLAYER_COPY, remainingTextOf, scrubTextOf } from '@raven/wren'
 import type { ComponentType, ReactElement } from 'react'
 import { Text, View } from 'react-native'
 
 import { Adjuster } from '@/player/Adjuster'
-import { remainingTextOf, scrubTextOf } from '@/player/playerModel'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
-import { PLAYER_COPY } from '@/ui/copy'
 
 // How far a screen reader's swipe moves the scrubber, in seconds.
 const SCRUB_STEP = 15

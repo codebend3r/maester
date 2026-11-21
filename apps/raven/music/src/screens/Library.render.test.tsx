@@ -1,18 +1,25 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MUSIC_PAGE, MUSIC_SORTS, type PlaylistDetails, plural } from '@raven/core'
 import type * as Native from '@raven/native'
+import {
+  COUNTS_COPY,
+  KIT_COPY,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  LIST_SORT_LABELS,
+  LIST_SORTS,
+  NEW_PLAYLIST_COPY,
+  PLAYER_COPY,
+} from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { LIBRARY_SEGMENTS, WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { LIST_SORT_LABELS, LIST_SORTS } from '@/screens/library/sorts'
+import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { useToast } from '@/stores/toast'
 import { LISTENER, MIXTAPE, MUSIC, OK_COMPUTER, RADIOHEAD, musicApi, trackFor } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { COUNTS_COPY, KIT_COPY, PLAYER_COPY, NEW_PLAYLIST_COPY } from '@/ui/copy'
 
 const ROAD_TRIP: PlaylistDetails = {
   playlist: { ...MIXTAPE, id: 12, name: 'Road trip', trackCount: 0, duration: 0 },

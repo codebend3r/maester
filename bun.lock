@@ -98,6 +98,7 @@
         "@raven/core": "workspace:*",
         "@raven/native": "workspace:*",
         "@raven/ui": "workspace:*",
+        "@raven/wren": "workspace:*",
         "@react-native-async-storage/async-storage": "2.2.0",
         "@tanstack/react-query": "5.107.1",
         "expo": "58.0.23",
@@ -452,6 +453,21 @@
         "react-dom": "19.3.0",
         "react-router-dom": "7.18.5",
         "zustand": "5.1.0",
+      },
+    },
+    "libs/raven/wren": {
+      "name": "@raven/wren",
+      "version": "0.9.0",
+      "dependencies": {
+        "@raven/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "bun-types": "1.4.4",
+        "oxfmt": "0.77.0",
+        "oxlint": "1.92.0",
+        "tsc-alias": "1.9.10",
+        "typescript": "6.0.3",
       },
     },
     "libs/rookery/core": {
@@ -1364,6 +1380,8 @@
     "@raven/ui": ["@raven/ui@workspace:libs/raven/ui"],
 
     "@raven/web": ["@raven/web@workspace:apps/raven/web"],
+
+    "@raven/wren": ["@raven/wren@workspace:libs/raven/wren"],
 
     "@react-native-async-storage/async-storage": ["@react-native-async-storage/async-storage@2.2.0", "", { "dependencies": { "merge-options": "^3.0.4" }, "peerDependencies": { "react-native": "^0.0.0-0 || >=0.65 <1.0" } }, "sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw=="],
 

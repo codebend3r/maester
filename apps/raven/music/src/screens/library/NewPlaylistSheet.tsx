@@ -1,13 +1,12 @@
 import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { LIBRARY_PAGE_COPY, NEW_PLAYLIST_COPY } from '@raven/wren'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { useToast } from '@/stores/toast'
 import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'
-import { NEW_PLAYLIST_COPY } from '@/ui/copy'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import type { WrenSession } from '@/useWren'
 

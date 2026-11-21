@@ -1,17 +1,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
+import { RECENT_KINDS, RECENT_SEARCHES_KEY, type RecentSearch, recentKeyOf } from '@raven/wren'
 import type { StateStorage } from 'zustand/middleware'
 
-import {
-  RECENT_KINDS,
-  RECENT_SEARCHES_KEPT,
-  RECENT_SEARCHES_KEY,
-  type RecentSearch,
-  configureRecentSearches,
-  recentKeyOf,
-  recentSearchesOf,
-  useRecentSearches,
-  withRecent,
-} from '@/stores/recentSearches'
+import { configureRecentSearches, useRecentSearches } from '@/stores/recentSearches'
 
 type MemoryStorageProps = { entries?: [string, string][] }
 
@@ -37,44 +28,6 @@ const DOO_WOPS: RecentSearch = {
   title: 'Doo-Wops & Hooligans',
   artists: 'Bruno Mars',
 }
-
-describe('withRecent', () => {
-  it('puts the newest first and moves a search made again to the top', () => {
-    const recents = withRecent({ recents: [SIA, LOVE], recent: DOO_WOPS })
-    expect(recents).toEqual([DOO_WOPS, SIA, LOVE])
-    expect(withRecent({ recents, recent: { ...LOVE, text: 'LOVE' } })).toEqual([
-      { ...LOVE, text: 'LOVE' },
-      DOO_WOPS,
-      SIA,
-    ])
-  })
-
-  it(`keeps at most ${RECENT_SEARCHES_KEPT}`, () => {
-    const many = Array.from({ length: RECENT_SEARCHES_KEPT + 3 }, (_, id) => ({
-      kind: RECENT_KINDS.artist,
-      id,
-      name: `Artist ${id}`,
-    }))
-    const recents = many.reduce<RecentSearch[]>(
-      (kept, recent) => withRecent({ recents: kept, recent }),
-      [],
-    )
-    expect(recents).toHaveLength(RECENT_SEARCHES_KEPT)
-    expect(recents[0]).toEqual(many.at(-1) ?? SIA)
-  })
-})
-
-describe('recentSearchesOf', () => {
-  it('keeps what is a recent search and drops the rest', () => {
-    expect(
-      recentSearchesOf({
-        recents: [LOVE, { kind: 'song', id: 1 }, { kind: RECENT_KINDS.album, id: 'x' }, SIA, 7],
-      }),
-    ).toEqual([LOVE, SIA])
-    expect(recentSearchesOf(null)).toEqual([])
-    expect(recentSearchesOf({ recents: 'love' })).toEqual([])
-  })
-})
 
 describe('useRecentSearches', () => {
   beforeEach(() => useRecentSearches.setState({ recents: [] }))

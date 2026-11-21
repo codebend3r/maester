@@ -78,6 +78,13 @@ export default {
        */
       entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts', 'src/testing.ts'],
     },
+    'libs/raven/wren': {
+      /*
+       * The package's two entries: the library, and the fixtures Wren's two apps' tests share.
+       * Its exports name them in dist, and knip's default finds only src/index.ts.
+       */
+      entry: ['src/index.ts', 'src/testing.ts'],
+    },
     'libs/raven/mpv': {
       /*
        * The native build consumes both: node-addon-api is the addon's C++

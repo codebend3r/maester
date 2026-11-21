@@ -2,8 +2,7 @@ import { SIGN_IN_STEPS, type SignInStep, keyboardFor } from '@raven/native/headl
 import { type ComponentType, useState } from 'react'
 import { Text, View } from 'react-native'
 
-import { SIGN_IN_COPY } from '@/screens/copy'
-import { signInErrorsOf } from '@/screens/signIn/signInErrors'
+import { SIGN_IN_COPY, signInErrorsOf } from '@raven/wren'
 import type { SignInFlow } from '@/screens/signIn/useSignInFlow'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'

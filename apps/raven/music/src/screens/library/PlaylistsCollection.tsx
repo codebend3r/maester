@@ -1,10 +1,19 @@
 import { type PlaylistSummary, plural, playlistFactsOf } from '@raven/core'
 import { useRouter } from 'expo-router'
-import { type ComponentType, useState } from 'react'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import {
+  COUNTS_COPY,
+  LIBRARY_PAGE_COPY,
+  type ListState,
+  NEW_PLAYLIST_COPY,
+  PLAYLIST_STATES,
+  type PlaylistState,
+  playlistsStateOf,
+  queryListStateOf,
+} from '@raven/wren'
+import { useState } from 'react'
 import { FlatList } from 'react-native'
 
-import { type ListState, queryListStateOf } from '@/music/merged'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { GRID_GAP, useGrid } from '@/ui/TileGrid'
@@ -19,7 +28,6 @@ import { AlbumTile } from '@/ui/AlbumTile'
 import { EmptyState } from '@/ui/EmptyState'
 import { IconButton } from '@/ui/IconButton'
 import { ICONS } from '@/ui/WrenIcon'
-import { COUNTS_COPY, NEW_PLAYLIST_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -29,21 +37,15 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 
 const NO_PLAYLISTS: readonly PlaylistSummary[] = []
 
-/** Whether the list says why it is empty, offers the first playlist, or has some. */
-const PLAYLIST_STATES = { notice: 'notice', empty: 'empty' } as const
+type PlaylistsNoticeProps = { listing: ListState }
 
-type PlaylistState = (typeof PLAYLIST_STATES)[keyof typeof PLAYLIST_STATES]
-
-type EmptyPlaylistsProps = {
-  listing: ListState
-  onNew: () => void
-}
-
-function PlaylistsNotice({ listing }: EmptyPlaylistsProps) {
+function PlaylistsNotice({ listing }: PlaylistsNoticeProps) {
   return <ListNotice empty={LIBRARY_PAGE_COPY.noPlaylists} listing={listing} />
 }
 
-function NoPlaylists({ onNew }: EmptyPlaylistsProps) {
+type NoPlaylistsProps = { onNew: () => void }
+
+function NoPlaylists({ onNew }: NoPlaylistsProps) {
   return (
     <EmptyState
       action={{ label: NEW_PLAYLIST_COPY.title, onPress: onNew }}
@@ -54,10 +56,23 @@ function NoPlaylists({ onNew }: EmptyPlaylistsProps) {
   )
 }
 
+type EmptyViewsProps = {
+  [PLAYLIST_STATES.notice]: PlaylistsNoticeProps
+  [PLAYLIST_STATES.empty]: NoPlaylistsProps
+}
+
 const EMPTY_VIEWS = {
   [PLAYLIST_STATES.notice]: PlaylistsNotice,
   [PLAYLIST_STATES.empty]: NoPlaylists,
-} as const satisfies Record<PlaylistState, ComponentType<EmptyPlaylistsProps>>
+} as const satisfies ViewsOf<EmptyViewsProps>
+
+type EmptyViewOfProps = PlaylistsNoticeProps & NoPlaylistsProps
+
+/** What each state of an empty list draws, handed only what it reads. */
+const EMPTY_VIEW_OF = {
+  [PLAYLIST_STATES.notice]: ({ listing }) => ({ key: PLAYLIST_STATES.notice, props: { listing } }),
+  [PLAYLIST_STATES.empty]: ({ onNew }) => ({ key: PLAYLIST_STATES.empty, props: { onNew } }),
+} as const satisfies Record<PlaylistState, (props: EmptyViewOfProps) => ViewOf<EmptyViewsProps>>
 
 type PlaylistTileProps = { playlist: PlaylistSummary; width: number }
 
@@ -84,13 +99,16 @@ export function PlaylistsCollection({ session, onBack }: CollectionPageProps) {
   const { columns, tileWidth, onLayout } = useGrid()
   const playlists = usePlaylists(session)
   const [isMaking, setIsMaking] = useState(false)
-  const listing = queryListStateOf(playlists)
-  const Empty = EMPTY_VIEWS[playlists.isSuccess ? PLAYLIST_STATES.empty : PLAYLIST_STATES.notice]
+  const onNew = () => setIsMaking(true)
+  const empty = EMPTY_VIEW_OF[playlistsStateOf(playlists)]({
+    listing: queryListStateOf(playlists),
+    onNew,
+  })
   const list = playlists.data ?? NO_PLAYLISTS
   return (
     <>
       <FlatList
-        ListEmptyComponent={<Empty listing={listing} onNew={() => setIsMaking(true)} />}
+        ListEmptyComponent={<KeyedView<EmptyViewsProps> view={empty} views={EMPTY_VIEWS} />}
         ListHeaderComponent={
           <CollectionHeader
             actions={
@@ -98,7 +116,7 @@ export function PlaylistsCollection({ session, onBack }: CollectionPageProps) {
                 color={colors.accentText}
                 icon={ICONS.plus}
                 label={NEW_PLAYLIST_COPY.title}
-                onPress={() => setIsMaking(true)}
+                onPress={onNew}
               />
             }
             count={list.length > 0 ? plural({ n: list.length, ...COUNTS_COPY.playlists }) : null}

@@ -166,6 +166,7 @@
               "@raven/core",
               "@raven/ui",
               "@raven/native",
+              "@raven/wren",
               "@rookery/core"
             ],
             "target": "build"
@@ -187,7 +188,8 @@
           {
             "projects": [
               "@raven/core",
-              "@raven/ui"
+              "@raven/ui",
+              "@raven/wren"
             ],
             "target": "build"
           }

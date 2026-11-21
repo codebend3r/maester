@@ -7,13 +7,12 @@ import type { ReactNode } from 'react'
 import { Dimensions } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
 import { WREN_ROUTES } from '@/routes'
 import { SignIn } from '@/screens/SignIn'
-import { SIGN_IN_COPY } from '@/screens/copy'
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
 import { PHONE_WINDOW } from '@/test/jestSetup'
-import { STATUS_COPY } from '@/ui/copy'
 
 const HOME: Home = { inProgress: [], shelves: [] }
 const SESSION = {

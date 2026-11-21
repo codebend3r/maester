@@ -1,21 +1,22 @@
 import { useSearch } from '@raven/ui/headless'
+import {
+  FILTER_CHIPS,
+  RECENT_KINDS,
+  SEARCH_COPY,
+  SEARCH_FILTERS,
+  type SearchFilter,
+} from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 import { Keyboard, ScrollView, View, useWindowDimensions } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import { SEARCH_COPY } from '@/screens/copy'
+import type { ResultsProps } from '@/screens/search/ResultParts'
 import { SearchIdle } from '@/screens/search/SearchIdle'
-import {
-  FILTER_CHIPS,
-  type ResultsProps,
-  SEARCH_FILTERS,
-  type SearchFilter,
-  SearchResults,
-} from '@/screens/search/SearchResults'
+import { SearchResults } from '@/screens/search/SearchResults'
 import { useResultActions } from '@/screens/search/useResultActions'
 import { useSearchResults } from '@/screens/search/useSearchResults'
 import { usePageInsets } from '@/shell/useShell'
-import { RECENT_KINDS, useRecentSearches } from '@/stores/recentSearches'
+import { useRecentSearches } from '@/stores/recentSearches'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { FilterChips } from '@/ui/FilterChips'

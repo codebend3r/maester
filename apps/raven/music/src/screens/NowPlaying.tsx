@@ -5,8 +5,8 @@ import { type ComponentType, useState } from 'react'
 import { Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { MENU_VIEWS, type MenuView, TrackMenu } from '@/components/TrackMenu'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
+import { NOW_PLAYING_COPY } from '@raven/wren'
+import { TrackMenu } from '@/components/TrackMenu'
 import { PhonePlayer } from '@/screens/nowPlaying/PhonePlayer'
 import { CloseButton } from '@/screens/nowPlaying/PlayerHeader'
 import { TabletPlayer } from '@/screens/nowPlaying/TabletPlayer'
@@ -38,17 +38,27 @@ const usePlayerFormFactor = (): FormFactor => {
   return isPortrait ? FORM_FACTORS.phone : formFactor
 }
 
-type PlayingSheetProps = { session: WrenSession; track: Track }
+/** Whether a song is queued for the sheet to show. */
+const SHEET_STATES = { idle: 'idle', playing: 'playing' } as const
+
+type SheetState = (typeof SHEET_STATES)[keyof typeof SHEET_STATES]
+
+/** What the sheet shows: nothing queued, or the song that plays. */
+type Sheet =
+  | { state: typeof SHEET_STATES.idle }
+  | { state: typeof SHEET_STATES.playing; track: Track }
+
+type SheetViewProps<K extends SheetState> = { session: WrenSession; sheet: Sheet & { state: K } }
 
 /** A song is queued: the layout for the screen, and the song's actions over it from More. */
-function PlayingSheet({ session, track }: PlayingSheetProps) {
+function PlayingSheet({ session, sheet: { track } }: SheetViewProps<typeof SHEET_STATES.playing>) {
   const playing = usePlaying({ session, track })
-  const [menu, setMenu] = useState<MenuView | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const Layout = LAYOUT_VIEWS[usePlayerFormFactor()]
   return (
     <>
-      <Layout onMore={() => setMenu(MENU_VIEWS.actions)} playing={playing} />
-      {menu !== null && <TrackMenu onView={setMenu} track={track} view={menu} />}
+      <Layout onMore={() => setIsMenuOpen(true)} playing={playing} />
+      {isMenuOpen && <TrackMenu onClose={() => setIsMenuOpen(false)} track={track} />}
     </>
   )
 }
@@ -68,28 +78,28 @@ function IdleSheet() {
   )
 }
 
-/** Whether a song is queued for the sheet to show. */
-const SHEET_STATES = { idle: 'idle', playing: 'playing' } as const
-
-type SheetState = (typeof SHEET_STATES)[keyof typeof SHEET_STATES]
-
-type SheetViewProps = { session: WrenSession; track: Track | null }
-
-function QueuedSheet({ session, track }: SheetViewProps) {
-  return track !== null && <PlayingSheet session={session} track={track} />
-}
+type SheetViews = { [K in SheetState]: ComponentType<SheetViewProps<K>> }
 
 const SHEET_VIEWS = {
   [SHEET_STATES.idle]: IdleSheet,
-  [SHEET_STATES.playing]: QueuedSheet,
-} as const satisfies Record<SheetState, ComponentType<SheetViewProps>>
+  [SHEET_STATES.playing]: PlayingSheet,
+} as const satisfies SheetViews
+
+// Typed as the mapped type, so a state looks up the view that takes that state's sheet.
+const SHEETS: SheetViews = SHEET_VIEWS
+
+function SheetView<K extends SheetState>({ session, sheet }: SheetViewProps<K>) {
+  const Shown: ComponentType<SheetViewProps<K>> = SHEETS[sheet.state]
+  return <Shown session={session} sheet={sheet} />
+}
 
 type NowPlayingSheetProps = { session: WrenSession }
 
 function NowPlayingSheet({ session }: NowPlayingSheetProps) {
   const track = useAudioQueue(playingTrackOf)
-  const Sheet = SHEET_VIEWS[track === null ? SHEET_STATES.idle : SHEET_STATES.playing]
-  return <Sheet session={session} track={track} />
+  const sheet: Sheet =
+    track === null ? { state: SHEET_STATES.idle } : { state: SHEET_STATES.playing, track }
+  return <SheetView session={session} sheet={sheet} />
 }
 
 /**

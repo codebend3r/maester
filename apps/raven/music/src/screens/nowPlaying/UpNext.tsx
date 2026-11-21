@@ -1,18 +1,21 @@
 import { useAudioQueue } from '@raven/ui/headless'
+import {
+  countsLineOf,
+  NOW_PLAYING_COPY,
+  placesToClearOf,
+  PLAYER_COPY,
+  upNextRowsOf,
+} from '@raven/wren'
 import type { ComponentType } from 'react'
 import { FlatList, Text, View } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import { NOW_PLAYING_COPY } from '@/screens/copy'
-import { placesToClearOf, upNextRowsOf } from '@/screens/nowPlaying/nowPlayingModel'
 import { QueueRow } from '@/screens/nowPlaying/QueueRow'
 import { RepeatToggle, ShuffleToggle } from '@/player/Transport'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { countsLineOf } from '@/ui/counts'
 import { TextLink } from '@/ui/TextLink'
 import type { WrenSession } from '@/useWren'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   upNext: { flex: 1 },
@@ -35,7 +38,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 /** Where Up next sits: under the phone's player, or along the foot of the tablet's. */
 export const UP_NEXT_PLACES = { sheet: 'sheet', panel: 'panel' } as const
 
-type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]
+export type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]
 
 type HeadEndProps = { onClear: () => void; hasRows: boolean }
 
@@ -124,11 +127,11 @@ export function UpNext({ session, sourceName, place }: UpNextProps) {
           <QueueRow
             first={first}
             height={height}
-            isPanel={isPanel}
             last={last}
             onJump={jump}
             onMove={move}
             onRemove={remove}
+            place={place}
             row={item}
             trackCoverOf={trackCoverOf}
           />

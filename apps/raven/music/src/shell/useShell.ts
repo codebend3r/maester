@@ -1,4 +1,4 @@
-import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { hasPlayingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useSegments } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -13,7 +13,7 @@ export const useChrome = (): Chrome => {
 }
 
 /** Whether a track is queued, so the mini player or the tablet's player bar shows. */
-const useHasPlayer = (): boolean => useAudioQueue((store) => playingTrackOf(store) !== null)
+const useHasPlayer = (): boolean => useAudioQueue(hasPlayingTrackOf)
 
 /**
  * A page's padding: below the status bar, inside the phone's gutter or the tablet's margins,

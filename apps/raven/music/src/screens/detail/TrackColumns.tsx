@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native'
 
-import { DETAIL_COPY } from '@/screens/copy'
+import { DETAIL_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 

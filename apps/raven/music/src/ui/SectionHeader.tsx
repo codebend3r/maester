@@ -1,8 +1,8 @@
 import { Text, View } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
-import { KIT_COPY } from '@/ui/copy'
 import { type TextAction, TextLink } from '@/ui/TextLink'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({

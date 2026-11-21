@@ -1,9 +1,11 @@
+import { TRANSPORTS } from '@raven/wren'
 import { ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
-import { TRANSPORTS, Transport } from '@/player/Transport'
+import { Transport } from '@/player/Transport'
 import { LyricsView } from '@/screens/nowPlaying/LyricsView'
+import { PlayerCover } from '@/screens/nowPlaying/PlayerCover'
 import { HEADER_TITLES, PlayerHeader } from '@/screens/nowPlaying/PlayerHeader'
 import { PlayerExtras } from '@/screens/nowPlaying/PlayerExtras'
 import { SongTitle } from '@/screens/nowPlaying/SongTitle'
@@ -12,7 +14,6 @@ import { UP_NEXT_PLACES, UpNext } from '@/screens/nowPlaying/UpNext'
 import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { AlbumArt } from '@/ui/AlbumArt'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -24,7 +25,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     paddingHorizontal: PLAYER_SIZES.gutter,
     paddingVertical: TABLET_COLUMN_GAP,
   },
-  art: { alignSelf: 'center' },
   lyrics: {
     flex: 1,
     gap: SPACE.s5,
@@ -83,9 +83,7 @@ export function TabletPlayer({ playing, onMore }: TabletPlayerProps) {
             title={title}
             variant={HEADER_TITLES.none}
           />
-          <View style={styles.art}>
-            <AlbumArt cover={playing.cover} isRaised radius={RADIUS.art} size={art} />
-          </View>
+          <PlayerCover cover={playing.cover} size={art} />
           <Scrubber kind={SCRUBBERS.bare} length={playing.length} />
           <Transport kind={TRANSPORTS.column} />
           <PlayerExtras isAudiobook={playing.isAudiobook} />

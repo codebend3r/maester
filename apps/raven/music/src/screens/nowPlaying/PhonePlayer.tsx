@@ -1,11 +1,11 @@
+import { PANES, type Pane, TRANSPORTS, paneAfter } from '@raven/wren'
 import { type ComponentType, type ReactNode, useState } from 'react'
-import { ScrollView, View, useWindowDimensions } from 'react-native'
+import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
-import { TRANSPORTS, Transport } from '@/player/Transport'
+import { Transport } from '@/player/Transport'
 import { BottomBar } from '@/screens/nowPlaying/BottomBar'
-import { PANES, type Pane, paneAfter } from '@/screens/nowPlaying/nowPlayingModel'
 import { LyricsView } from '@/screens/nowPlaying/LyricsView'
 import { PlayerHeader } from '@/screens/nowPlaying/PlayerHeader'
 import { PlayerStack } from '@/screens/nowPlaying/PlayerStack'
@@ -15,20 +15,10 @@ import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SPACE } from '@/theme/wrenTokens'
 
-// The share of the window's height the cover may take, so a short phone still fits the controls.
-const ART_HEIGHT_SHARE = 0.4
-
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   sheet: { backgroundColor: colors.bg, flex: 1 },
   header: { paddingHorizontal: SPACE.s3 },
   pane: { flex: 1 },
-  player: {
-    flexGrow: 1,
-    gap: SPACE.s5,
-    justifyContent: 'center',
-    paddingHorizontal: PLAYER_SIZES.gutter,
-    paddingVertical: SPACE.s5,
-  },
   padded: { paddingHorizontal: PLAYER_SIZES.gutter },
   compact: {
     paddingBottom: SPACE.s3,
@@ -40,22 +30,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 }))
 
 type PaneProps = { playing: Playing }
-
-/** The player: the cover large, the song, the scrubber, the transport and the volume. */
-function PlayerPane({ playing }: PaneProps) {
-  const styles = useStyles()
-  const { width, height } = useWindowDimensions()
-  const artSize = Math.min(
-    width - 2 * PLAYER_SIZES.gutter,
-    PLAYER_SIZES.art,
-    height * ART_HEIGHT_SHARE,
-  )
-  return (
-    <ScrollView contentContainerStyle={styles.player} style={styles.pane}>
-      <PlayerStack artSize={artSize} playing={playing} />
-    </ScrollView>
-  )
-}
 
 type CompactPaneProps = PaneProps & {
   /** What fills the middle: the lyrics, or Up next. */
@@ -117,7 +91,7 @@ function UpNextPane({ playing }: PaneProps) {
 }
 
 const PANE_VIEWS = {
-  [PANES.player]: PlayerPane,
+  [PANES.player]: PlayerStack,
   [PANES.lyrics]: LyricsPane,
   [PANES.upNext]: UpNextPane,
 } as const satisfies Record<Pane, ComponentType<PaneProps>>

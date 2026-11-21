@@ -1,7 +1,7 @@
 import { formatBytes } from '@raven/core'
 
+import { STORAGE_COPY } from '@raven/wren'
 import { BYTES_PER_GB, usedBytesOf, useDownloads } from '@/downloads/downloadStore'
-import { STORAGE_COPY } from '@/screens/copy'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 
 /** What the usage meter shows: its words, and how full its bar is, or no bar. */

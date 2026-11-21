@@ -3,17 +3,15 @@ import { audioPlayer } from '@raven/audio'
 import { MEDIA_TICKET_PARAM, REPEAT_MODES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
+import { LIBRARY_PAGE_COPY, PLAYER_COPY, scrubTextOf } from '@raven/wren'
 import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
-import { scrubTextOf } from '@/player/playerModel'
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'
-import { LIBRARY_PAGE_COPY } from '@/screens/copy'
-import { PLAYER_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 

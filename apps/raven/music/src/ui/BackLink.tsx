@@ -1,8 +1,8 @@
 import { Pressable, Text } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, TYPE } from '@/theme/wrenTokens'
-import { KIT_COPY } from '@/ui/copy'
 import { pressedStyleOf } from '@/ui/press'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 

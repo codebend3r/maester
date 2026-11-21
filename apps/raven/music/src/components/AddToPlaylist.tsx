@@ -1,17 +1,14 @@
 import type { PlaylistSummary, Track } from '@raven/core'
-import { useServerPlaylistMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 
-import { TRACK_MENU_COPY } from '@/components/copy'
+import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY } from '@raven/wren'
 import { Notice } from '@/components/Notice'
-import { useToast } from '@/stores/toast'
+import { type PickedPlaylist, useAddToPlaylist } from '@/components/useAddToPlaylist'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { DETAIL_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
-import { NEW_PLAYLIST_COPY } from '@/ui/copy'
-import { countsLineOf } from '@/ui/counts'
 import { EmptyState } from '@/ui/EmptyState'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import { pressedStyleOf } from '@/ui/press'
@@ -64,6 +61,41 @@ type AddToPlaylistProps = {
   onDone: () => void
 }
 
+type NoticeOfProps = { error: Error | null; isSuccess: boolean }
+
+/** What stands in for the list while there is none: why it could not be read, or that it is on its way. */
+const noticeOf = ({ error, isSuccess }: NoticeOfProps): string | null => {
+  if (error !== null) return error.message
+  return isSuccess ? null : TRACK_MENU_COPY.loading
+}
+
+type PlaylistRowProps = {
+  playlist: PlaylistSummary
+  onAdd: (playlist: PickedPlaylist) => void
+}
+
+/** One of the listener's playlists: its art, its name and how many songs it holds. */
+function PlaylistRow({ playlist, onAdd }: PlaylistRowProps) {
+  const styles = useStyles()
+  const count = countsLineOf({ songs: playlist.trackCount })
+  return (
+    <Pressable
+      accessibilityLabel={TRACK_MENU_COPY.playlistRow({ name: playlist.name, count })}
+      accessibilityRole="button"
+      onPress={() => onAdd(playlist)}
+      style={pressedStyleOf({ style: styles.row })}
+    >
+      <AlbumArt cover={null} radius={RADIUS.xs} size={SIZE.rowArt} />
+      <View style={styles.rowText}>
+        <Text numberOfLines={1} style={styles.rowTitle}>
+          {playlist.name}
+        </Text>
+        {count !== '' && <Text style={styles.rowLine}>{count}</Text>}
+      </View>
+    </Pressable>
+  )
+}
+
 /**
  * Add to playlist: New playlist, which makes one here and puts the tracks in it, then the
  * listener's own playlists, a press adding the tracks to the end of one. Either way the sheet
@@ -73,23 +105,10 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
   const styles = useStyles()
   const { colors } = useWrenTheme()
   const playlists = useQuery(session.queries.ownPlaylistsQuery)
-  const { append } = useServerPlaylistMutations({ api: session.api })
   const [isNaming, setIsNaming] = useState(false)
   const list = playlists.data ?? NO_PLAYLISTS
-  const toast = useToast((state) => state.show)
-  const add = (playlist: PlaylistSummary) => {
-    onDone()
-    tracksOf()
-      .then((tracks) => append.mutateAsync({ id: playlist.id, tracks }))
-      .then(
-        () => toast(TRACK_MENU_COPY.added(playlist.name)),
-        (error: unknown) => error instanceof Error && toast(error.message),
-      )
-  }
-  const notice = ((): string | null => {
-    if (playlists.error !== null) return playlists.error.message
-    return playlists.isSuccess ? null : TRACK_MENU_COPY.loading
-  })()
+  const add = useAddToPlaylist({ session, tracksOf, onDone })
+  const notice = noticeOf({ error: playlists.error, isSuccess: playlists.isSuccess })
   const isEmpty = playlists.isSuccess && list.length === 0
   return (
     <View style={styles.body}>
@@ -117,26 +136,9 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
       )}
       {list.length > 0 && (
         <ScrollView accessibilityLabel={TRACK_MENU_COPY.pickPlaylist(name)} style={styles.list}>
-          {list.map((playlist) => {
-            const count = countsLineOf({ songs: playlist.trackCount })
-            return (
-              <Pressable
-                accessibilityLabel={TRACK_MENU_COPY.playlistRow({ name: playlist.name, count })}
-                accessibilityRole="button"
-                key={playlist.id}
-                onPress={() => add(playlist)}
-                style={pressedStyleOf({ style: styles.row })}
-              >
-                <AlbumArt cover={null} radius={RADIUS.xs} size={SIZE.rowArt} />
-                <View style={styles.rowText}>
-                  <Text numberOfLines={1} style={styles.rowTitle}>
-                    {playlist.name}
-                  </Text>
-                  {count !== '' && <Text style={styles.rowLine}>{count}</Text>}
-                </View>
-              </Pressable>
-            )
-          })}
+          {list.map((playlist) => (
+            <PlaylistRow key={playlist.id} onAdd={add} playlist={playlist} />
+          ))}
         </ScrollView>
       )}
     </View>

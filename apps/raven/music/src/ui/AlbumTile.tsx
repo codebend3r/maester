@@ -2,12 +2,12 @@ import { type AlbumSummary, artistNames } from '@raven/core'
 import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
+import { KIT_COPY } from '@raven/wren'
 import type { Cover, CoverOf } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
-import { KIT_COPY } from '@/ui/copy'
 import { pressedStyleOf } from '@/ui/press'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({

@@ -2,13 +2,20 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MUSIC_PAGE, MUSIC_SORTS, plural } from '@raven/core'
 import type * as Native from '@raven/native'
 import { useAudioQueue } from '@raven/ui/headless'
+import {
+  COUNTS_COPY,
+  HOME_COPY,
+  KIT_COPY,
+  LIBRARY_PAGE_COPY,
+  LIBRARY_SEGMENTS,
+  RECENT_SORTS,
+} from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { LIBRARY_SEGMENTS, WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
-import { HOME_COPY, LIBRARY_PAGE_COPY } from '@/screens/copy'
+import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
-import { DEFAULT_WREN_PREFS, RECENT_SORTS, useWrenPrefs } from '@/stores/wrenPrefs'
+import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   AIRBAG,
   LISTENER,
@@ -20,7 +27,6 @@ import {
 } from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
-import { COUNTS_COPY, KIT_COPY } from '@/ui/copy'
 
 const mockApi = musicApi()
 

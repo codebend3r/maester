@@ -1,14 +1,18 @@
+import {
+  KIT_COPY,
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  RECENT_KINDS,
+  recentKeyOf,
+  type RecentSearch,
+  recentTextOf,
+  SEARCH_COPY,
+} from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
-import { LIBRARY_SEGMENTS, type LibrarySegment, WREN_PAGES, libraryHref, pageHref } from '@/routes'
-import { SEARCH_COPY } from '@/screens/copy'
-import {
-  RECENT_KINDS,
-  type RecentSearch,
-  recentKeyOf,
-  useRecentSearches,
-} from '@/stores/recentSearches'
+import { WREN_PAGES, libraryHref, pageHref } from '@/routes'
+import { useRecentSearches } from '@/stores/recentSearches'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
   ART,
@@ -22,7 +26,6 @@ import {
 } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { KIT_COPY } from '@/ui/copy'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { tileWidthOf } from '@/ui/tileWidth'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
@@ -133,27 +136,6 @@ function Browse({ width }: BrowseProps) {
 
 type RecentViewProps = { recent: RecentSearch }
 
-/** What a recent search shows: its name and what it was. */
-type RecentText = { name: string; line: string }
-
-function recentTextOf({ recent }: RecentViewProps): RecentText {
-  switch (recent.kind) {
-    case RECENT_KINDS.query:
-      return { name: recent.text, line: SEARCH_COPY.recentSearch }
-    case RECENT_KINDS.artist:
-      return { name: recent.name, line: SEARCH_COPY.recentArtist }
-    case RECENT_KINDS.album:
-      return {
-        name: recent.title,
-        line: SEARCH_COPY.recentAlbum({ kind: SEARCH_COPY.album, artists: recent.artists }),
-      }
-    default: {
-      const unknownKind: never = recent
-      return unknownKind
-    }
-  }
-}
-
 type RecentRowProps = RecentViewProps & { onSearch: (text: string) => void }
 
 /** A recent search: a press searches again or opens its page, and its x forgets it. */
@@ -163,7 +145,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
   const { colors } = useWrenTheme()
   const remember = useRecentSearches((state) => state.remember)
   const forget = useRecentSearches((state) => state.forget)
-  const { name, line } = recentTextOf({ recent })
+  const { name, line } = recentTextOf(recent)
   const open = () => {
     remember(recent)
     switch (recent.kind) {
