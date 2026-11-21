@@ -1,5 +1,5 @@
 import { artistNames } from '@raven/core'
-import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { AUDIO_STATES, hasPlayingTrackOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useRouter, useSegments } from 'expo-router'
 import { useEffect } from 'react'
 
@@ -16,7 +16,7 @@ const BARLESS_SCREENS: ReadonlySet<string> = new Set([APP_SCREENS.play, APP_SCRE
 /** Whether the bar shows: while a track is queued, off the screens above. */
 export const useIsBarShown = (): boolean => {
   const screen = useSegments().join('/')
-  const hasTrack = useAudioQueue((store) => playingTrackOf(store) !== null)
+  const hasTrack = useAudioQueue(hasPlayingTrackOf)
   return hasTrack && !BARLESS_SCREENS.has(screen)
 }
 

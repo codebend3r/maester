@@ -3,6 +3,8 @@ description: >-
   Everything before a native build of raven's device app: Bun, Node, the build caches
   restored, ffmpeg and ccache, the build environment, the install and the libraries.
   Restores only; its outputs are each cache's key and path, for app-caches.yml to save.
+  An end to end job, which takes its build from the build job, sets up through it too, with
+  `compiles` off: the same tools and environment, without the compile's caches or the NDK.
 
 # The single definition of how the app is built, shared by the app jobs in
 # native-checks.yml, by device-release.yml and by app-caches.yml, which builds on main and saves the
@@ -17,6 +19,12 @@ inputs:
   node-version:
     description: The Node the app's tooling runs on, at least 22.18 (babel.config.ts)
     required: true
+  compiles:
+    description: >-
+      'false' for a job that only runs the flows on a build another job made: the CocoaPods,
+      Gradle and ccache caches and the NDK are left out, since nothing compiles
+    required: false
+    default: 'true'
 # A cache's version includes its paths, so a save names exactly the paths restored here.
 outputs:
   packages-key:
@@ -118,6 +126,7 @@ runs:
 
     - name: 🗃️ Dependencies
       id: dependencies
+      if: inputs.compiles == 'true'
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.keys.outputs.dependencies-path }}
@@ -125,6 +134,7 @@ runs:
         restore-keys: ${{ steps.keys.outputs.dependencies-restore }}
 
     - name: 🗃️ ccache
+      if: inputs.compiles == 'true'
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.keys.outputs.ccache-path }}
@@ -206,7 +216,7 @@ runs:
     # archive") failed a build. sdkmanager installs it here first, checks the download's
     # digest, and a bad one is tried again.
     - name: 🧱 Android NDK
-      if: inputs.platform == 'android-tv'
+      if: inputs.platform == 'android-tv' && inputs.compiles == 'true'
       shell: bash
       working-directory: apps/raven/app
       run: |

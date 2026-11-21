@@ -5,7 +5,8 @@
   "workspaces": [
     "apps/*/*",
     "libs/*/*",
-    "scripts"
+    "scripts",
+    "tooling/web"
   ],
   "type": "module",
   "scripts": {

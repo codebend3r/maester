@@ -7,9 +7,10 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 // Shared primitives load before host components that override them.
 import '@raven/ui/styles.css'
+import { startMediaOrigin } from '@raven/ui'
 import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
-import { startMediaOrigin } from '@/lib/apiOrigin'
+import { API_ORIGIN } from '@/lib/apiOrigin'
 import { api } from '@/lib/api'
 import { applyStylesheets } from '@/lib/applyStylesheets'
 import { CardLinks } from '@/components/CardLink/CardLink'
@@ -24,7 +25,7 @@ import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
 followTheme()
-startMediaOrigin()
+startMediaOrigin({ apiOrigin: API_ORIGIN })
 restoreAuthConfig({ storage: window.localStorage, queryClient })
 keepAuthConfigSaved({ storage: window.localStorage, queryClient })
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })

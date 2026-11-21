@@ -10,7 +10,7 @@ import {
   playlistTracksOf,
   withoutPlace,
 } from '@raven/core'
-import { playingTrackOf, useAudioQueue, useServerPlaylistMutations } from '@raven/ui/headless'
+import { playingIdOf, useAudioQueue, useServerPlaylistMutations } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
@@ -29,7 +29,7 @@ type PlaylistPageProps = { session: AppQueries; details: PlaylistDetails }
 const PlaylistPage = ({ session, details }: PlaylistPageProps) => {
   const { api } = session
   const router = useRouter()
-  const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
+  const playingId = useAudioQueue(playingIdOf)
   const playTracks = useAudioQueue((store) => store.playTracks)
   const { rename, setTracks, remove } = useServerPlaylistMutations({ api })
   const { playlist, tracks } = details

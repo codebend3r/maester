@@ -8,7 +8,7 @@ import {
   albumDiscsOf,
   albumFactsOf,
 } from '@raven/core'
-import { playingTrackOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
+import { playingIdOf, useAudioQueue, useServerAlbumFavourite } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
@@ -31,7 +31,7 @@ const AlbumPage = ({ session, details }: AlbumPageProps) => {
   const { server, api } = session
   const router = useRouter()
   const pictures = usePictures({ server, api })
-  const playingId = useAudioQueue((store) => playingTrackOf(store)?.id ?? null)
+  const playingId = useAudioQueue(playingIdOf)
   const playTracks = useAudioQueue((store) => store.playTracks)
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)

@@ -276,7 +276,7 @@ GROUPS: tuple[Group, ...] = (
             Command("ci:docker", "The ✅ Checks job inside an Ubuntu 24.04 container.", "Docker"),
             Command(
                 "ci:app:ios",
-                "The 📱 App on iPhone and iPad job: every ci:app:ios step below, in order.",
+                "The 🏗️ Build iPhone job and its end to end job: every ci:app:ios step below, in order.",
                 "macOS + Xcode",
             ),
             Command(
@@ -303,7 +303,9 @@ GROUPS: tuple[Group, ...] = (
                 "The touch Maestro flows on the iPhone simulator.",
                 "macOS + Xcode",
             ),
-            Command("ci:app:tvos", "The 📺 App on Apple TV job.", "macOS + Xcode"),
+            Command(
+                "ci:app:tvos", "The 🏗️ Build Apple TV job and its end to end job.", "macOS + Xcode"
+            ),
             Command(
                 "ci:app:tvos:build",
                 "The Apple TV job's Release build for the simulator, with a brief log.",
@@ -311,7 +313,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:android-tv",
-                "The 📺 App on Android TV job: every ci:app:android-tv step below, in order.",
+                "The 🏗️ Build Android TV job and its end to end job: every ci:app:android-tv step below, in order.",
                 "Android SDK",
             ),
             Command(
@@ -355,8 +357,10 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "ci:app:fixture:wait", "Waits up to three minutes for the fixture server to answer."
             ),
-            Command("ci:wren", "The 🎵 Wren on iPhone job.", "macOS + Xcode"),
-            Command("ci:desktop:e2e", "The 🎬 Desktop end to end job.", "macOS"),
+            Command(
+                "ci:wren", "The 🏗️ Build Wren iPhone job and its end to end job.", "macOS + Xcode"
+            ),
+            Command("ci:desktop:e2e", "The 🎬 E2E Mac job.", "macOS"),
             Command(
                 "web:e2e",
                 "The 🌐 Web end to end job: Playwright drives the web app against a fixture server.",
