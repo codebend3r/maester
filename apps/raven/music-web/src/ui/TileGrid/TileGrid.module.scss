@@ -1,0 +1,14 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns-tablet), minmax(0, 1fr));
+  gap: var(--space-5) var(--size-row-gap);
+
+  @media (max-width: 48rem) {
+    grid-template-columns: repeat(var(--columns-phone), minmax(0, 1fr));
+  }
+}
+
+.cell {
+  display: grid;
+  min-inline-size: 0;
+}

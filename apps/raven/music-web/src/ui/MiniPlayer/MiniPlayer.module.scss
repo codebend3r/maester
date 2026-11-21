@@ -1,0 +1,65 @@
+@use '../../styles/mixins';
+
+.card {
+  position: relative;
+  display: grid;
+  grid-template-areas: 'open toggle next';
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  block-size: var(--size-mini-player);
+  overflow: hidden;
+  padding-inline: var(--size-float-inset) var(--space-1);
+  border: var(--size-hairline) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.open {
+  display: grid;
+  grid-area: open;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  block-size: 100%;
+}
+
+.text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title,
+.line,
+.error {
+  @include mixins.one-line;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.line {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+.error {
+  color: var(--color-accent-text);
+  font: var(--type-meta);
+}
+
+// The thin line along the card's foot for how far the track has played.
+.track {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  display: grid;
+  block-size: var(--size-progress-line);
+}
+
+.progress {
+  inline-size: var(--played);
+  background: var(--color-accent-text);
+}

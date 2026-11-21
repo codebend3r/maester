@@ -1,0 +1,130 @@
+@use '../../styles/mixins';
+
+// The dialog fills the screen: the scrim behind, the sheet over it in the same area.
+.dialog {
+  inline-size: 100%;
+  max-inline-size: none;
+  block-size: 100%;
+  max-block-size: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+
+  &[open] {
+    display: grid;
+    grid-template-areas: 'stage';
+  }
+
+  // The scrim is the sheet's own, so a press on it closes the sheet.
+  &::backdrop {
+    background: none;
+  }
+}
+
+.scrim {
+  grid-area: stage;
+  background: var(--color-scrim);
+  cursor: default;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fade var(--duration-sheet) var(--ease-out);
+  }
+}
+
+// A centred dialog on the wide layout, a sheet at the foot on the narrow one.
+.sheet {
+  display: grid;
+  grid-area: stage;
+  place-self: center;
+  align-content: start;
+  inline-size: calc(100% - 2 * var(--size-dialog-inset));
+  max-inline-size: var(--size-sheet-dialog);
+  max-block-size: calc(100% - 2 * var(--size-dialog-inset));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-dialog);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: fade var(--duration-sheet) var(--ease-out);
+  }
+
+  @media (max-width: 48rem) {
+    place-self: end stretch;
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: calc(100% - var(--space-10));
+    padding: 0 var(--space-2) calc(var(--space-2) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    box-shadow: none;
+  }
+
+  @media (max-width: 48rem) and (prefers-reduced-motion: no-preference) {
+    animation: rise var(--duration-sheet) var(--ease-out);
+  }
+}
+
+// The narrow sheet's grabber; the wide dialog has none.
+.grabber {
+  display: none;
+
+  @media (max-width: 48rem) {
+    display: block;
+    justify-self: center;
+    box-sizing: content-box;
+    inline-size: var(--size-grabber-width);
+    block-size: var(--size-grabber-height);
+    border-block: var(--space-2) solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--color-line-2);
+    background-clip: padding-box;
+  }
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 0 var(--space-3) var(--space-3);
+  border-block-end: var(--size-hairline) solid var(--color-line);
+}
+
+// With a cover before the words, which still take the room left.
+.led {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.headerText {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title,
+.subtitle {
+  @include mixins.one-line;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.subtitle {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}

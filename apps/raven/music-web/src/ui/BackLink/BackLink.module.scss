@@ -1,0 +1,9 @@
+.back {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-self: start;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-accent-text);
+  font: var(--type-row-title);
+}

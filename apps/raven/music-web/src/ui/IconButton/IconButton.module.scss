@@ -1,0 +1,42 @@
+@use '../../styles/mixins';
+
+.button {
+  // About half the circle, from 18 to 26, unless the place names a size.
+  --icon-size: clamp(var(--size-small-icon), calc(var(--button-size) / 2), var(--size-large-icon));
+
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: var(--button-size);
+  block-size: var(--button-size);
+  border-radius: var(--radius-pill);
+  color: var(--button-ink, var(--color-text-2));
+
+  // A circle under 44 still answers a 44 wide press.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: calc(
+      min(var(--button-size), var(--size-touch-target)) / 2 - var(--size-touch-target) / 2
+    );
+  }
+
+  @include mixins.press-feedback(':hover:enabled');
+
+  &:disabled {
+    opacity: var(--opacity-disabled);
+  }
+}
+
+.plain {
+  background: var(--button-fill, transparent);
+}
+
+.filled {
+  background: var(--button-fill, var(--color-surface-2));
+}
+
+.outlined {
+  background: var(--button-fill, transparent);
+  @include mixins.hairline-ring;
+}

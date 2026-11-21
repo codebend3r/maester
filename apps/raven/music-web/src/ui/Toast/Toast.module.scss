@@ -1,0 +1,38 @@
+// Above the shell's foot, whatever it holds, and never in the way of a press.
+.host {
+  position: absolute;
+  inset-block-end: calc(100% + var(--space-4));
+  inset-inline: 0;
+  display: grid;
+  justify-items: center;
+  padding-inline: var(--size-gutter);
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  padding-inline: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-text);
+  box-shadow: var(--shadow-card);
+  color: var(--color-bg);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: arrive var(--duration-sheet) var(--ease-out);
+  }
+}
+
+.message {
+  font: var(--type-row-strong);
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2));
+  }
+}

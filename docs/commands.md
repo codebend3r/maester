@@ -64,6 +64,8 @@ Run a product locally; each reads the .env beside its compose file.
 | `web:build`            | Builds raven's web app, as Netlify and the desktop app ship it.                                                                  |        |
 | `build:raven:splash`   | Builds raven's splash page.                                                                                                      |        |
 | `preview:raven:splash` | Serves the built splash page, as Netlify would.                                                                                  |        |
+| `dev:wren:web`         | raven's server and Wren on the web, with hot reload.                                                                             |        |
+| `build:wren:web`       | Builds Wren on the web, as Netlify does.                                                                                         |        |
 | `dev:sparrow`          | sparrow's API and chat page.                                                                                                     |        |
 | `sandbox:sparrow`      | sparrow's sandbox for testing its answers.                                                                                       |        |
 | `dev:rookery`          | rookery's sign-in server and its login pages.                                                                                    |        |

@@ -1,0 +1,15 @@
+@use '../../styles/mixins';
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.title {
+  @include mixins.one-line;
+  color: var(--color-text);
+  font: var(--type-section);
+  letter-spacing: var(--tracking-section);
+}

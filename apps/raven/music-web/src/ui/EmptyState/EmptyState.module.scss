@@ -1,0 +1,35 @@
+.empty {
+  display: grid;
+  gap: var(--space-4);
+  justify-items: center;
+  padding-block: var(--space-8);
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-empty-tile);
+  block-size: var(--size-empty-tile);
+  border: var(--size-hairline) solid var(--color-line);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+}
+
+.text {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  max-inline-size: var(--size-empty-measure);
+  text-align: center;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-empty-title);
+}
+
+.body {
+  color: var(--color-text-2);
+  font: var(--type-body);
+}

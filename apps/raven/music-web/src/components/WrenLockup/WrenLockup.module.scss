@@ -1,0 +1,23 @@
+// Either drawing keeps its shape, in the scheme's ink unless a ground fixes one.
+.logo {
+  aspect-ratio: var(--logo-ratio);
+  fill: var(--logo-ink, var(--color-brand-ink));
+}
+
+// The lockup is sized by its height.
+.lockup {
+  inline-size: auto;
+  block-size: var(--logo-size);
+}
+
+// The mark is sized by its width, and never grows past the room it is given.
+.mark {
+  inline-size: var(--logo-size);
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+// The logo's own red, never the theme's.
+.eye {
+  fill: var(--color-eye-red);
+}

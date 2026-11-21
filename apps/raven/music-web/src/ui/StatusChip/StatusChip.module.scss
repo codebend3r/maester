@@ -1,0 +1,33 @@
+@use '../../styles/mixins';
+
+.chip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-block-size: var(--size-status-chip);
+  padding-inline: var(--space-3);
+  border: var(--size-hairline) solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.dot {
+  inline-size: var(--size-status-dot);
+  block-size: var(--size-status-dot);
+  border-radius: var(--radius-pill);
+}
+
+.ok {
+  background: var(--color-ok);
+}
+
+.down {
+  background: var(--color-accent-text);
+}
+
+.label {
+  @include mixins.one-line;
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}

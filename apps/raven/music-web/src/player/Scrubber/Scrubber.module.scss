@@ -1,0 +1,24 @@
+.stacked {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.times {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+}
+
+.inline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  inline-size: 100%;
+}
+
+.time {
+  color: var(--color-text-3);
+  font: var(--type-small);
+  font-variant-numeric: tabular-nums;
+}
