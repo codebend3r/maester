@@ -181,8 +181,14 @@ await cp(
   resolve(mvk, 'Package/Release/MoltenVK/dynamic/dylib/macOS/libMoltenVK.dylib'),
   resolve(prefix, 'lib/libMoltenVK.dylib'),
 )
+/*
+ * MoltenVK's include/MoltenVK is a symlink to its API folder. Copied as a link it points
+ * into native-build/sources, outside the prefix, and Nx refuses to restore a cached output
+ * holding such a link, so the headers are copied as files.
+ */
 await cp(resolve(mvk, 'MoltenVK/include/MoltenVK'), resolve(prefix, 'include/MoltenVK'), {
   recursive: true,
+  dereference: true,
 })
 await cp(resolve(src('Vulkan-Headers'), 'include/vulkan'), resolve(prefix, 'include/vulkan'), {
   recursive: true,

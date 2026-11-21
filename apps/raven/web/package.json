@@ -114,11 +114,11 @@
         "inputs": [
           "default",
           "^production",
-          "{workspaceRoot}/apps/raven/server/src/**/*",
-          "{workspaceRoot}/libs/shared/server/src/**/*"
+          "againstServer"
         ]
       },
       "lighthouse": {
+        "cache": true,
         "dependsOn": [
           "build",
           "^build",
@@ -129,7 +129,11 @@
             "target": "build"
           }
         ],
-        "cache": false
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
+        ]
       }
     }
   }

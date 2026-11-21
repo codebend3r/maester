@@ -19,7 +19,7 @@ on:
         required: false
     secrets:
       NX_CLOUD_ACCESS_TOKEN:
-        description: Nx Cloud's remote cache, for the desktop and Windows jobs. Unset, Nx caches locally only.
+        description: Nx Cloud's remote cache, for the device app, desktop and Windows jobs. Unset, Nx caches locally only.
         required: false
 
 permissions:
@@ -164,7 +164,8 @@ jobs:
       run:
         shell: bash
     steps:
-      # The same head commit the artifact is named for, so the app and its engine match.
+      # The PR's head commit, which the artifact is named for. The native job checks out
+      # with no ref, so on a pull request its engine was built from the merge commit.
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
@@ -232,6 +233,10 @@ jobs:
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the remote flow.
     timeout-minutes: 60
+    env:
+      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
+      # build, and the flows' pass with it, instead of running them.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact commit
@@ -248,16 +253,16 @@ jobs:
           platform: tvos
           node-version: ${{ env.APP_NODE_VERSION }}
 
-      # A real raven server with a locked film library and an open series library, started
+      # A real, accountless raven server with open film, series and music libraries, started
       # while the app builds. It prints its ready line once its libraries are scanned.
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
 
       # Runs `prebuild:tvos` first (bun runs it before `build:tvos`), which regenerates
       # ios/ and installs the pods, so the pods are checked right after. Nx caches only what
-      # the steps below read: the app, the lockfiles, and the project with the remote test
-      # target. Pods/ and DerivedData ran Nx Cloud's upload out of open files (EMFILE), so no
-      # Apple build was ever stored and every PR compiled from scratch.
+      # the steps below read: the app, the two lockfiles, the Xcode project, the remote test
+      # target and the pods' support files. Pods/ and DerivedData are left out, since they ran
+      # Nx Cloud's upload out of open files (EMFILE).
       - name: 📺 Build for the Apple TV simulator
         run: bun run ci:app:tvos:build
 
@@ -287,8 +292,9 @@ jobs:
           device-type: com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K
           app: apps/raven/app/build/tvos/Build/Products/Release-appletvsimulator/Raven.app
 
-      # The XCUITest the tvOS prebuild added (`tvos-e2e/`) signs in, plays the film from
-      # Home and returns with the Siri Remote. The screen it ends on goes up with the app.
+      # The XCUITests the tvOS prebuild added (`tvos-e2e/`) open on Home, play the film, leave
+      # with Menu and find it under Continue watching, all with the Siri Remote. The screen
+      # they end on goes up with the app.
       - name: 🎬 Apple TV end to end
         env:
           TVOS_SIMULATOR: raven-tv
@@ -341,6 +347,10 @@ jobs:
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
+    env:
+      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
+      # build, and the flows' pass with it, instead of running them.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       # The PR's head commit, so the artifact names below match the commit that was built.
       - name: 📥 Checkout exact commit
@@ -403,7 +413,7 @@ jobs:
           app: apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/Raven.app
           skip-keyboard-intro: true
 
-      # A real raven server with a locked film library and an open series library, started
+      # A real, accountless raven server with open film, series and music libraries, started
       # above for the flows.
       - name: 🗄️ Wait for the fixture server
         uses: ./.github/actions/raven-fixture-ready
@@ -421,11 +431,11 @@ jobs:
           cat "$RUNNER_TEMP/maestro.log"
           exit 1
 
-      # Every flow in `apps/raven/app/e2e`, each signing in with the PIN and the admin password
-      # first. A fresh runner can start Maestro's XCTest driver slower than it waits by default,
-      # so it waits five minutes (in milliseconds). A busy macOS runner can still miss even
-      # that, before any flow runs, so a driver that never came up is retried once as a dead
-      # screenshot service is.
+      # Every flow in `apps/raven/app/e2e` but the remote's (`dpad`), each opening on the
+      # accountless fixture's Home. A fresh runner can start Maestro's XCTest driver slower
+      # than it waits by default, so it waits five minutes (in milliseconds). A busy macOS
+      # runner can still miss even that, before any flow runs, so a driver that never came up
+      # is retried once as a dead screenshot service is.
       - name: 🎬 App end to end
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
@@ -493,6 +503,10 @@ jobs:
     # A Release build of React Native, its compile cached by ccache and Gradle, the
     # emulator's boot and the flows.
     timeout-minutes: 60
+    env:
+      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the
+      # build, and the flows' pass with it, instead of running them.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       # The PR's head commit, so the artifact name below matches the commit that was built.
       - name: 📥 Checkout exact commit
@@ -535,7 +549,7 @@ jobs:
         id: avd
         uses: ./.github/actions/raven-android-avd
 
-      # A real raven server with a locked film library and an open series library, in the
+      # A real, accountless raven server with open film, series and music libraries, in the
       # background for the flows. It prints its ready line once its libraries are scanned.
       - name: 🗄️ Start the fixture server
         run: bunx nx run @raven/server:serve:fixture --excludeTaskDependencies > "$RUNNER_TEMP/fixture.log" 2>&1 &
@@ -606,6 +620,10 @@ jobs:
     runs-on: ubuntu-24.04
     # A Release build of React Native, its compile cached by ccache and Gradle.
     timeout-minutes: 60
+    env:
+      # Nx Cloud's remote cache: a commit that leaves the app's inputs alone restores the APK
+      # instead of building it.
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
     steps:
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
@@ -651,8 +669,7 @@ jobs:
   music-ios:
     name: 🎵 Wren on iPhone
     needs: select
-    # Runs only while the repository variable WREN_CHECKS is `true`; Wren's builds are off until then.
-    if: vars.WREN_CHECKS == 'true' && needs.select.outputs.music == 'true'
+    if: needs.select.outputs.music == 'true'
     runs-on: macos-26
     # One Release build of React Native, its compile cached by ccache, and the flows.
     timeout-minutes: 60
@@ -721,7 +738,8 @@ jobs:
           cat "$RUNNER_TEMP/maestro.log"
           exit 1
 
-      # Every flow in `apps/raven/music/e2e`: sign in to Home, and play the fixture's album.
+      # Every flow in `apps/raven/music/e2e`: open on Home, play the fixture's album, and
+      # download it.
       - name: 🎬 Wren end to end
         env:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: 300000
@@ -768,8 +786,7 @@ jobs:
   music-android:
     name: 🎵 Wren for Android
     needs: select
-    # Runs only while the repository variable WREN_CHECKS is `true`; Wren's builds are off until then.
-    if: vars.WREN_CHECKS == 'true' && needs.select.outputs.music == 'true'
+    if: needs.select.outputs.music == 'true'
     runs-on: ubuntu-24.04
     # A Release build of React Native, its compile cached by ccache and Gradle.
     timeout-minutes: 60
@@ -889,7 +906,7 @@ jobs:
     timeout-minutes: 30
     env:
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
-      # Keeps the Xcode version the cached app is keyed on the same as the native job's.
+      # The same Xcode as the native job, for the tools the make and the audit run.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: 📥 Checkout exact commit
@@ -967,7 +984,8 @@ jobs:
       NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
       # Keeps the Xcode version the cached results are keyed on the same as the native job's.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      # `-allow_sw 1` falls back to Apple's software H.264 encoder on a VM.
+      # The source-built ffmpeg encodes the e2e clips; `clips.ts` passes `-allow_sw 1`, so
+      # VideoToolbox falls back to its software H.264 encoder on a VM.
       RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
     steps:
       - name: 📥 Checkout exact commit

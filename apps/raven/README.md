@@ -160,6 +160,8 @@ The player forgets its volume and mute setting once, since the browser now keeps
 
 ## How playback works
 
+Which app plays which video codec, bit depth and HDR format as it is, Dolby Vision included, is a table of its own: [Which app plays which video](docs/video-support.md).
+
 Three ways, cheapest first:
 
 | Mode      | When                                                                                     | What the server does                                                       |

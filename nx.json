@@ -16,6 +16,31 @@
       "!{projectRoot}/src/test-setup.ts",
       "!{projectRoot}/vitest.config.ts",
       "!{projectRoot}/bunfig.toml"
+    ],
+    "expoVariant": [
+      {
+        "env": "APP_VARIANT"
+      },
+      {
+        "env": "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN"
+      }
+    ],
+    "xcode": [
+      {
+        "env": "DEVELOPER_DIR"
+      },
+      {
+        "runtime": "xcodebuild -version"
+      }
+    ],
+    "gradle": [
+      {
+        "env": "ORG_GRADLE_PROJECT_reactNativeArchitectures"
+      }
+    ],
+    "againstServer": [
+      "{workspaceRoot}/apps/raven/server/src/**/*",
+      "{workspaceRoot}/libs/shared/server/src/**/*"
     ]
   },
   "targetDefaults": {

@@ -118,6 +118,6 @@ Every sign-up, approved or pending, emails the owner through the `signup-alert` 
 
 ## CI and rollout
 
-The `Supabase` PR job sets up Deno, type-checks and tests the Edge Functions (`check:functions`, `test:functions`), starts the Docker stack, runs the pgTAP authorization tests and database lint, then stops it even on failure. General `verify`, `affected` and git hooks do not start Docker or deploy anything.
+The `Supabase` PR job sets up Deno, type-checks and tests the Edge Functions (`check:functions`, `test:functions`), then starts the Docker stack and runs the pgTAP authorization tests and database lint as one target (`test:db:ci`), and stops the stack even on failure. Nx caches all three targets, so a PR that leaves `@raven/supabase` alone restores their pass and starts no containers. General `verify`, `affected` and git hooks do not start Docker or deploy anything.
 
 Stacked on this project: raven's server (`raven-auth-server`), web (`raven-auth-ui`) and player (`raven-auth-desktop`), then enforcement (`raven-auth-enforcement`). Per-account progress and favourites are the follow-up (`raven-account-data`).
