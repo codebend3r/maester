@@ -1,0 +1,21 @@
+.actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+}
+
+.list {
+  display: grid;
+  min-inline-size: 0;
+}
+
+// Thousands of songs stay light: a row off screen is skipped until it is scrolled to.
+.row {
+  display: grid;
+  min-inline-size: 0;
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--size-row);
+}
+
+// The mark the next page is asked for at, just past the last row.

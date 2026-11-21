@@ -1,0 +1,27 @@
+@use '../../styles/mixins';
+
+// The email takes the room the disc and Sign out leave.
+.card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--size-row-gap);
+  align-items: center;
+  padding: var(--space-4);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-avatar);
+  block-size: var(--size-avatar);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font: var(--type-dialog-title);
+}
+
+.name {
+  @include mixins.one-line;
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}

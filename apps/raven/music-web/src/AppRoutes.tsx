@@ -15,6 +15,22 @@ const NOT_FOUND_ROUTE = '*'
  * chunk of its own the first time a route asks for it.
  */
 const Home = lazyPage(() => import('@/screens/Home/Home').then((module) => module.Home))
+const Library = lazyPage(() => import('@/screens/Library/Library').then((module) => module.Library))
+const Search = lazyPage(() => import('@/screens/Search/Search').then((module) => module.Search))
+const Settings = lazyPage(() =>
+  import('@/screens/Settings/Settings').then((module) => module.Settings),
+)
+const Album = lazyPage(() => import('@/screens/Album/Album').then((module) => module.Album))
+const Artist = lazyPage(() => import('@/screens/Artist/Artist').then((module) => module.Artist))
+const Playlist = lazyPage(() =>
+  import('@/screens/Playlist/Playlist').then((module) => module.Playlist),
+)
+const Collection = lazyPage(() =>
+  import('@/screens/Collection/Collection').then((module) => module.Collection),
+)
+const NowPlaying = lazyPage(() =>
+  import('@/screens/NowPlaying/NowPlaying').then((module) => module.NowPlaying),
+)
 
 /** The page asked for, once its code has come. */
 function Page() {
@@ -68,6 +84,14 @@ export function AppRoutes() {
       <Route element={<Shell />}>
         <Route element={<Guarded />}>
           <Route element={<Home />} path={WREN_ROUTES.home} />
+          <Route element={<Library />} path={WREN_ROUTES.library} />
+          <Route element={<Search />} path={WREN_ROUTES.search} />
+          <Route element={<Settings />} path={WREN_ROUTES.settings} />
+          <Route element={<Album />} path={WREN_ROUTES.album} />
+          <Route element={<Artist />} path={WREN_ROUTES.artist} />
+          <Route element={<Playlist />} path={WREN_ROUTES.playlist} />
+          <Route element={<Collection />} path={WREN_ROUTES.collection} />
+          <Route element={<NowPlaying />} path={WREN_ROUTES.nowPlaying} />
         </Route>
         <Route element={<SignInRoute />} path={WREN_ROUTES.signIn} />
         <Route element={<ToHome />} path={NOT_FOUND_ROUTE} />

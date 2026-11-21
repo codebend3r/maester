@@ -1,0 +1,68 @@
+@use '../../styles/mixins';
+
+.upNext {
+  display: grid;
+  grid-template-areas:
+    'head'
+    'songs';
+  grid-template-rows: auto minmax(0, 1fr);
+  min-block-size: 0;
+}
+
+// Under the narrow player: the head and the empty line keep the player's gutters.
+.sheet {
+  --up-next-inset: var(--size-player-gutter);
+  --up-next-head-top: var(--size-up-next-head-top);
+  --up-next-head-bottom: var(--size-up-next-head-bottom);
+}
+
+// Along the foot of the wide player, whose panel pads itself.
+.panel {
+  --up-next-inset: 0rem;
+  --up-next-head-top: 0rem;
+  --up-next-head-bottom: var(--space-2);
+}
+
+.head {
+  display: grid;
+  grid-area: head;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--up-next-head-top) var(--up-next-inset) var(--up-next-head-bottom);
+}
+
+.headText {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-pane-title);
+}
+
+.line {
+  @include mixins.one-line;
+  color: var(--color-text-3);
+  font: var(--type-meta);
+}
+
+.toggles {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+.list {
+  grid-area: songs;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.empty {
+  grid-area: songs;
+  padding: var(--space-4) var(--up-next-inset);
+  color: var(--color-text-2);
+  font: var(--type-body);
+}

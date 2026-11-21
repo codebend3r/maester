@@ -1,0 +1,14 @@
+// The player's pane scrolls when a short window cannot hold it.
+.player {
+  display: grid;
+  gap: var(--space-5);
+  align-content: safe center;
+  min-inline-size: 0;
+  overflow-y: auto;
+  padding: var(--space-5) var(--size-player-gutter);
+}
+
+// The cover: the column's width, the player's largest, or two fifths of the window's height.
+.cover {
+  inline-size: min(100%, var(--size-player-art), 40dvh);
+}

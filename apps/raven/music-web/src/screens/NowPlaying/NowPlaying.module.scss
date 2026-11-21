@@ -1,0 +1,33 @@
+// Now Playing covers the screen, and each of its panes scrolls inside it.
+.screen {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  block-size: 100dvh;
+  min-inline-size: 0;
+  background: var(--color-bg);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: rise var(--duration-sheet) var(--ease-out);
+  }
+}
+
+// The sheet rises from the foot, as the apps' does.
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-10));
+  }
+}
+
+.idle {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: start;
+  padding: calc(env(safe-area-inset-top) + var(--space-2)) var(--space-3) 0;
+}
+
+.idleText {
+  place-self: center;
+  color: var(--color-text-2);
+  font: var(--type-body);
+}
