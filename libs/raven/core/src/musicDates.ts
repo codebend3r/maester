@@ -35,13 +35,23 @@ export const albumDateLabel = ({ releaseDate, year }: AlbumDateLabelProps): stri
   return known === null ? null : String(known)
 }
 
+// Made once: a TV's Hermes builds a formatter slowly, and every album card formats a date.
+const RELEASE_MONTH = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'long',
+  timeZone: 'UTC',
+})
+
+const RELEASE_DAY = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+})
+
 /** UTC avoids shifting a calendar release date into the previous day. */
 export const formatReleaseDate = (value: string): string => {
   if (value.length === 4) return value
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    ...(value.length === 10 ? ({ day: 'numeric' } as const) : {}),
-    timeZone: 'UTC',
-  }).format(new Date(`${value.padEnd(10, '-01')}T00:00:00Z`))
+  const format = value.length === 10 ? RELEASE_DAY : RELEASE_MONTH
+  return format.format(new Date(`${value.padEnd(10, '-01')}T00:00:00Z`))
 }

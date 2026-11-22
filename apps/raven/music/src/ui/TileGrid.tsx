@@ -55,27 +55,31 @@ export const useGrid = ({ columns = GRID_COLUMNS, tile }: UseGridProps = {}) => 
 
 type RenderTileProps<T> = { item: T; width: number }
 
-type TileGridProps<T> = {
+type TileGridProps<T> = UseGridProps & {
   items: readonly T[]
-  columns?: GridColumns
   keyOf: (item: T) => string | number
   renderTile: (props: RenderTileProps<T>) => ReactNode
 }
 
 /**
- * Tiles in rows filling the width they are given, a row's count by the form factor: a short,
- * whole grid inside a page that scrolls. It measures itself, and starts from the page's width.
+ * Tiles in rows filling the width they are given, a row's count by the form factor, or, given a
+ * `tile`, as many as fit at that size: a short, whole grid inside a page that scrolls. It
+ * measures itself, and starts from the page's width.
  */
 export function TileGrid<T>({
   items,
   columns = GRID_COLUMNS,
+  tile,
   keyOf,
   renderTile,
 }: TileGridProps<T>) {
-  const count = columns[useFormFactor()]
+  const formFactor = useFormFactor()
   const guess = useInnerWidth()
   const [measured, setMeasured] = useState<number | null>(null)
-  const width = tileWidthOf({ width: measured ?? guess, columns: count, gap: GRID_GAP })
+  const inner = measured ?? guess
+  const count =
+    tile === undefined ? columns[formFactor] : columnsFitting({ width: inner, tile, gap: GRID_GAP })
+  const width = tileWidthOf({ width: inner, columns: count, gap: GRID_GAP })
   return (
     <View onLayout={(event) => setMeasured(event.nativeEvent.layout.width)} style={styles.grid}>
       {width > 0 &&

@@ -8,6 +8,7 @@ import { factsLineOf, PLAYER_COPY, TRANSPORTS } from '@raven/wren'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
 import { Transport } from '@/player/Transport'
 import { useNowPlaying } from '@/player/useNowPlaying'
+import { useQuality } from '@/player/useQuality'
 import { WREN_ROUTES } from '@/routes'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
@@ -34,6 +35,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   text: { flex: 1 },
   title: { ...TYPE.rowStrong, color: colors.text },
   line: { ...TYPE.meta, color: colors.text2 },
+  quality: { ...TYPE.meta, color: colors.text3 },
   error: { ...TYPE.meta, color: colors.accentText },
   centre: { alignItems: 'center', width: SHELL_SIZES.scrubber },
 }))
@@ -45,6 +47,7 @@ function PlayingBar({ session, track }: PlayingBarProps) {
   const router = useRouter()
   const { bottom } = useSafeAreaInsets()
   const { cover, artists, length, error } = useNowPlaying({ session, track })
+  const quality = useQuality({ track })
   const openNowPlaying = () => router.push(WREN_ROUTES.nowPlaying)
   return (
     <View style={[styles.bar, { paddingBottom: bottom }]}>
@@ -63,6 +66,11 @@ function PlayingBar({ session, track }: PlayingBarProps) {
             <Text numberOfLines={1} style={error === null ? styles.line : styles.error}>
               {error ?? factsLineOf([artists, track.album.title])}
             </Text>
+            {quality !== null && error === null && (
+              <Text numberOfLines={1} style={styles.quality}>
+                {quality}
+              </Text>
+            )}
           </View>
         </Pressable>
       </View>

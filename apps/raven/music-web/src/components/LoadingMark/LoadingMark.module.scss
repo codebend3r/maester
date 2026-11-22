@@ -1,0 +1,37 @@
+@use '../../styles/mixins';
+
+.loading {
+  display: grid;
+  grid-template-areas: 'stack';
+  place-items: center;
+  inline-size: calc(var(--loading-mark-size) * 2);
+  block-size: calc(var(--loading-mark-size) * 2);
+}
+
+.ring {
+  grid-area: stack;
+  inline-size: 100%;
+  block-size: 100%;
+  border: var(--size-focus-ring) solid var(--color-text-2);
+  border-block-start-color: transparent;
+  border-radius: var(--radius-pill);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: spin var(--duration-spin) linear infinite;
+  }
+}
+
+.mark {
+  grid-area: stack;
+  display: grid;
+}
+
+.label {
+  @include mixins.visually-hidden;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}

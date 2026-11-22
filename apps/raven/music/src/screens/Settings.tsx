@@ -6,8 +6,10 @@ import { AboutGroup } from '@/screens/settings/AboutGroup'
 import { AccountCard } from '@/screens/settings/AccountCard'
 import { AppearanceGroup } from '@/screens/settings/AppearanceGroup'
 import { DownloadsGroup, RemoveAllDownloads } from '@/screens/settings/DownloadsGroup'
+import { LibraryGroup } from '@/screens/settings/LibraryGroup'
 import { ServerGroup } from '@/screens/settings/ServerGroup'
 import { usePageInsets } from '@/shell/useShell'
+import { useServerName } from '@/stores/wrenPrefs'
 import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { PageHeader } from '@/ui/PageHeader'
@@ -24,6 +26,7 @@ const useStyles = themedStyles(() => ({
 type SettingsGroups = {
   account: ReactNode
   server: ReactNode
+  library: ReactNode
   appearance: ReactNode
   downloads: ReactNode
   removeAll: ReactNode
@@ -39,6 +42,7 @@ function OneColumn({ groups }: SettingsLayoutProps) {
     <View style={styles.column}>
       {groups.account}
       {groups.server}
+      {groups.library}
       {groups.appearance}
       {groups.downloads}
       {groups.removeAll}
@@ -55,6 +59,7 @@ function TwoColumns({ groups }: SettingsLayoutProps) {
       <View style={styles.half}>
         {groups.account}
         {groups.server}
+        {groups.library}
         {groups.appearance}
         {groups.about}
       </View>
@@ -73,20 +78,23 @@ const LAYOUTS = {
 } as const satisfies Record<FormFactor, ComponentType<SettingsLayoutProps>>
 
 /**
- * The account and Sign out, the server and whether it answers, the appearance, the downloads'
- * quality, limit and use, Remove all downloads, and which Wren this is.
+ * The account and Sign out, the server with its address and whether it answers, the music
+ * library worn, the appearance, the downloads' quality, limit and use, Remove all downloads,
+ * and which Wren this is.
  */
 export function Settings() {
   const styles = useStyles()
   const insets = usePageInsets()
   const session = useWren()
+  const serverName = useServerName({ fallback: session?.server.name ?? null })
   const Layout = LAYOUTS[useFormFactor()]
   const groups = {
     account: <AccountCard />,
     server: session !== null && <ServerGroup session={session} />,
+    library: session !== null && <LibraryGroup session={session} />,
     appearance: <AppearanceGroup />,
     downloads: <DownloadsGroup />,
-    removeAll: <RemoveAllDownloads serverName={session?.server.name ?? null} />,
+    removeAll: <RemoveAllDownloads serverName={serverName} />,
     about: <AboutGroup />,
   }
   return (

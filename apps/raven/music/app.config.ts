@@ -84,14 +84,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
        * The window's own colour, under the app. iOS reads its counterpart only through
        * expo-system-ui; there the splash covers the window until Wren draws.
        */
-      backgroundColor: COLORS.dark.bg,
+      backgroundColor: COLORS.night.bg,
     },
     plugins: [
       'expo-router',
       // What the system draws before Wren's first frame, in the system's own light or dark.
       [
         'expo-splash-screen',
-        { backgroundColor: COLORS.light.bg, dark: { backgroundColor: COLORS.dark.bg } },
+        { backgroundColor: COLORS.paper.bg, dark: { backgroundColor: COLORS.night.bg } },
       ],
       /*
        * Young Serif and Instrument Sans, embedded in both native projects, so they are there at

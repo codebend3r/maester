@@ -262,6 +262,10 @@ export const queryKeys = {
   recentMusic: ['music', 'recent'],
   album: (id: number | null) => ['music', 'albums', id],
   artist: (id: number | null) => ['music', 'artists', id],
+  /** Who an artist is, under their page's key. */
+  artistAbout: (id: number) => ['music', 'artists', id, 'about'],
+  /** The pictures an owner may set behind an artist's name, under their page's key. */
+  artistBackgrounds: (id: number) => ['music', 'artists', id, 'backgrounds'],
   /** A track's lyrics, under the music's prefix so a scan reads them again. */
   lyrics: (id: number | null) => ['music', 'tracks', id, 'lyrics'],
   /** The account's playlists, and each one's page under the same prefix. */

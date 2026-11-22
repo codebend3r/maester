@@ -13,14 +13,20 @@
     <title>Wren</title>
     <script>
       /*
-       * The kept appearance goes on before first paint, so a light or dark choice never
-       * flashes the system's; stores/wrenPrefs.ts takes over once the app loads.
+       * The kept theme goes on before first paint, so the page never flashes another;
+       * theme/followTheme.ts takes over once the app loads. An older Wren kept `appearance`,
+       * whose Light and Dark are Paper and Night.
        */
       try {
-        const appearance = JSON.parse(localStorage.getItem('wren.prefs') ?? '{}')?.state?.appearance
-        if (appearance === 'light' || appearance === 'dark') {
-          document.documentElement.dataset.theme = appearance
-        }
+        const kept = JSON.parse(localStorage.getItem('wren.prefs') ?? '{}')?.state ?? {}
+        const isLight = matchMedia('(prefers-color-scheme: light)').matches
+        const forDevice = isLight ? (kept.lightTheme ?? 'paper') : (kept.darkTheme ?? 'night')
+        const older = { light: 'paper', dark: 'night' }[kept.appearance]
+        const single = kept.themeMode === 'single' ? kept.theme : undefined
+        const isFollowing = kept.themeMode === 'system'
+        document.documentElement.dataset.theme = isFollowing
+          ? forDevice
+          : (single ?? older ?? forDevice)
       } catch {}
     </script>
   </head>

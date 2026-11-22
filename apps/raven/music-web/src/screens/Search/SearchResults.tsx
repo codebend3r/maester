@@ -1,17 +1,18 @@
 import { LIBRARY_COPY, RESULT_STATES, type ResultState, SEARCH_COPY } from '@raven/wren'
 import type { ComponentType } from 'react'
+import { LoadingMark } from '@/components/LoadingMark/LoadingMark'
 import { FilterResults } from '@/screens/Search/FilterResults'
 import { NoMatches, type ResultsProps } from '@/screens/Search/ResultParts'
+import { SIZES } from '@/theme/tokens'
 import { EmptyState } from '@/ui/EmptyState/EmptyState'
-import { Spinner } from '@/ui/Spinner/Spinner'
 import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Search/SearchResults.module.scss'
 
 function Searching() {
   return (
-    <output aria-label={SEARCH_COPY.searching} className={styles.searching}>
-      <Spinner />
-    </output>
+    <section className={styles.searching}>
+      <LoadingMark label={SEARCH_COPY.searching} size={SIZES.loadingMark} />
+    </section>
   )
 }
 

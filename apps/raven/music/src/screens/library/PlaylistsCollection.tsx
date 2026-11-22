@@ -18,6 +18,7 @@ import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { GRID_GAP, useGrid } from '@/ui/TileGrid'
 import { usePlaylists } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { NewPlaylistSheet } from '@/screens/library/NewPlaylistSheet'
 import { WREN_PAGES, pageHref } from '@/routes'
@@ -40,7 +41,9 @@ const NO_PLAYLISTS: readonly PlaylistSummary[] = []
 type PlaylistsNoticeProps = { listing: ListState }
 
 function PlaylistsNotice({ listing }: PlaylistsNoticeProps) {
-  return <ListNotice empty={LIBRARY_PAGE_COPY.noPlaylists} listing={listing} />
+  return (
+    <ListNotice empty={LIBRARY_PAGE_COPY.noPlaylists} listing={listing} shape={LIST_SHAPES.tiles} />
+  )
 }
 
 type NoPlaylistsProps = { onNew: () => void }

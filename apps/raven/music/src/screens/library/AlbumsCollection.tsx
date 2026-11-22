@@ -19,6 +19,7 @@ import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { GRID_GAP, useGrid } from '@/ui/TileGrid'
 import { useAllAlbums } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { CoverSizeButton } from '@/screens/library/CoverSizeButton'
 import { SortButton } from '@/screens/library/SortButton'
@@ -63,7 +64,9 @@ export function AlbumsCollection({ session, onBack }: CollectionPageProps) {
   const count = listing.isRead ? plural({ n: shown.length, ...COUNTS_COPY.albums }) : null
   return (
     <FlatList
-      ListEmptyComponent={<ListNotice empty={search.empty} listing={listing} />}
+      ListEmptyComponent={
+        <ListNotice empty={search.empty} listing={listing} shape={LIST_SHAPES.tiles} />
+      }
       ListHeaderComponent={
         <CollectionHeader
           count={count}

@@ -176,6 +176,51 @@ export const isArtistDetails = object({
 
 export type ArtistDetails = Infer<typeof isArtistDetails>
 
+/** Where an artist's background option comes from: a photo (fanart.tv, TheAudioDB or Wikimedia Commons), or the cover of one of their albums. */
+export const ARTIST_BACKGROUND_KINDS = { photo: 'photo', cover: 'cover' } as const
+
+export type ArtistBackgroundKind =
+  (typeof ARTIST_BACKGROUND_KINDS)[keyof typeof ARTIST_BACKGROUND_KINDS]
+
+/** One picture an owner may set as an artist's background; `key` names it in the picture's address and in the choice. */
+export const isArtistBackgroundOption = object({
+  key: isString,
+  kind: oneOf(Object.values(ARTIST_BACKGROUND_KINDS)),
+})
+
+export type ArtistBackgroundOption = Infer<typeof isArtistBackgroundOption>
+
+/** `GET /api/artists/:id/backgrounds`: every option, and the key of the one worn, or null for the artist's default photo. */
+export const isArtistBackgrounds = object({
+  options: listOf(isArtistBackgroundOption),
+  chosen: nullable(isString),
+})
+
+export type ArtistBackgrounds = Infer<typeof isArtistBackgrounds>
+
+/** `GET /api/artists/:id/about`: who the artist is, from Wikipedia and Wikidata; a part neither knows is null or empty. */
+export const isArtistAbout = object({
+  /** The opening of their Wikipedia article. */
+  bio: nullable(isString),
+  /** The name they were born with, as Wikidata records it. */
+  birthName: nullable(isString),
+  /** The day they were born, `1986-10-24`. */
+  born: nullable(isString),
+  /** Where they were born: "Toronto". */
+  birthplace: nullable(isString),
+  /** The countries they are a citizen of: "Canada", "United States". */
+  nationality: isStringArray,
+  /** The awards Wikidata says they received, each named once. */
+  awards: isStringArray,
+})
+
+export type ArtistAbout = Infer<typeof isArtistAbout>
+
+/** `PUT /api/artists/:id/background`: the option to wear, or null to go back to the default photo. */
+export const isArtistBackgroundChoice = object({ key: nullable(isString) })
+
+export type ArtistBackgroundChoice = Infer<typeof isArtistBackgroundChoice>
+
 /** A MusicBrainz release id: a UUID. */
 export const isMbid = matching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
 

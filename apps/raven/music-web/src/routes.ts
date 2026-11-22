@@ -16,6 +16,12 @@ export const WREN_ROUTES = {
   collection: '/collection/:kind',
 } as const
 
+/**
+ * The web's own pages, which the phone and tablet apps have no file for: `/design`, Wren's design
+ * on one page. `parity.test.ts` checks the apps' pages against `WREN_ROUTES` alone.
+ */
+export const WREN_WEB_ONLY_ROUTES = { design: '/design' } as const
+
 /** The params a page reads from its path. */
 export const WREN_ROUTE_PARAMS = { id: 'id', kind: 'kind' } as const
 

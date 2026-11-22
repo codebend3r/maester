@@ -33,6 +33,21 @@ export const KIT_COPY = {
   backAlone: 'Back',
 } as const
 
+/** The key that collapses or expands the web's sidebar, as the web app's own side menu does. */
+export const SIDEBAR_KEY = 'b'
+
+/** The sidebar's key as a keyboard names it. */
+const SIDEBAR_KEY_NAME = SIDEBAR_KEY.toUpperCase()
+
+/** The web's sidebar and the key that folds it to its icons. */
+export const SIDEBAR_COPY = {
+  name: 'Side menu',
+  /** The key that collapses or expands it, as a keyboard names it. */
+  key: SIDEBAR_KEY_NAME,
+  collapse: `Collapse the side menu (${SIDEBAR_KEY_NAME})`,
+  expand: `Expand the side menu (${SIDEBAR_KEY_NAME})`,
+} as const
+
 /** Facts on one line, each one missing or empty left out: "Pop · 2014 · 20 songs". */
 export const factsLineOf = (facts: readonly (string | null)[]): string =>
   KIT_COPY.facts(facts.filter((fact): fact is string => fact !== null && fact !== ''))

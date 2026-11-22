@@ -169,7 +169,7 @@ describe('Search', () => {
     music().listArtists.mockReturnValue(new Promise(() => undefined))
     renderSearch()
     await searchFor('radio')
-    expect(await screen.findByLabelText(SEARCH_COPY.searching)).toBeInTheDocument()
+    expect(await screen.findByText(SEARCH_COPY.searching)).toBeInTheDocument()
   })
 
   it('says why a search failed', async () => {
@@ -185,7 +185,7 @@ describe('Search', () => {
     renderSearch()
     await searchFor('radio')
     expect(await screen.findByText(LIBRARY_COPY.noMusic)).toBeInTheDocument()
-    expect(screen.queryByLabelText(SEARCH_COPY.searching)).toBeNull()
+    expect(screen.queryByText(SEARCH_COPY.searching)).toBeNull()
     expect(music().listTracks).not.toHaveBeenCalled()
   })
 

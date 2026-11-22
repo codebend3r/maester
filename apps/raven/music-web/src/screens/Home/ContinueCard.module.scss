@@ -36,11 +36,7 @@
 // Two lines of the album's title on the wide layout, one on the narrow.
 .album,
 .line {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  @include mixins.clamp-lines(2);
   overflow-wrap: anywhere;
 }
 

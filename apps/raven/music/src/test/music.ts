@@ -1,13 +1,19 @@
 import { jest } from '@jest/globals'
 import {
+  ARTIST_BACKGROUND_KINDS,
+  type Account,
   type AlbumDetails,
   type AlbumSummary,
   type Artist,
+  type ArtistAbout,
+  type ArtistBackgrounds,
   type ArtistDetails,
   type HistoryEntry,
   type Library,
   type LibraryCounts,
+  MEMBER_STATUSES,
   type Lyrics,
+  type MediaItem,
   type MusicListOptions,
   NO_LYRICS,
   type PlaylistDetails,
@@ -32,6 +38,7 @@ import {
   RADIOHEAD,
   RADIOHEAD_PAGE,
   SONGS,
+  mediaOf,
 } from '@raven/wren/testing'
 
 // The library both of Wren's apps' tests read, which `musicApi()` answers with.
@@ -69,6 +76,27 @@ type AlbumFavouriteProps = { albumId: number; favourite: boolean }
 
 type ArtistFavouriteProps = { artistId: number; favourite: boolean }
 
+type ArtistBackgroundProps = { artistId: number; key: string | null }
+
+type TrackFavouriteProps = { id: number; favourite: boolean }
+
+/** The signed-in listener as raven knows them: approved, and not its owner. */
+export const LISTENER_ACCOUNT: Account = {
+  id: LISTENER.userId,
+  email: LISTENER.email,
+  status: MEMBER_STATUSES.approved,
+  isOwner: false,
+}
+
+/** The pictures an owner may pick from for Radiohead's background, the second one worn. */
+export const RADIOHEAD_BACKGROUNDS: ArtistBackgrounds = {
+  options: [
+    { key: 'a1b2c3d4e5f6', kind: ARTIST_BACKGROUND_KINDS.photo },
+    { key: '0f9e8d7c6b5a', kind: ARTIST_BACKGROUND_KINDS.cover },
+  ],
+  chosen: '0f9e8d7c6b5a',
+}
+
 /** raven's own address builders, which ask the network nothing. */
 const addresses = createApiClient({
   baseUrl: 'https://raven.example',
@@ -103,8 +131,28 @@ export const musicApi = () => ({
       isFavourite: favourite,
     }),
   ),
+  getMe: jest.fn(async (): Promise<Account> => LISTENER_ACCOUNT),
+  getArtistAbout: jest.fn(async (_artistId: number): Promise<ArtistAbout> => ({
+    bio: null,
+    birthName: null,
+    born: null,
+    birthplace: null,
+    nationality: [],
+    awards: [],
+  })),
+  listArtistBackgrounds: jest.fn(
+    async (_artistId: number): Promise<ArtistBackgrounds> => RADIOHEAD_BACKGROUNDS,
+  ),
+  setArtistBackground: jest.fn(
+    async (_props: ArtistBackgroundProps): Promise<ArtistDetails> => RADIOHEAD_PAGE,
+  ),
   getLibraryCounts: jest.fn(async (_id: number): Promise<LibraryCounts> => MUSIC_COUNTS),
   listInProgress: jest.fn(async (_id: number): Promise<PosterEntry[]> => IN_PROGRESS),
+  setFavourite: jest.fn(async ({ id }: TrackFavouriteProps): Promise<MediaItem> =>
+    mediaOf({ ...AIRBAG, id }),
+  ),
+  listFavouriteArtists: jest.fn(async (): Promise<Artist[]> => []),
+  listFavouriteAlbums: jest.fn(async (): Promise<AlbumSummary[]> => []),
   listLibraryFavourites: jest.fn(async (_id: number): Promise<PosterEntry[]> => FAVOURITES),
   listHistory: jest.fn(async (_props: HistoryProps): Promise<HistoryEntry[]> => FINISHED),
   getLyrics: jest.fn(async (id: number): Promise<Lyrics> =>
@@ -118,4 +166,5 @@ export const musicApi = () => ({
   startListen: jest.fn(async () => 1),
   reportListen: jest.fn(async () => undefined),
   albumCoverUrl: (): string | null => null,
+  artistBackgroundUrl: addresses.artistBackgroundUrl,
 })

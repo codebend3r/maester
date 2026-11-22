@@ -1,12 +1,5 @@
 import { oneOf } from '@raven/core'
 
-/** How Wren picks its palette: the system's, or always light or dark. */
-export const APPEARANCES = { system: 'system', light: 'light', dark: 'dark' } as const
-
-export type Appearance = (typeof APPEARANCES)[keyof typeof APPEARANCES]
-
-export const isAppearance = oneOf(Object.values(APPEARANCES))
-
 /** What makes an album recent on Home: when it was added, or when it came out. */
 export const RECENT_SORTS = { added: 'added', release: 'release' } as const
 

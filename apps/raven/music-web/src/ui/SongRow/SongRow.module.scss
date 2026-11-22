@@ -25,6 +25,23 @@
   inline-size: var(--size-track-number);
 }
 
+.artEqualizer {
+  display: grid;
+  grid-template-areas: 'art';
+
+  > * {
+    grid-area: art;
+  }
+}
+
+// The picture's own veil, the same in every theme, so the bars read over any cover.
+.veil {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-xs);
+  background: var(--color-picture-veil);
+}
+
 .text {
   @include mixins.stacked-lines;
 }
@@ -47,6 +64,25 @@
   color: var(--color-text-3);
   font: var(--type-time);
   font-variant-numeric: tabular-nums;
+}
+
+// The heart waits unseen until the row is hovered or holds focus, unless the song is a favourite.
+.like {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-small-button);
+  block-size: var(--size-touch-target);
+  opacity: 0;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity var(--duration-hover) var(--ease-out);
+  }
+}
+
+.row:hover .like,
+.row:focus-within .like,
+.liked {
+  opacity: 1;
 }
 
 .more {

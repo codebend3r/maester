@@ -16,7 +16,12 @@ type PictureVersionsItemProps = {
 type PictureVersionsPhotoProps = { id: number; photo: string | null }
 
 type PictureVersionsAvatarProps = { id: number; avatar: string | null }
-type PictureVersionsArtistProps = { id: number; mbid: string | null }
+type PictureVersionsArtistProps = {
+  id: number
+  mbid: string | null
+  /** The picture an owner chose for the artist's page, by its source; null wears the default photo. */
+  background: string | null
+}
 
 /** Where an album's cover comes from and what names it there: the file that embeds it, or a picture's path. */
 type PictureVersionsAlbumProps = {
@@ -65,8 +70,12 @@ export class PictureVersions {
     return photo == null ? null : this.of(`person:${id}:tmdb:${photo}`)
   }
 
-  /** The version of artist `id`'s MusicBrainz identity; null until that identity is known. */
-  artist({ id, mbid }: PictureVersionsArtistProps): string | null {
+  /**
+   * The version of artist `id`'s picture: their MusicBrainz identity, which names the default photo,
+   * or the background an owner chose, which replaces it. Null until either is known.
+   */
+  artist({ id, mbid, background }: PictureVersionsArtistProps): string | null {
+    if (background != null) return this.of(`artist:${id}:background:${background}`)
     return mbid == null ? null : this.of(`artist:${id}:musicbrainz:${mbid}`)
   }
 

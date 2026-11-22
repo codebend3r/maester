@@ -9,6 +9,11 @@ type PlaylistRowLabelProps = { name: string; count: string }
 
 /** What a track's sheet and the Add to playlist sheet say. */
 export const TRACK_MENU_COPY = {
+  /** A song's favourite, which the menu's first row and the row's heart turn on and off. */
+  like: 'Like',
+  unlike: 'Unlike',
+  /** The row's heart, read out with the song: "Like Airbag". */
+  likeSong: (title: string) => `Like ${title}`,
   playNext: 'Play next',
   addToQueue: 'Add to queue',
   addToPlaylist: 'Add to playlist…',

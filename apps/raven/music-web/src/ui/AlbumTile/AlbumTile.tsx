@@ -18,16 +18,20 @@ type AlbumTileProps = Press & {
 }
 
 /**
- * An album or a playlist as a tile: its square art, its title and a line under it, each on one
- * line. It fills the column it is set in, a grid's or a shelf's.
+ * An album or a playlist as a tile: its square art, its title, which wraps to four lines, and the
+ * line under it, which wraps to two. It fills the column it is set in, a grid's or a shelf's.
  */
 export function AlbumTile({ title, subtitle, detail, cover, label, ...press }: AlbumTileProps) {
   return (
     <Pressable {...press} className={styles.tile} label={label}>
       <AlbumArt cover={cover} />
       <span className={styles.text}>
-        <span className={styles.title}>{title}</span>
-        <span className={styles.subtitle}>{subtitle}</span>
+        <span className={styles.title} title={title}>
+          {title}
+        </span>
+        <span className={styles.subtitle} title={subtitle}>
+          {subtitle}
+        </span>
         {detail !== undefined && <span className={styles.detail}>{detail}</span>}
       </span>
     </Pressable>

@@ -1,4 +1,10 @@
-import { ROUTE_STATES, type RouteQuery, routeIdOf, routeState } from '@raven/core'
+import {
+  ROUTE_STATES,
+  type RoutePending,
+  type RouteQuery,
+  routeIdOf,
+  routeState,
+} from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { detailNoticeOf } from '@raven/wren'
 import { type QueryKey, type UseQueryOptions, useQuery } from '@tanstack/react-query'
@@ -6,6 +12,7 @@ import { useLocalSearchParams } from 'expo-router'
 import type { ComponentType, ReactNode } from 'react'
 import { ScrollView, View } from 'react-native'
 
+import { LoadingMark } from '@/components/LoadingMark'
 import { Notice } from '@/components/Notice'
 import { WREN_ROUTE_PARAMS } from '@/routes'
 import { BackButton } from '@/screens/detail/BackButton'
@@ -19,10 +26,10 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   content: { gap: SPACE.s4 },
 }))
 
-type DetailNoticeProps = { text: string }
+type DetailFrameProps = { children: ReactNode }
 
-/** A page that has nothing to show yet, or will not: what it says, and the way back. */
-function DetailNotice({ text }: DetailNoticeProps) {
+/** A page that has nothing to show yet, or will not: what stands in for it, and the way back. */
+function DetailFrame({ children }: DetailFrameProps) {
   const styles = useStyles()
   const insets = usePageInsets()
   return (
@@ -30,8 +37,28 @@ function DetailNotice({ text }: DetailNoticeProps) {
       <View>
         <BackButton />
       </View>
-      <Notice text={text} />
+      {children}
     </ScrollView>
+  )
+}
+
+type DetailNoticeProps = { text: string }
+
+/** The page while it is read: the loading mark, its words said aloud. */
+function DetailLoading({ text }: DetailNoticeProps) {
+  return (
+    <DetailFrame>
+      <LoadingMark label={text} />
+    </DetailFrame>
+  )
+}
+
+/** The page missing from the server or not read: its words. */
+function DetailNotice({ text }: DetailNoticeProps) {
+  return (
+    <DetailFrame>
+      <Notice text={text} />
+    </DetailFrame>
   )
 }
 
@@ -44,18 +71,29 @@ function DetailReady({ render }: DetailReadyProps) {
   return render()
 }
 
-const DETAIL_VIEW_KEYS = { pending: 'pending', ready: 'ready' } as const
+const DETAIL_VIEW_KEYS = { loading: 'loading', notice: 'notice', ready: 'ready' } as const
+
+type DetailViewKey = (typeof DETAIL_VIEW_KEYS)[keyof typeof DETAIL_VIEW_KEYS]
 
 type DetailViewsProps = {
-  [DETAIL_VIEW_KEYS.pending]: DetailNoticeProps
+  [DETAIL_VIEW_KEYS.loading]: DetailNoticeProps
+  [DETAIL_VIEW_KEYS.notice]: DetailNoticeProps
   [DETAIL_VIEW_KEYS.ready]: DetailReadyProps
 }
 
 /** What a page reading one thing draws: what it says while it has nothing to show, else itself. */
 const DETAIL_VIEWS = {
-  [DETAIL_VIEW_KEYS.pending]: DetailNotice,
+  [DETAIL_VIEW_KEYS.loading]: DetailLoading,
+  [DETAIL_VIEW_KEYS.notice]: DetailNotice,
   [DETAIL_VIEW_KEYS.ready]: DetailReady,
 } as const satisfies ViewsOf<DetailViewsProps>
+
+/** Which stand-in a page shows by where it stands: the loading mark while it is read, else its words. */
+const PENDING_VIEWS = {
+  [ROUTE_STATES.loading]: DETAIL_VIEW_KEYS.loading,
+  [ROUTE_STATES.missing]: DETAIL_VIEW_KEYS.notice,
+  [ROUTE_STATES.error]: DETAIL_VIEW_KEYS.notice,
+} as const satisfies Record<RoutePending['state'], DetailViewKey>
 
 /** What a page says while it has nothing of its own to show. */
 type DetailCopy = Parameters<typeof detailNoticeOf>[0]['copy']
@@ -88,7 +126,7 @@ const detailViewOf = <T, Key extends QueryKey>({
   session,
 }: DetailViewOfProps<T, Key>): ViewOf<DetailViewsProps> => {
   if (page.state !== ROUTE_STATES.ready)
-    return { key: DETAIL_VIEW_KEYS.pending, props: { text: detailNoticeOf({ page, copy }) } }
+    return { key: PENDING_VIEWS[page.state], props: { text: detailNoticeOf({ page, copy }) } }
   const { data } = page
   return {
     key: DETAIL_VIEW_KEYS.ready,

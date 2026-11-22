@@ -24,6 +24,10 @@ type IconButtonProps = {
   color?: Color
   /** Fills the circle with this colour instead: the player's play button in `text`. */
   fill?: Color
+  /** A larger glyph, well over half the circle: Play and Pause. */
+  isProminent?: boolean
+  /** The circle rides above where it sits, bleeding past the bar's top edge. */
+  isLifted?: boolean
   isDisabled?: boolean
   /** A toggle's state, said aloud: Shuffle on, Like on. */
   isSelected?: boolean
@@ -38,6 +42,8 @@ export function IconButton({
   size = SIZES.touchTarget,
   color,
   fill,
+  isProminent = false,
+  isLifted = false,
   isDisabled = false,
   isSelected,
 }: IconButtonProps) {
@@ -50,7 +56,12 @@ export function IconButton({
     <button
       aria-label={label}
       aria-pressed={isSelected}
-      className={classNames([styles.button, styles[variant]])}
+      className={classNames([
+        styles.button,
+        styles[variant],
+        isProminent && styles.prominent,
+        isLifted && styles.lifted,
+      ])}
       disabled={isDisabled}
       onClick={onPress}
       style={style}

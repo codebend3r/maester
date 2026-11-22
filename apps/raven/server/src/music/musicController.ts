@@ -17,11 +17,14 @@ import {
   type AlbumMatchCandidate,
   type AlbumSummary,
   type Artist,
+  type ArtistAbout as About,
+  type ArtistBackgrounds,
   type ArtistDetails,
   type Lyrics,
   type MusicListParams,
   type TrackPage,
   isAlbumMatchChoice,
+  isArtistBackgroundChoice,
   isFavouriteChange,
   isRecord,
   isString,
@@ -35,6 +38,8 @@ import { LockService, PRIVACIES } from '@/lock/lockService'
 import { favouriteAnswered } from '@/media/favouriteOutcomes'
 import { ViewingAccounts } from '@/media/viewingAccounts'
 import { AlbumMatching } from '@/music/albumMatching'
+import { ArtistAbout } from '@/music/artistAbout'
+import { ArtistBackgroundOptions, BACKGROUND_CHOICES } from '@/music/artistBackgroundOptions'
 import { MUSICBRAINZ_ERROR_KINDS, MusicBrainzError } from '@/music/musicBrainzClient'
 import { MusicFavourites } from '@/music/musicFavourites'
 import { MusicMatchStore } from '@/music/musicMatchStore'
@@ -205,6 +210,8 @@ export class ArtistsController {
     @Inject(LockService) private readonly lock: LockService,
     @Inject(MusicFavourites) private readonly favourites: MusicFavourites,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
+    @Inject(ArtistBackgroundOptions) private readonly backgrounds: ArtistBackgroundOptions,
+    @Inject(ArtistAbout) private readonly about: ArtistAbout,
   ) {}
 
   /** The artist's page as this caller may see it, with whether its account marked them a favourite. */
@@ -221,6 +228,46 @@ export class ArtistsController {
     @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
     @Req() request: FastifyRequest,
   ): ArtistDetails {
+    return this.find({ id, request })
+  }
+
+  /** Who the artist is: a short bio, their birth name and day, and their awards. */
+  @Get(':id/about')
+  async getAbout(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Req() request: FastifyRequest,
+  ): Promise<About> {
+    const { artist } = this.find({ id, request })
+    return this.about.of({ artistId: id, mbid: artist.mbid })
+  }
+
+  /** The pictures an owner may set as the artist's background, and the key of the one worn. */
+  @AdminOnly()
+  @Get(':id/backgrounds')
+  async listBackgrounds(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+  ): Promise<ArtistBackgrounds> {
+    const backgrounds = await this.backgrounds.list(id)
+    if (backgrounds === null) throw new NotFoundException(`No artist ${id}`)
+    return backgrounds
+  }
+
+  /** Sets the artist's background to an option by its key, or back to the default photo with `{ key: null }`. */
+  @AdminOnly()
+  @Put(':id/background')
+  async setBackground(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() request: FastifyRequest,
+  ): Promise<ArtistDetails> {
+    if (!isArtistBackgroundChoice(body)) {
+      throw new BadRequestException('key must be an option key or null')
+    }
+    const outcome = await this.backgrounds.choose({ artistId: id, key: body.key })
+    if (outcome === BACKGROUND_CHOICES.noArtist) throw new NotFoundException(`No artist ${id}`)
+    if (outcome === BACKGROUND_CHOICES.noOption) {
+      throw new NotFoundException(`No background ${body.key ?? ''} for artist ${id}`)
+    }
     return this.find({ id, request })
   }
 

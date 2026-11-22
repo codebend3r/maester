@@ -4,6 +4,7 @@ import { KIT_COPY } from '@/copy/kit'
 import { LIBRARY_COPY, LIBRARY_PAGE_COPY } from '@/copy/screens'
 import {
   emptyCopyOf,
+  isListLoading,
   listNoticeOf,
   listStateOf,
   mergedOf,
@@ -121,5 +122,14 @@ describe('emptyCopyOf', () => {
   it('says the list holds none when nothing was typed, else that nothing matches', () => {
     expect(emptyCopyOf({ query: '', none })).toBe(none)
     expect(emptyCopyOf({ query: 'radio', none })).toBe(LIBRARY_PAGE_COPY.noMatches)
+  })
+})
+
+describe('isListLoading', () => {
+  it('is loading only while nothing has failed and nothing is read', () => {
+    const failure = new Error('down')
+    expect(isListLoading({ failure: null, isRead: false, hasNoMusic: false })).toBe(true)
+    expect(isListLoading({ failure: null, isRead: true, hasNoMusic: false })).toBe(false)
+    expect(isListLoading({ failure, isRead: false, hasNoMusic: false })).toBe(false)
   })
 })

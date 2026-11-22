@@ -120,7 +120,7 @@ export const IMAGE_CACHE_PATH = '/api/images'
 /** The query parameter a thumbnail's or an avatar's version rides in, so a new one is a new address. */
 export const PICTURE_VERSION_PARAM = 'v'
 
-export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version' } as const
+export const PICTURE_PARAMS = { id: 'id', kind: 'kind', version: 'version', key: 'key' } as const
 
 /**
  * Pictures by their capability address: the version, keyed with the
@@ -131,5 +131,7 @@ export const PICTURE_PATHS = {
   item: '/api/pictures/items/:id/:kind/:version',
   photo: '/api/pictures/people/:id/:version',
   artist: '/api/pictures/artists/:id/:version',
+  /** One option for an artist's background, by its key. */
+  artistBackground: '/api/pictures/artists/:id/backgrounds/:key',
   album: '/api/pictures/albums/:id/:version',
 } as const

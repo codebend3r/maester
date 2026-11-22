@@ -12,6 +12,7 @@ import {
 } from '@raven/wren'
 import { useState } from 'react'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { usePlaylists } from '@/music/listings'
 import { playlistPath } from '@/routes'
 import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
@@ -30,7 +31,9 @@ const NO_PLAYLISTS: readonly PlaylistSummary[] = []
 type PlaylistsNoticeProps = { listing: ListState }
 
 function PlaylistsNotice({ listing }: PlaylistsNoticeProps) {
-  return <ListNotice empty={LIBRARY_PAGE_COPY.noPlaylists} listing={listing} />
+  return (
+    <ListNotice empty={LIBRARY_PAGE_COPY.noPlaylists} listing={listing} shape={LIST_SHAPES.tiles} />
+  )
 }
 
 type NoPlaylistsProps = { onNew: () => void }

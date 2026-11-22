@@ -10,11 +10,8 @@ import { AlbumsCollection } from '@/screens/Collection/AlbumsCollection'
 import { ArtistsCollection } from '@/screens/Collection/ArtistsCollection'
 import { PlaylistsCollection } from '@/screens/Collection/PlaylistsCollection'
 import { SongsCollection } from '@/screens/Collection/SongsCollection'
-import {
-  FavouritesCollection,
-  FinishedCollection,
-  InProgressCollection,
-} from '@/screens/Collection/TracksCollection'
+import { FavouritesCollection } from '@/screens/Collection/FavouritesCollection'
+import { FinishedCollection, InProgressCollection } from '@/screens/Collection/TracksCollection'
 import { UnmatchedAlbumsCollection } from '@/screens/Collection/UnmatchedAlbumsCollection'
 
 /** The page each of Library's categories opens. */

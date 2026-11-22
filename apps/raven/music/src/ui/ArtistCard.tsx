@@ -1,7 +1,10 @@
+import type { Artist } from '@raven/core'
 import { countsLineOf } from '@raven/wren'
+import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
-import type { Cover } from '@/music/useCovers'
+import type { ArtistPhotoOf } from '@/music/useCovers'
+import { WREN_PAGES, pageHref } from '@/routes'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { ArtistAvatar } from '@/ui/ArtistAvatar'
@@ -25,41 +28,38 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 }))
 
 type ArtistCardProps = {
-  name: string
-  albumCount: number
-  trackCount: number
-  picture: Cover | null
+  artist: Artist
+  photoOf: ArtistPhotoOf
   /** The column's width, which a grid works out. */
   width: number
-  onPress: () => void
 }
 
 /**
  * An artist in a grid, as raven's Artists tab draws one: their photo, or their initial, beside
- * their name in the display face and what they hold under it, the zeros left out.
+ * their name in the display face and what they hold under it, the zeros left out. A press opens
+ * their page.
  */
-export function ArtistCard({
-  name,
-  albumCount,
-  trackCount,
-  picture,
-  width,
-  onPress,
-}: ArtistCardProps) {
+export function ArtistCard({ artist, photoOf, width }: ArtistCardProps) {
   const styles = useStyles()
-  const counts = countsLineOf({ albums: albumCount, tracks: trackCount })
+  const router = useRouter()
+  const counts = countsLineOf({ albums: artist.albumCount, tracks: artist.trackCount })
   return (
     <Pressable
-      accessibilityLabel={name}
+      accessibilityLabel={artist.name}
       accessibilityRole="button"
-      onPress={onPress}
+      onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: artist.id }))}
       style={pressedStyleOf({ style: { width } })}
     >
       <Card style={styles.card}>
-        <ArtistAvatar name={name} picture={picture} radius={RADIUS.md} size={SIZE.artistPhoto} />
+        <ArtistAvatar
+          name={artist.name}
+          picture={photoOf(artist)}
+          radius={RADIUS.md}
+          size={SIZE.artistPhoto}
+        />
         <View style={styles.text}>
           <Text numberOfLines={1} style={styles.name}>
-            {name}
+            {artist.name}
           </Text>
           {counts !== '' && (
             <Text numberOfLines={1} style={styles.counts}>

@@ -108,6 +108,9 @@ export type { HistoryShow, RavenQueries } from '@/query/ravenQueries'
 export { shuffledTracksOf } from '@/query/shuffledTracks'
 export { itemFavouriteFor, useServerItemFavourite } from '@/query/useItemFavourite'
 export { mediaMutationsFor, useServerMediaMutations } from '@/query/useMediaMutations'
+export { useTrackFavourite } from '@/query/useTrackFavourite'
+export { useChooseArtistBackground } from '@/query/useChooseArtistBackground'
+export { useIsOwner } from '@/query/useIsOwner'
 export {
   musicFavouritesFor,
   useServerAlbumFavourite,

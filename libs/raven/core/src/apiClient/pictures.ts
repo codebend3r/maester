@@ -88,6 +88,8 @@ const albumCoverPath = ({ albumId, coverVersion }: AlbumCoverPathProps): string 
     params: { [PICTURE_PARAMS.id]: albumId, [PICTURE_PARAMS.version]: coverVersion },
   })
 
+type ArtistBackgroundUrlProps = { artistId: number; key: string }
+
 type ImageOptionUrlProps = {
   id: number
   kind: ChoosableImageKind
@@ -240,6 +242,15 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
               params: { [PICTURE_PARAMS.id]: artistId, [PICTURE_PARAMS.version]: photoVersion },
             }),
           }),
+
+    /** One option for an artist's background, by its key. */
+    artistBackgroundUrl: ({ artistId, key }: ArtistBackgroundUrlProps): string =>
+      pictureAt({
+        path: fillPath({
+          path: PICTURE_PATHS.artistBackground,
+          params: { [PICTURE_PARAMS.id]: artistId, [PICTURE_PARAMS.key]: key },
+        }),
+      }),
 
     /** An album's cover at its own width; null while the album has none. Versioned, so cached for good. */
     albumCoverUrl: ({ albumId, coverVersion }: AlbumCoverUrlProps): string | null =>

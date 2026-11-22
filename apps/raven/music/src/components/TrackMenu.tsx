@@ -1,9 +1,15 @@
 import { type Track, artistNames } from '@raven/core'
-import { useAudioQueue } from '@raven/ui/headless'
+import { useAudioQueue, useTrackFavourite } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { type ComponentProps, type ComponentType, useState } from 'react'
 
-import { type MenuPlaces, factsLineOf, menuGroupsOf, TRACK_MENU_COPY } from '@raven/wren'
+import {
+  type MenuLike,
+  type MenuPlaces,
+  factsLineOf,
+  menuGroupsOf,
+  TRACK_MENU_COPY,
+} from '@raven/wren'
 import { AddToPlaylist } from '@/components/AddToPlaylist'
 import { useCovers } from '@/music/useCovers'
 import { WREN_PAGES, pageHref } from '@/routes'
@@ -30,6 +36,8 @@ type TracksMenuProps = {
   canAddToPlaylist: boolean
   /** Where the menu can go from here; `{}` for a menu with nowhere to go. */
   places: MenuPlaces
+  /** A song's Like or Unlike; left out of a menu over more than one. */
+  like?: MenuLike
   onClose: () => void
 }
 
@@ -41,7 +49,14 @@ type MenuBodyProps = TracksMenuProps & {
 type TracksAct = (tracks: readonly Track[]) => void
 
 /** Play next, Add to queue and, where it shows, Add to playlist; then where to go from here. */
-function MenuActions({ tracksOf, canAddToPlaylist, places, onPlaylists, onClose }: MenuBodyProps) {
+function MenuActions({
+  tracksOf,
+  canAddToPlaylist,
+  places,
+  like,
+  onPlaylists,
+  onClose,
+}: MenuBodyProps) {
   const router = useRouter()
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
@@ -55,6 +70,7 @@ function MenuActions({ tracksOf, canAddToPlaylist, places, onPlaylists, onClose 
   }
   const groups = menuGroupsOf({
     icons: ICONS,
+    like,
     canAddToPlaylist,
     places,
     onPlayNext: withTracks(playNext),
@@ -109,8 +125,14 @@ type TrackMenuOfProps = TrackMenuProps & { session: WrenSession }
 
 function TrackMenuOf({ session, track, onClose }: TrackMenuOfProps) {
   const { trackCoverOf } = useCovers(session)
+  const like = useTrackFavourite({
+    api: session.api,
+    queries: session.queries,
+    track,
+    onFailure: toastFailure,
+  })
   const [artist] = track.artists
-  // TODO(redesign): Like and Download once the server keeps a track's favourite and a track downloads alone.
+  // TODO(redesign): Download once a track downloads alone.
   return (
     <TracksMenu
       canAddToPlaylist
@@ -119,6 +141,7 @@ function TrackMenuOf({ session, track, onClose }: TrackMenuOfProps) {
         subtitle: factsLineOf([artistNames(track), track.album.title]),
         cover: trackCoverOf(track),
       }}
+      like={like}
       onClose={onClose}
       places={{ albumId: track.albumId, artist }}
       session={session}
@@ -128,9 +151,9 @@ function TrackMenuOf({ session, track, onClose }: TrackMenuOfProps) {
 }
 
 /**
- * A track's menu, held on its row or opened from its More: play it next, add it to the queue
- * or to a playlist, or go to its album or artist. Like and Download are left out: the server
- * keeps no favourite for a track, and a download is an album's or a playlist's.
+ * A track's menu, held on its row or opened from its More: like or unlike it, play it next, add
+ * it to the queue or to a playlist, or go to its album or artist. Download is left out: a
+ * download is an album's or a playlist's.
  */
 export function TrackMenu(props: TrackMenuProps) {
   const session = useWren()

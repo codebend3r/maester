@@ -10,9 +10,9 @@ import '@/styles/globals.scss'
 import { AppRoutes } from '@/AppRoutes'
 import { queryClient } from '@/lib/queryClient'
 import { StartAuthSession } from '@/lib/startAuthSession'
-import { followAppearance } from '@/stores/wrenPrefs'
+import { followTheme } from '@/theme/followTheme'
 
-followAppearance()
+followTheme()
 // raven's origin when this page's `/api` is a proxy to it (Netlify's); unset when `/api` is raven itself.
 startMediaOrigin({ apiOrigin: import.meta.env.VITE_API_ORIGIN ?? '' })
 // The queue and the player's choices are read back before any route draws, as the apps read their stores.

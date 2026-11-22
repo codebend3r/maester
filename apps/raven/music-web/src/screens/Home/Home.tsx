@@ -13,6 +13,7 @@ import {
 import { useState } from 'react'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { Notice } from '@/components/Notice/Notice'
 import { Section } from '@/components/Section/Section'
 import { WrenLockup } from '@/components/WrenLockup/WrenLockup'
@@ -143,7 +144,13 @@ function RecentlyAdded() {
         onSelect={(homeSort) => change({ homeSort })}
         selected={sort}
       />
-      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      {albums.length === 0 && (
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
+      )}
       <AlbumGrid
         albums={albums}
         columns={RECENT_COLUMNS}

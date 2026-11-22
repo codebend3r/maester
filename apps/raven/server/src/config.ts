@@ -49,6 +49,8 @@ export const RAVEN_ENV = {
   metadataCountry: 'METADATA_COUNTRY',
   omdbApiKey: 'OMDB_API_KEY',
   omdbDailyLimit: 'OMDB_DAILY_LIMIT',
+  theAudioDbApiKey: 'THEAUDIODB_API_KEY',
+  fanartTvApiKey: 'FANARTTV_API_KEY',
   mdblistApiKey: 'MDBLIST_API_KEY',
   mdblistDailyLimit: 'MDBLIST_DAILY_LIMIT',
   anthropicApiKey: 'ANTHROPIC_API_KEY',
@@ -63,6 +65,9 @@ export const RAVEN_ENV = {
   libraryPin: 'LIBRARY_PIN',
   adminPassword: 'ADMIN_PASSWORD',
 } as const
+
+/** TheAudioDB's public key, which anyone may use without signing up, at 30 calls a minute. */
+const THEAUDIODB_FREE_KEY = '123'
 
 /** GiB of MP4 copies for device downloads kept unless `DEVICE_DOWNLOAD_CACHE_GB` says otherwise. */
 const DEVICE_DOWNLOAD_CACHE_GB = 300
@@ -137,6 +142,10 @@ export type ServerConfig = ListenConfig & {
   omdbApiKey: string | null
   /** OMDb calls a day; a free key allows 1,000. */
   omdbDailyLimit: number
+  /** TheAudioDB's key, for artist backgrounds; its free public key unless a paid one is set. Never logged or sent to a client. */
+  theAudioDbApiKey: string
+  /** fanart.tv's personal key, for artist backgrounds; null leaves fanart.tv out. Never logged or sent to a client. */
+  fanartTvApiKey: string | null
   /** MDBList's key, for Rotten Tomatoes and Metacritic scores of shows too; null leaves it out. Never logged or sent to a client. */
   mdblistApiKey: string | null
   /** MDBList calls a day; a free key allows 1,000. */
@@ -232,6 +241,8 @@ export const readServerConfig = (env: NodeJS.ProcessEnv = process.env): ServerCo
   metadataCountry: text({ value: env[RAVEN_ENV.metadataCountry], fallback: 'US' }).toUpperCase(),
   omdbApiKey: text({ value: env[RAVEN_ENV.omdbApiKey], fallback: null }),
   omdbDailyLimit: atLeast({ value: env[RAVEN_ENV.omdbDailyLimit], min: 1, fallback: 1000 }),
+  theAudioDbApiKey: text({ value: env[RAVEN_ENV.theAudioDbApiKey], fallback: THEAUDIODB_FREE_KEY }),
+  fanartTvApiKey: text({ value: env[RAVEN_ENV.fanartTvApiKey], fallback: null }),
   mdblistApiKey: text({ value: env[RAVEN_ENV.mdblistApiKey], fallback: null }),
   mdblistDailyLimit: atLeast({ value: env[RAVEN_ENV.mdblistDailyLimit], min: 1, fallback: 1000 }),
   anthropicApiKey: text({ value: env[RAVEN_ENV.anthropicApiKey], fallback: null }),

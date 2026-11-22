@@ -3,6 +3,7 @@ import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { NOW_PLAYING_COPY } from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 import { TrackMenu } from '@/components/TrackMenu/TrackMenu'
+import { useTrackLike } from '@/lib/useTrackLike'
 import { WREN_ROUTES } from '@/routes'
 import { PhonePlayer } from '@/screens/NowPlaying/PhonePlayer'
 import { CloseButton } from '@/screens/NowPlaying/PlayerHeader'
@@ -36,6 +37,7 @@ type SheetViewProps<K extends SheetState> = { sheet: Sheet & { state: K } }
 /** A song is queued: the layout for the window, and the song's actions over it from More. */
 function PlayingSheet({ sheet: { track } }: SheetViewProps<typeof SHEET_STATES.playing>) {
   const playing = usePlaying({ track })
+  const like = useTrackLike({ track })
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const Layout = LAYOUT_VIEWS[usePlayerFormFactor()]
   // While the menu is open Escape is its own, and closes it alone.
@@ -43,7 +45,7 @@ function PlayingSheet({ sheet: { track } }: SheetViewProps<typeof SHEET_STATES.p
   return (
     <>
       <Layout onMore={() => setIsMenuOpen(true)} playing={playing} />
-      {isMenuOpen && <TrackMenu onClose={() => setIsMenuOpen(false)} track={track} />}
+      {isMenuOpen && <TrackMenu like={like} onClose={() => setIsMenuOpen(false)} track={track} />}
     </>
   )
 }

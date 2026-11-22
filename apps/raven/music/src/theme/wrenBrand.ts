@@ -4,7 +4,9 @@
  * to the mark is made there and copied here, never redrawn.
  */
 
-import { BRAND, COLOR_SCHEMES, type ColorScheme } from '@/theme/wrenTokens'
+import { COLOR_SCHEMES, type ColorScheme } from '@raven/wren'
+
+import { BRAND } from '@/theme/wrenTokens'
 
 /** The bird's and the name's ink on each scheme's ground: Bark on the dark, Ink on the light. */
 export const BRAND_INKS = {

@@ -352,7 +352,12 @@ describe('MusicRepository', () => {
         id: radiohead?.id ?? 0,
         version: radiohead?.photoVersion ?? '',
       }),
-    ).toEqual({ mbid: 'artist-radiohead', picture: null, isFetched: false })
+    ).toEqual({
+      mbid: 'artist-radiohead',
+      picture: null,
+      isFetched: false,
+      background: null,
+    })
     const picture = 'https://commons.wikimedia.org/radiohead.jpg'
     coverStore().setArtistPicture({ id: radiohead?.id ?? 0, picture })
     expect(
@@ -360,7 +365,12 @@ describe('MusicRepository', () => {
         id: radiohead?.id ?? 0,
         version: radiohead?.photoVersion ?? '',
       }),
-    ).toEqual({ mbid: 'artist-radiohead', picture, isFetched: true })
+    ).toEqual({
+      mbid: 'artist-radiohead',
+      picture,
+      isFetched: true,
+      background: null,
+    })
     expect(coverStore().artistPicture({ id: radiohead?.id ?? 0, version: 'wrong' })).toBeNull()
   })
 

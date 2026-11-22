@@ -31,6 +31,9 @@ import { playerQueriesFor } from '@/lib/playerQueries'
 /** How long Coming soon is taken as read: the server keeps TMDB's answer for hours. */
 const UPCOMING_STALE_MS = 30 * 60_000
 
+/** How long an artist's about is taken as read: the server keeps it a day. */
+const ARTIST_ABOUT_STALE_MS = 60 * 60_000
+
 /** How often a page that shows requests asks again where they stand: the server reads each arr as often. */
 const REQUESTS_REFETCH_MS = 30_000
 
@@ -511,6 +514,21 @@ export const ravenQueriesFor = (api: ApiClient) => {
       queryOptions({
         queryKey: queryKeys.artist(id),
         queryFn: id == null ? skipToken : () => api.getArtist(id),
+      }),
+
+    /** Who the artist is: a short bio, their birth name and day, and their awards. */
+    artistAboutQuery: (id: number) =>
+      queryOptions({
+        queryKey: queryKeys.artistAbout(id),
+        queryFn: () => api.getArtistAbout(id),
+        staleTime: ARTIST_ABOUT_STALE_MS,
+      }),
+
+    /** The pictures an owner may set behind an artist's name, and the one worn. */
+    artistBackgroundsQuery: (id: number) =>
+      queryOptions({
+        queryKey: queryKeys.artistBackgrounds(id),
+        queryFn: () => api.listArtistBackgrounds(id),
       }),
 
     /** The account's favourite albums, across every library it may see. */

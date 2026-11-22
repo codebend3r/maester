@@ -5,31 +5,6 @@
  * component as *.module.scss and use only these values.
  */
 
-// The light palette, worn by the system's light scheme and by Settings' Light alike.
-@mixin light-palette {
-  --color-bg: #f4efe6;
-  --color-surface: #fbf8f2;
-  --color-surface-2: #e9e3d7;
-  --color-raised: #ffffff;
-  --color-field: #ffffff;
-  --color-line: rgb(19 20 22 / 8%);
-  --color-line-2: rgb(19 20 22 / 14%);
-  --color-text: #131416;
-  --color-text-2: #474a47;
-  --color-text-3: #5f615c;
-  --color-accent: #a8262f;
-  --color-accent-ink: #ffffff;
-  --color-accent-text: #a8262f;
-  --color-accent-soft: rgb(168 38 47 / 8%);
-  --color-ok: #2f7a57;
-  --color-scrim: rgb(19 20 22 / 36%);
-  --color-shadow: rgb(40 30 20 / 14%);
-  // The bird's and the name's ink on this ground.
-  --color-brand-ink: var(--color-ink);
-
-  color-scheme: light;
-}
-
 :root {
   // The logo's own colours, fixed in every theme. The eye red is the logo's alone, never UI.
   --color-night: #15201e;
@@ -39,7 +14,7 @@
   --color-leaf: #a8262f;
   --color-paper: #f1ece2;
 
-  // What sits on a picture, the same in both themes: the dark palette's text on its scrim.
+  // What sits on a picture, the same in every theme: Night's text on its scrim.
   --color-picture-ink: #efebe3;
   --color-picture-veil: rgb(4 8 7 / 66%);
 
@@ -52,26 +27,6 @@
   --color-art-cream: #efe7d8;
   --color-art-pine: #2e4a44;
   --color-art-sand: #e8dcc4;
-
-  // The dark palette, Wren's default.
-  --color-bg: #101816;
-  --color-surface: #17211e;
-  --color-surface-2: #1f2b27;
-  --color-raised: #1b2622;
-  --color-field: #17211e;
-  --color-line: rgb(230 225 214 / 8%);
-  --color-line-2: rgb(230 225 214 / 15%);
-  --color-text: #efebe3;
-  --color-text-2: #b3b8b1;
-  --color-text-3: #89928d;
-  --color-accent: #b8323b;
-  --color-accent-ink: #ffffff;
-  --color-accent-text: #f2858a;
-  --color-accent-soft: rgb(242 133 138 / 13%);
-  --color-ok: #7fc4a4;
-  --color-scrim: rgb(4 8 7 / 66%);
-  --color-shadow: rgb(0 0 0 / 45%);
-  --color-brand-ink: var(--color-bark);
 
   // Young Serif for identity, Instrument Sans for everything else.
   --font-display: 'Young Serif', georgia, serif;
@@ -126,8 +81,8 @@
   --line-meta: 1.125rem;
   --font-size-tile-title: 0.875rem;
   --line-tile-title: 1.1875rem;
-  --font-size-tile-album: 0.875rem;
-  --line-tile-album: 1.1875rem;
+  --font-size-tile-album: 1.0625rem;
+  --line-tile-album: 1.375rem;
   --font-size-tile-artist: 0.875rem;
   --line-tile-artist: 1.1875rem;
   --font-size-time: 0.875rem;
@@ -262,6 +217,8 @@
   --size-progress-line: 2px;
   --size-small-button: 2.25rem;
   --size-play-button: 2.75rem;
+  // The player bar's Play and Pause, which rides above the bar's edge.
+  --size-play-bar: 5.625rem;
   --size-segment: 1.875rem;
   --size-segment-inset: 3px;
   --size-segment-gap: 2px;
@@ -310,10 +267,22 @@
   --size-spinner: 1.25rem;
   // How wide the centred dialog a sheet becomes at 48rem and wider grows.
   --size-sheet-dialog: 26.25rem;
+  --size-sheet-dialog-wide: 60rem;
+  --size-background-option: 9rem;
+
+  // Settings' theme picker: a theme's tile, its small picture of the theme, and the picture's parts (`THEME_SIZES`).
+  --size-theme-tile: 8rem;
+  --size-theme-preview: 4.5rem;
+  --size-theme-bar: 0.375rem;
+  --size-theme-pill-width: 2.75rem;
+  --size-theme-pill-height: 0.875rem;
+  --size-theme-dot: 1.125rem;
+  --size-theme-check: 1.25rem;
 
   // The wide shell: the sidebar, its rail, the player bar and the pages' margins (`SHELL_SIZES`).
   --size-sidebar: 16rem;
-  --size-rail: 4.75rem;
+  // The rail's padding and its rows' on both sides of an icon: four `--space-3` and `--size-nav-icon`.
+  --size-rail: 4.25rem;
   --size-sidebar-item: 2.625rem;
   --size-player-bar: 5.25rem;
   --size-bar-art: 3.25rem;
@@ -345,17 +314,27 @@
   --size-artist-circle-item: 5.5rem;
 
   // An album's, an artist's and a playlist's pages (`DETAIL_SIZES`).
-  --size-detail-column: 18.75rem;
+  --size-detail-column: 22.5rem;
   --size-detail-cover: 14.75rem;
   --size-detail-cover-wide: 18.75rem;
-  --size-detail-hero: 18.75rem;
-  --size-detail-hero-wide: 15.625rem;
+  --size-detail-hero: 22.5rem;
+  --size-detail-hero-wide: 25rem;
   // How tall Add to playlist's list grows before it scrolls: six rows.
   --size-playlist-list: 22.5rem;
 
   // Home: the Continue listening card's art on each layout (`HOME_SIZES`).
   --size-continue-art: 6rem;
   --size-continue-art-wide: 8.25rem;
+
+  // The mark a list or a sheet shows while it loads; the page's own is the sign-in mark.
+  --size-loading-mark: 1.125rem;
+  // A line of words in a list's stand-ins while it loads.
+  --size-skeleton-line: 0.875rem;
+
+  // /design's own: its prose at its widest, a column (a theme's panel, a line height's sample) and an icon's cell.
+  --size-design-measure: 42rem;
+  --size-design-column: 24rem;
+  --size-design-icon: 7rem;
 
   // Sign-in, from the handoff's P01 and T01 (`SIGN_IN_SIZES`).
   --size-sign-in-mark: 4.75rem;
@@ -371,11 +350,16 @@
   --opacity-hover: 0.92;
   --opacity-disabled: 0.4;
   --opacity-sung: 0.55;
+  // The faintest a list's stand-ins breathe to while it is read.
+  --opacity-breathe: 0.5;
 
   // A sheet's or Now Playing's rise.
   --duration-sheet: 320ms;
+  --duration-hover: 180ms;
   // One turn of a waiting button's spinner.
   --duration-spin: 800ms;
+  // One breath of a list's stand-ins, faint and back.
+  --duration-breathe: 1400ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   // The mini player's and a toast's lift, a page's large cover, a picked segment, and a dialog.
@@ -389,20 +373,230 @@
 
   --focus-ring: var(--size-focus-ring) solid var(--color-accent-text);
   --focus-offset: 2px;
+}
+
+/*
+ * The themes: each gives the palette's names its own values, on the root (which `followTheme`
+ * names from Settings' Appearance) or on any element inside it, as a theme's tile in Settings
+ * and its panel on /design wear theirs. The apps' `COLORS` in `wrenTokens.ts` holds the same
+ * values under the same names, and `themes.test.ts` checks every theme declares every colour.
+ */
+
+// Night, Wren's own dark and its default: worn by name, and by a page that names no theme at all.
+:root,
+[data-theme='night'] {
+  --color-bg: #101816;
+  --color-surface: #17211e;
+  --color-surface-2: #1f2b27;
+  --color-raised: #1b2622;
+  --color-field: #17211e;
+  --color-line: rgb(230 225 214 / 8%);
+  --color-line-2: rgb(230 225 214 / 15%);
+  --color-text: #efebe3;
+  --color-text-2: #b3b8b1;
+  --color-text-3: #89928d;
+  --color-accent: #b8323b;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #f2858a;
+  --color-accent-soft: rgb(242 133 138 / 13%);
+  --color-ok: #7fc4a4;
+  --color-scrim: rgb(4 8 7 / 66%);
+  --color-shadow: rgb(0 0 0 / 45%);
+  --color-brand-ink: var(--color-bark);
 
   color-scheme: dark;
 }
 
-// The system's light scheme, unless Settings' Appearance keeps the dark one.
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
-    @include light-palette;
-  }
+// Paper, Wren's own light.
+[data-theme='paper'] {
+  --color-bg: #f4efe6;
+  --color-surface: #fbf8f2;
+  --color-surface-2: #e9e3d7;
+  --color-raised: #ffffff;
+  --color-field: #ffffff;
+  --color-line: rgb(19 20 22 / 8%);
+  --color-line-2: rgb(19 20 22 / 14%);
+  --color-text: #131416;
+  --color-text-2: #474a47;
+  --color-text-3: #5f615c;
+  --color-accent: #a8262f;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #a8262f;
+  --color-accent-soft: rgb(168 38 47 / 8%);
+  --color-ok: #2f7a57;
+  --color-scrim: rgb(19 20 22 / 36%);
+  --color-shadow: rgb(40 30 20 / 14%);
+  --color-brand-ink: var(--color-ink);
+
+  color-scheme: light;
 }
 
-// Settings' Light, whatever the system's scheme.
-:root[data-theme='light'] {
-  @include light-palette;
+// Garnet: the brand's red is the ground, and cream does the accent's work.
+[data-theme='garnet'] {
+  --color-bg: #b8323b;
+  --color-surface: #a82a33;
+  --color-surface-2: #98232c;
+  --color-raised: #c4434b;
+  --color-field: #98232c;
+  --color-line: rgb(255 244 234 / 16%);
+  --color-line-2: rgb(255 244 234 / 30%);
+  --color-text: #ffffff;
+  --color-text-2: #ffe9e6;
+  --color-text-3: #fbdcd8;
+  --color-accent: #fff4ea;
+  --color-accent-ink: #8f1f29;
+  --color-accent-text: #fff4ea;
+  --color-accent-soft: rgb(255 244 234 / 16%);
+  --color-ok: #c8f0d8;
+  --color-scrim: rgb(60 8 12 / 66%);
+  --color-shadow: rgb(60 8 12 / 40%);
+  --color-brand-ink: var(--color-bark);
+
+  color-scheme: dark;
+}
+
+// Blush, Garnet's light partner: rose paper under the same red.
+[data-theme='blush'] {
+  --color-bg: #f8ecea;
+  --color-surface: #fdf6f4;
+  --color-surface-2: #f0dcd9;
+  --color-raised: #ffffff;
+  --color-field: #ffffff;
+  --color-line: rgb(74 16 22 / 9%);
+  --color-line-2: rgb(74 16 22 / 16%);
+  --color-text: #2a0f12;
+  --color-text-2: #5c3d40;
+  --color-text-3: #76575a;
+  --color-accent: #b8323b;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #a8262f;
+  --color-accent-soft: rgb(184 50 59 / 10%);
+  --color-ok: #2f7a57;
+  --color-scrim: rgb(42 15 18 / 36%);
+  --color-shadow: rgb(74 16 22 / 14%);
+  --color-brand-ink: var(--color-ink);
+
+  color-scheme: light;
+}
+
+// Mint: cool green paper with a deep green accent.
+[data-theme='mint'] {
+  --color-bg: #e9f5ee;
+  --color-surface: #f4faf6;
+  --color-surface-2: #d6eadf;
+  --color-raised: #ffffff;
+  --color-field: #ffffff;
+  --color-line: rgb(16 52 40 / 9%);
+  --color-line-2: rgb(16 52 40 / 16%);
+  --color-text: #10261e;
+  --color-text-2: #3b5248;
+  --color-text-3: #54695f;
+  --color-accent: #17785a;
+  --color-accent-ink: #ffffff;
+  --color-accent-text: #0f6a4e;
+  --color-accent-soft: rgb(23 120 90 / 10%);
+  --color-ok: #2f7a57;
+  --color-scrim: rgb(16 38 30 / 36%);
+  --color-shadow: rgb(16 52 40 / 14%);
+  --color-brand-ink: var(--color-ink);
+
+  color-scheme: light;
+}
+
+// Dracula, after the editor theme: its ground, foreground, purple and green.
+[data-theme='dracula'] {
+  --color-bg: #282a36;
+  --color-surface: #313442;
+  --color-surface-2: #3a3d4f;
+  --color-raised: #44475a;
+  --color-field: #21222c;
+  --color-line: rgb(248 248 242 / 8%);
+  --color-line-2: rgb(248 248 242 / 16%);
+  --color-text: #f8f8f2;
+  --color-text-2: #c5c8dc;
+  --color-text-3: #a4aed6;
+  --color-accent: #bd93f9;
+  --color-accent-ink: #282a36;
+  --color-accent-text: #c9a6ff;
+  --color-accent-soft: rgb(189 147 249 / 16%);
+  --color-ok: #50fa7b;
+  --color-scrim: rgb(15 16 22 / 66%);
+  --color-shadow: rgb(0 0 0 / 45%);
+  --color-brand-ink: var(--color-bark);
+
+  color-scheme: dark;
+}
+
+// Midnight: deep navy with a sky blue accent.
+[data-theme='midnight'] {
+  --color-bg: #0e1524;
+  --color-surface: #151e31;
+  --color-surface-2: #1e2a42;
+  --color-raised: #1a2439;
+  --color-field: #151e31;
+  --color-line: rgb(222 231 247 / 8%);
+  --color-line-2: rgb(222 231 247 / 16%);
+  --color-text: #e9eef8;
+  --color-text-2: #b1bcd0;
+  --color-text-3: #8a97b0;
+  --color-accent: #7cb7ff;
+  --color-accent-ink: #0e1524;
+  --color-accent-text: #8fc2ff;
+  --color-accent-soft: rgb(124 183 255 / 15%);
+  --color-ok: #7fd4b0;
+  --color-scrim: rgb(4 8 16 / 66%);
+  --color-shadow: rgb(0 0 0 / 45%);
+  --color-brand-ink: var(--color-bark);
+
+  color-scheme: dark;
+}
+
+// Banana: banana yellow paper with a stem brown accent.
+[data-theme='banana'] {
+  --color-bg: #fcefa8;
+  --color-surface: #fff7cc;
+  --color-surface-2: #f3e08a;
+  --color-raised: #ffffff;
+  --color-field: #fffdf0;
+  --color-line: rgb(64 48 0 / 10%);
+  --color-line-2: rgb(64 48 0 / 18%);
+  --color-text: #2b2204;
+  --color-text-2: #54471a;
+  --color-text-3: #6b5d2a;
+  --color-accent: #7a5200;
+  --color-accent-ink: #fff8d6;
+  --color-accent-text: #7a5200;
+  --color-accent-soft: rgb(122 82 0 / 10%);
+  --color-ok: #2f7a57;
+  --color-scrim: rgb(43 34 4 / 36%);
+  --color-shadow: rgb(64 48 0 / 16%);
+  --color-brand-ink: var(--color-ink);
+
+  color-scheme: light;
+}
+
+// Ember: warm charcoal with an orange accent.
+[data-theme='ember'] {
+  --color-bg: #17120f;
+  --color-surface: #201915;
+  --color-surface-2: #2c231d;
+  --color-raised: #251d18;
+  --color-field: #201915;
+  --color-line: rgb(245 232 220 / 8%);
+  --color-line-2: rgb(245 232 220 / 16%);
+  --color-text: #f3ebe3;
+  --color-text-2: #bdb0a4;
+  --color-text-3: #9c8f83;
+  --color-accent: #f28c28;
+  --color-accent-ink: #1c1109;
+  --color-accent-text: #ffa24a;
+  --color-accent-soft: rgb(242 140 40 / 15%);
+  --color-ok: #7fc4a4;
+  --color-scrim: rgb(8 5 3 / 66%);
+  --color-shadow: rgb(0 0 0 / 45%);
+  --color-brand-ink: var(--color-bark);
+
+  color-scheme: dark;
 }
 
 * {
@@ -427,7 +621,9 @@ body {
 h1,
 h2,
 p,
-ul {
+ul,
+dl,
+dd {
   margin: 0;
 }
 

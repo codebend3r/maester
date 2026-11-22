@@ -222,6 +222,45 @@ export const useInProgressTracks = (session: WrenSession) => {
   return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
 }
 
+const NO_ENTRIES: readonly never[] = []
+
+type UseAccountListingProps<Entry, Key extends QueryKey> = {
+  session: WrenSession
+  query: UseQueryOptions<Entry[], Error, Entry[], Key>
+}
+
+/** A list the account keeps across every music library, and where it stands beside them. */
+const useAccountListing = <Entry, Key extends QueryKey>({
+  session,
+  query,
+}: UseAccountListingProps<Entry, Key>) => {
+  const music = useMusicLibraries(session)
+  const answer = useQuery(query)
+  const entries: readonly Entry[] = answer.data ?? NO_ENTRIES
+  return {
+    entries,
+    listing: listStateOf({ music, failure: answer.error, isRead: answer.isSuccess }),
+  }
+}
+
+/** The artists the account marked a favourite, most recently marked first, and where they stand. */
+export const useFavouriteArtists = (session: WrenSession) => {
+  const { entries, listing } = useAccountListing({
+    session,
+    query: session.queries.favouriteArtistsQuery,
+  })
+  return { artists: entries, listing }
+}
+
+/** The albums the account marked a favourite, most recently marked first, and where they stand. */
+export const useFavouriteAlbums = (session: WrenSession) => {
+  const { entries, listing } = useAccountListing({
+    session,
+    query: session.queries.favouriteAlbumsQuery,
+  })
+  return { albums: entries, listing }
+}
+
 /** The songs marked a favourite in every music library, each library's most recently marked first. */
 export const useFavouriteTracks = (session: WrenSession) => {
   const { entries, listing } = useMergedListing({

@@ -313,6 +313,38 @@ describe('Collection', () => {
       expect(music().listLibraryFavourites).toHaveBeenCalledWith(MUSIC.id)
     })
 
+    it('lists the favourite artists above the favourite songs, each under its heading', async () => {
+      music().listFavouriteArtists.mockResolvedValue([RADIOHEAD])
+      renderCollection({ kind: COLLECTION_KINDS.favourites })
+      expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: new RegExp(RADIOHEAD.name) })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: LIBRARY_PAGE_COPY.artists })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: LIBRARY_PAGE_COPY.songs })).toBeInTheDocument()
+    })
+
+    it('lists a favourite artist when there are no favourite songs', async () => {
+      music().listFavouriteArtists.mockResolvedValue([RADIOHEAD])
+      music().listLibraryFavourites.mockResolvedValue([])
+      renderCollection({ kind: COLLECTION_KINDS.favourites })
+      expect(
+        await screen.findByRole('link', { name: new RegExp(RADIOHEAD.name) }),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: LIBRARY_PAGE_COPY.songs })).toBeNull()
+      expect(screen.queryByText(LIBRARY_PAGE_COPY.noFavourites)).toBeNull()
+    })
+
+    it('lists the favourite albums as tiles under their heading', async () => {
+      music().listFavouriteAlbums.mockResolvedValue([OK_COMPUTER])
+      music().listLibraryFavourites.mockResolvedValue([])
+      renderCollection({ kind: COLLECTION_KINDS.favourites })
+      expect(await screen.findByRole('link', { name: OK_COMPUTER_TILE })).toHaveAttribute(
+        'href',
+        albumPath(OK_COMPUTER.id),
+      )
+      expect(screen.getByRole('heading', { name: LIBRARY_PAGE_COPY.albums })).toBeInTheDocument()
+      expect(screen.queryByText(LIBRARY_PAGE_COPY.noFavourites)).toBeNull()
+    })
+
     it('lists the songs played to their end, as many as raven shows', async () => {
       renderCollection({ kind: COLLECTION_KINDS.finished })
       expect(await screen.findByRole('button', { name: LUCKY.title })).toBeInTheDocument()

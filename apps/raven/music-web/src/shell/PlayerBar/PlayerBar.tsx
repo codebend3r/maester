@@ -1,10 +1,11 @@
 import type { Track } from '@raven/core'
-import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
+import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { PLAYER_COPY, TRANSPORTS, factsLineOf } from '@raven/wren'
 import { useNavigate } from 'react-router-dom'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
 import { Transport } from '@/player/Transport/Transport'
 import { useNowPlaying } from '@/player/useNowPlaying'
+import { useQuality } from '@/player/useQuality'
 import { Volume } from '@/player/Volume/Volume'
 import { WREN_ROUTES } from '@/routes'
 import { SIZES } from '@/theme/tokens'
@@ -18,6 +19,8 @@ type PlayingBarProps = { track: Track }
 function PlayingBar({ track }: PlayingBarProps) {
   const navigate = useNavigate()
   const { cover, artists, length, error } = useNowPlaying({ track })
+  const quality = useQuality({ track })
+  const isPlaying = useAudioQueue(isPlayingOf)
   const openNowPlaying = () => navigate(WREN_ROUTES.nowPlaying)
   return (
     <section className={styles.bar}>
@@ -27,8 +30,10 @@ function PlayingBar({ track }: PlayingBarProps) {
         className={styles.nowPlaying}
         cover={cover}
         error={error}
+        isPlaying={isPlaying}
         line={factsLineOf([artists, track.album.title])}
         onOpen={openNowPlaying}
+        quality={quality}
         title={track.title}
       />
       <div className={styles.centre}>

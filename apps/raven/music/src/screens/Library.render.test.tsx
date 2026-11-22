@@ -338,6 +338,38 @@ describe('Library', () => {
     mockApi.listLibraryFavourites.mockResolvedValue(FAVOURITES)
   })
 
+  it('lists the favourite artists above the favourite songs, each under its heading', async () => {
+    mockApi.listFavouriteArtists.mockResolvedValue([RADIOHEAD])
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
+    expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeTruthy()
+    expect(screen.getByRole('button', { name: RADIOHEAD.name })).toBeTruthy()
+    expect(screen.getByRole('header', { name: LIBRARY_PAGE_COPY.artists })).toBeTruthy()
+    expect(screen.getByRole('header', { name: LIBRARY_PAGE_COPY.songs })).toBeTruthy()
+    mockApi.listFavouriteArtists.mockResolvedValue([])
+  })
+
+  it('lists a favourite artist when there are no favourite songs', async () => {
+    mockApi.listFavouriteArtists.mockResolvedValue([RADIOHEAD])
+    mockApi.listLibraryFavourites.mockResolvedValue([])
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
+    expect(await screen.findByRole('button', { name: RADIOHEAD.name })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: LIBRARY_PAGE_COPY.songs })).toBeNull()
+    expect(screen.queryByText(LIBRARY_PAGE_COPY.noFavourites)).toBeNull()
+    mockApi.listFavouriteArtists.mockResolvedValue([])
+    mockApi.listLibraryFavourites.mockResolvedValue(FAVOURITES)
+  })
+
+  it('lists the favourite albums under their heading, with no notice', async () => {
+    mockApi.listFavouriteAlbums.mockResolvedValue([OK_COMPUTER])
+    mockApi.listLibraryFavourites.mockResolvedValue([])
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
+    expect(await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.albums })).toBeTruthy()
+    expect(screen.getByText(OK_COMPUTER.title)).toBeTruthy()
+    expect(screen.queryByText(LIBRARY_PAGE_COPY.noFavourites)).toBeNull()
+    mockApi.listFavouriteAlbums.mockResolvedValue([])
+    mockApi.listLibraryFavourites.mockResolvedValue(FAVOURITES)
+  })
+
   it('lists the songs a page at a time, asking for the next page at the end of the list', async () => {
     mockApi.listTracks.mockImplementation(async ({ offset = 0 }) =>
       offset === 0

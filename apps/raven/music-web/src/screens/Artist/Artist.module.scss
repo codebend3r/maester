@@ -7,10 +7,12 @@
   --page-pad-side: 0;
 }
 
-// Play and Shuffle share the row; Follow keeps its circle at the end.
+// Play and Shuffle share the row; Follow, and the owner's Edit background image, keep their circles at the end.
 .actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
   gap: var(--space-3);
   align-items: center;
   padding-inline: var(--page-gutter);

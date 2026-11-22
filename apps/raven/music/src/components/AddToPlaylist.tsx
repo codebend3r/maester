@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 
 import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY } from '@raven/wren'
+import { LoadingMark } from '@/components/LoadingMark'
 import { Notice } from '@/components/Notice'
 import { type PickedPlaylist, useAddToPlaylist } from '@/components/useAddToPlaylist'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
@@ -61,14 +62,6 @@ type AddToPlaylistProps = {
   onDone: () => void
 }
 
-type NoticeOfProps = { error: Error | null; isSuccess: boolean }
-
-/** What stands in for the list while there is none: why it could not be read, or that it is on its way. */
-const noticeOf = ({ error, isSuccess }: NoticeOfProps): string | null => {
-  if (error !== null) return error.message
-  return isSuccess ? null : TRACK_MENU_COPY.loading
-}
-
 type PlaylistRowProps = {
   playlist: PlaylistSummary
   onAdd: (playlist: PickedPlaylist) => void
@@ -108,7 +101,6 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
   const [isNaming, setIsNaming] = useState(false)
   const list = playlists.data ?? NO_PLAYLISTS
   const add = useAddToPlaylist({ session, tracksOf, onDone })
-  const notice = noticeOf({ error: playlists.error, isSuccess: playlists.isSuccess })
   const isEmpty = playlists.isSuccess && list.length === 0
   return (
     <View style={styles.body}>
@@ -126,7 +118,8 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
         </Pressable>
       )}
       {isNaming && <NewPlaylistForm onCreated={add} session={session} />}
-      {notice !== null && <Notice text={notice} />}
+      {playlists.isPending && <LoadingMark label={TRACK_MENU_COPY.loading} />}
+      {playlists.error !== null && <Notice text={playlists.error.message} />}
       {isEmpty && (
         <EmptyState
           body={TRACK_MENU_COPY.noPlaylistsHint(name)}

@@ -1,0 +1,78 @@
+@use '../../styles/mixins';
+
+.skeleton,
+.bones {
+  display: grid;
+  min-inline-size: 0;
+}
+
+// Every stand-in is a grey block that breathes while motion is allowed.
+.cover,
+.art,
+.line,
+.shortLine {
+  display: block;
+  background: var(--color-surface-2);
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: breathe var(--duration-breathe) ease-in-out infinite alternate;
+  }
+}
+
+.tile {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.cover {
+  aspect-ratio: 1;
+  border-radius: var(--radius-art);
+}
+
+.line,
+.shortLine {
+  block-size: var(--size-skeleton-line);
+  border-radius: var(--radius-xs);
+}
+
+.line {
+  inline-size: 80%;
+}
+
+.shortLine {
+  inline-size: 50%;
+}
+
+.rows {
+  display: grid;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  block-size: var(--size-row);
+}
+
+.art {
+  inline-size: var(--size-row-art);
+  block-size: var(--size-row-art);
+  border-radius: var(--radius-xs);
+}
+
+.text {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.label {
+  @include mixins.visually-hidden;
+}
+
+@keyframes breathe {
+  to {
+    opacity: var(--opacity-breathe);
+  }
+}

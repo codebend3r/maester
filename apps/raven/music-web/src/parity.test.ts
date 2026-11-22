@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { fileURLToPath } from 'node:url'
 import { Glob } from 'bun'
-import { WREN_ROUTES } from '@/routes'
+import { WREN_ROUTES, WREN_WEB_ONLY_ROUTES } from '@/routes'
 
 /** The phone and tablet apps' expo-router tree, whose every file but a layout is a page. */
 const APP_DIR = fileURLToPath(new URL('../../music/app', import.meta.url))
@@ -51,5 +51,12 @@ describe('Wren on the web and Wren on the phone', () => {
     const native = await appPaths()
     expect(native.length).toBeGreaterThan(0)
     expect(Object.values<string>(WREN_ROUTES).toSorted()).toEqual(native)
+  })
+
+  it('keeps the web-only pages out of the apps, and the apps out of them', async () => {
+    const native = await appPaths()
+    const webOnly = Object.values<string>(WREN_WEB_ONLY_ROUTES)
+    expect(webOnly.filter((path) => native.includes(path))).toEqual([])
+    expect(webOnly.filter((path) => Object.values<string>(WREN_ROUTES).includes(path))).toEqual([])
   })
 })

@@ -8,11 +8,15 @@ export {
   TRACK_MENU_COPY,
   WREN_LOCKUP_COPY,
 } from '@/copy/components'
+export { DESIGN_COPY } from '@/copy/design'
+export { isLibraryPick, wornLibrariesOf } from '@/library/wornLibrary'
 export {
   COUNTS_COPY,
   KIT_COPY,
   NEW_PLAYLIST_COPY,
   PLAYER_COPY,
+  SIDEBAR_COPY,
+  SIDEBAR_KEY,
   STATUS_COPY,
   TAB_COPY,
   factsLineOf,
@@ -32,14 +36,19 @@ export {
   SIGN_IN_COPY,
   STORAGE_COPY,
 } from '@/copy/screens'
+export { isServerNamePick, serverNameEditOf } from '@/serverName'
+export { themePickerLabelOf, themeSlotLabelOf } from '@/themePickerLabel'
+export { aboutFactsOf, hasAbout } from '@/artistAbout'
 export { countValueOf, countsLineOf, lineValueOf } from '@/counts'
 export { albumMetaOf, artistMetaOf, playlistMetaOf } from '@/detailFacts'
 export { detailNoticeOf } from '@/detailNotice'
 export { greetingOf } from '@/greeting'
 export { firstAtLetter } from '@/library/artistIndex'
+export { favouritesOf } from '@/library/favourites'
 export {
   type ListState,
   emptyCopyOf,
+  isListLoading,
   listNoticeOf,
   listStateOf,
   mergedOf,
@@ -107,17 +116,30 @@ export {
   scrubTextOf,
 } from '@/playerModel'
 export {
-  APPEARANCES,
-  type Appearance,
   COVER_SIZES,
   type CoverSize,
   isCoverSize,
   RECENT_SORTS,
   type RecentSort,
   WREN_PREFS_KEY,
-  isAppearance,
   isRecentSort,
 } from '@/prefs'
+export {
+  COLOR_SCHEMES,
+  type ColorScheme,
+  DEFAULT_THEME_CHOICE,
+  THEME_MODES,
+  THEME_SCHEMES,
+  type ThemeChoice,
+  type ThemeMode,
+  WREN_THEMES,
+  type WrenThemeName,
+  themeChoiceIn,
+  themeFor,
+  systemSchemeOf,
+  themeChoiceOf,
+  withThemePicked,
+} from '@/themes'
 export {
   RECENT_KINDS,
   RECENT_SEARCHES_KEY,
@@ -141,6 +163,6 @@ export {
 } from '@/search/searchFilters'
 export { signInErrorsOf } from '@/signIn/signInErrors'
 export { TOAST_MS } from '@/toast'
-export { type MenuPlaces, menuGroupsOf } from '@/menuGroups'
-export { SONG_LEADS, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
+export { type MenuLike, type MenuPlaces, menuGroupsOf } from '@/menuGroups'
+export { SONG_LEADS, type ShownLead, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
 export { TOP_RESULT_KINDS, type TopResult, topResultOf } from '@/search/topResult'

@@ -1,7 +1,7 @@
 import { type AccessibilityRole, Pressable } from 'react-native'
 
-import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { RADIUS, SIZE } from '@/theme/wrenTokens'
+import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
+import { RADIUS, SHADOWS, SIZE } from '@/theme/wrenTokens'
 import { hitSlopOf, pressedStyleOf } from '@/ui/press'
 import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
 
@@ -19,7 +19,12 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   [ICON_BUTTON_VARIANTS.plain]: {},
   [ICON_BUTTON_VARIANTS.filled]: { backgroundColor: colors.surface2 },
   [ICON_BUTTON_VARIANTS.outlined]: { borderColor: colors.line2, borderWidth: SIZE.hairline },
+  // The card's shadow, the web's `--shadow-card`.
+  lifted: shadowOf({ shadow: SHADOWS.card, color: colors.shadow }),
 }))
+
+/** How far a lifted circle rides above where it sits, as a share of its size: the web's too. */
+const LIFT_SHARE = 0.25
 
 /** The icon's size for a button's size: about half of it, from 18 to 26. */
 const iconSizeOf = (size: number): number =>
@@ -38,6 +43,8 @@ type IconButtonProps = {
   color?: string
   /** Fills the circle with this colour instead: the tablet's play button in `text`. */
   fill?: string
+  /** The circle rides above where it sits, bleeding past the bar's top edge. */
+  isLifted?: boolean
   isDisabled?: boolean
   /** A toggle's state, said aloud: Shuffle on, Like on. */
   isSelected?: boolean
@@ -54,6 +61,7 @@ export function IconButton({
   iconSize = iconSizeOf(size),
   color,
   fill,
+  isLifted = false,
   isDisabled = false,
   isSelected,
   role = 'button',
@@ -74,6 +82,7 @@ export function IconButton({
           styles[variant],
           { width: size, height: size },
           fill !== undefined && { backgroundColor: fill },
+          isLifted && [styles.lifted, { transform: [{ translateY: -size * LIFT_SHARE }] }],
         ],
         isDisabled,
       })}

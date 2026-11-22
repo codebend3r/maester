@@ -9,6 +9,8 @@ type MenuAction<Icon> = { icon: Icon; label: string; onPress: () => void }
 
 /** The drawings the menu's rows wear, which each app's `ICONS` holds under these names. */
 type MenuIcons<Icon> = {
+  heart: Icon
+  heartFilled: Icon
   playNext: Icon
   queueAdd: Icon
   playlistAdd: Icon
@@ -16,8 +18,13 @@ type MenuIcons<Icon> = {
   artist: Icon
 }
 
+/** A song's favourite as the menu turns it: whether it is one, and the press that flips it. */
+export type MenuLike = { isLiked: boolean; onToggle: () => void }
+
 type MenuGroupsOfProps<Icon> = {
   icons: MenuIcons<Icon>
+  /** Like or Unlike, first, on a song's menu; left out where the menu is about more than one. */
+  like?: MenuLike
   /** Whether Add to playlist shows. */
   canAddToPlaylist: boolean
   places: MenuPlaces
@@ -31,12 +38,23 @@ type MenuGroupsOfProps<Icon> = {
   onArtist: (artistId: number) => void
 }
 
+type LikingOfProps<Icon> = Pick<MenuGroupsOfProps<Icon>, 'icons' | 'like'>
+
+/** A song's Like, or its Unlike while it is a favourite; none where the menu has no like. */
+const likingOf = <Icon>({ icons, like }: LikingOfProps<Icon>): MenuAction<Icon> | null => {
+  if (like === undefined) return null
+  return like.isLiked
+    ? { icon: icons.heartFilled, label: TRACK_MENU_COPY.unlike, onPress: like.onToggle }
+    : { icon: icons.heart, label: TRACK_MENU_COPY.like, onPress: like.onToggle }
+}
+
 /**
- * The menu's actions in their groups: Play next, Add to queue and, where it shows, Add to
- * playlist; then the places it was given, the album before the artist.
+ * The menu's actions in their groups: Like or Unlike on a song's, Play next, Add to queue and,
+ * where it shows, Add to playlist; then the places it was given, the album before the artist.
  */
 export const menuGroupsOf = <Icon>({
   icons,
+  like,
   canAddToPlaylist,
   places: { albumId, artist },
   onPlayNext,
@@ -47,6 +65,7 @@ export const menuGroupsOf = <Icon>({
 }: MenuGroupsOfProps<Icon>): readonly (readonly MenuAction<Icon>[])[] => {
   const isAction = (action: MenuAction<Icon> | null): action is MenuAction<Icon> => action !== null
   const queue: readonly (MenuAction<Icon> | null)[] = [
+    likingOf({ icons, like }),
     { icon: icons.playNext, label: TRACK_MENU_COPY.playNext, onPress: onPlayNext },
     { icon: icons.queueAdd, label: TRACK_MENU_COPY.addToQueue, onPress: onAddToQueue },
     canAddToPlaylist

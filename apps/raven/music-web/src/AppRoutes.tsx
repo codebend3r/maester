@@ -2,7 +2,7 @@ import { lazyPage } from '@raven/ui/headless'
 import { type ComponentType, Suspense } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { ACCESS_KINDS, type AccessKind, useAccess } from '@/lib/access'
-import { WREN_ROUTES } from '@/routes'
+import { WREN_ROUTES, WREN_WEB_ONLY_ROUTES } from '@/routes'
 import { SignIn } from '@/screens/SignIn/SignIn'
 import { Loading } from '@/shell/Loading/Loading'
 import { Shell } from '@/shell/Shell'
@@ -28,6 +28,7 @@ const Playlist = lazyPage(() =>
 const Collection = lazyPage(() =>
   import('@/screens/Collection/Collection').then((module) => module.Collection),
 )
+const Design = lazyPage(() => import('@/screens/Design/Design').then((module) => module.Design))
 const NowPlaying = lazyPage(() =>
   import('@/screens/NowPlaying/NowPlaying').then((module) => module.NowPlaying),
 )
@@ -76,7 +77,8 @@ function SignInRoute() {
 
 /**
  * Wren's pages, the same as the files under the phone and tablet apps' `app/` (`parity.test.ts`
- * checks the two sets match), inside the shell that frames them all.
+ * checks the two sets match), inside the shell that frames them all, and `/design`, the web's
+ * own, which needs no listener signed in since it shows no one's music.
  */
 export function AppRoutes() {
   return (
@@ -92,6 +94,9 @@ export function AppRoutes() {
           <Route element={<Playlist />} path={WREN_ROUTES.playlist} />
           <Route element={<Collection />} path={WREN_ROUTES.collection} />
           <Route element={<NowPlaying />} path={WREN_ROUTES.nowPlaying} />
+        </Route>
+        <Route element={<Page />}>
+          <Route element={<Design />} path={WREN_WEB_ONLY_ROUTES.design} />
         </Route>
         <Route element={<SignInRoute />} path={WREN_ROUTES.signIn} />
         <Route element={<ToHome />} path={NOT_FOUND_ROUTE} />

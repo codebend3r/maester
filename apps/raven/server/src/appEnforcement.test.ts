@@ -140,6 +140,7 @@ it('declares every route exactly as the inventory says', () => {
       ROUTES.itemPicture,
       ROUTES.photoPicture,
       ROUTES.artistPicture,
+      ROUTES.artistBackgroundPicture,
       ROUTES.albumCover,
       ROUTES.lastFmCallback,
       ROUTES.remoteAccessEcho,
@@ -152,6 +153,7 @@ const CAPABILITY_ROUTES: ReadonlySet<Route> = new Set([
   ROUTES.itemPicture,
   ROUTES.photoPicture,
   ROUTES.artistPicture,
+  ROUTES.artistBackgroundPicture,
   ROUTES.albumCover,
 ])
 
@@ -538,7 +540,7 @@ describe('owner-only management', () => {
 
   it('refuses every owner route to an approved member', async () => {
     const ownerRoutes = ROUTE_LIST.filter(({ account }) => account === ACCOUNT_REQUIREMENTS.owner)
-    expect(ownerRoutes).toHaveLength(47)
+    expect(ownerRoutes).toHaveLength(49)
     const headers = await asMember()
     const observed = await Promise.all(
       asSent(ownerRoutes).map(async ({ route, method }) => {

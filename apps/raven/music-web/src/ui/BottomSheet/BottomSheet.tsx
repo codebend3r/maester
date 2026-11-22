@@ -18,12 +18,14 @@ type BottomSheetProps = {
   /** Asked by a press on the scrim, Escape, or Close. */
   onClose: () => void
   head: SheetHead
+  /** Whether the centred dialog takes the wide measure, for a grid of pictures; the narrow sheet is the same either way. */
+  isWide?: boolean
   children: ReactNode
 }
 
 type SheetBodyProps = Omit<BottomSheetProps, 'isOpen'> & { titleId: string }
 
-function SheetBody({ onClose, head, titleId, children }: SheetBodyProps) {
+function SheetBody({ onClose, head, isWide = false, titleId, children }: SheetBodyProps) {
   return (
     <>
       <button
@@ -33,7 +35,7 @@ function SheetBody({ onClose, head, titleId, children }: SheetBodyProps) {
         tabIndex={-1}
         type="button"
       />
-      <section className={styles.sheet}>
+      <section className={classNames([styles.sheet, isWide && styles.wide])}>
         <span className={styles.grabber} />
         <header className={classNames([styles.header, head.cover !== undefined && styles.led])}>
           {head.cover !== undefined && (
@@ -66,13 +68,13 @@ function SheetBody({ onClose, head, titleId, children }: SheetBodyProps) {
  * with a press on the scrim, Escape or Close; it has no Cancel. It rises in about a third of a
  * second, or at once for a listener who asked for less motion.
  */
-export function BottomSheet({ isOpen, onClose, head, children }: BottomSheetProps) {
+export function BottomSheet({ isOpen, onClose, head, isWide, children }: BottomSheetProps) {
   const { ref, onCancel } = useModalDialog({ isOpen, onClose })
   const titleId = useId()
   return (
     <dialog aria-labelledby={titleId} className={styles.dialog} onCancel={onCancel} ref={ref}>
       {isOpen && (
-        <SheetBody head={head} onClose={onClose} titleId={titleId}>
+        <SheetBody head={head} isWide={isWide} onClose={onClose} titleId={titleId}>
           {children}
         </SheetBody>
       )}

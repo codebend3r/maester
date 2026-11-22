@@ -7,6 +7,7 @@ import {
   tokenRenewalFor,
   useStoresLoaded,
 } from '@raven/native/headless'
+import { COLOR_SCHEMES, type ColorScheme } from '@raven/wren'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
@@ -31,7 +32,7 @@ import { TabletPlayerBar } from '@/shell/TabletPlayerBar'
 import { TabletSidebar } from '@/shell/TabletSidebar'
 import { useChrome } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
-import { COLOR_SCHEMES, type ColorScheme, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { ToastHost } from '@/ui/Toast'
 import { useWren } from '@/useWren'
 

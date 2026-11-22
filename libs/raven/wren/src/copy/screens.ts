@@ -1,4 +1,6 @@
+import { ARTIST_BACKGROUND_KINDS, type ArtistBackgroundKind } from '@raven/core'
 import { KIT_COPY, factsLineOf } from '@/copy/kit'
+import { COLOR_SCHEMES, THEME_MODES, WREN_THEMES } from '@/themes'
 
 export const SIGN_IN_COPY = {
   welcome: 'Welcome to Wren',
@@ -32,10 +34,60 @@ export const SETTINGS_COPY = {
   title: 'Settings',
   signOut: 'Sign out',
   server: 'Server',
+  /** The label of the field that names the server on this device. */
+  serverName: 'Name',
+  serverNameError: 'Use up to 80 characters, with no hidden ones.',
+  /** The label of the server's address, which is shown and never edited. */
+  serverAddress: 'Address',
+  serverNote:
+    "Name the server anything you like; Wren shows it wherever it says what it is connected to. The address Wren plays from, with its port, can't be changed here.",
+  library: 'Library',
+  libraryNote:
+    'The music libraries on this server. Home, Search and your collection show the one you pick.',
   appearance: 'Appearance',
-  system: 'System',
-  light: 'Light',
-  dark: 'Dark',
+  /** What the control that picks the mode sets, said aloud before its choices. */
+  themeMode: 'How Wren picks its theme',
+  themeModes: {
+    [THEME_MODES.system]: 'Match device',
+    [THEME_MODES.single]: 'One theme',
+  },
+  themeModeNotes: {
+    [THEME_MODES.system]:
+      'Wren switches between two themes as your device goes light or dark. Pick one for each.',
+    [THEME_MODES.single]: 'Wren always wears this theme, whether your device is light or dark.',
+  },
+  /** What the two slots set, said aloud before them. */
+  themeSlots: 'The theme to pick',
+  /** A slot of the Match device mode: the device's scheme it is worn in. */
+  themeSlotNames: {
+    [COLOR_SCHEMES.light]: 'When light',
+    [COLOR_SCHEMES.dark]: 'When dark',
+  },
+  /** The slot the device's scheme is showing now. */
+  showingNow: 'Showing now',
+  /** The heading over the themes, in the One theme mode. */
+  theme: 'Theme',
+  /** The heading over the themes, for each slot of the Match device mode. */
+  themeFor: {
+    [COLOR_SCHEMES.light]: 'Theme when light',
+    [COLOR_SCHEMES.dark]: 'Theme when dark',
+  },
+  themeNames: {
+    [WREN_THEMES.night]: 'Night',
+    [WREN_THEMES.paper]: 'Paper',
+    [WREN_THEMES.garnet]: 'Garnet',
+    [WREN_THEMES.blush]: 'Blush',
+    [WREN_THEMES.mint]: 'Mint',
+    [WREN_THEMES.dracula]: 'Dracula',
+    [WREN_THEMES.midnight]: 'Midnight',
+    [WREN_THEMES.banana]: 'Banana',
+    [WREN_THEMES.ember]: 'Ember',
+  },
+  /** Whether a theme is a light or a dark one, under its name. */
+  schemeNames: {
+    [COLOR_SCHEMES.light]: 'Light',
+    [COLOR_SCHEMES.dark]: 'Dark',
+  },
   about: 'About',
   version: 'Version',
   /** Which build this is: "v0.9.0.15". */
@@ -147,7 +199,8 @@ export const LIBRARY_PAGE_COPY = {
   noSongs: 'No songs yet.',
   noUnmatchedAlbums: 'Every album has a MusicBrainz match.',
   noInProgress: 'Nothing in progress. A song left partway through waits here.',
-  noFavourites: 'No favourite songs yet.',
+  noFavourites:
+    'No favourites yet. Mark an artist, an album or a song with the heart and it waits here.',
   noFinished: 'Nothing finished yet. A song counts once it plays to its end.',
   noMatches: 'Nothing matches that search.',
   searchAlbums: 'Search albums',
@@ -213,11 +266,42 @@ export const ALBUM_COPY = {
   queued: (title: string) => `${title} added to the queue`,
 } as const
 
+/** What each background option is called, by where it comes from. */
+const ARTIST_BACKGROUND_KIND_NAMES = {
+  [ARTIST_BACKGROUND_KINDS.photo]: 'Photo',
+  [ARTIST_BACKGROUND_KINDS.cover]: 'Album cover',
+} as const
+
+type BackgroundOptionProps = { kind: ArtistBackgroundKind; position: number }
+
 export const ARTIST_COPY = {
   opening: 'Opening the artist',
   missing: 'This artist is not on the server.',
   albums: 'Albums',
   appearsOn: 'Appears on',
+  /** The owner's button beside Follow, which opens the pictures to pick the background from. */
+  editBackground: 'Edit background image',
+  backgroundTitle: 'Background image',
+  backgroundNote: "Pick the picture behind this artist's name.",
+  /** The choice that goes back to the photo raven found for the artist. */
+  backgroundDefault: 'Default photo',
+  backgroundLoading: 'Finding pictures',
+  backgroundFailed: "Couldn't load the pictures. Try again.",
+  backgroundEmpty: 'No other pictures were found for this artist.',
+  /** Said on the picture in use. */
+  backgroundWorn: 'In use',
+  /** What each option is called aloud, by where it comes from and its place in the grid. */
+  backgroundOption: ({ kind, position }: BackgroundOptionProps) =>
+    `${ARTIST_BACKGROUND_KIND_NAMES[kind]} ${position}`,
+  /** The head's corner beside the photo: who the artist is. */
+  about: 'About the artist',
+  birthName: 'Birth name',
+  born: 'Born',
+  birthplace: 'Birthplace',
+  nationality: 'Nationality',
+  awards: 'Awards',
+  /** Countries or awards on one line: "Canada, United States". */
+  listLine: (names: readonly string[]) => names.join(', '),
 } as const
 
 export const PLAYLIST_COPY = {

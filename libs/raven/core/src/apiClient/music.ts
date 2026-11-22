@@ -6,6 +6,9 @@ import {
   type AlbumMatchChoice,
   type AlbumSummary,
   type Artist,
+  type ArtistBackgroundChoice,
+  type ArtistAbout,
+  type ArtistBackgrounds,
   type ArtistDetails,
   type FavouriteChange,
   type Lyrics,
@@ -26,6 +29,8 @@ type SetAlbumMatchProps = { albumId: number } & AlbumMatchChoice
 type SetAlbumFavouriteProps = { albumId: number } & FavouriteChange
 
 type SetArtistFavouriteProps = { artistId: number } & FavouriteChange
+
+type SetArtistBackgroundProps = { artistId: number } & ArtistBackgroundChoice
 
 /** A music library's artists, albums and tracks, and the pages of one album or artist. */
 export const musicCalls = ({ ask }: Transport) => ({
@@ -60,6 +65,10 @@ export const musicCalls = ({ ask }: Transport) => ({
   getArtist: (id: number): Promise<ArtistDetails> =>
     ask({ route: ROUTES.getArtist, params: { id } }),
 
+  /** Who the artist is: a short bio, their birth name, day and place, nationality and awards. */
+  getArtistAbout: (id: number): Promise<ArtistAbout> =>
+    ask({ route: ROUTES.getArtistAbout, params: { id } }),
+
   /** MusicBrainz's releases for an album's Fix match, each with how sure raven is of it, best first. */
   searchAlbumMatches: ({
     albumId,
@@ -93,6 +102,18 @@ export const musicCalls = ({ ask }: Transport) => ({
       route: ROUTES.setArtistFavourite,
       params: { id: artistId },
       body: { favourite } satisfies FavouriteChange,
+    }),
+
+  /** The pictures an owner may set as an artist's background, and the one worn. */
+  listArtistBackgrounds: (artistId: number): Promise<ArtistBackgrounds> =>
+    ask({ route: ROUTES.listArtistBackgrounds, params: { id: artistId } }),
+
+  /** Sets an artist's background to an option by its key, or back to the default photo with null; answers with their page. */
+  setArtistBackground: ({ artistId, key }: SetArtistBackgroundProps): Promise<ArtistDetails> =>
+    ask({
+      route: ROUTES.setArtistBackground,
+      params: { id: artistId },
+      body: { key } satisfies ArtistBackgroundChoice,
     }),
 
   /** The account's favourite albums across every library it may see, most recently marked first. */

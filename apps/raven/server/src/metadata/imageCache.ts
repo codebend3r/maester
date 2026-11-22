@@ -232,7 +232,7 @@ export class ImageCache {
     })
   }
 
-  /** An artist photo from Wikimedia Commons, cached once at the width Commons serves. */
+  /** An artist photo from Wikimedia Commons, fanart.tv or TheAudioDB, cached once as it is served. */
   artist({ artistId, source }: ImageCacheArtistProps): Promise<string | null> {
     const identity = createHash('sha256').update(source).digest('hex').slice(0, 12)
     return this.downloaded({

@@ -24,6 +24,8 @@ export const APP_OWNER_CALLS = {
   updateLibraryRatings: ROUTES.updateLibraryRatings,
   cancelLibraryRatings: ROUTES.cancelLibraryRatings,
   matchLibrary: ROUTES.matchLibrary,
+  listArtistBackgrounds: ROUTES.listArtistBackgrounds,
+  setArtistBackground: ROUTES.setArtistBackground,
   listEveryonesRequests: ROUTES.listEveryonesRequests,
   deleteMedia: ROUTES.deleteMedia,
 } as const satisfies Record<string, AppClientCall>
@@ -71,6 +73,7 @@ export const APP_CLIENT_CALLS = {
   listTracks: ROUTES.listTracks,
   getAlbum: ROUTES.getAlbum,
   getArtist: ROUTES.getArtist,
+  getArtistAbout: ROUTES.getArtistAbout,
   getLyrics: ROUTES.getLyrics,
   listFavourites: ROUTES.listFavourites,
   listFavouriteTitles: ROUTES.listFavouriteTitles,
@@ -100,6 +103,7 @@ export const APP_CLIENT_CALLS = {
   itemPicture: ROUTES.itemPicture,
   personPicture: ROUTES.personPicture,
   artistPicture: ROUTES.artistPicture,
+  artistBackgroundPicture: ROUTES.artistBackgroundPicture,
   albumCover: ROUTES.albumCover,
 
   getMedia: ROUTES.getMedia,
@@ -159,7 +163,24 @@ const PLACEHOLDER = ':'
 const DOT_SEGMENT = /^(?:\.|%2e){1,2}$/iu
 
 const isAppClientCallName = (value: string): value is AppClientCallName =>
-  Object.keys(APP_CLIENT_CALLS).includes(value)
+  Object.hasOwn(APP_CLIENT_CALLS, value)
+
+type CallTemplate = Pick<AppClientCall, 'method'> & {
+  name: AppClientCallName
+  template: readonly string[]
+}
+
+/*
+ * Every call's method and path segments, split once. The match runs for every picture a screen
+ * draws and every fetch, and on a TV's Hermes building this for each one held Home's first
+ * render for seconds.
+ */
+const CALL_TEMPLATES: readonly CallTemplate[] = Object.keys(APP_CLIENT_CALLS)
+  .filter(isAppClientCallName)
+  .map((name) => {
+    const call: AppClientCall = APP_CLIENT_CALLS[name]
+    return { name, method: call.method, template: call.path.split('/') }
+  })
 
 /** The path of an address, absolute or already a path: no origin, query or fragment. */
 const pathOf = (url: string): string | null => {
@@ -195,13 +216,10 @@ export const appClientCallOf = ({
   if (path === null) return null
   const segments = path.split('/')
   if (segments.some((segment) => DOT_SEGMENT.test(segment))) return null
-  const names = Object.keys(APP_CLIENT_CALLS).filter(isAppClientCallName)
   return (
-    names.find((name) => {
-      const call: AppClientCall = APP_CLIENT_CALLS[name]
-      return (
-        call.method === method && hasMatchingSegments({ template: call.path.split('/'), segments })
-      )
-    }) ?? null
+    CALL_TEMPLATES.find(
+      (call) =>
+        call.method === method && hasMatchingSegments({ template: call.template, segments }),
+    )?.name ?? null
   )
 }

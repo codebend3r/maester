@@ -47,6 +47,7 @@ export const ICONS = {
   home: lines(
     'M3.5 10.2 12 3.5l8.5 6.7V19a1.5 1.5 0 0 1-1.5 1.5h-4.2v-5.8H9.2v5.8H5A1.5 1.5 0 0 1 3.5 19z',
   ),
+  sidebar: lines(rect({ x: 3.5, y: 4.5, width: 17, height: 15, rx: 3 }), 'M9.5 4.5v15'),
   library: lines('M5 4v16M9.5 4v16M14 4.8l5.2 15'),
   search: lines(circle({ cx: 11, cy: 11, r: 6.8 }), 'm20 20-4.2-4.2'),
   settings: lines(
@@ -128,6 +129,11 @@ export const ICONS = {
     'M7.5 7.5h.01M7.5 16.5h.01',
   ),
   trash: lines('M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7'),
+  image: lines(
+    rect({ x: 3.5, y: 4.5, width: 17, height: 15, rx: 3 }),
+    circle({ cx: 9, cy: 10, r: 1.6 }),
+    'm4 17 5-4.5 4 3.5 3-2.5 4 3',
+  ),
   grid: lines(
     rect({ x: 3.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),
     rect({ x: 13.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),

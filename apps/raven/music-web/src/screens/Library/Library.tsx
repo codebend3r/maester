@@ -2,6 +2,7 @@ import { LIBRARY_PAGE_COPY, RECENT_SORTS } from '@raven/wren'
 import { useNavigate } from 'react-router-dom'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { Section } from '@/components/Section/Section'
 import { useLibraryValues, useRecentAlbums } from '@/music/listings'
 import { WREN_ROUTES } from '@/routes'
@@ -29,7 +30,13 @@ function RecentGrid() {
   })
   return (
     <Section title={LIBRARY_PAGE_COPY.recent}>
-      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      {albums.length === 0 && (
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
+      )}
       <AlbumGrid albums={albums} />
     </Section>
   )

@@ -18,6 +18,8 @@ type TrackCoverOfProps = Pick<Track, 'albumId' | 'album'>
 
 type ArtistPhotoOfProps = Pick<Artist, 'id' | 'photoVersion'>
 
+type ArtistBackgroundOfProps = { artistId: number; key: string }
+
 /**
  * The active server's pictures, each with the server's cookies and the account's token on its
  * request: an album's cover, a track's (its album's), and an artist's photo. None has one until
@@ -34,6 +36,9 @@ export const useCovers = ({ server, api }: UseCoversProps) => {
     coverOf,
     trackCoverOf: (track: TrackCoverOfProps): Cover | null =>
       coverOf({ albumId: track.albumId, coverVersion: track.album.coverVersion }),
+    /** One option for an artist's background, by its key. */
+    artistBackgroundOf: ({ artistId, key }: ArtistBackgroundOfProps): Cover | null =>
+      pictureAt(api.artistBackgroundUrl({ artistId, key })),
     artistPhotoOf: ({ id, photoVersion }: ArtistPhotoOfProps): Cover | null =>
       photoVersion === null ? null : pictureAt(api.artistPhotoUrl({ artistId: id, photoVersion })),
   }
@@ -43,3 +48,5 @@ export const useCovers = ({ server, api }: UseCoversProps) => {
 export type Covers = ReturnType<typeof useCovers>
 
 export type CoverOf = Covers['coverOf']
+
+export type ArtistPhotoOf = Covers['artistPhotoOf']

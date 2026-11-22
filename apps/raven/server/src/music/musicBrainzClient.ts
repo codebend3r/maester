@@ -9,18 +9,12 @@ import {
   releaseDateOf,
   releaseYearOf,
 } from '@raven/core'
-import { CONTENT_TYPES, HEADERS } from '@shared/server'
 import { METADATA_FETCH, type MetadataFetch } from '@/metadata/tmdbClient'
-import { RAVEN_USER_AGENT } from '@/music/userAgent'
+import { listAt, recordAt, serviceRequest } from '@/music/serviceJson'
 import { type RateLimit, createRateLimit, sleep } from '@/scanner/concurrency'
 import { errorMessage } from '@/errorMessage'
 
 const API = 'https://musicbrainz.org/ws/2'
-const WIKIDATA_ENTITY = 'https://www.wikidata.org/wiki/Special:EntityData'
-const COMMONS_FILE = 'https://commons.wikimedia.org/wiki/Special:Redirect/file'
-
-/** One call may take this long before it counts as MusicBrainz being down. */
-const TIMEOUT_MS = 10_000
 
 /** How often a 503 is waited out before the call gives up. */
 const RETRIES = 3
@@ -96,24 +90,6 @@ const MB_FIELDS = {
 
 const MB_STATUSES = { official: 'Official' } as const
 const MB_RELATION_TYPES = { wikidata: 'wikidata' } as const
-
-type AtProps = { record: Record<string, unknown>; key: string }
-
-type ListAtProps = AtProps
-
-/** The list under `key`, or none: MusicBrainz leaves a field out as often as it sends an empty list. */
-const listAt = ({ record, key }: ListAtProps): unknown[] => {
-  const value = record[key]
-  return Array.isArray(value) ? value : []
-}
-
-type RecordAtProps = AtProps
-
-/** The record under `key`, or an empty one. */
-const recordAt = ({ record, key }: RecordAtProps): Record<string, unknown> => {
-  const value = record[key]
-  return isRecord(value) ? value : {}
-}
 
 /** The year a MusicBrainz date opens with: `1997-05-21`, `1997`, or nothing. */
 const yearOf = (date: unknown): number | null => {
@@ -215,19 +191,6 @@ const wikidataIdOf = (value: unknown): string | null => {
   return match?.[1] ?? null
 }
 
-type CommonsFileOfProps = { value: unknown; id: string }
-
-const commonsFileOf = ({ value, id }: CommonsFileOfProps): string | null => {
-  if (!isRecord(value)) return null
-  const entity = recordAt({ record: recordAt({ record: value, key: 'entities' }), key: id })
-  const claims = recordAt({ record: entity, key: 'claims' })
-  const image = listAt({ record: claims, key: 'P18' }).find(isRecord)
-  if (image === undefined) return null
-  const snak = recordAt({ record: image, key: 'mainsnak' })
-  const data = recordAt({ record: snak, key: 'datavalue' }).value
-  return isString(data) && data.trim() !== '' ? data : null
-}
-
 /** A Lucene term with its quotes and operators escaped, so a title is searched for as words. */
 const quoted = (text: string): string => `"${text.replace(/["\\]/g, (char) => `\\${char}`)}"`
 
@@ -253,10 +216,9 @@ export class MusicBrainzClient {
   private async get({ path, params }: MusicBrainzClientGetProps): Promise<unknown> {
     const query = new URLSearchParams({ ...params, fmt: 'json' })
     const url = `${API}${path}?${query.toString()}`
-    const headers = { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT }
     const attempt = async (retriesLeft: number): Promise<unknown> => {
       const response = await this.limit
-        .run(() => this.fetch({ url, init: { headers, signal: AbortSignal.timeout(TIMEOUT_MS) } }))
+        .run(() => serviceRequest({ fetch: this.fetch, url }))
         .catch((error: unknown) => {
           throw new MusicBrainzError({
             kind: MUSICBRAINZ_ERROR_KINDS.unavailable,
@@ -287,26 +249,13 @@ export class MusicBrainzClient {
     return attempt(RETRIES)
   }
 
-  /** The artist's Wikimedia Commons photo through MusicBrainz's Wikidata relation, when both have one. */
-  async artistPhoto(mbid: string): Promise<string | null> {
+  /** The id of the artist's Wikidata entity, through MusicBrainz's relation to it; null when it has none. */
+  async wikidataId(mbid: string): Promise<string | null> {
     const artist = await this.get({
       path: `/artist/${encodeURIComponent(mbid)}`,
       params: { inc: 'url-rels' },
     })
-    const wikidataId = wikidataIdOf(artist)
-    if (wikidataId === null) return null
-    const response = await this.fetch({
-      url: `${WIKIDATA_ENTITY}/${wikidataId}.json`,
-      init: {
-        headers: { [HEADERS.accept]: CONTENT_TYPES.json, [HEADERS.userAgent]: RAVEN_USER_AGENT },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      },
-    }).catch(() => null)
-    if (!response?.ok) return null
-    const file = commonsFileOf({ value: await response.json(), id: wikidataId })
-    return file === null
-      ? null
-      : `${COMMONS_FILE}/${encodeURIComponent(file.replaceAll(' ', '_'))}?width=500`
+    return wikidataIdOf(artist)
   }
 
   /** Releases matching an album's title and artist, MusicBrainz's best first. */

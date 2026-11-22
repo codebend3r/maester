@@ -1,9 +1,10 @@
 import { type AlbumSummary, type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
-import { useAudioQueue, useServerArtistFavourite } from '@raven/ui/headless'
+import { useAudioQueue, useIsOwner, useServerArtistFavourite } from '@raven/ui/headless'
 import { ARTIST_COPY, PLAYER_COPY, artistMetaOf } from '@raven/wren'
+import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
-import { ACTION_SHAPES } from '@/components/DetailAction/DetailAction'
+import { ACTION_SHAPES, DetailAction } from '@/components/DetailAction/DetailAction'
 import { FavouriteAction } from '@/components/FavouriteAction/FavouriteAction'
 import { Nothing } from '@/components/Nothing/Nothing'
 import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
@@ -13,11 +14,14 @@ import { api } from '@/lib/api'
 import { queries } from '@/lib/queries'
 import { useAlbumTracks } from '@/music/useAlbumTracks'
 import { useCovers } from '@/music/useCovers'
+import { ArtistBackgroundModal } from '@/screens/Artist/ArtistBackgroundModal'
 import { ArtistHero, HeroActions } from '@/screens/Artist/ArtistHero'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
 import { Page } from '@/shell/Page/Page'
+import { useAuthSession } from '@/stores/authSession'
 import { toastFailure } from '@/stores/toast'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
+import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Artist/Artist.module.scss'
 
 type ActionsSlotProps = { children: ReactNode }
@@ -58,7 +62,11 @@ function ArtistPage({ details }: ArtistPageProps) {
   const { artist, albums, appearsOn, isFavourite } = details
   const favourite = useServerArtistFavourite({ api, artistId: artist.id })
   const photo = artistPhotoOf(artist)
+  const about = useQuery(queries.artistAboutQuery(artist.id))
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isBackgroundOpen, setIsBackgroundOpen] = useState(false)
+  const userId = useAuthSession((state) => state.session?.userId ?? null)
+  const isOwner = useIsOwner({ queries, userId })
   const source = { kind: QUEUE_SOURCE_KINDS.artist, id: artist.id } as const
   // The artist's songs are their albums' tracks, read only once something plays them.
   const tracksOf = () => albumTracks(albums.map(({ id }) => id))
@@ -75,6 +83,14 @@ function ArtistPage({ details }: ArtistPageProps) {
         onToggle={follow}
         shape={ACTION_SHAPES.circle}
       />
+      {isOwner && (
+        <DetailAction
+          icon={ICONS.image}
+          label={ARTIST_COPY.editBackground}
+          onPress={() => setIsBackgroundOpen(true)}
+          shape={ACTION_SHAPES.circle}
+        />
+      )}
     </>
   )
   // TODO(redesign): Top songs, once the server ranks an artist's tracks by plays.
@@ -82,6 +98,7 @@ function ArtistPage({ details }: ArtistPageProps) {
     <>
       <Page className={styles.artist}>
         <ArtistHero
+          about={about.data ?? null}
           actions={<InHero>{actions}</InHero>}
           meta={artistMetaOf({ artist })}
           name={artist.name}
@@ -100,6 +117,14 @@ function ArtistPage({ details }: ArtistPageProps) {
           </Section>
         )}
       </Page>
+      {isOwner && (
+        <ArtistBackgroundModal
+          artistId={artist.id}
+          artistName={artist.name}
+          isOpen={isBackgroundOpen}
+          onClose={() => setIsBackgroundOpen(false)}
+        />
+      )}
       {isMenuOpen && (
         <TracksMenu
           canAddToPlaylist={false}

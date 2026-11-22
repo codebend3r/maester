@@ -1,8 +1,8 @@
 import { Image, StyleSheet, View } from 'react-native'
 
 import type { Cover } from '@/music/useCovers'
-import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { RADIUS, SPACE } from '@/theme/wrenTokens'
+import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
+import { RADIUS, SHADOWS } from '@/theme/wrenTokens'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 
 // The fallback's note is drawn at this share of the square.
@@ -18,11 +18,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   // A raised cover lifts off the ground on a soft shadow its clipped square cannot cast itself.
   raised: {
     backgroundColor: colors.bg,
-    elevation: SPACE.s4,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: SPACE.s6 },
-    shadowOpacity: 1,
-    shadowRadius: SPACE.s8,
+    ...shadowOf({ shadow: SHADOWS.raised, color: colors.shadow }),
   },
 }))
 

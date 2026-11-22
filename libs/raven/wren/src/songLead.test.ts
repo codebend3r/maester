@@ -1,18 +1,34 @@
 import { describe, expect, it } from 'bun:test'
 
-import { SONG_LEADS, songLeadOf } from '@/songLead'
+import { SONG_LEADS, SONG_LEAD_KINDS, songLeadOf } from '@/songLead'
+
+const COVER = { src: '/cover' }
+const ART = { kind: SONG_LEAD_KINDS.art, cover: COVER }
+const NUMBER = { kind: SONG_LEAD_KINDS.number, number: '3' }
 
 describe('songLeadOf', () => {
-  it('keeps the art on a row that has it, playing or not', () => {
-    expect(songLeadOf({ hasArt: true, isPlaying: true })).toBe(SONG_LEADS.art)
-    expect(songLeadOf({ hasArt: true, isPlaying: false })).toBe(SONG_LEADS.art)
+  it("lays the equalizer over a row's art while it is the queue's track", () => {
+    expect(songLeadOf({ lead: ART, isCurrent: true })).toEqual({
+      kind: SONG_LEADS.artEqualizer,
+      cover: COVER,
+    })
+  })
+
+  it("keeps the art alone on a row that is not the queue's track", () => {
+    expect(songLeadOf({ lead: ART, isCurrent: false })).toEqual({
+      kind: SONG_LEADS.art,
+      cover: COVER,
+    })
   })
 
   it("puts the equalizer in a numbered row's place while it is the queue's track", () => {
-    expect(songLeadOf({ hasArt: false, isPlaying: true })).toBe(SONG_LEADS.equalizer)
+    expect(songLeadOf({ lead: NUMBER, isCurrent: true })).toEqual({ kind: SONG_LEADS.equalizer })
   })
 
   it('shows the number otherwise', () => {
-    expect(songLeadOf({ hasArt: false, isPlaying: false })).toBe(SONG_LEADS.number)
+    expect(songLeadOf({ lead: NUMBER, isCurrent: false })).toEqual({
+      kind: SONG_LEADS.number,
+      number: '3',
+    })
   })
 })

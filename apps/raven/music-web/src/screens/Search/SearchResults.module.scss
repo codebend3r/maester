@@ -38,10 +38,9 @@
   min-inline-size: 0;
 }
 
-// The mark the songs' next page is asked for at: it holds a place and draws nothing.
+// The loading mark a search shows while its results are on their way.
 .searching {
   display: grid;
   justify-items: center;
   padding-block: var(--space-8);
-  color: var(--color-text-3);
 }

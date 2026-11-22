@@ -1,15 +1,14 @@
 import { type Letter, LETTERS, plural } from '@raven/core'
 import { COUNTS_COPY, LIBRARY_PAGE_COPY, firstAtLetter, matchingArtists } from '@raven/wren'
 import { useRef } from 'react'
+import { ArtistGrid } from '@/components/ArtistGrid/ArtistGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { useAllArtists } from '@/music/listings'
-import { useCovers } from '@/music/useCovers'
-import { artistPath } from '@/routes'
 import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
 import { useCollectionSearch } from '@/screens/Collection/useCollectionSearch'
 import { useListStart } from '@/screens/Collection/useListStart'
 import { Page } from '@/shell/Page/Page'
-import { ArtistCard } from '@/ui/ArtistCard/ArtistCard'
 import collectionStyles from '@/screens/Collection/Collection.module.scss'
 import styles from '@/screens/Collection/ArtistsCollection.module.scss'
 
@@ -46,7 +45,6 @@ export function ArtistsCollection() {
   })
   const grid = useRef<HTMLUListElement>(null)
   const { artists, listing } = useAllArtists({ search: '' })
-  const { artistPhotoOf } = useCovers()
   const shown = matchingArtists({ artists, query: search.query })
   const count = listing.isRead ? plural({ n: shown.length, ...COUNTS_COPY.artists }) : null
   const { listing: listingStart, header } = useListStart({ isShown: shown.length > 0 })
@@ -63,22 +61,12 @@ export function ArtistsCollection() {
         search={search.field}
         title={LIBRARY_PAGE_COPY.artists}
       />
-      {shown.length === 0 && <ListNotice empty={search.empty} listing={listing} />}
+      {shown.length === 0 && (
+        <ListNotice empty={search.empty} listing={listing} shape={LIST_SHAPES.tiles} />
+      )}
       {shown.length > 0 && (
         <div className={styles.listing} ref={listingStart}>
-          <ul className={styles.grid} ref={grid}>
-            {shown.map((artist) => (
-              <li className={styles.cell} key={artist.id}>
-                <ArtistCard
-                  albumCount={artist.albumCount}
-                  href={artistPath(artist.id)}
-                  name={artist.name}
-                  picture={artistPhotoOf(artist)}
-                  trackCount={artist.trackCount}
-                />
-              </li>
-            ))}
-          </ul>
+          <ArtistGrid artists={shown} className={styles.grid} ref={grid} />
           <IndexRail onLetter={jump} />
         </div>
       )}

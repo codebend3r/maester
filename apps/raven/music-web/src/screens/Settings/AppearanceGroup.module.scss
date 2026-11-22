@@ -1,5 +1,17 @@
-.row {
+@use '../../styles/mixins';
+
+.group {
   display: grid;
+  gap: var(--space-4);
   min-inline-size: 0;
-  padding-block: var(--space-3);
+  padding-block: var(--space-4);
+}
+
+.note {
+  @include mixins.meta-line;
+}
+
+.heading {
+  color: var(--color-text);
+  font: var(--type-meta-strong);
 }
