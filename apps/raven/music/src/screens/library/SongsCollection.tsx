@@ -16,6 +16,7 @@ import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { useAllSongs, useSongCount } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { SortButton } from '@/screens/library/SortButton'
 import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
@@ -65,7 +66,9 @@ export function SongsCollection({ session, onBack }: CollectionPageProps) {
   )
   return (
     <FlatList
-      ListEmptyComponent={<ListNotice empty={search.empty} listing={listing} />}
+      ListEmptyComponent={
+        <ListNotice empty={search.empty} listing={listing} shape={LIST_SHAPES.rows} />
+      }
       ListHeaderComponent={header}
       ListHeaderComponentStyle={styles.header}
       contentContainerStyle={insets}

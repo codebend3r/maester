@@ -9,6 +9,7 @@ import { NowPlayingBar } from '@/shell/NowPlayingBar/NowPlayingBar'
 import { TABS } from '@/shell/places'
 import { PlayerBar } from '@/shell/PlayerBar/PlayerBar'
 import { Sidebar } from '@/shell/Sidebar/Sidebar'
+import { usePlayPauseKey } from '@/shell/usePlayPauseKey'
 import { useScrollReset } from '@/shell/useScrollReset'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
 import { TabBar } from '@/ui/TabBar/TabBar'
@@ -94,6 +95,7 @@ export function Shell() {
   const chrome = useChrome()
   const Frame = FRAMES[useFormFactor()]
   useScrollReset()
+  usePlayPauseKey()
   return (
     <>
       {isOpen && <AudioHost api={api} />}

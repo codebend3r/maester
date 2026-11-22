@@ -209,3 +209,28 @@ describe("the shell at 48rem and wider, the apps' tablet layout", () => {
     expect(openPlayer()).toBeInTheDocument()
   })
 })
+
+describe('the Space key', () => {
+  it('plays and pauses the queue from the page, and leaves a focused link its own press', async () => {
+    await renderShell({
+      route: WREN_ROUTES.library,
+      formFactor: FORM_FACTORS.tablet,
+      isPlaying: true,
+    })
+    const real = useAudioQueue.getState().toggle
+    let presses = 0
+    act(() =>
+      useAudioQueue.setState({
+        toggle: () => {
+          presses += 1
+        },
+      }),
+    )
+    await userEvent.keyboard(' ')
+    expect(presses).toBe(1)
+    act(() => screen.getByRole('link', { name: HOME_COPY.title }).focus())
+    await userEvent.keyboard(' ')
+    expect(presses).toBe(1)
+    act(() => useAudioQueue.setState({ toggle: real }))
+  })
+})

@@ -2,7 +2,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 
 import { WREN_LOCKUP_COPY } from '@raven/wren'
 import { BRAND_INKS, LOCKUP_DRAWING, LOCKUP_VIEW_BOX } from '@/theme/wrenBrand'
-import { useColorSchemeOf } from '@/theme/wrenTheme'
+import { useWrenTheme } from '@/theme/wrenTheme'
 import { BRAND } from '@/theme/wrenTokens'
 
 // 64 points tall, where the brand's rules give the mark its full cut.
@@ -23,9 +23,9 @@ type WrenLockupProps = {
   ink?: string
 }
 
-/** The ink a logo is drawn in: the one asked for, else the scheme showing's. */
+/** The ink a logo is drawn in: the one asked for, else the one for the scheme of the theme showing. */
 const useInk = (ink: string | undefined): string => {
-  const scheme = useColorSchemeOf()
+  const { scheme } = useWrenTheme()
   return ink ?? BRAND_INKS[scheme]
 }
 

@@ -11,14 +11,25 @@
   @include mixins.stacked-lines;
 }
 
+/*
+ * A long title wraps up to four lines; the rest is cut with an ellipsis, and the title attribute
+ * shows it whole on hover.
+ */
 .title {
+  @include mixins.clamp-lines(4);
   color: var(--color-text);
   font: var(--type-tile-album);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
+// The artists wrap up to two lines, cut with an ellipsis, and the title attribute shows them whole.
 .subtitle {
+  @include mixins.clamp-lines(2);
   color: var(--color-text);
   font: var(--type-tile-artist);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .detail {

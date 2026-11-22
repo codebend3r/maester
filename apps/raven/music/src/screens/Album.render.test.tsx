@@ -34,6 +34,7 @@ import { PHONE_WINDOW } from '@/test/jestSetup'
 import {
   AIRBAG,
   LISTENER,
+  LUCKY,
   MIXTAPE,
   OK_COMPUTER,
   OK_COMPUTER_PAGE,
@@ -175,6 +176,17 @@ describe('Album', () => {
     await fireEvent(airbag, 'longPress')
     await fireEvent.press(await screen.findByRole('button', { name: TRACK_MENU_COPY.addToQueue }))
     expect(addToQueue).toHaveBeenCalledWith([AIRBAG])
+  })
+
+  it('unlikes a liked song from its sheet, and likes one that is not', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: ALBUM_URL })
+    await fireEvent(await screen.findByRole('button', { name: '1. Airbag' }), 'longPress')
+    await fireEvent.press(await screen.findByRole('button', { name: TRACK_MENU_COPY.unlike }))
+    expect(mockApi.setFavourite).toHaveBeenCalledWith({ id: AIRBAG.id, favourite: false })
+
+    await fireEvent(screen.getByRole('button', { name: '3. Lucky' }), 'longPress')
+    await fireEvent.press(await screen.findByRole('button', { name: TRACK_MENU_COPY.like }))
+    expect(mockApi.setFavourite).toHaveBeenLastCalledWith({ id: LUCKY.id, favourite: true })
   })
 
   it("goes to a track's artist from its sheet", async () => {

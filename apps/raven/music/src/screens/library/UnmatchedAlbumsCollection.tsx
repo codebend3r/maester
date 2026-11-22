@@ -6,6 +6,7 @@ import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { useUnmatchedAlbums } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
@@ -33,7 +34,11 @@ export function UnmatchedAlbumsCollection({ session, onBack }: CollectionPagePro
   return (
     <FlatList
       ListEmptyComponent={
-        <ListNotice empty={LIBRARY_PAGE_COPY.noUnmatchedAlbums} listing={listing} />
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noUnmatchedAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
       }
       ListHeaderComponent={
         <CollectionHeader

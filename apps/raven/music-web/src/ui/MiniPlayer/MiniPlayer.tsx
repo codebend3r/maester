@@ -44,8 +44,10 @@ export function MiniPlayer({
         className={styles.open}
         cover={cover}
         error={error}
+        isPlaying={isPlaying}
         line={artists}
         onOpen={onOpen}
+        quality={null}
         title={title}
       />
       <IconButton

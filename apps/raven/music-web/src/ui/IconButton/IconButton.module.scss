@@ -31,3 +31,14 @@
 .filled {
   background: var(--button-fill, var(--color-surface-2));
 }
+
+// Play and Pause: the glyph runs to well over two thirds of the circle, past the 26 the others stop at.
+.prominent {
+  --icon-size: calc(var(--button-size) * 0.7);
+}
+
+// Rides above its row so the circle bleeds past the bar's top edge.
+.lifted {
+  translate: 0 calc(var(--button-size) * -0.25);
+  box-shadow: var(--shadow-card);
+}

@@ -1,7 +1,8 @@
 import { classNames } from '@raven/ui/headless'
-import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
+import { SIGN_IN_COPY } from '@raven/wren'
 import type { ComponentType, ReactNode } from 'react'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup/WrenLockup'
+import { useServerName } from '@/stores/wrenPrefs'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { StatusChip } from '@/ui/StatusChip/StatusChip'
@@ -32,6 +33,7 @@ function SignInTitles({ title, note, className }: SignInTitlesProps) {
 
 /** P01: the mark, the welcome and the form in one column, the server and Maester at its foot. */
 function PhoneFrame({ isServerDown, children }: SignInFrameProps) {
+  const name = useServerName()
   return (
     <main className={styles.phone}>
       <header className={styles.head}>
@@ -40,7 +42,7 @@ function PhoneFrame({ isServerDown, children }: SignInFrameProps) {
       </header>
       <div className={styles.body}>{children}</div>
       <footer className={styles.foot}>
-        <StatusChip isConnected={!isServerDown} name={STATUS_COPY.raven} />
+        <StatusChip isConnected={!isServerDown} name={name} />
         <p className={styles.family}>{SIGN_IN_COPY.family}</p>
       </footer>
     </main>
@@ -52,6 +54,7 @@ function PhoneFrame({ isServerDown, children }: SignInFrameProps) {
  * themed form, which grows no wider than 400.
  */
 function WideFrame({ isServerDown, children }: SignInFrameProps) {
+  const name = useServerName()
   return (
     <main className={styles.split}>
       <section className={styles.brand}>
@@ -72,7 +75,7 @@ function WideFrame({ isServerDown, children }: SignInFrameProps) {
           />
           {children}
           <span className={styles.server}>
-            <StatusChip isConnected={!isServerDown} name={STATUS_COPY.raven} />
+            <StatusChip isConnected={!isServerDown} name={name} />
           </span>
         </div>
       </section>

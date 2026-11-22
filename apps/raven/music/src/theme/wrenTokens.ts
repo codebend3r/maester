@@ -1,13 +1,8 @@
 /*
- * Wren's design tokens, from the redesign handoff's `design/redesign/tokens/tokens.json`: the
- * dark and light palettes, the two faces, the type scale, radii, spacing and fixed sizes.
+ * Wren's design tokens, from the redesign handoff's `design/redesign/tokens/tokens.json`: each
+ * theme's palette, the two faces, the type scale, radii, spacing and fixed sizes.
  * app.config.ts reads this file by relative path, so it imports nothing.
  */
-
-/** The two palettes Wren draws with. */
-export const COLOR_SCHEMES = { dark: 'dark', light: 'light' } as const
-
-export type ColorScheme = (typeof COLOR_SCHEMES)[keyof typeof COLOR_SCHEMES]
 
 /** The logo's own colours, fixed in every theme. The eye red is the logo's alone, never UI. */
 export const BRAND = {
@@ -31,7 +26,8 @@ export const ART = {
   sand: '#e8dcc4',
 } as const
 
-const DARK = {
+/** Wren's own dark, and its default. */
+const NIGHT = {
   bg: '#101816',
   surface: '#17211e',
   surface2: '#1f2b27',
@@ -51,10 +47,14 @@ const DARK = {
   shadow: 'rgba(0,0,0,0.45)',
 } as const
 
-/** Every colour a screen paints with, by what it is for. */
-export type Palette = { readonly [K in keyof typeof DARK]: string }
+/** What sits on a picture, the same in every theme: Night's text on its scrim. */
+export const ON_PICTURE = { veil: NIGHT.scrim, ink: NIGHT.text } as const
 
-const LIGHT = {
+/** Every colour a screen paints with, by what it is for. */
+export type Palette = { readonly [K in keyof typeof NIGHT]: string }
+
+/** Wren's own light. */
+const PAPER = {
   bg: '#f4efe6',
   surface: '#fbf8f2',
   surface2: '#e9e3d7',
@@ -74,11 +74,168 @@ const LIGHT = {
   shadow: 'rgba(40,30,20,0.14)',
 } as const satisfies Palette
 
-/** Each scheme's palette. */
+/** The brand's red is the ground, and cream does the accent's work. */
+const GARNET = {
+  bg: '#b8323b',
+  surface: '#a82a33',
+  surface2: '#98232c',
+  raised: '#c4434b',
+  field: '#98232c',
+  line: 'rgba(255,244,234,0.16)',
+  line2: 'rgba(255,244,234,0.3)',
+  text: '#ffffff',
+  text2: '#ffe9e6',
+  text3: '#fbdcd8',
+  accent: '#fff4ea',
+  accentInk: '#8f1f29',
+  accentText: '#fff4ea',
+  accentSoft: 'rgba(255,244,234,0.16)',
+  ok: '#c8f0d8',
+  scrim: 'rgba(60,8,12,0.66)',
+  shadow: 'rgba(60,8,12,0.4)',
+} as const satisfies Palette
+
+/** Garnet's light partner: rose paper under the same red. */
+const BLUSH = {
+  bg: '#f8ecea',
+  surface: '#fdf6f4',
+  surface2: '#f0dcd9',
+  raised: '#ffffff',
+  field: '#ffffff',
+  line: 'rgba(74,16,22,0.09)',
+  line2: 'rgba(74,16,22,0.16)',
+  text: '#2a0f12',
+  text2: '#5c3d40',
+  text3: '#76575a',
+  accent: '#b8323b',
+  accentInk: '#ffffff',
+  accentText: '#a8262f',
+  accentSoft: 'rgba(184,50,59,0.1)',
+  ok: '#2f7a57',
+  scrim: 'rgba(42,15,18,0.36)',
+  shadow: 'rgba(74,16,22,0.14)',
+} as const satisfies Palette
+
+/** Cool green paper with a deep green accent. */
+const MINT = {
+  bg: '#e9f5ee',
+  surface: '#f4faf6',
+  surface2: '#d6eadf',
+  raised: '#ffffff',
+  field: '#ffffff',
+  line: 'rgba(16,52,40,0.09)',
+  line2: 'rgba(16,52,40,0.16)',
+  text: '#10261e',
+  text2: '#3b5248',
+  text3: '#54695f',
+  accent: '#17785a',
+  accentInk: '#ffffff',
+  accentText: '#0f6a4e',
+  accentSoft: 'rgba(23,120,90,0.1)',
+  ok: '#2f7a57',
+  scrim: 'rgba(16,38,30,0.36)',
+  shadow: 'rgba(16,52,40,0.14)',
+} as const satisfies Palette
+
+/** After the editor theme: its ground, foreground, purple and green. */
+const DRACULA = {
+  bg: '#282a36',
+  surface: '#313442',
+  surface2: '#3a3d4f',
+  raised: '#44475a',
+  field: '#21222c',
+  line: 'rgba(248,248,242,0.08)',
+  line2: 'rgba(248,248,242,0.16)',
+  text: '#f8f8f2',
+  text2: '#c5c8dc',
+  text3: '#a4aed6',
+  accent: '#bd93f9',
+  accentInk: '#282a36',
+  accentText: '#c9a6ff',
+  accentSoft: 'rgba(189,147,249,0.16)',
+  ok: '#50fa7b',
+  scrim: 'rgba(15,16,22,0.66)',
+  shadow: 'rgba(0,0,0,0.45)',
+} as const satisfies Palette
+
+/** Deep navy with a sky blue accent. */
+const MIDNIGHT = {
+  bg: '#0e1524',
+  surface: '#151e31',
+  surface2: '#1e2a42',
+  raised: '#1a2439',
+  field: '#151e31',
+  line: 'rgba(222,231,247,0.08)',
+  line2: 'rgba(222,231,247,0.16)',
+  text: '#e9eef8',
+  text2: '#b1bcd0',
+  text3: '#8a97b0',
+  accent: '#7cb7ff',
+  accentInk: '#0e1524',
+  accentText: '#8fc2ff',
+  accentSoft: 'rgba(124,183,255,0.15)',
+  ok: '#7fd4b0',
+  scrim: 'rgba(4,8,16,0.66)',
+  shadow: 'rgba(0,0,0,0.45)',
+} as const satisfies Palette
+
+/** Banana yellow paper with a stem brown accent. */
+const BANANA = {
+  bg: '#fcefa8',
+  surface: '#fff7cc',
+  surface2: '#f3e08a',
+  raised: '#ffffff',
+  field: '#fffdf0',
+  line: 'rgba(64,48,0,0.1)',
+  line2: 'rgba(64,48,0,0.18)',
+  text: '#2b2204',
+  text2: '#54471a',
+  text3: '#6b5d2a',
+  accent: '#7a5200',
+  accentInk: '#fff8d6',
+  accentText: '#7a5200',
+  accentSoft: 'rgba(122,82,0,0.1)',
+  ok: '#2f7a57',
+  scrim: 'rgba(43,34,4,0.36)',
+  shadow: 'rgba(64,48,0,0.16)',
+} as const satisfies Palette
+
+/** Warm charcoal with an orange accent. */
+const EMBER = {
+  bg: '#17120f',
+  surface: '#201915',
+  surface2: '#2c231d',
+  raised: '#251d18',
+  field: '#201915',
+  line: 'rgba(245,232,220,0.08)',
+  line2: 'rgba(245,232,220,0.16)',
+  text: '#f3ebe3',
+  text2: '#bdb0a4',
+  text3: '#9c8f83',
+  accent: '#f28c28',
+  accentInk: '#1c1109',
+  accentText: '#ffa24a',
+  accentSoft: 'rgba(242,140,40,0.15)',
+  ok: '#7fc4a4',
+  scrim: 'rgba(8,5,3,0.66)',
+  shadow: 'rgba(0,0,0,0.45)',
+} as const satisfies Palette
+
+/**
+ * Each theme's palette, by the theme's name in `@raven/wren`'s `WREN_THEMES`, which
+ * `wrenTheme.ts` checks these keys against. The web's `globals.scss` holds the same values.
+ */
 export const COLORS = {
-  [COLOR_SCHEMES.dark]: DARK,
-  [COLOR_SCHEMES.light]: LIGHT,
-} as const satisfies Record<ColorScheme, Palette>
+  night: NIGHT,
+  paper: PAPER,
+  garnet: GARNET,
+  blush: BLUSH,
+  mint: MINT,
+  dracula: DRACULA,
+  midnight: MIDNIGHT,
+  banana: BANANA,
+  ember: EMBER,
+} as const
 
 /**
  * The faces, by PostScript name. The files in `assets/fonts` carry the same names, so the name is
@@ -126,7 +283,7 @@ export const TYPE = {
   metaStrong: { fontFamily: FONTS.bodySemiBold, fontSize: 13, lineHeight: 18 },
   tileTitle: { fontFamily: FONTS.bodySemiBold, fontSize: 14, lineHeight: 19 },
   /** An album's or a playlist's name on its tile. */
-  tileAlbum: { fontFamily: FONTS.display, fontSize: 14, lineHeight: 19 },
+  tileAlbum: { fontFamily: FONTS.display, fontSize: 17, lineHeight: 22 },
   /** The line under it, the artists: a step over meta, and bold. */
   tileArtist: { fontFamily: FONTS.bodySemiBold, fontSize: 14, lineHeight: 19 },
   time: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 18, fontVariant: ['tabular-nums'] },
@@ -167,9 +324,24 @@ export const RADIUS = {
 
 export const SPACE = { s1: 4, s2: 8, s3: 12, s4: 16, s5: 20, s6: 24, s8: 32, s10: 40 } as const
 
+/**
+ * The shadows, the web's `--shadow-*`: how far each falls, how soft it is, and Android's
+ * elevation for it.
+ */
+export const SHADOWS = {
+  card: { offsetY: 8, radius: 20, elevation: 8 },
+  raised: { offsetY: 24, radius: 32, elevation: 16 },
+  segment: { offsetY: 1, radius: 1, elevation: 0 },
+} as const
+
+export type Shadow = (typeof SHADOWS)[keyof typeof SHADOWS]
+
 /** The kit's fixed sizes, in points: its controls, rows, icons, art and lines. */
 export const SIZE = {
   touchTarget: 44,
+  loadingMark: 18,
+  /** A line of words in a list's stand-ins while it loads. */
+  skeletonLine: 14,
   button: 48,
   buttonLarge: 52,
   field: 52,
@@ -194,6 +366,8 @@ export const SIZE = {
   progressLine: 2,
   smallButton: 36,
   playButton: 44,
+  /** The player bar's Play and Pause. */
+  playBar: 60,
   segment: 30,
   segmentInset: 3,
   segmentGap: 2,
@@ -240,7 +414,8 @@ export const SIZE = {
 /** The tablet's shell: the sidebar, its rail, the player bar and the pages' margins. */
 export const SHELL_SIZES = {
   tabletSidebar: 256,
-  tabletRail: 76,
+  /** The rail's padding and its rows' on both sides of an icon: four `SPACE.s3` and `SIZE.navIcon`. */
+  tabletRail: 68,
   sidebarItem: 42,
   tabletPlayerBar: 84,
   barArt: 52,
@@ -280,8 +455,12 @@ export const DETAIL_SIZES = {
   tabletColumn: 300,
   cover: 236,
   tabletCover: 300,
-  hero: 300,
-  tabletHero: 250,
+  hero: 360,
+  tabletHero: 400,
+  /** How far an artist's wide hero blurs the copy of the photo behind it; the web's `$backdrop-blur`. */
+  heroBlur: 48,
+  /** The room the about needs beside the photo before it shows, so its lines never crowd; the web's `$about-room`. */
+  heroAboutRoom: 352,
   /** How tall Add to playlist's list grows before it scrolls: six rows. */
   playlistList: 360,
 } as const
@@ -290,6 +469,20 @@ export const DETAIL_SIZES = {
 export const HOME_SIZES = {
   continueArt: 96,
   tabletContinueArt: 132,
+} as const
+
+/** Settings' theme picker: a theme's small picture of itself, its parts, and a slot's dots. */
+export const THEME_SIZES = {
+  /** How tall a tile's picture of its theme is. */
+  preview: 72,
+  /** A line of the picture: its title's and its meta's. */
+  bar: 6,
+  pillWidth: 44,
+  pillHeight: 14,
+  /** One of the three colours a slot shows of its theme. */
+  dot: 18,
+  /** The disc the picked tile's check sits in. */
+  check: 20,
 } as const
 
 /** Sign-in, from the handoff's P01 and T01. */
@@ -317,10 +510,10 @@ export type FormFactor = (typeof FORM_FACTORS)[keyof typeof FORM_FACTORS]
 export const BREAKPOINTS = { tablet: 744 } as const
 
 /**
- * How faint a control is drawn while a finger holds it and while it is turned off, and how
- * faint a lyric line is once sung.
+ * How faint a control is drawn while a finger holds it and while it is turned off, how faint a
+ * lyric line is once sung, and the faintest a list's stand-ins breathe to while it is read.
  */
-export const OPACITIES = { pressed: 0.85, disabled: 0.4, sung: 0.55 } as const
+export const OPACITIES = { pressed: 0.85, disabled: 0.4, sung: 0.55, breathe: 0.5 } as const
 
-/** How long a sheet or Now Playing takes to rise, in milliseconds. */
-export const MOTION = { sheet: 320 } as const
+/** How long a sheet or Now Playing takes to rise, a tile to lift, the mark to turn and a stand-in to breathe, in milliseconds. */
+export const MOTION = { sheet: 320, tile: 160, spin: 800, breathe: 1400 } as const

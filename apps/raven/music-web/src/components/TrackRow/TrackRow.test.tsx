@@ -1,9 +1,10 @@
-import { describe, expect, it, mock } from 'bun:test'
+import { describe, expect, it, mock, spyOn } from 'bun:test'
 import { KIT_COPY, SONG_LEADS, TRACK_MENU_COPY } from '@raven/wren'
 import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { TrackRow } from '@/components/TrackRow/TrackRow'
+import { api } from '@/lib/api'
 import { WREN_ROUTES } from '@/routes'
 import { AIRBAG, OK_COMPUTER, RADIOHEAD, mockMusicApiEach, mockQueueEach } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -72,12 +73,28 @@ describe('TrackRow', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([
+      TRACK_MENU_COPY.unlike,
       TRACK_MENU_COPY.playNext,
       TRACK_MENU_COPY.addToQueue,
       TRACK_MENU_COPY.addToPlaylist,
       TRACK_MENU_COPY.goToAlbum,
       TRACK_MENU_COPY.goToArtist,
     ])
+  })
+
+  it('turns the song off as a favourite from its heart', async () => {
+    const setFavourite = spyOn(api, 'setFavourite').mockImplementation(
+      () => new Promise(() => undefined),
+    )
+    renderRow()
+    const heart = await screen.findByRole('button', {
+      name: TRACK_MENU_COPY.likeSong(AIRBAG.title),
+      pressed: true,
+    })
+    await userEvent.click(heart)
+    expect(setFavourite).toHaveBeenCalledWith({ id: AIRBAG.id, favourite: false })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    setFavourite.mockRestore()
   })
 
   it('opens its sheet on a right click or the context menu key, in place of the browser menu', () => {

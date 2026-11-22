@@ -11,13 +11,28 @@
   @include mixins.stacked-lines;
 }
 
+// The equalizer, then the title, on one line.
+.heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
 .title {
+  @include mixins.one-line;
+
   color: var(--color-text);
   font: var(--type-row-strong);
 }
 
 .line {
   @include mixins.meta-line;
+}
+
+.quality {
+  color: var(--color-text-3);
+  font: var(--type-meta);
 }
 
 .error {

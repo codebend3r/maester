@@ -1,10 +1,17 @@
 import type { ComponentType } from 'react'
-import { Pressable, Text, View } from 'react-native'
-import { KIT_COPY, SONG_LEADS, type SongLead, songLeadOf, type SongLeadOf } from '@raven/wren'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  KIT_COPY,
+  SONG_LEADS,
+  type ShownLead,
+  type SongLead,
+  songLeadOf,
+  type SongLeadOf,
+} from '@raven/wren'
 
 import type { Cover } from '@/music/useCovers'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { ON_PICTURE, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton'
@@ -28,6 +35,14 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     paddingVertical: SPACE.s2,
   },
   lead: { alignItems: 'center', justifyContent: 'center', width: SIZE.trackNumber },
+  // The picture's own veil, the same in every theme, so the bars read over any cover.
+  veil: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    backgroundColor: ON_PICTURE.veil,
+    borderRadius: RADIUS.xs,
+    justifyContent: 'center',
+  },
   number: { ...TYPE.time, color: colors.text3 },
   text: { flex: 1 },
   title: { ...TYPE.rowTitle, color: colors.text },
@@ -43,12 +58,27 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   },
 }))
 
-type LeadProps = { lead: SongLeadOf<Cover>; isPlaying: boolean }
+type LeadProps = { lead: ShownLead<Cover>; isPlaying: boolean }
 
 function ArtLead({ lead }: LeadProps) {
   return (
     lead.kind === SONG_LEADS.art && (
       <AlbumArt cover={lead.cover} radius={RADIUS.xs} size={SIZE.rowArt} />
+    )
+  )
+}
+
+/** The queue's track in a list of covers: its cover under a veil, the equalizer over it. */
+function ArtEqualizerLead({ lead, isPlaying }: LeadProps) {
+  const styles = useStyles()
+  return (
+    lead.kind === SONG_LEADS.artEqualizer && (
+      <View>
+        <AlbumArt cover={lead.cover} radius={RADIUS.xs} size={SIZE.rowArt} />
+        <View style={styles.veil}>
+          <EqualizerIndicator isOnPicture isPlaying={isPlaying} />
+        </View>
+      </View>
     )
   )
 }
@@ -77,6 +107,7 @@ const LEAD_VIEWS = {
   [SONG_LEADS.art]: ArtLead,
   [SONG_LEADS.number]: NumberLead,
   [SONG_LEADS.equalizer]: EqualizerLead,
+  [SONG_LEADS.artEqualizer]: ArtEqualizerLead,
 } as const satisfies Record<SongLead, ComponentType<LeadProps>>
 
 type SongRowProps = {
@@ -119,8 +150,8 @@ export function SongRow({
 }: SongRowProps) {
   const styles = useStyles()
   const { colors } = useWrenTheme()
-  const Lead =
-    LEAD_VIEWS[songLeadOf({ hasArt: lead.kind === SONG_LEADS.art, isPlaying: isCurrent })]
+  const shown = songLeadOf({ lead, isCurrent })
+  const Lead = LEAD_VIEWS[shown.kind]
   return (
     <View style={styles.row}>
       <Pressable
@@ -131,7 +162,7 @@ export function SongRow({
         onPress={onPress}
         style={pressedStyleOf({ style: styles.main })}
       >
-        <Lead isPlaying={isPlaying} lead={lead} />
+        <Lead isPlaying={isPlaying} lead={shown} />
         <View style={styles.text}>
           <Text numberOfLines={1} style={[styles.title, isCurrent && styles.playing]}>
             {title}

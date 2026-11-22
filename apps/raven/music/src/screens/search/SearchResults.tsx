@@ -1,10 +1,11 @@
 import { LIBRARY_COPY, RESULT_STATES, type ResultState, SEARCH_COPY } from '@raven/wren'
 import type { ComponentType } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { View } from 'react-native'
 
+import { LoadingMark } from '@/components/LoadingMark'
 import { FilterResults } from '@/screens/search/FilterResults'
 import { NoMatches, type ResultsProps } from '@/screens/search/ResultParts'
-import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
+import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { EmptyState } from '@/ui/EmptyState'
 import { ICONS } from '@/ui/WrenIcon'
@@ -15,10 +16,9 @@ const useStyles = themedStyles(() => ({
 
 function Searching({ contentStyle }: ResultsProps) {
   const styles = useStyles()
-  const { colors } = useWrenTheme()
   return (
     <View style={[contentStyle, styles.searching]}>
-      <ActivityIndicator accessibilityLabel={SEARCH_COPY.searching} color={colors.text3} />
+      <LoadingMark label={SEARCH_COPY.searching} />
     </View>
   )
 }

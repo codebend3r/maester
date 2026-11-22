@@ -1,6 +1,12 @@
 import { type Track, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { type MenuPlaces, TRACK_MENU_COPY, factsLineOf, menuGroupsOf } from '@raven/wren'
+import {
+  type MenuLike,
+  type MenuPlaces,
+  TRACK_MENU_COPY,
+  factsLineOf,
+  menuGroupsOf,
+} from '@raven/wren'
 import { type ComponentProps, type ComponentType, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AddToPlaylist } from '@/components/AddToPlaylist/AddToPlaylist'
@@ -27,6 +33,8 @@ type TracksMenuProps = {
   canAddToPlaylist: boolean
   /** Where the menu can go from here; `{}` for a menu with nowhere to go. */
   places: MenuPlaces
+  /** A song's Like or Unlike; left out of a menu over more than one. */
+  like?: MenuLike
   onClose: () => void
 }
 
@@ -38,7 +46,14 @@ type MenuBodyProps = TracksMenuProps & {
 type TracksAct = (tracks: readonly Track[]) => void
 
 /** Play next, Add to queue and, where it shows, Add to playlist; then where to go from here. */
-function MenuActions({ tracksOf, canAddToPlaylist, places, onPlaylists, onClose }: MenuBodyProps) {
+function MenuActions({
+  tracksOf,
+  canAddToPlaylist,
+  places,
+  like,
+  onPlaylists,
+  onClose,
+}: MenuBodyProps) {
   const navigate = useNavigate()
   const playNext = useAudioQueue((store) => store.playNext)
   const addToQueue = useAudioQueue((store) => store.addToQueue)
@@ -52,6 +67,7 @@ function MenuActions({ tracksOf, canAddToPlaylist, places, onPlaylists, onClose 
   }
   const groups = menuGroupsOf({
     icons: ICONS,
+    like,
     canAddToPlaylist,
     places,
     onPlayNext: withTracks(playNext),
@@ -100,17 +116,19 @@ export function TracksMenu(props: TracksMenuProps) {
   )
 }
 
-type TrackMenuProps = Pick<TracksMenuProps, 'onClose'> & { track: Track }
+type TrackMenuProps = Pick<TracksMenuProps, 'onClose'> & {
+  track: Track
+  /** The song's Like, from `useTrackLike` where its heart shows too, so both say the same. */
+  like: MenuLike
+}
 
 /**
- * A track's menu, opened from its row's More: play it next, add it to the queue or to a
- * playlist, or go to its album or artist. Like is left out: the server keeps no favourite for a
- * track.
+ * A track's menu, opened from its row's More: like or unlike it, play it next, add it to the
+ * queue or to a playlist, or go to its album or artist.
  */
-export function TrackMenu({ track, onClose }: TrackMenuProps) {
+export function TrackMenu({ track, like, onClose }: TrackMenuProps) {
   const { trackCoverOf } = useCovers()
   const [artist] = track.artists
-  // TODO(redesign): Like, once the server keeps a track's favourite.
   return (
     <TracksMenu
       canAddToPlaylist
@@ -119,6 +137,7 @@ export function TrackMenu({ track, onClose }: TrackMenuProps) {
         subtitle: factsLineOf([artistNames(track), track.album.title]),
         cover: trackCoverOf(track),
       }}
+      like={like}
       onClose={onClose}
       places={{ albumId: track.albumId, artist }}
       tracksOf={async () => [track]}

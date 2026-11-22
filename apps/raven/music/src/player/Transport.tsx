@@ -15,10 +15,13 @@ import { PLAYER_SIZES, SIZE, SPACE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
 import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
-type PlayButtonProps = { size: number }
+/** How much of Play's circle its glyph fills: well over half, past the 26 the other buttons stop at. */
+const PLAY_GLYPH_SHARE = 0.7
+
+type PlayButtonProps = { size: number; isLifted: boolean }
 
 /** Play or Pause, a circle filled in the text colour. */
-function PlayButton({ size }: PlayButtonProps) {
+function PlayButton({ size, isLifted }: PlayButtonProps) {
   const { colors } = useWrenTheme()
   const isPlaying = useAudioQueue(isPlayingOf)
   const toggle = useAudioQueue((store) => store.toggle)
@@ -27,6 +30,8 @@ function PlayButton({ size }: PlayButtonProps) {
       color={colors.bg}
       fill={colors.text}
       icon={isPlaying ? ICONS.pause : ICONS.play}
+      iconSize={Math.round(size * PLAY_GLYPH_SHARE)}
+      isLifted={isLifted}
       label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
       onPress={toggle}
       size={size}
@@ -101,14 +106,32 @@ type TransportSizes = {
   play: number
   /** Previous's and Next's. */
   step: number
+  /** Whether Play rides above the row, as the player bar's does. */
+  isPlayLifted: boolean
 }
 
 const TRANSPORT_SIZES = {
-  [TRANSPORTS.player]: { play: PLAYER_SIZES.playLarge, step: PLAYER_SIZES.transportButton },
-  [TRANSPORTS.lyrics]: { play: PLAYER_SIZES.playCompact, step: PLAYER_SIZES.transportButton },
-  [TRANSPORTS.queue]: { play: PLAYER_SIZES.playQueue, step: PLAYER_SIZES.transportSmall },
-  [TRANSPORTS.bar]: { play: SIZE.playButton, step: SIZE.touchTarget },
-  [TRANSPORTS.column]: { play: PLAYER_SIZES.playQueue, step: PLAYER_SIZES.transportSmall },
+  [TRANSPORTS.player]: {
+    play: PLAYER_SIZES.playLarge,
+    step: PLAYER_SIZES.transportButton,
+    isPlayLifted: false,
+  },
+  [TRANSPORTS.lyrics]: {
+    play: PLAYER_SIZES.playCompact,
+    step: PLAYER_SIZES.transportButton,
+    isPlayLifted: false,
+  },
+  [TRANSPORTS.queue]: {
+    play: PLAYER_SIZES.playQueue,
+    step: PLAYER_SIZES.transportSmall,
+    isPlayLifted: false,
+  },
+  [TRANSPORTS.bar]: { play: SIZE.playBar, step: SIZE.touchTarget, isPlayLifted: true },
+  [TRANSPORTS.column]: {
+    play: PLAYER_SIZES.playQueue,
+    step: PLAYER_SIZES.transportSmall,
+    isPlayLifted: false,
+  },
 } as const satisfies Record<TransportKind, TransportSizes>
 
 const spread = {
@@ -135,13 +158,13 @@ type TransportProps = { kind: TransportKind }
 
 /** Shuffle, Previous, Play or Pause, Next and Repeat, as large as the place they sit in asks. */
 export function Transport({ kind }: TransportProps) {
-  const { play, step } = TRANSPORT_SIZES[kind]
+  const { play, step, isPlayLifted } = TRANSPORT_SIZES[kind]
   const hasToggles = hasTogglesOf(kind)
   return (
     <View style={TRANSPORT_ROWS[kind]}>
       {hasToggles && <ShuffleToggle />}
       <StepButton size={step} step={STEPS.previous} />
-      <PlayButton size={play} />
+      <PlayButton isLifted={isPlayLifted} size={play} />
       <StepButton size={step} step={STEPS.next} />
       {hasToggles && <RepeatToggle />}
     </View>

@@ -96,6 +96,7 @@ type ArtistRow = {
   name: string
   sort_name: string
   mbid: string | null
+  background: string | null
   album_count: number
   track_count: number
 }
@@ -418,7 +419,11 @@ export class MusicRepository implements OnModuleInit {
       name: row.name,
       sortName: row.sort_name,
       mbid: row.mbid,
-      photoVersion: this.pictureVersions.artist({ id: row.id, mbid: row.mbid }),
+      photoVersion: this.pictureVersions.artist({
+        id: row.id,
+        mbid: row.mbid,
+        background: row.background,
+      }),
       albumCount: row.album_count,
       trackCount: row.track_count,
     }
@@ -744,7 +749,7 @@ export class MusicRepository implements OnModuleInit {
             WHERE t.album_id IN (SELECT album_id FROM credits) AND ${SHOWN_TRACK}
             GROUP BY t.album_id
          )
-         SELECT ar.id, ar.name, ar.sort_name, ar.mbid,
+         SELECT ar.id, ar.name, ar.sort_name, ar.mbid, ar.background,
                 COUNT(*) AS album_count, COALESCE(SUM(shown.count), 0) AS track_count
            FROM credits
            JOIN artists ar ON ar.id = credits.artist_id
@@ -877,7 +882,7 @@ export class MusicRepository implements OnModuleInit {
   artists({ ids, hidden }: MusicRepositoryArtistsProps): Map<number, Artist> {
     const artists = this.db
       .prepare<{ ids: string; hidden: string }, ArtistRow>(
-        `SELECT ar.id, ar.name, ar.sort_name, ar.mbid,
+        `SELECT ar.id, ar.name, ar.sort_name, ar.mbid, ar.background,
                 (SELECT COUNT(DISTINCT aa.album_id) FROM album_artists aa JOIN albums a ON a.id = aa.album_id
                   WHERE aa.artist_id = ar.id
                     AND a.library_id NOT IN (SELECT value FROM json_each(@hidden))) AS album_count,
@@ -938,7 +943,7 @@ export class MusicRepository implements OnModuleInit {
   artist({ id, seesLibrary, account }: MusicRepositoryArtistProps): ArtistPage | null {
     const row = this.db
       .prepare<[number], Omit<ArtistRow, 'album_count' | 'track_count'>>(
-        'SELECT id, name, sort_name, mbid FROM artists WHERE id = ?',
+        'SELECT id, name, sort_name, mbid, background FROM artists WHERE id = ?',
       )
       .get(id)
     if (!row) return null

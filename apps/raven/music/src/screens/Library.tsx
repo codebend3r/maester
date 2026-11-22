@@ -13,6 +13,7 @@ import { ScrollView, View } from 'react-native'
 import { useCovers } from '@/music/useCovers'
 import { CATEGORIES } from '@/screens/library/categories'
 import { useDownloadsSummary, useLibraryValues, useRecentAlbums } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { WREN_ROUTES, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
@@ -78,7 +79,13 @@ function RecentGrid({ session }: LibraryPageProps) {
   return (
     <View style={styles.section}>
       <SectionHeader title={LIBRARY_PAGE_COPY.recent} />
-      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      {albums.length === 0 && (
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
+      )}
       <TileGrid
         items={albums}
         keyOf={(album) => album.id}

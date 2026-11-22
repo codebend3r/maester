@@ -1,4 +1,11 @@
-import { APPEARANCES, COVER_SIZES, RECENT_SORTS, WREN_PREFS_KEY } from '@raven/wren'
+import {
+  COVER_SIZES,
+  DEFAULT_THEME_CHOICE,
+  RECENT_SORTS,
+  THEME_MODES,
+  WREN_PREFS_KEY,
+  WREN_THEMES,
+} from '@raven/wren'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
@@ -22,22 +29,23 @@ const memoryStorage = ({ entries = [] }: MemoryStorageProps = {}) => {
 }
 
 const prefsOf = () => {
-  const { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort, coverSize } =
-    useWrenPrefs.getState()
-  return { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort, coverSize }
+  const { change: _change, ...values } = useWrenPrefs.getState()
+  return values
 }
 
 describe('useWrenPrefs', () => {
   beforeEach(() => useWrenPrefs.setState(DEFAULT_WREN_PREFS))
 
-  it('starts downloads at 256 kbps and cellular on the file itself, with no storage limit, following the system appearance, covers at medium', () => {
+  it("starts downloads at 256 kbps and cellular on the file itself, with no storage limit, Paper and Night by the device's scheme, covers at medium", () => {
     expect(prefsOf()).toEqual({
       downloadKbps: AUDIO_BITRATES.standard,
       cellularKbps: null,
       storageLimitGb: null,
-      appearance: APPEARANCES.system,
+      ...DEFAULT_THEME_CHOICE,
       homeSort: RECENT_SORTS.added,
       coverSize: COVER_SIZES.medium,
+      libraryId: null,
+      serverName: null,
     })
   })
 
@@ -45,7 +53,7 @@ describe('useWrenPrefs', () => {
     const { storage, items } = memoryStorage()
     await configureWrenPrefs({ storage })
     useWrenPrefs.getState().change({ downloadKbps: AUDIO_BITRATES.high, cellularKbps: null })
-    useWrenPrefs.getState().change({ storageLimitGb: 5, appearance: APPEARANCES.light })
+    useWrenPrefs.getState().change({ storageLimitGb: 5, lightTheme: WREN_THEMES.banana })
     useWrenPrefs.getState().change({ homeSort: RECENT_SORTS.release })
     useWrenPrefs.getState().change({ coverSize: COVER_SIZES.extraSmall })
 
@@ -56,9 +64,12 @@ describe('useWrenPrefs', () => {
       downloadKbps: AUDIO_BITRATES.high,
       cellularKbps: null,
       storageLimitGb: 5,
-      appearance: APPEARANCES.light,
+      ...DEFAULT_THEME_CHOICE,
+      lightTheme: WREN_THEMES.banana,
       homeSort: RECENT_SORTS.release,
       coverSize: COVER_SIZES.extraSmall,
+      libraryId: null,
+      serverName: null,
     })
   })
 
@@ -68,7 +79,7 @@ describe('useWrenPrefs', () => {
         downloadKbps: 192,
         cellularKbps: '128',
         storageLimitGb: 10,
-        appearance: 'sepia',
+        theme: 'sepia',
         coverSize: 'huge',
       },
     }
@@ -83,7 +94,7 @@ describe('useWrenPrefs', () => {
         downloadKbps: AUDIO_BITRATES.high,
         cellularKbps: AUDIO_BITRATES.standard,
         storageLimitGb: 5,
-        appearance: APPEARANCES.dark,
+        appearance: 'dark',
       },
       version: 0,
     }
@@ -93,9 +104,13 @@ describe('useWrenPrefs', () => {
       downloadKbps: AUDIO_BITRATES.high,
       cellularKbps: null,
       storageLimitGb: 5,
-      appearance: APPEARANCES.dark,
+      ...DEFAULT_THEME_CHOICE,
+      themeMode: THEME_MODES.single,
+      theme: WREN_THEMES.night,
       homeSort: RECENT_SORTS.added,
       coverSize: COVER_SIZES.medium,
+      libraryId: null,
+      serverName: null,
     })
   })
 

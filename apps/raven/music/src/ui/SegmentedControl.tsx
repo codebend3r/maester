@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native'
 
-import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
-import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { type WrenTheme, themedStyles, shadowOf } from '@/theme/wrenTheme'
+import { RADIUS, SHADOWS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { hitSlopOf, pressedStyleOf } from '@/ui/press'
 
 // A segment is shorter than a finger, so it answers above and below its edges.
@@ -28,10 +28,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   },
   selected: {
     backgroundColor: colors.raised,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: SIZE.hairline },
-    shadowOpacity: 1,
-    shadowRadius: SIZE.hairline,
+    ...shadowOf({ shadow: SHADOWS.segment, color: colors.shadow }),
   },
   label: { ...TYPE.metaStrong, color: colors.text },
   idle: { ...TYPE.meta, color: colors.text2 },

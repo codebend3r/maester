@@ -1,0 +1,36 @@
+@use '../../styles/mixins';
+
+.rows {
+  display: grid;
+}
+
+.choice {
+  & + & {
+    border-block-start: var(--size-hairline) solid var(--color-line);
+  }
+}
+
+// The name takes the room the check leaves.
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: var(--size-nav-row);
+}
+
+.name {
+  @include mixins.one-line;
+  color: var(--color-text);
+  font: var(--type-row-title);
+}
+
+// Drawn on every row, so no row changes when it is picked; seen on the worn one alone.
+.check {
+  color: var(--color-accent-text);
+  opacity: 0;
+
+  input:checked + .row & {
+    opacity: 1;
+  }
+}

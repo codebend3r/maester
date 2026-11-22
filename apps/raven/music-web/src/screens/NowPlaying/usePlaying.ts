@@ -1,17 +1,9 @@
-import {
-  type AudioBitrate,
-  QUEUE_SOURCE_KINDS,
-  TRACK_STREAM_KINDS,
-  type Track,
-  type TrackStream,
-} from '@raven/core'
-import { useAudioQueue, useIsAudiobook, useTrackBitrate } from '@raven/ui/headless'
+import { QUEUE_SOURCE_KINDS, type Track } from '@raven/core'
+import { useAudioQueue, useIsAudiobook } from '@raven/ui/headless'
 import {
   NOW_PLAYING_COPY,
-  STATUS_COPY,
   type SourceTitle,
   type ShownLyrics,
-  qualityLineOf,
   shownLyricsOf,
   sourceIdOf,
   sourceTitleOf,
@@ -20,8 +12,10 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { queries } from '@/lib/queries'
 import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
+import { useQuality } from '@/player/useQuality'
 import { WREN_ROUTES, artistPath } from '@/routes'
 import { useGoBack } from '@/shell/useGoBack'
+import { useServerName } from '@/stores/wrenPrefs'
 
 /** Whether the song's artists open a page. */
 export const ARTIST_KINDS = { linked: 'linked', plain: 'plain' } as const
@@ -51,26 +45,6 @@ export type Playing = NowPlayingTrack & {
   artist: PlayingArtist
 }
 
-/*
- * The stream the host's own decision makes: the transcode at `kbps`, or the file when it names
- * none. A browser plays nothing from a download, so the apps' third stream is never made here.
- */
-const trackStreamOf = (kbps: AudioBitrate | null): TrackStream =>
-  kbps === null ? { kind: TRACK_STREAM_KINDS.file } : { kind: TRACK_STREAM_KINDS.transcode, kbps }
-
-type UseQualityProps = { track: Track }
-
-/*
- * The format and quality line, from the decision `@raven/ui`'s `AudioHost` plays by: nothing
- * while the libraries that tell a book from music are read, which the host waits out before it
- * sets a source, then the file, or the transcode at the bitrate the prefs pick.
- */
-const useQuality = ({ track }: UseQualityProps): string | null => {
-  const libraries = useQuery(queries.librariesQuery)
-  const kbps = useTrackBitrate({ api, track })
-  return libraries.isPending ? null : qualityLineOf({ track, stream: trackStreamOf(kbps) })
-}
-
 type UsePlayingProps = { track: Track }
 
 /** The playing song, its cover, artists and length, its lyrics, where it plays from and on, and the way out of the sheet. */
@@ -89,6 +63,7 @@ export const usePlaying = ({ track }: UsePlayingProps): Playing => {
   )
   const quality = useQuality({ track })
   const device = NOW_PLAYING_COPY.devices.browser
+  const serverName = useServerName()
   const [firstArtist] = track.artists
   return {
     ...nowPlaying,
@@ -100,7 +75,7 @@ export const usePlaying = ({ track }: UsePlayingProps): Playing => {
     }),
     lyrics: shownLyricsOf({ isAudiobook, lyrics }),
     isAudiobook,
-    output: NOW_PLAYING_COPY.output({ server: STATUS_COPY.raven, device }),
+    output: NOW_PLAYING_COPY.output({ server: serverName, device }),
     playingOn: NOW_PLAYING_COPY.playingOn(device),
     close,
     quality,

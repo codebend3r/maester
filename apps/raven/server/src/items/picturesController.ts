@@ -19,10 +19,13 @@ import { IMAGE_WIDTHS, ImageCache } from '@/metadata/imageCache'
 import { ItemImagesRepository } from '@/metadata/itemImagesRepository'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import { AlbumCovers } from '@/music/albumCovers'
-import { MusicBrainzClient } from '@/music/musicBrainzClient'
-import { MusicCoverStore } from '@/music/musicCoverStore'
+import { ArtistBackgroundOptions } from '@/music/artistBackgroundOptions'
+import { type ArtistPicture, MusicCoverStore } from '@/music/musicCoverStore'
+import { WikimediaClient } from '@/music/wikimediaClient'
 import { PeopleRepository } from '@/people/peopleRepository'
 import { QUERY_PARAMS } from '@/queryValues'
+
+type ArtistPhotoPathProps = { id: number; artist: ArtistPicture }
 
 type IsCurrentProps = { given: string; current: string | null | undefined }
 
@@ -56,7 +59,8 @@ export class PicturesController {
     @Inject(PictureVersions) private readonly versions: PictureVersions,
     @Inject(AlbumCovers) private readonly covers: AlbumCovers,
     @Inject(MusicCoverStore) private readonly coverStore: MusicCoverStore,
-    @Inject(MusicBrainzClient) private readonly musicBrainz: MusicBrainzClient,
+    @Inject(WikimediaClient) private readonly wikimedia: WikimediaClient,
+    @Inject(ArtistBackgroundOptions) private readonly backgrounds: ArtistBackgroundOptions,
   ) {}
 
   /** An item's poster, backdrop, logo or still; a poster comes narrower when `w` asks. */
@@ -94,7 +98,7 @@ export class PicturesController {
     await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
   }
 
-  /** An artist's photo from Wikimedia Commons. */
+  /** An artist's photo from Wikimedia Commons, or the background an owner chose for them. */
   @OpenToAnyone()
   @Get(PICTURE_PATHS.artist)
   async artist(
@@ -104,12 +108,35 @@ export class PicturesController {
   ): Promise<void> {
     const artist = this.coverStore.artistPicture({ id, version })
     if (artist === null) throw new NotFoundException('No picture')
+    const path =
+      artist.background === null
+        ? await this.artistPhotoPath({ id, artist })
+        : await this.backgrounds.pathOf({ artistId: id, source: artist.background })
+    await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
+  }
+
+  /** The cached file of the artist's default photo, looked for through MusicBrainz and Wikidata once. */
+  private async artistPhotoPath({ id, artist }: ArtistPhotoPathProps): Promise<string | null> {
+    if (artist.mbid === null) throw new NotFoundException('No picture')
     const picture =
-      artist.picture ?? (!artist.isFetched ? await this.musicBrainz.artistPhoto(artist.mbid) : null)
+      artist.picture ?? (!artist.isFetched ? await this.wikimedia.artistPhoto(artist.mbid) : null)
     if (!artist.isFetched) this.coverStore.setArtistPicture({ id, picture })
     if (picture === null) throw new NotFoundException('No picture')
-    const path = await this.images.artist({ artistId: id, source: picture })
-    await sendImage({ reply, path, version, audience: IMAGE_AUDIENCES.everyone })
+    return this.images.artist({ artistId: id, source: picture })
+  }
+
+  /** One of the options an owner may set as an artist's background, by its key. */
+  @OpenToAnyone()
+  @Get(PICTURE_PATHS.artistBackground)
+  async artistBackground(
+    @Param(PICTURE_PARAMS.id, ParseIntPipe) id: number,
+    @Param(PICTURE_PARAMS.key) key: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const source = this.backgrounds.sourceOf({ artistId: id, key })
+    if (source === null) throw new NotFoundException('No picture')
+    const path = await this.backgrounds.pathOf({ artistId: id, source })
+    await sendImage({ reply, path, version: key, audience: IMAGE_AUDIENCES.everyone })
   }
 
   /** A person's photo from TMDB. */

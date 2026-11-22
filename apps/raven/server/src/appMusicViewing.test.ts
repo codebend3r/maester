@@ -13,6 +13,7 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { DatabaseService } from '@/db/database'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
@@ -31,6 +32,24 @@ const TITLES = {
   outage: 'Later',
   gone: 'Gone',
 } as const
+
+/** What MusicBrainz, Wikidata and Commons say of the band, whose photos an owner may pick from. */
+const BAND_RELATIONS = {
+  relations: [{ type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q42' } }],
+}
+const BAND_WIKIDATA = {
+  entities: {
+    Q42: {
+      claims: {
+        P18: [{ mainsnak: { datavalue: { value: 'Band Main.jpg' } } }],
+        P373: [{ mainsnak: { datavalue: { value: 'Band' } } }],
+      },
+    },
+  },
+}
+const BAND_CATEGORY = {
+  query: { categorymembers: [{ title: 'File:Band Main.jpg' }, { title: 'File:Band Live.png' }] },
+}
 
 const LRC = {
   tagged: '[00:01.00]Sung from the tag',
@@ -96,8 +115,16 @@ describe('playlists, favourites, lyrics and chapters', () => {
         { start: 2, end: 6, title: 'The Rest' },
       ],
     })
-    const fetch: MetadataFetch = (request) =>
-      new URL(request.url).host === LRCLIB_HOST ? lrclib.fetch(request) : musicBrainz.fetch(request)
+    const fetch: MetadataFetch = (request) => {
+      const { host, pathname } = new URL(request.url)
+      if (host === LRCLIB_HOST) return lrclib.fetch(request)
+      if (host === 'musicbrainz.org' && pathname.startsWith('/ws/2/artist/')) {
+        return Promise.resolve(Response.json(BAND_RELATIONS))
+      }
+      if (host === 'www.wikidata.org') return Promise.resolve(Response.json(BAND_WIKIDATA))
+      if (host === 'commons.wikimedia.org') return Promise.resolve(Response.json(BAND_CATEGORY))
+      return musicBrainz.fetch(request)
+    }
     state.app = await createApp({
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
       metadataFetch: fetch,
@@ -231,6 +258,51 @@ describe('playlists, favourites, lyrics and chapters', () => {
     await expect(
       api().setArtistFavourite({ artistId: 999_999, favourite: true }),
     ).rejects.toMatchObject({ status: 404 })
+  })
+
+  it("lets an owner pick an artist's background from their photos and covers, and back to the default", async () => {
+    const [album] = await api().listAlbums({ libraryId: state.music })
+    const artistId = album?.artists[0]?.id ?? 0
+    const { db } = app().get(DatabaseService)
+    db.prepare("UPDATE artists SET mbid = '9d1f2b1c-0000-4000-8000-000000000001' WHERE id = ?").run(
+      artistId,
+    )
+    db.prepare("UPDATE albums SET cover_source = 'file', cover_ref = ? WHERE id = ?").run(
+      at('Music', 'Band', 'Words', 'cover.jpg'),
+      album?.id ?? 0,
+    )
+
+    const listed = await api().listArtistBackgrounds(artistId)
+    expect(listed.chosen).toBeNull()
+    expect(listed.options.map(({ kind }) => kind)).toEqual(['photo', 'photo', 'cover'])
+    const [photo, , cover] = listed.options
+
+    const before = (await api().getArtist(artistId)).artist.photoVersion
+    expect(before).not.toBeNull()
+    const worn = await api().setArtistBackground({ artistId, key: cover?.key ?? '' })
+    expect(worn.artist.photoVersion).not.toBeNull()
+    expect(worn.artist.photoVersion).not.toBe(before)
+    expect((await api().listArtistBackgrounds(artistId)).chosen).toBe(cover!.key)
+
+    const photoWorn = await api().setArtistBackground({ artistId, key: photo?.key ?? '' })
+    expect(photoWorn.artist.photoVersion).not.toBe(worn.artist.photoVersion)
+
+    const reset = await api().setArtistBackground({ artistId, key: null })
+    expect(reset.artist.photoVersion).toBe(before)
+    expect((await api().listArtistBackgrounds(artistId)).chosen).toBeNull()
+
+    await expect(api().setArtistBackground({ artistId, key: 'nothing' })).rejects.toMatchObject({
+      status: 404,
+    })
+    await expect(api().setArtistBackground({ artistId: 999_999, key: null })).rejects.toMatchObject(
+      { status: 404 },
+    )
+    await expect(api().listArtistBackgrounds(999_999)).rejects.toMatchObject({ status: 404 })
+    const missing = await app().inject({
+      method: 'GET',
+      url: `/api/pictures/artists/${artistId}/backgrounds/nothing`,
+    })
+    expect(missing.statusCode).toBe(404)
   })
 
   it("reads a track's lyrics from its tag, then a sidecar, then LRCLIB, which it asks once", async () => {

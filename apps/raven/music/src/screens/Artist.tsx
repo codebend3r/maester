@@ -1,10 +1,11 @@
 import { type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
-import { useAudioQueue, useServerArtistFavourite } from '@raven/ui/headless'
+import { useAudioQueue, useIsOwner, useServerArtistFavourite } from '@raven/ui/headless'
 import { ARTIST_COPY, artistMetaOf, PLAYER_COPY } from '@raven/wren'
+import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { ScrollView, View } from 'react-native'
 
-import { ACTION_SHAPES } from '@/components/DetailAction'
+import { ACTION_SHAPES, DetailAction } from '@/components/DetailAction'
 import { FavouriteAction } from '@/components/FavouriteAction'
 import { Nothing } from '@/components/Nothing'
 import { TracksMenu } from '@/components/TrackMenu'
@@ -12,15 +13,17 @@ import { useAlbumTracks } from '@/music/useAlbumTracks'
 import { useCovers } from '@/music/useCovers'
 import { ArtistHero, HeroActions } from '@/screens/detail/ArtistHero'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
+import { EditBackgroundSheet } from '@/screens/detail/EditBackgroundSheet'
 import { usePageInsets } from '@/shell/useShell'
+import { useWrenAccount } from '@/session'
 import { toastFailure } from '@/stores/toast'
-import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
+import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { AlbumTileOf } from '@/ui/AlbumTile'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
-import { ICONS } from '@/ui/WrenIcon'
+import { ICONS, WrenIcon } from '@/ui/WrenIcon'
 import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -37,16 +40,20 @@ type ArtistActionsProps = {
   onShuffle: () => void
   isFollowing: boolean
   onFollow: () => void
+  /** Opens the sheet of backgrounds, for the owner; null for everyone else, who has no button. */
+  onEditBackground: (() => void) | null
 }
 
-/** Play, Shuffle and Follow. */
+/** Play, Shuffle and Follow, and for the owner the button that edits the background image. */
 function ArtistActions({
   isStretched,
   onPlay,
   onShuffle,
   isFollowing,
   onFollow,
+  onEditBackground,
 }: ArtistActionsProps) {
+  const { colors } = useWrenTheme()
   return (
     <>
       <Button
@@ -68,6 +75,14 @@ function ArtistActions({
         onToggle={onFollow}
         shape={ACTION_SHAPES.circle}
       />
+      {onEditBackground !== null && (
+        <DetailAction
+          glyph={<WrenIcon color={colors.text2} name={ICONS.image} />}
+          label={ARTIST_COPY.editBackground}
+          onPress={onEditBackground}
+          shape={ACTION_SHAPES.circle}
+        />
+      )}
     </>
   )
 }
@@ -111,7 +126,11 @@ function ArtistPage({ session, details }: ArtistPageProps) {
   const { artist, albums, appearsOn, isFavourite } = details
   const favourite = useServerArtistFavourite({ api: session.api, artistId: artist.id })
   const photo = artistPhotoOf(artist)
+  const about = useQuery(session.queries.artistAboutQuery(artist.id))
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isBackgroundOpen, setIsBackgroundOpen] = useState(false)
+  const userId = useWrenAccount((state) => state.session?.userId ?? null)
+  const isOwner = useIsOwner({ queries: session.queries, userId })
   const source = { kind: QUEUE_SOURCE_KINDS.artist, id: artist.id } as const
   // The artist's songs are their albums' tracks, read only once something plays them.
   const tracksOf = () => albumTracks(albums.map(({ id }) => id))
@@ -123,6 +142,7 @@ function ArtistPage({ session, details }: ArtistPageProps) {
     <ArtistActions
       isFollowing={isFavourite}
       isStretched={isStretched}
+      onEditBackground={isOwner ? () => setIsBackgroundOpen(true) : null}
       onFollow={follow}
       onPlay={play(false)}
       onShuffle={play(true)}
@@ -137,6 +157,7 @@ function ArtistPage({ session, details }: ArtistPageProps) {
         style={styles.ground}
       >
         <ArtistHero
+          about={about.data ?? null}
           actions={<InHero>{actions}</InHero>}
           meta={artistMetaOf({ artist })}
           name={artist.name}
@@ -175,6 +196,15 @@ function ArtistPage({ session, details }: ArtistPageProps) {
           </View>
         )}
       </ScrollView>
+      {isOwner && (
+        <EditBackgroundSheet
+          artistId={artist.id}
+          artistName={artist.name}
+          isOpen={isBackgroundOpen}
+          onClose={() => setIsBackgroundOpen(false)}
+          session={session}
+        />
+      )}
       {isMenuOpen && (
         <TracksMenu
           canAddToPlaylist={false}

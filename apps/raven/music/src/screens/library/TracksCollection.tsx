@@ -8,11 +8,8 @@ import { SongTrackRow } from '@/components/SongTrackRow'
 import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
-import {
-  useFavouriteTracks,
-  useFinishedTracks,
-  useInProgressTracks,
-} from '@/screens/library/listings'
+import { useFinishedTracks, useInProgressTracks } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
@@ -41,7 +38,7 @@ function TracksPage({ session, onBack, title, empty, tracks, listing }: TracksPa
   const isCounted = listing.isRead && tracks.length > 0
   return (
     <FlatList
-      ListEmptyComponent={<ListNotice empty={empty} listing={listing} />}
+      ListEmptyComponent={<ListNotice empty={empty} listing={listing} shape={LIST_SHAPES.rows} />}
       ListHeaderComponent={
         <CollectionHeader
           count={isCounted ? plural({ n: tracks.length, ...COUNTS_COPY.songs }) : null}
@@ -84,21 +81,6 @@ export function InProgressCollection({ session, onBack }: CollectionPageProps) {
       onBack={onBack}
       session={session}
       title={LIBRARY_PAGE_COPY.inProgress}
-      tracks={tracks}
-    />
-  )
-}
-
-/** Favourites: the songs marked a favourite in every music library, as raven's tab lists them. */
-export function FavouritesCollection({ session, onBack }: CollectionPageProps) {
-  const { tracks, listing } = useFavouriteTracks(session)
-  return (
-    <TracksPage
-      empty={LIBRARY_PAGE_COPY.noFavourites}
-      listing={listing}
-      onBack={onBack}
-      session={session}
-      title={LIBRARY_PAGE_COPY.favourites}
       tracks={tracks}
     />
   )

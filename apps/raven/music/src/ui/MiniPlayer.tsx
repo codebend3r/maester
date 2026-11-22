@@ -3,8 +3,8 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 
 import { PLAYER_COPY } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
-import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
+import { RADIUS, SHADOWS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
@@ -18,11 +18,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     borderWidth: SIZE.hairline,
     height: SIZE.miniPlayer,
     overflow: 'hidden',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: SPACE.s2 },
-    shadowOpacity: 1,
-    shadowRadius: SPACE.s5,
-    elevation: SPACE.s2,
+    ...shadowOf({ shadow: SHADOWS.card, color: colors.shadow }),
   },
   row: {
     alignItems: 'center',

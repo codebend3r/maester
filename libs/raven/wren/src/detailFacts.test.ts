@@ -18,15 +18,22 @@ describe('lengthOf', () => {
 })
 
 describe('albumMetaOf', () => {
-  it('reads the genre, the year, the songs and the length', () => {
-    const album = { trackCount: 20, duration: 84 * 60, year: 2014 }
+  it('reads the genre, the release date, the songs and the length', () => {
+    const album = { trackCount: 17, duration: 80 * 60, year: 2011, releaseDate: '2011-11-15' }
+    expect(albumMetaOf({ details: { album, genres: ['Contemporary R&B'] } })).toBe(
+      'Contemporary R&B · November 15, 2011 · 17 songs · 1 hr 20 min',
+    )
+  })
+
+  it('reads the year when no release date is known', () => {
+    const album = { trackCount: 20, duration: 84 * 60, year: 2014, releaseDate: null }
     expect(albumMetaOf({ details: { album, genres: ['Pop', 'Rock'] } })).toBe(
       'Pop · 2014 · 20 songs · 1 hr 24 min',
     )
   })
 
   it('leaves out what the album does not say', () => {
-    const album = { trackCount: 3, duration: 900, year: null }
+    const album = { trackCount: 3, duration: 900, year: null, releaseDate: null }
     expect(albumMetaOf({ details: { album, genres: [] } })).toBe('3 songs · 15 min')
   })
 })

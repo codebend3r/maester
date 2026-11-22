@@ -3,6 +3,7 @@ import { classNames, isPlayingOf, useAudioQueue } from '@raven/ui/headless'
 import type { SongLeadOf } from '@raven/wren'
 import { type MouseEvent, useState } from 'react'
 import { TrackMenu } from '@/components/TrackMenu/TrackMenu'
+import { useTrackLike } from '@/lib/useTrackLike'
 import type { Cover } from '@/music/useCovers'
 import { SongRow } from '@/ui/SongRow/SongRow'
 import styles from '@/components/TrackRow/TrackRow.module.scss'
@@ -39,6 +40,7 @@ export function TrackRow({
 }: TrackRowProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const isPlaying = useAudioQueue((store) => isCurrent && isPlayingOf(store))
+  const like = useTrackLike({ track })
   const openMenu = () => setIsMenuOpen(true)
   /*
    * The row's own menu stands in for the browser's, as the apps' long press opens it. A right
@@ -64,12 +66,13 @@ export function TrackRow({
         isPlaying={isPlaying}
         label={label}
         lead={lead}
+        like={like}
         onMore={openMenu}
         onPress={onPress}
         subtitle={subtitle}
         title={track.title}
       />
-      {isMenuOpen && <TrackMenu onClose={() => setIsMenuOpen(false)} track={track} />}
+      {isMenuOpen && <TrackMenu like={like} onClose={() => setIsMenuOpen(false)} track={track} />}
     </div>
   )
 }

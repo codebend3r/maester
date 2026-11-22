@@ -1,3 +1,5 @@
+@use '../../styles/mixins';
+
 // The fade to the ground covers this share of the hero, from its foot.
 $fade-share: 47%;
 
@@ -5,6 +7,31 @@ $fade-share: 47%;
 $shape-size: 1.2;
 $shape-right: -0.3;
 $shape-top: -0.27;
+
+/* On a wide hero the photo keeps to the end at its own shape, but never narrower than this many
+   hero heights, so a square photo is cropped to a face rather than a band of forehead, and a
+   blurred copy of it fills the rest. */
+$photo-ratio: 1.5;
+
+/* Where the photo stops spanning the hero: its narrowest at the wide hero's height. Container
+   queries can't read the --size-detail-hero-wide token, so this repeats its 25rem. */
+$wide-from: 25rem * $photo-ratio;
+
+// The photo's start edge fades into the blurred copy over this share of the photo.
+$seam-share: 40%;
+
+$backdrop-blur: 3rem;
+$backdrop-brightness: 0.6;
+
+// The blur pulls the backdrop's edges in; scaling it up keeps them outside the hero.
+$backdrop-scale: 1.2;
+
+// The about shows only once it has this much room beside the photo, so its lines never crowd.
+$about-room: 22rem;
+$about-from: $wide-from + $about-room;
+
+// How many lines of the bio show before it is cut.
+$bio-lines: 4;
 
 // The initial is set at this share of its circle, as an artist's avatar sets it.
 $initial-share: 0.42;
@@ -16,11 +43,13 @@ $initial-share: 0.42;
   display: grid;
   grid-template-areas:
     'bar'
+    'about'
     'foot';
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   block-size: var(--hero-height);
   overflow: hidden;
   background: var(--color-surface);
+  container: hero / inline-size;
 
   @media (max-width: 48rem) {
     --hero-height: var(--size-detail-hero);
@@ -45,12 +74,82 @@ $initial-share: 0.42;
   line-height: var(--line-tight);
 }
 
-.photo {
+.photo,
+.backdrop {
   position: absolute;
   inset: 0;
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
+  // A quarter down, so a face near the top of a photo stays in the crop.
+  object-position: 50% 25%;
+}
+
+.backdrop {
+  display: none;
+  filter: blur($backdrop-blur) brightness($backdrop-brightness);
+  transform: scale($backdrop-scale);
+}
+
+@container hero (min-width: #{$wide-from}) {
+  .backdrop {
+    display: block;
+  }
+
+  .photo {
+    inset-inline-start: auto;
+    inline-size: auto;
+    min-inline-size: calc(var(--hero-height) * #{$photo-ratio});
+    max-inline-size: 100%;
+    mask-image: linear-gradient(to right, transparent, var(--color-bg) $seam-share);
+  }
+}
+
+// Who the artist is, on the blurred copy between the bar and the name, clear of the photo.
+.about {
+  position: relative;
+  display: none;
+  grid-area: about;
+  gap: var(--space-3);
+  align-content: start;
+  justify-self: start;
+  max-inline-size: calc(100cqi - var(--hero-height) * #{$photo-ratio});
+  min-block-size: 0;
+  overflow: hidden;
+  padding: var(--space-2) var(--space-4) 0 var(--page-gutter);
+  color: var(--color-picture-ink);
+
+  @container hero (min-width: #{$about-from}) {
+    display: grid;
+  }
+}
+
+.bio {
+  @include mixins.clamp-lines($bio-lines);
+  font: var(--type-body);
+}
+
+.facts {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.fact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+// The overline's small capitals in the picture's ink, which the about sets.
+.factLabel {
+  @include mixins.overline;
+  color: inherit;
+}
+
+.factValue {
+  @include mixins.one-line;
+  font: var(--type-small);
 }
 
 .fade {
@@ -81,7 +180,7 @@ $initial-share: 0.42;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-4);
   align-items: end;
-  padding: 0 var(--page-gutter) var(--space-4);
+  padding: var(--space-3) var(--page-gutter) var(--space-4);
 }
 
 .names {
@@ -90,13 +189,9 @@ $initial-share: 0.42;
 }
 
 .name {
-  display: -webkit-box;
-  overflow: hidden;
+  @include mixins.clamp-lines(2);
   color: var(--color-text);
   font: var(--type-artist-name);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
 }
 
 .meta {

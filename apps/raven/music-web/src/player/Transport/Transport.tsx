@@ -13,10 +13,10 @@ import { IconButton } from '@/ui/IconButton/IconButton'
 import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import styles from '@/player/Transport/Transport.module.scss'
 
-type PlayButtonProps = { size: Size }
+type PlayButtonProps = { size: Size; isLifted: boolean }
 
 /** Play or Pause, a circle filled in the text colour. */
-function PlayButton({ size }: PlayButtonProps) {
+function PlayButton({ size, isLifted }: PlayButtonProps) {
   const isPlaying = useAudioQueue(isPlayingOf)
   const toggle = useAudioQueue((store) => store.toggle)
   return (
@@ -24,6 +24,8 @@ function PlayButton({ size }: PlayButtonProps) {
       color={COLORS.bg}
       fill={COLORS.text}
       icon={isPlaying ? ICONS.pause : ICONS.play}
+      isLifted={isLifted}
+      isProminent
       label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
       onPress={toggle}
       size={size}
@@ -96,32 +98,38 @@ export function RepeatToggle({ size = SIZES.touchTarget, isFilled = false }: Tog
   )
 }
 
-type TransportSizes = {
+type TransportLook = {
   /** Play or Pause's circle. */
   play: Size
   /** Previous's and Next's. */
   step: Size
+  /** Whether Play or Pause rides above the row, past the player bar's top edge. */
+  isPlayLifted: boolean
 }
 
-const TRANSPORT_SIZES = {
-  [TRANSPORTS.player]: { play: SIZES.playLarge, step: SIZES.transportButton },
-  [TRANSPORTS.lyrics]: { play: SIZES.playCompact, step: SIZES.transportButton },
-  [TRANSPORTS.queue]: { play: SIZES.playQueue, step: SIZES.transportSmall },
-  [TRANSPORTS.bar]: { play: SIZES.playButton, step: SIZES.touchTarget },
-  [TRANSPORTS.column]: { play: SIZES.playQueue, step: SIZES.transportSmall },
-} as const satisfies Record<TransportKind, TransportSizes>
+const TRANSPORT_LOOKS = {
+  [TRANSPORTS.player]: { play: SIZES.playLarge, step: SIZES.transportButton, isPlayLifted: false },
+  [TRANSPORTS.lyrics]: {
+    play: SIZES.playCompact,
+    step: SIZES.transportButton,
+    isPlayLifted: false,
+  },
+  [TRANSPORTS.queue]: { play: SIZES.playQueue, step: SIZES.transportSmall, isPlayLifted: false },
+  [TRANSPORTS.bar]: { play: SIZES.playBar, step: SIZES.touchTarget, isPlayLifted: true },
+  [TRANSPORTS.column]: { play: SIZES.playQueue, step: SIZES.transportSmall, isPlayLifted: false },
+} as const satisfies Record<TransportKind, TransportLook>
 
 type TransportProps = { kind: TransportKind }
 
 /** Shuffle, Previous, Play or Pause, Next and Repeat, as large as the place they sit in asks. */
 export function Transport({ kind }: TransportProps) {
-  const { play, step } = TRANSPORT_SIZES[kind]
+  const { play, step, isPlayLifted } = TRANSPORT_LOOKS[kind]
   const hasToggles = hasTogglesOf(kind)
   return (
     <div className={styles[kind]}>
       {hasToggles && <ShuffleToggle />}
       <StepButton size={step} step={STEPS.previous} />
-      <PlayButton size={play} />
+      <PlayButton isLifted={isPlayLifted} size={play} />
       <StepButton size={step} step={STEPS.next} />
       {hasToggles && <RepeatToggle />}
     </div>

@@ -1,0 +1,16 @@
+// As many cards a row as fit.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--size-artist-card), 100%), 1fr));
+  align-content: start;
+  // The apps' grid gap across a row, and their space between rows of cards.
+  gap: var(--space-3) var(--size-row-gap);
+  min-inline-size: 0;
+}
+
+// A card off screen is skipped until it is scrolled to.
+.cell {
+  display: grid;
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto calc(var(--size-artist-photo) + 2 * var(--space-2));
+}

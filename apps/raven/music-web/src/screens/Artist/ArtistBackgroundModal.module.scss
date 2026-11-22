@@ -1,0 +1,87 @@
+@use '../../styles/mixins';
+
+// The note sits over the grid, on the grid's own gutter.
+.note {
+  padding: var(--space-3) var(--space-3) 0;
+  @include mixins.meta-line;
+}
+
+// Every picture on a cell of its own, as many to a row as the sheet has room for.
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-background-option), 1fr));
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.cell {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.option {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-item);
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+  @include mixins.hairline-ring;
+
+  &:disabled {
+    opacity: var(--opacity-disabled);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      transform var(--duration-hover) var(--ease-out),
+      box-shadow var(--duration-hover) var(--ease-out);
+
+    &:hover:not(:disabled),
+    &:focus-visible {
+      transform: translateY(calc(-1 * var(--space-1)));
+      box-shadow: var(--shadow-dialog);
+    }
+
+    &:hover:not(:disabled) .picture,
+    &:focus-visible .picture {
+      transform: scale(1.08);
+    }
+  }
+}
+
+.picture {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  object-position: top;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform var(--duration-hover) var(--ease-out);
+  }
+}
+
+.plain {
+  display: grid;
+  place-content: center;
+  place-items: center;
+  gap: var(--space-2);
+  font: var(--type-row-strong);
+}
+
+// The picture in use wears the accent's ring and says so.
+.worn {
+  box-shadow: 0 0 0 var(--size-focus-ring) var(--color-accent-text);
+}
+
+.badge {
+  position: absolute;
+  inset-block-end: var(--space-2);
+  inset-inline-start: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-text);
+  color: var(--color-bg);
+  font: var(--type-action-label);
+}

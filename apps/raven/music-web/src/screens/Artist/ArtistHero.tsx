@@ -1,4 +1,5 @@
-import { DETAIL_COPY } from '@raven/wren'
+import type { ArtistAbout } from '@raven/core'
+import { ARTIST_COPY, DETAIL_COPY, aboutFactsOf, hasAbout } from '@raven/wren'
 import type { ReactNode } from 'react'
 import type { Cover } from '@/music/useCovers'
 import { BackButton } from '@/screens/detail/BackButton'
@@ -20,9 +21,30 @@ type ArtistHeroProps = {
   onMore: () => void
   /** What sits at the foot's end: `HeroActions` on the wide layout, nothing on the narrow one. */
   actions: ReactNode
+  /** Who the artist is, told beside a wide hero's photo; null until it is known. */
+  about: ArtistAbout | null
 }
 
 type HeroActionsProps = { children: ReactNode }
+
+type AboutProps = { about: ArtistAbout }
+
+/** The artist's bio and facts, over the blurred photo at the head's start; only a wide hero shows it. */
+function About({ about }: AboutProps) {
+  return (
+    <section aria-label={ARTIST_COPY.about} className={styles.about}>
+      {about.bio !== null && <p className={styles.bio}>{about.bio}</p>}
+      <dl className={styles.facts}>
+        {aboutFactsOf(about).map(({ label, value }) => (
+          <div className={styles.fact} key={label}>
+            <dt className={styles.factLabel}>{label}</dt>
+            <dd className={styles.factValue}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
 
 /** Play, Shuffle and Follow at the hero's foot, as the wide layout holds them. */
 export function HeroActions({ children }: HeroActionsProps) {
@@ -30,10 +52,12 @@ export function HeroActions({ children }: HeroActionsProps) {
 }
 
 /**
- * An artist's page's head, full bleed: their photo, or a shape with their initial, fading to the
- * ground, back and More on dark circles over it, and their name in Young Serif with their counts.
+ * An artist's page's head, full bleed: their photo (kept to the end over a blurred copy of
+ * itself and who they are beside it when the hero is wide), or a shape with their initial,
+ * fading to the ground, back and More on dark circles over it, and their name in Young Serif
+ * with their counts.
  */
-export function ArtistHero({ name, meta, photo, onMore, actions }: ArtistHeroProps) {
+export function ArtistHero({ name, meta, photo, onMore, actions, about }: ArtistHeroProps) {
   const { src, onError } = usePicture({ picture: photo })
   return (
     <header className={styles.hero}>
@@ -43,7 +67,10 @@ export function ArtistHero({ name, meta, photo, onMore, actions }: ArtistHeroPro
         </span>
       )}
       {src !== null && (
-        <img alt="" className={styles.photo} decoding="async" onError={onError} src={src} />
+        <>
+          <img alt="" className={styles.backdrop} decoding="async" src={src} />
+          <img alt="" className={styles.photo} decoding="async" onError={onError} src={src} />
+        </>
       )}
       <span className={styles.fade} />
       <nav className={styles.bar}>
@@ -56,6 +83,7 @@ export function ArtistHero({ name, meta, photo, onMore, actions }: ArtistHeroPro
           onPress={onMore}
         />
       </nav>
+      {src !== null && about !== null && hasAbout(about) && <About about={about} />}
       <div className={styles.foot}>
         <div className={styles.names}>
           <h1 className={styles.name}>{name}</h1>

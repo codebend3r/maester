@@ -1,4 +1,11 @@
-import { APPEARANCES, type Appearance } from '@raven/wren'
+import {
+  type ColorScheme,
+  THEME_SCHEMES,
+  WREN_THEMES,
+  type WrenThemeName,
+  systemSchemeOf,
+  themeFor,
+} from '@raven/wren'
 import {
   type ImageStyle,
   StyleSheet,
@@ -11,53 +18,77 @@ import {
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   BREAKPOINTS,
-  COLOR_SCHEMES,
   COLORS,
-  type ColorScheme,
   FORM_FACTORS,
   type FormFactor,
   type Palette,
+  type Shadow,
 } from '@/theme/wrenTokens'
 
-/** What a screen paints with: the scheme picked and its palette. */
-export type WrenTheme = { scheme: ColorScheme; colors: Palette }
+type ShadowOfProps = { shadow: Shadow; color: string }
+
+/** A shadow from `SHADOWS` as React Native's style, in the theme's shadow colour. */
+export const shadowOf = ({ shadow, color }: ShadowOfProps): ViewStyle => ({
+  shadowColor: color,
+  shadowOffset: { width: 0, height: shadow.offsetY },
+  shadowOpacity: 1,
+  shadowRadius: shadow.radius,
+  elevation: shadow.elevation,
+})
+
+/** What a screen paints with: the theme showing, its scheme and its palette. */
+export type WrenTheme = { name: WrenThemeName; scheme: ColorScheme; colors: Palette }
+
+/** Every theme's palette by its name, so a theme `@raven/wren` names and the tokens lack is a compile error. */
+export const PALETTES = COLORS satisfies Record<WrenThemeName, Palette>
+
+const themeOf = (name: WrenThemeName): WrenTheme => ({
+  name,
+  scheme: THEME_SCHEMES[name],
+  colors: PALETTES[name],
+})
 
 const THEMES = {
-  [COLOR_SCHEMES.dark]: { scheme: COLOR_SCHEMES.dark, colors: COLORS.dark },
-  [COLOR_SCHEMES.light]: { scheme: COLOR_SCHEMES.light, colors: COLORS.light },
-} as const satisfies Record<ColorScheme, WrenTheme>
+  [WREN_THEMES.night]: themeOf(WREN_THEMES.night),
+  [WREN_THEMES.paper]: themeOf(WREN_THEMES.paper),
+  [WREN_THEMES.garnet]: themeOf(WREN_THEMES.garnet),
+  [WREN_THEMES.blush]: themeOf(WREN_THEMES.blush),
+  [WREN_THEMES.mint]: themeOf(WREN_THEMES.mint),
+  [WREN_THEMES.dracula]: themeOf(WREN_THEMES.dracula),
+  [WREN_THEMES.midnight]: themeOf(WREN_THEMES.midnight),
+  [WREN_THEMES.banana]: themeOf(WREN_THEMES.banana),
+  [WREN_THEMES.ember]: themeOf(WREN_THEMES.ember),
+} as const satisfies Record<WrenThemeName, WrenTheme>
 
-type SchemeOfProps = { appearance: Appearance; system: string | null | undefined }
+/** The device's scheme now, followed as it changes: which of Settings' two slots is showing. */
+export const useSystemScheme = (): ColorScheme => systemSchemeOf(useColorScheme())
 
-/** The scheme an appearance picks: the system's (dark when it says neither), or the one kept. */
-const schemeOf = ({ appearance, system }: SchemeOfProps): ColorScheme => {
-  if (appearance !== APPEARANCES.system) return appearance
-  return system === COLOR_SCHEMES.light ? COLOR_SCHEMES.light : COLOR_SCHEMES.dark
-}
-
-/** The scheme Wren draws in now, following Settings' Appearance and the system. */
-export const useColorSchemeOf = (): ColorScheme => {
-  const appearance = useWrenPrefs((state) => state.appearance)
-  const system = useColorScheme()
-  return schemeOf({ appearance, system })
+/** The name of the theme Wren draws in now, following Settings' Appearance and the device. */
+const useThemeName = (): WrenThemeName => {
+  const scheme = useSystemScheme()
+  return useWrenPrefs((choice) => themeFor({ choice, scheme }))
 }
 
 /** The theme Wren draws in now. */
-export const useWrenTheme = (): WrenTheme => THEMES[useColorSchemeOf()]
+export const useWrenTheme = (): WrenTheme => THEMES[useThemeName()]
 
 type NamedStyles = Record<string, ViewStyle | TextStyle | ImageStyle>
 
 /**
- * A component's styles for both schemes, made once each when the module loads: the hook it
- * returns hands back the sheet for the scheme showing, so a component re-renders with the other
- * when the appearance changes and nothing is rebuilt.
+ * A component's styles for every theme, each made the first time its theme shows and kept: the
+ * hook it returns hands back the sheet for the theme showing, so a component re-renders with
+ * another when the theme changes and nothing is rebuilt.
  */
 export const themedStyles = <S extends NamedStyles>(factory: (theme: WrenTheme) => S) => {
-  const sheets = {
-    [COLOR_SCHEMES.dark]: StyleSheet.create(factory(THEMES.dark)),
-    [COLOR_SCHEMES.light]: StyleSheet.create(factory(THEMES.light)),
-  } as const satisfies Record<ColorScheme, Readonly<S>>
-  return (): Readonly<S> => sheets[useColorSchemeOf()]
+  const sheets = new Map<WrenThemeName, Readonly<S>>()
+  const sheetOf = (name: WrenThemeName): Readonly<S> => {
+    const kept = sheets.get(name)
+    if (kept !== undefined) return kept
+    const made = StyleSheet.create(factory(THEMES[name]))
+    sheets.set(name, made)
+    return made
+  }
+  return (): Readonly<S> => sheetOf(useThemeName())
 }
 
 /** Whether the screen is a tablet's: its shortest side at least the tablet breakpoint. */

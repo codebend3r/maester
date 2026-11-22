@@ -77,6 +77,7 @@ const WRITES = [
   APP_OWNER_CALLS.updateLibraryRatings,
   APP_OWNER_CALLS.cancelLibraryRatings,
   APP_OWNER_CALLS.matchLibrary,
+  APP_OWNER_CALLS.setArtistBackground,
   APP_OWNER_CALLS.deleteMedia,
 ]
 
@@ -196,6 +197,7 @@ describe('the calls raven’s app may make', () => {
       api.updateLibraryRatings(1),
       api.cancelLibraryRatings(1),
       api.matchLibrary(1),
+      api.setArtistBackground({ artistId: 5, key: null }),
       api.deleteMedia(7),
     ])
     expect(heard).toEqual(WRITES)

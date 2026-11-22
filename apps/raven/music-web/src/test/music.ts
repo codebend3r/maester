@@ -77,6 +77,8 @@ export const mockMusicApi = () =>
     getLibraryCounts: spyOn(api, 'getLibraryCounts').mockResolvedValue(MUSIC_COUNTS),
     listInProgress: spyOn(api, 'listInProgress').mockResolvedValue(IN_PROGRESS),
     listLibraryFavourites: spyOn(api, 'listLibraryFavourites').mockResolvedValue(FAVOURITES),
+    listFavouriteArtists: spyOn(api, 'listFavouriteArtists').mockResolvedValue([]),
+    listFavouriteAlbums: spyOn(api, 'listFavouriteAlbums').mockResolvedValue([]),
     listHistory: spyOn(api, 'listHistory').mockResolvedValue(FINISHED),
   })
 

@@ -66,6 +66,11 @@
   }
 }
 
+// The wide measure, for a grid of pictures; under 48rem the sheet spans the screen anyway.
+.wide {
+  max-inline-size: var(--size-sheet-dialog-wide);
+}
+
 // The narrow sheet's grabber; the wide dialog has none.
 .grabber {
   display: none;

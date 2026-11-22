@@ -1,0 +1,13 @@
+@use '../../styles/mixins';
+
+// The card over the line that says what it holds or what a pick there changes.
+.group {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.note {
+  padding-inline: var(--space-1);
+  @include mixins.meta-line;
+}

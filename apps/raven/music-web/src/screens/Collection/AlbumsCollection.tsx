@@ -11,6 +11,7 @@ import {
 import { useState } from 'react'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { useAllAlbums } from '@/music/listings'
 import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
 import { CoverSizeButton } from '@/screens/Collection/CoverSizeButton'
@@ -47,7 +48,9 @@ export function AlbumsCollection() {
           </>
         }
       />
-      {shown.length === 0 && <ListNotice empty={search.empty} listing={listing} />}
+      {shown.length === 0 && (
+        <ListNotice empty={search.empty} listing={listing} shape={LIST_SHAPES.tiles} />
+      )}
       <AlbumGrid albums={shown} tileSize={coverSize} />
     </Page>
   )

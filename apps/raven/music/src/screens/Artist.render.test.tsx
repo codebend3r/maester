@@ -10,7 +10,15 @@ import { queryClient } from '@/queryClient'
 import { WREN_PAGES } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { PHONE_WINDOW } from '@/test/jestSetup'
-import { LISTENER, OK_COMPUTER, OK_COMPUTER_PAGE, RADIOHEAD, musicApi } from '@/test/music'
+import {
+  LISTENER,
+  LISTENER_ACCOUNT,
+  OK_COMPUTER,
+  OK_COMPUTER_PAGE,
+  RADIOHEAD,
+  RADIOHEAD_BACKGROUNDS,
+  musicApi,
+} from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
@@ -42,6 +50,8 @@ const OK_COMPUTER_TILE = KIT_COPY.labelled({ label: OK_COMPUTER.title, value: RA
 describe('Artist', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockApi.getMe.mockResolvedValue(LISTENER_ACCOUNT)
+    mockApi.listArtistBackgrounds.mockResolvedValue(RADIOHEAD_BACKGROUNDS)
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
     useAudioQueue.setState({ playTracks, addToQueue })
@@ -97,6 +107,62 @@ describe('Artist', () => {
     await fireEvent.press(await screen.findByRole('button', { name: DETAIL_COPY.more }))
     await fireEvent.press(await screen.findByRole('button', { name: TRACK_MENU_COPY.addToQueue }))
     await waitFor(() => expect(addToQueue).toHaveBeenCalledWith(OK_COMPUTER_PAGE.tracks))
+  })
+
+  it('gives the owner, and no one else, a button to edit the background image', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: ARTIST_URL })
+    expect(await screen.findByRole('header', { name: RADIOHEAD.name })).toBeTruthy()
+    expect(mockApi.getMe).toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: ARTIST_COPY.editBackground })).toBeNull()
+  })
+
+  it('lists the background options, marks the one worn, and sets the one pressed', async () => {
+    mockApi.getMe.mockResolvedValue({ ...LISTENER_ACCOUNT, isOwner: true })
+    await renderRouter(WREN_TREE, { initialUrl: ARTIST_URL })
+    await fireEvent.press(await screen.findByRole('button', { name: ARTIST_COPY.editBackground }))
+
+    const [photo, cover] = RADIOHEAD_BACKGROUNDS.options
+    const worn = await screen.findByRole('radio', {
+      name: ARTIST_COPY.backgroundOption({ kind: cover!.kind, position: 2 }),
+    })
+    expect(worn.props.accessibilityState).toEqual(expect.objectContaining({ checked: true }))
+    expect(mockApi.listArtistBackgrounds).toHaveBeenCalledWith(RADIOHEAD.id)
+
+    await fireEvent.press(
+      screen.getByRole('radio', {
+        name: ARTIST_COPY.backgroundOption({ kind: photo!.kind, position: 1 }),
+      }),
+    )
+    await waitFor(() =>
+      expect(mockApi.setArtistBackground).toHaveBeenCalledWith({
+        artistId: RADIOHEAD.id,
+        key: photo!.key,
+      }),
+    )
+    await waitFor(() =>
+      expect(screen.queryByRole('radio', { name: ARTIST_COPY.backgroundDefault })).toBeNull(),
+    )
+  })
+
+  it('goes back to the default photo with null', async () => {
+    mockApi.getMe.mockResolvedValue({ ...LISTENER_ACCOUNT, isOwner: true })
+    await renderRouter(WREN_TREE, { initialUrl: ARTIST_URL })
+    await fireEvent.press(await screen.findByRole('button', { name: ARTIST_COPY.editBackground }))
+    await fireEvent.press(await screen.findByRole('radio', { name: ARTIST_COPY.backgroundDefault }))
+    await waitFor(() =>
+      expect(mockApi.setArtistBackground).toHaveBeenCalledWith({
+        artistId: RADIOHEAD.id,
+        key: null,
+      }),
+    )
+  })
+
+  it('says so when the pictures cannot be loaded', async () => {
+    mockApi.getMe.mockResolvedValue({ ...LISTENER_ACCOUNT, isOwner: true })
+    mockApi.listArtistBackgrounds.mockRejectedValue(new Error('down'))
+    await renderRouter(WREN_TREE, { initialUrl: ARTIST_URL })
+    await fireEvent.press(await screen.findByRole('button', { name: ARTIST_COPY.editBackground }))
+    expect(await screen.findByText(ARTIST_COPY.backgroundFailed)).toBeTruthy()
   })
 
   it('draws the hero and the albums on a tablet', async () => {

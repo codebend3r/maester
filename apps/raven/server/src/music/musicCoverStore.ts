@@ -34,10 +34,16 @@ export const coverOf = ({ source, ref, mbid, stamp = '' }: CoverOfProps): AlbumC
   return mbid === null ? null : { source: COVER_SOURCES.coverArtArchive, ref: mbid }
 }
 
-type ArtistPictureRow = { mbid: string | null; picture: string | null; fetched_at: string | null }
+type ArtistPictureRow = ArtistSources & { picture: string | null; fetched_at: string | null }
 
-/** Where an artist's picture comes from: their MusicBrainz id, and the picture found for it, once looked for. */
-type ArtistPicture = { mbid: string; picture: string | null; isFetched: boolean }
+/**
+ * Where an artist's picture comes from: the background an owner chose, else the picture found for
+ * their MusicBrainz id, once looked for.
+ */
+export type ArtistPicture = ArtistSources & { picture: string | null; isFetched: boolean }
+
+/** What names an artist's pictures: their MusicBrainz id, null while none is known, and the background an owner chose, null for none. */
+export type ArtistSources = { mbid: string | null; background: string | null }
 
 /** Every album's id, and every release id an album shows the archive's cover of. */
 type KeptCovers = { albumIds: Set<number>; coverArtIds: Set<string> }
@@ -52,6 +58,7 @@ type MusicCoverStoreCoverProps = { id: number; version: string }
 type MusicCoverStoreSetCoverProps = { id: number; cover: AlbumCover }
 type MusicCoverStoreSetArtistPictureProps = { id: number; picture: string | null }
 type MusicCoverStoreArtistPictureProps = { id: number; version: string }
+type MusicCoverStoreSetArtistBackgroundProps = { id: number; background: string | null }
 
 /** The music tables' pictures: where each album's cover and each artist's picture is read from, and the versions that address them. */
 @Injectable()
@@ -71,16 +78,69 @@ export class MusicCoverStore {
       .run(picture, new Date().toISOString(), id)
   }
 
+  /** Keeps the background an owner chose for the artist's page, or null to wear the default photo again. */
+  setArtistBackground({ id, background }: MusicCoverStoreSetArtistBackgroundProps): void {
+    this.db.prepare('UPDATE artists SET background = ? WHERE id = ?').run(background, id)
+  }
+
+  /** The artist's MusicBrainz id and chosen background; null for no such artist. */
+  artistSources(id: number): ArtistSources | null {
+    return (
+      this.db
+        .prepare<[number], ArtistSources>('SELECT mbid, background FROM artists WHERE id = ?')
+        .get(id) ?? null
+    )
+  }
+
+  /** The albums credited to the artist that have a cover, oldest first. */
+  artistCoverAlbums(id: number): number[] {
+    return this.db
+      .prepare<[number], CoverOfProps & { id: number }>(
+        `SELECT a.id, a.cover_source AS source, a.cover_ref AS ref, a.cover_stamp AS stamp, a.mbid
+           FROM albums a
+          WHERE a.id IN (SELECT album_id FROM album_artists WHERE artist_id = ?)
+          ORDER BY COALESCE(a.original_year, a.year), a.id`,
+      )
+      .all(id)
+      .filter((row) => coverOf(row) !== null)
+      .map((row) => row.id)
+  }
+
+  /** The version an album's cover address carries; null for an album with no cover, or none at all. */
+  albumCoverVersion(id: number): string | null {
+    const cover = this.albumCover(id)
+    return cover === null ? null : this.pictureVersions.album({ id, cover })
+  }
+
+  /** Where an album's cover is read from, whatever its version; null for an album with no cover, or none at all. */
+  private albumCover(id: number): AlbumCover | null {
+    const row = this.db
+      .prepare<[number], CoverOfProps>(
+        'SELECT cover_source AS source, cover_ref AS ref, cover_stamp AS stamp, mbid FROM albums WHERE id = ?',
+      )
+      .get(id)
+    return row === undefined ? null : coverOf(row)
+  }
+
   artistPicture({ id, version }: MusicCoverStoreArtistPictureProps): ArtistPicture | null {
     const row = this.db
       .prepare<[number], ArtistPictureRow>(
-        'SELECT mbid, picture, fetched_at FROM artists WHERE id = ?',
+        'SELECT mbid, picture, fetched_at, background FROM artists WHERE id = ?',
       )
       .get(id)
-    if (row === undefined || row.mbid === null) return null
-    const current = this.pictureVersions.artist({ id, mbid: row.mbid })
+    if (row === undefined) return null
+    const current = this.pictureVersions.artist({
+      id,
+      mbid: row.mbid,
+      background: row.background,
+    })
     return current !== null && sameSecret({ given: version, expected: current })
-      ? { mbid: row.mbid, picture: row.picture, isFetched: row.fetched_at !== null }
+      ? {
+          mbid: row.mbid,
+          picture: row.picture,
+          isFetched: row.fetched_at !== null,
+          background: row.background,
+        }
       : null
   }
 
@@ -118,12 +178,7 @@ export class MusicCoverStore {
    * another version, or an album with no cover.
    */
   cover({ id, version }: MusicCoverStoreCoverProps): AlbumCover | null {
-    const row = this.db
-      .prepare<[number], CoverOfProps>(
-        'SELECT cover_source AS source, cover_ref AS ref, cover_stamp AS stamp, mbid FROM albums WHERE id = ?',
-      )
-      .get(id)
-    const cover = row === undefined ? null : coverOf(row)
+    const cover = this.albumCover(id)
     return cover !== null && this.pictureVersions.album({ id, cover }) === version ? cover : null
   }
 

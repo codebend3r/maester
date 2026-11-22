@@ -1,11 +1,13 @@
 import { describe, expect, it, mock } from 'bun:test'
 
 import { TRACK_MENU_COPY } from '@/copy/components'
-import { type MenuPlaces, menuGroupsOf } from '@/menuGroups'
+import { type MenuLike, type MenuPlaces, menuGroupsOf } from '@/menuGroups'
 import { OK_COMPUTER } from '@/testing'
 
 // Each app hands its own drawings; a name stands in for one here.
 const MENU_ICONS = {
+  heart: 'heart',
+  heartFilled: 'heartFilled',
   playNext: 'playNext',
   queueAdd: 'queueAdd',
   playlistAdd: 'playlistAdd',
@@ -13,9 +15,9 @@ const MENU_ICONS = {
   artist: 'artist',
 } as const
 
-type GroupsProps = { canAddToPlaylist?: boolean; places?: MenuPlaces }
+type GroupsProps = { canAddToPlaylist?: boolean; places?: MenuPlaces; like?: MenuLike }
 
-const groupsWith = ({ canAddToPlaylist = false, places = {} }: GroupsProps = {}) => {
+const groupsWith = ({ canAddToPlaylist = false, places = {}, like }: GroupsProps = {}) => {
   const onPlayNext = mock()
   const onAddToQueue = mock()
   const onPlaylists = mock()
@@ -23,6 +25,7 @@ const groupsWith = ({ canAddToPlaylist = false, places = {} }: GroupsProps = {})
   const onArtist = mock()
   const groups = menuGroupsOf({
     icons: MENU_ICONS,
+    like,
     canAddToPlaylist,
     places,
     onPlayNext,
@@ -82,6 +85,23 @@ describe('menuGroupsOf', () => {
     expect(labelsOf(groups)[1]).toEqual([TRACK_MENU_COPY.goToArtist])
   })
 
+  it('leads a song with Like, its outline heart, until it is a favourite', () => {
+    const onToggle = mock()
+    const { groups } = groupsWith({ like: { isLiked: false, onToggle } })
+
+    expect(groups[0]![0]!.label).toBe(TRACK_MENU_COPY.like)
+    expect(groups[0]![0]!.icon).toBe(MENU_ICONS.heart)
+    groups[0]![0]!.onPress()
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('leads a favourite song with Unlike, its filled heart', () => {
+    const { groups } = groupsWith({ like: { isLiked: true, onToggle: mock() } })
+
+    expect(groups[0]![0]!.label).toBe(TRACK_MENU_COPY.unlike)
+    expect(groups[0]![0]!.icon).toBe(MENU_ICONS.heartFilled)
+  })
+
   it('hands each queue action its own drawing and its own press', () => {
     const { groups, onPlayNext, onAddToQueue } = groupsWith()
 
@@ -89,7 +109,7 @@ describe('menuGroupsOf', () => {
       MENU_ICONS.playNext,
       MENU_ICONS.queueAdd,
     ])
-    groups[0]?.[0]?.onPress()
+    groups[0]![0]!.onPress()
     expect(onPlayNext).toHaveBeenCalledTimes(1)
     expect(onAddToQueue).not.toHaveBeenCalled()
     groups[0]?.[1]?.onPress()

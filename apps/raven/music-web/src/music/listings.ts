@@ -173,6 +173,36 @@ export const useFavouriteTracks = () => {
   return useListedTracks({ media: entries.map(({ media }) => media), listing })
 }
 
+const NO_ENTRIES: readonly never[] = []
+
+/**
+ * A list the account keeps across every music library: its entries, none while it is read, and
+ * where it stands beside the libraries.
+ */
+const useAccountList = <Entry, Key extends QueryKey>(
+  query: UseQueryOptions<Entry[], Error, Entry[], Key>,
+) => {
+  const music = useMusicLibraries()
+  const answer = useQuery(query)
+  const entries: readonly Entry[] = answer.data ?? NO_ENTRIES
+  return {
+    entries,
+    listing: listStateOf({ music, failure: answer.error, isRead: answer.isSuccess }),
+  }
+}
+
+/** The artists the account marked a favourite, most recently marked first, and where they stand. */
+export const useFavouriteArtists = () => {
+  const { entries, listing } = useAccountList(queries.favouriteArtistsQuery)
+  return { artists: entries, listing }
+}
+
+/** The albums the account marked a favourite, most recently marked first, and where they stand. */
+export const useFavouriteAlbums = () => {
+  const { entries, listing } = useAccountList(queries.favouriteAlbumsQuery)
+  return { albums: entries, listing }
+}
+
 /** The songs played to their end most recently in every music library, the newest first. */
 export const useFinishedTracks = () => {
   const { music, listings } = usePerLibrary((library) =>

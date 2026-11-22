@@ -3,6 +3,7 @@ import { NEW_PLAYLIST_COPY, TRACK_MENU_COPY, countsLineOf } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type PickedPlaylist, useAddToPlaylist } from '@/components/AddToPlaylist/useAddToPlaylist'
+import { LoadingMark } from '@/components/LoadingMark/LoadingMark'
 import { Notice } from '@/components/Notice/Notice'
 import { queries } from '@/lib/queries'
 import { RADII, SIZES } from '@/theme/tokens'
@@ -23,14 +24,6 @@ type AddToPlaylistProps = {
   name: string
   /** Closes the sheet once a playlist is picked. */
   onDone: () => void
-}
-
-type NoticeOfProps = { error: Error | null; isSuccess: boolean }
-
-/** What stands in for the list while there is none: why it could not be read, or that it is on its way. */
-const noticeOf = ({ error, isSuccess }: NoticeOfProps): string | null => {
-  if (error !== null) return error.message
-  return isSuccess ? null : TRACK_MENU_COPY.loading
 }
 
 type PlaylistRowProps = {
@@ -68,7 +61,6 @@ export function AddToPlaylist({ tracksOf, name, onDone }: AddToPlaylistProps) {
   const [isNaming, setIsNaming] = useState(false)
   const list = playlists.data ?? NO_PLAYLISTS
   const add = useAddToPlaylist({ tracksOf, onDone })
-  const notice = noticeOf({ error: playlists.error, isSuccess: playlists.isSuccess })
   const isEmpty = playlists.isSuccess && list.length === 0
   return (
     <div className={styles.body}>
@@ -81,7 +73,10 @@ export function AddToPlaylist({ tracksOf, name, onDone }: AddToPlaylistProps) {
         </Pressable>
       )}
       {isNaming && <NewPlaylistForm onCreated={add} />}
-      {notice !== null && <Notice text={notice} />}
+      {playlists.isPending && (
+        <LoadingMark label={TRACK_MENU_COPY.loading} size={SIZES.loadingMark} />
+      )}
+      {playlists.error !== null && <Notice text={playlists.error.message} />}
       {isEmpty && (
         <EmptyState
           body={TRACK_MENU_COPY.noPlaylistsHint(name)}

@@ -1,5 +1,35 @@
 @use '../../styles/mixins';
 
+/*
+ * The rail: the same places with only their words gone. Every icon, the mark over them and each
+ * row keeps the place it has in the open sidebar; the overline and the status keep their room
+ * and are only unseen. It is the sidebar at `64rem` and narrower, and wherever the listener
+ * folded it. Included inside `.sidebar`, so every selector reads from it.
+ */
+@mixin rail {
+  & {
+    inline-size: var(--size-rail);
+  }
+
+  .label {
+    display: none;
+  }
+
+  .overline,
+  .status {
+    visibility: hidden;
+  }
+
+  .item {
+    grid-template-columns: auto;
+  }
+
+  // The mark stands over the icons, its centre on theirs.
+  .lockup {
+    padding-inline: calc(var(--space-3) + (var(--size-nav-icon) - var(--size-large-icon)) / 2);
+  }
+}
+
 // It holds the screen's height less the player bar's, which the shell names in `--shell-foot`.
 .sidebar {
   position: sticky;
@@ -18,9 +48,12 @@
   border-inline-end: var(--size-hairline) solid var(--color-line);
   background: var(--color-surface);
 
-  // The rail: the same places as icons alone.
   @media (max-width: 64rem) {
-    inline-size: var(--size-rail);
+    @include rail;
+  }
+
+  &.collapsed {
+    @include rail;
   }
 }
 
@@ -30,10 +63,6 @@
   display: grid;
   gap: var(--space-1);
   align-content: start;
-
-  @media (max-width: 64rem) {
-    justify-items: center;
-  }
 }
 
 .places {
@@ -48,21 +77,19 @@
 
 .lockup {
   display: grid;
+  align-items: center;
   justify-items: start;
+  /*
+   * Border-box, so the row is the lockup's height and the room under it, whichever of the lockup
+   * or the mark is drawn in it.
+   */
+  min-block-size: calc(var(--size-lockup) + var(--space-6));
   padding: 0 var(--space-2) var(--space-6);
-
-  @media (max-width: 64rem) {
-    display: none;
-  }
 }
 
 .overline {
   padding: var(--space-5) var(--space-3) 0;
   @include mixins.overline;
-
-  @media (max-width: 64rem) {
-    display: none;
-  }
 }
 
 .item {
@@ -74,24 +101,12 @@
   padding-inline: var(--space-3);
   border-radius: var(--radius-item);
   color: var(--color-text-2);
-
-  @media (max-width: 64rem) {
-    grid-template-columns: auto;
-    place-items: center;
-    inline-size: var(--size-touch-target);
-    min-block-size: var(--size-touch-target);
-    padding-inline: 0;
-  }
 }
 
 .label {
   @include mixins.one-line;
   color: var(--color-text);
   font: var(--type-row-title);
-
-  @media (max-width: 64rem) {
-    display: none;
-  }
 }
 
 .active {
@@ -109,8 +124,20 @@
   grid-template-columns: auto;
   justify-content: start;
   padding-block-start: var(--space-2);
+}
 
-  @media (max-width: 64rem) {
-    display: none;
+// Folds the sidebar to its icons, or opens it again; the rail has no room for it.
+.toggle {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-touch-target);
+  block-size: var(--size-touch-target);
+  border-radius: var(--radius-item);
+  color: var(--color-text-2);
+
+  @include mixins.press-feedback;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
   }
 }

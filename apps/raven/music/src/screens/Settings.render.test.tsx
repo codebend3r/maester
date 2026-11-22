@@ -3,12 +3,15 @@ import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
 import { RAVEN_SERVER } from '@raven/native/headless'
 import {
-  APPEARANCES,
+  COLOR_SCHEMES,
+  type ColorScheme,
   KIT_COPY,
   SETTINGS_COPY,
   SIGN_IN_COPY,
   STATUS_COPY,
   STORAGE_COPY,
+  THEME_MODES,
+  WREN_THEMES,
 } from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
@@ -96,7 +99,12 @@ describe('Settings', () => {
     await openSettings()
     expect(screen.getByText(LISTENER.email)).toBeTruthy()
     expect(screen.getByText(RAVEN_SERVER.name)).toBeTruthy()
-    expect(screen.getByText(RAVEN_SERVER.origin)).toBeTruthy()
+    expect(
+      screen.getByLabelText(
+        KIT_COPY.labelled({ label: SETTINGS_COPY.serverAddress, value: RAVEN_SERVER.origin }),
+      ),
+    ).toBeTruthy()
+    expect(screen.getByText(SETTINGS_COPY.serverNote)).toBeTruthy()
     expect(await screen.findByLabelText(STATUS_COPY.connected(RAVEN_SERVER.name))).toBeTruthy()
     expect(
       screen.getByLabelText(
@@ -114,14 +122,79 @@ describe('Settings', () => {
     expect(await screen.findByLabelText(STATUS_COPY.unreachable(RAVEN_SERVER.name))).toBeTruthy()
   })
 
-  it('keeps the appearance picked', async () => {
+  it('names the server, and says that name wherever it says what it is connected to', async () => {
     await openSettings()
-    const dark = screen.getByRole('radio', { name: SETTINGS_COPY.dark })
-    await fireEvent.press(dark)
-    expect(useWrenPrefs.getState().appearance).toBe(APPEARANCES.dark)
-    expect(
-      screen.getByRole('radio', { name: SETTINGS_COPY.dark }).props.accessibilityState,
-    ).toEqual(expect.objectContaining({ checked: true }))
+    await fireEvent.changeText(screen.getByLabelText(SETTINGS_COPY.serverName), 'Living room')
+    expect(useWrenPrefs.getState().serverName).toBe('Living room')
+    expect(await screen.findByLabelText(STATUS_COPY.connected('Living room'))).toBeTruthy()
+
+    await fireEvent.changeText(screen.getByLabelText(SETTINGS_COPY.serverName), '')
+    expect(useWrenPrefs.getState().serverName).toBeNull()
+    expect(await screen.findByLabelText(STATUS_COPY.connected(RAVEN_SERVER.name))).toBeTruthy()
+  })
+
+  it('refuses a name that is too long and keeps the last one that will do', async () => {
+    await openSettings()
+    const field = screen.getByLabelText(SETTINGS_COPY.serverName)
+    await fireEvent.changeText(field, 'Home')
+    await fireEvent.changeText(field, 'x'.repeat(81))
+    expect(screen.getByText(SETTINGS_COPY.serverNameError)).toBeTruthy()
+    expect(useWrenPrefs.getState().serverName).toBe('Home')
+  })
+
+  it('switches the music library worn', async () => {
+    const vinyl = { ...MUSIC, id: 6, name: 'Vinyl' }
+    mockApi.listLibraries.mockResolvedValue([MUSIC, vinyl])
+    await openSettings()
+
+    const worn = await screen.findByRole('radio', { name: MUSIC.name })
+    expect(worn.props.accessibilityState).toEqual(expect.objectContaining({ checked: true }))
+
+    await fireEvent.press(screen.getByRole('radio', { name: vinyl.name }))
+    expect(useWrenPrefs.getState().libraryId).toBe(vinyl.id)
+    expect(screen.getByRole('radio', { name: vinyl.name }).props.accessibilityState).toEqual(
+      expect.objectContaining({ checked: true }),
+    )
+  })
+
+  it('keeps one theme whatever the device says, with no slots to pick', async () => {
+    await openSettings()
+    await fireEvent.press(
+      screen.getByRole('radio', { name: SETTINGS_COPY.themeModes[THEME_MODES.single] }),
+    )
+    expect(screen.queryByLabelText(SETTINGS_COPY.themeSlots)).toBeNull()
+
+    const garnet = SETTINGS_COPY.themeNames[WREN_THEMES.garnet]
+    await fireEvent.press(screen.getByRole('radio', { name: garnet }))
+    expect(useWrenPrefs.getState()).toMatchObject({
+      themeMode: THEME_MODES.single,
+      theme: WREN_THEMES.garnet,
+    })
+    expect(screen.getByRole('radio', { name: garnet }).props.accessibilityState).toEqual(
+      expect.objectContaining({ checked: true }),
+    )
+  })
+
+  it("keeps a theme for each of the device's schemes", async () => {
+    await openSettings()
+    expect(screen.getByLabelText(SETTINGS_COPY.themeSlots)).toBeTruthy()
+    expect(screen.getByText(SETTINGS_COPY.showingNow)).toBeTruthy()
+
+    const slot = (scheme: ColorScheme) =>
+      screen.getByRole('radio', { name: new RegExp(`^${SETTINGS_COPY.themeSlotNames[scheme]},`) })
+    await fireEvent.press(slot(COLOR_SCHEMES.light))
+    await fireEvent.press(
+      screen.getByRole('radio', { name: SETTINGS_COPY.themeNames[WREN_THEMES.banana] }),
+    )
+    await fireEvent.press(slot(COLOR_SCHEMES.dark))
+    await fireEvent.press(
+      screen.getByRole('radio', { name: SETTINGS_COPY.themeNames[WREN_THEMES.ember] }),
+    )
+    expect(useWrenPrefs.getState()).toMatchObject({
+      themeMode: THEME_MODES.system,
+      lightTheme: WREN_THEMES.banana,
+      darkTheme: WREN_THEMES.ember,
+    })
   })
 
   it('sets the download quality, the cellular quality and the storage limit', async () => {
@@ -192,6 +265,12 @@ describe('Settings', () => {
     await openSettings()
     expect(screen.getByRole('header', { name: SETTINGS_COPY.downloads })).toBeTruthy()
     expect(screen.getByRole('header', { name: SETTINGS_COPY.about })).toBeTruthy()
+  })
+
+  it('shows the music libraries once on a tablet', async () => {
+    await holdAs(TABLET_WINDOW)
+    await openSettings()
+    expect(await screen.findAllByRole('header', { name: SETTINGS_COPY.library })).toHaveLength(1)
   })
 
   it('signs out, forgetting the account, and lands on sign-in', async () => {

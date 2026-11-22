@@ -13,6 +13,10 @@ export type ListState = { failure: Error | null; isRead: boolean; hasNoMusic: bo
 /** Where one query stands, as TanStack Query reports it. */
 type QueryState = Pick<Listing<unknown>, 'error' | 'isSuccess'>
 
+/** Whether a list is still on its way: nothing has failed and it has not been read yet. */
+export const isListLoading = ({ failure, isRead }: ListState): boolean =>
+  failure === null && !isRead
+
 /** A list one query reads that no music library holds, such as the account's playlists. */
 export const queryListStateOf = ({ error, isSuccess }: QueryState): ListState => ({
   failure: error,

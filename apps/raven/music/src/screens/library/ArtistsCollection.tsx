@@ -1,6 +1,5 @@
 import { type Artist, type Letter, LETTERS, plural } from '@raven/core'
 import { COUNTS_COPY, firstAtLetter, LIBRARY_PAGE_COPY, matchingArtists } from '@raven/wren'
-import { useRouter } from 'expo-router'
 import { useRef, useState } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
@@ -8,9 +7,9 @@ import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { useAllArtists } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
-import { WREN_PAGES, pageHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
@@ -65,7 +64,6 @@ function IndexRail({ onLetter, top, bottom }: IndexRailProps) {
  */
 export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   const styles = useStyles()
-  const router = useRouter()
   const insets = usePageInsets()
   const search = useCollectionSearch({
     placeholder: LIBRARY_PAGE_COPY.searchArtists,
@@ -87,7 +85,9 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   return (
     <View style={styles.page}>
       <FlatList
-        ListEmptyComponent={<ListNotice empty={search.empty} listing={listing} />}
+        ListEmptyComponent={
+          <ListNotice empty={search.empty} listing={listing} shape={LIST_SHAPES.tiles} />
+        }
         ListHeaderComponent={
           <View
             onLayout={({ nativeEvent: { layout } }) => setHeaderEnd(layout.y + layout.height)}
@@ -113,14 +113,7 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
         ref={list}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <ArtistCard
-              albumCount={item.albumCount}
-              name={item.name}
-              onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: item.id }))}
-              picture={artistPhotoOf(item)}
-              trackCount={item.trackCount}
-              width={tileWidth}
-            />
+            <ArtistCard artist={item} photoOf={artistPhotoOf} width={tileWidth} />
           </View>
         )}
         showsVerticalScrollIndicator={false}

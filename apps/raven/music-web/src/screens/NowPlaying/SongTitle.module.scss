@@ -9,13 +9,9 @@
 
 // Two lines at most, as the apps cut a long title.
 .largeName {
-  display: -webkit-box;
-  overflow: hidden;
+  @include mixins.clamp-lines(2);
   color: var(--color-text);
   font: var(--type-album-title);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
 }
 
 .artist {

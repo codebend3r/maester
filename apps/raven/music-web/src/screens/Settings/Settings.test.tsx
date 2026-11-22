@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { type Account, MEMBER_STATUSES } from '@raven/core'
-import { APPEARANCES, KIT_COPY, SETTINGS_COPY, STATUS_COPY } from '@raven/wren'
+import {
+  COLOR_SCHEMES,
+  KIT_COPY,
+  SETTINGS_COPY,
+  STATUS_COPY,
+  THEME_MODES,
+  WREN_THEMES,
+} from '@raven/wren'
 import { QueryClient } from '@tanstack/react-query'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -11,7 +18,7 @@ import { WREN_ROUTES } from '@/routes'
 import { Settings } from '@/screens/Settings/Settings'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { SIGNED_IN, fakeAuthClient } from '@/test/authClient'
-import { mockMusicApiEach } from '@/test/music'
+import { MUSIC, mockMusicApiEach } from '@/test/music'
 import { renderWithProviders, signedIn } from '@/test/render'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 
@@ -21,6 +28,8 @@ const LISTENER: Account = {
   status: MEMBER_STATUSES.approved,
   isOwner: false,
 }
+
+const THEME_NAMES = SETTINGS_COPY.themeNames
 
 type Mocks = { getMe: ReturnType<typeof spyOn<typeof api, 'getMe'>> | null }
 
@@ -81,14 +90,58 @@ describe('Settings', () => {
     expect(await screen.findByText(STATUS_COPY.unreachable(STATUS_COPY.raven))).toBeInTheDocument()
   })
 
-  it('keeps the appearance picked', async () => {
+  it("keeps a theme for each of the device's schemes, starting on the slot showing", async () => {
     renderOpen()
-    const group = screen.getByRole('radiogroup', { name: SETTINGS_COPY.appearance })
-    expect(within(group).getByRole('radio', { name: SETTINGS_COPY.system })).toBeChecked()
+    const modes = screen.getByRole('radiogroup', { name: SETTINGS_COPY.themeMode })
+    expect(
+      within(modes).getByRole('radio', { name: SETTINGS_COPY.themeModes[THEME_MODES.system] }),
+    ).toBeChecked()
+    const slots = screen.getByRole('radiogroup', { name: SETTINGS_COPY.themeSlots })
+    expect(within(slots).getByText(SETTINGS_COPY.showingNow)).toBeInTheDocument()
 
-    await userEvent.click(within(group).getByRole('radio', { name: SETTINGS_COPY.dark }))
-    expect(useWrenPrefs.getState().appearance).toBe(APPEARANCES.dark)
-    expect(within(group).getByRole('radio', { name: SETTINGS_COPY.dark })).toBeChecked()
+    // happy-dom's device is a light one, so the light slot is the one showing and picked.
+    const light = screen.getByRole('radiogroup', {
+      name: SETTINGS_COPY.themeFor[COLOR_SCHEMES.light],
+    })
+    expect(within(light).getByRole('radio', { name: THEME_NAMES.paper })).toBeChecked()
+    await userEvent.click(within(light).getByRole('radio', { name: THEME_NAMES.banana }))
+    expect(useWrenPrefs.getState().lightTheme).toBe(WREN_THEMES.banana)
+
+    await userEvent.click(
+      within(slots).getByRole('radio', {
+        name: KIT_COPY.labelled({
+          label: SETTINGS_COPY.themeSlotNames[COLOR_SCHEMES.dark],
+          value: THEME_NAMES.night,
+        }),
+      }),
+    )
+    const dark = screen.getByRole('radiogroup', {
+      name: SETTINGS_COPY.themeFor[COLOR_SCHEMES.dark],
+    })
+    expect(within(dark).getByRole('radio', { name: THEME_NAMES.night })).toBeChecked()
+    await userEvent.click(within(dark).getByRole('radio', { name: THEME_NAMES.dracula }))
+    expect(useWrenPrefs.getState()).toMatchObject({
+      lightTheme: WREN_THEMES.banana,
+      darkTheme: WREN_THEMES.dracula,
+    })
+  })
+
+  it('keeps one theme whatever the device says, with no slots to pick', async () => {
+    renderOpen()
+    const modes = screen.getByRole('radiogroup', { name: SETTINGS_COPY.themeMode })
+    await userEvent.click(
+      within(modes).getByRole('radio', { name: SETTINGS_COPY.themeModes[THEME_MODES.single] }),
+    )
+    expect(screen.queryByRole('radiogroup', { name: SETTINGS_COPY.themeSlots })).toBeNull()
+
+    const themes = screen.getByRole('radiogroup', { name: SETTINGS_COPY.theme })
+    expect(within(themes).getAllByRole('radio')).toHaveLength(Object.keys(WREN_THEMES).length)
+    await userEvent.click(within(themes).getByRole('radio', { name: THEME_NAMES.garnet }))
+    expect(useWrenPrefs.getState()).toMatchObject({
+      themeMode: THEME_MODES.single,
+      theme: WREN_THEMES.garnet,
+    })
+    expect(within(themes).getByRole('radio', { name: THEME_NAMES.garnet })).toBeChecked()
   })
 
   it("shows the fonts' licences", async () => {
@@ -106,12 +159,57 @@ describe('Settings', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('has nothing of the downloads, the cellular stream or the address', () => {
+  it("shows the server's address, port included, with only the name to edit", async () => {
+    renderSignedIn()
+    const server = screen.getByRole('heading', { name: SETTINGS_COPY.server }).closest('section')
+    expect(within(server!).getByText(SETTINGS_COPY.serverAddress)).toBeInTheDocument()
+    expect(within(server!).getByText(window.location.origin)).toBeInTheDocument()
+    expect(screen.getByText(SETTINGS_COPY.serverNote)).toBeInTheDocument()
+    expect(within(server!).queryByRole('button')).toBeNull()
+    expect(within(server!).queryByRole('link')).toBeNull()
+    expect(within(server!).getAllByRole('textbox')).toHaveLength(1)
+  })
+
+  it('switches the music library worn', async () => {
+    const vinyl = { ...MUSIC, id: 6, name: 'Vinyl' }
+    music().listLibraries.mockResolvedValue([MUSIC, vinyl])
+    renderSignedIn()
+
+    const libraries = await screen.findByRole('radiogroup', { name: SETTINGS_COPY.library })
+    expect(within(libraries).getByRole('radio', { name: MUSIC.name })).toBeChecked()
+
+    await userEvent.click(within(libraries).getByRole('radio', { name: vinyl.name }))
+    expect(useWrenPrefs.getState().libraryId).toBe(vinyl.id)
+    expect(within(libraries).getByRole('radio', { name: vinyl.name })).toBeChecked()
+  })
+
+  it('names the server, and says that name wherever it says what it is connected to', async () => {
+    renderSignedIn()
+    const field = await screen.findByRole('textbox', { name: SETTINGS_COPY.serverName })
+    await userEvent.type(field, 'Living room')
+    expect(useWrenPrefs.getState().serverName).toBe('Living room')
+    expect(await screen.findByText(STATUS_COPY.connected('Living room'))).toBeInTheDocument()
+
+    await userEvent.clear(field)
+    expect(useWrenPrefs.getState().serverName).toBeNull()
+    expect(await screen.findByText(STATUS_COPY.connected(STATUS_COPY.raven))).toBeInTheDocument()
+  })
+
+  it('refuses a name that is too long and keeps the last one that will do', async () => {
+    renderSignedIn()
+    const field = await screen.findByRole('textbox', { name: SETTINGS_COPY.serverName })
+    await userEvent.type(field, 'Home')
+    await userEvent.click(field)
+    await userEvent.paste('x'.repeat(80))
+    expect(screen.getByText(SETTINGS_COPY.serverNameError)).toBeInTheDocument()
+    expect(useWrenPrefs.getState().serverName).toBe('Home')
+  })
+
+  it('has nothing of the downloads or the cellular stream', () => {
     renderSignedIn()
     expect(screen.queryByRole('heading', { name: SETTINGS_COPY.downloads })).toBeNull()
     expect(screen.queryByText(SETTINGS_COPY.cellularQuality)).toBeNull()
     expect(screen.queryByRole('button', { name: SETTINGS_COPY.removeAll })).toBeNull()
-    expect(screen.queryByText(window.location.origin)).toBeNull()
   })
 
   it.each([FORM_FACTORS.phone, FORM_FACTORS.tablet])(

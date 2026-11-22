@@ -2,6 +2,7 @@ import { plural } from '@raven/core'
 import { COUNTS_COPY, LIBRARY_PAGE_COPY } from '@raven/wren'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
+import { LIST_SHAPES } from '@/components/ListSkeleton/ListSkeleton'
 import { useUnmatchedAlbums } from '@/music/listings'
 import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
 import { Page } from '@/shell/Page/Page'
@@ -21,7 +22,11 @@ export function UnmatchedAlbumsCollection() {
         title={LIBRARY_PAGE_COPY.unmatchedAlbums}
       />
       {albums.length === 0 && (
-        <ListNotice empty={LIBRARY_PAGE_COPY.noUnmatchedAlbums} listing={listing} />
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noUnmatchedAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
       )}
       <AlbumGrid albums={albums} />
     </Page>

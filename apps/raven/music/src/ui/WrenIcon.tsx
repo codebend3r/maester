@@ -111,6 +111,11 @@ export const ICONS = {
     circle({ cx: 6.5, cy: 17.5, r: 2.5 }),
     circle({ cx: 16.5, cy: 15.5, r: 2.5 }),
   ),
+  image: lines(
+    rect({ x: 3.5, y: 4.5, width: 17, height: 15, rx: 3 }),
+    circle({ cx: 9, cy: 10, r: 1.6 }),
+    'm4 17 5-4.5 4 3.5 3-2.5 4 3',
+  ),
   lyrics: lines('M4.5 5.5h15v10.5H10l-5.5 4z', 'M8.5 9.5h7M8.5 12.5h4.5'),
   upNext: lines('M4 6h13M4 11h13M4 16h7', 'M15 14.2v6.2l5-3.1z'),
   output: lines(

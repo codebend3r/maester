@@ -647,6 +647,8 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 | `OMDB_DAILY_LIMIT`            | `1000`                         | OMDb calls a day                             |
 | `MDBLIST_API_KEY`             | unset                          | MDBList's key, for Rotten Tomatoes and Metacritic scores of shows too |
 | `MDBLIST_DAILY_LIMIT`         | `1000`                         | MDBList calls a day                          |
+| `FANARTTV_API_KEY`            | unset                          | fanart.tv's personal key, for artist backgrounds; unset leaves fanart.tv out |
+| `THEAUDIODB_API_KEY`          | TheAudioDB's free key (`123`)  | TheAudioDB's key, for artist backgrounds; a paid one lifts the 30 calls a minute |
 | `ANTHROPIC_API_KEY`           | unset                          | raven's own Anthropic key, for the [AI lookup](#metadata) of what matching leaves; unset turns it off |
 | `AI_MATCH_MODEL`              | `claude-haiku-5-5`             | The model the AI lookup asks                 |
 | `AI_MATCH_EFFORT`             | `low`                          | How hard it thinks: `low`, `medium`, `high`, `xhigh` or `max` |

@@ -19,6 +19,7 @@ export const SIZES = {
   emptyIcon: 'var(--size-empty-icon)',
   smallButton: 'var(--size-small-button)',
   playButton: 'var(--size-play-button)',
+  playBar: 'var(--size-play-bar)',
   rowArt: 'var(--size-row-art)',
   avatar: 'var(--size-avatar)',
   artistPhoto: 'var(--size-artist-photo)',
@@ -37,6 +38,7 @@ export const SIZES = {
   artistCircle: 'var(--size-artist-circle)',
   continueArt: 'var(--size-continue-art)',
   continueArtWide: 'var(--size-continue-art-wide)',
+  loadingMark: 'var(--size-loading-mark)',
   signInMark: 'var(--size-sign-in-mark)',
   signInHeroMark: 'var(--size-sign-in-hero-mark)',
   signInLockup: 'var(--size-sign-in-lockup)',
@@ -79,6 +81,18 @@ export const COLORS = {
 } as const
 
 export type Color = (typeof COLORS)[keyof typeof COLORS]
+
+/**
+ * The colour tokens code reads by name rather than hands a component: the theme's ground, which
+ * the browser's bars wear, and the colours text is drawn in, whose contrast /design shows.
+ */
+export const COLOR_TOKEN_NAMES = {
+  ground: '--color-bg',
+  text: '--color-text',
+  text2: '--color-text-2',
+  text3: '--color-text-3',
+  accentText: '--color-accent-text',
+} as const
 
 /** An inline style that sets a component's own custom properties from token names. */
 export type TokenStyle = CSSProperties & Record<`--${string}`, string | undefined>

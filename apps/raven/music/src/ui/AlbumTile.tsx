@@ -10,6 +10,12 @@ import { SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { pressedStyleOf } from '@/ui/press'
 
+/** A title wraps to this many lines; the rest is cut with an ellipsis. */
+const TITLE_LINES = 4
+
+/** The line under the title wraps to this many. */
+const SUBTITLE_LINES = 2
+
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   tile: { gap: SPACE.s2 },
   title: { ...TYPE.tileAlbum, color: colors.text },
@@ -30,7 +36,7 @@ type AlbumTileProps = {
   onPress: () => void
 }
 
-/** An album or a playlist as a tile: its square art, its title and a line under it, each on one line. */
+/** An album or a playlist as a tile: its square art, its title (up to four lines) and the line under it (up to two). */
 export function AlbumTile({
   title,
   subtitle,
@@ -50,10 +56,10 @@ export function AlbumTile({
     >
       <AlbumArt cover={cover} size={width} />
       <View>
-        <Text numberOfLines={1} style={styles.title}>
+        <Text numberOfLines={TITLE_LINES} style={styles.title}>
           {title}
         </Text>
-        <Text numberOfLines={1} style={styles.subtitle}>
+        <Text numberOfLines={SUBTITLE_LINES} style={styles.subtitle}>
           {subtitle}
         </Text>
         {detail !== undefined && (

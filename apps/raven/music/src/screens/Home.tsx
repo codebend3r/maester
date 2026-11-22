@@ -28,6 +28,7 @@ import {
   useRecentAlbums,
   useSongCount,
 } from '@/screens/library/listings'
+import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
@@ -229,7 +230,13 @@ function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
         onSelect={(homeSort) => change({ homeSort })}
         selected={sort}
       />
-      {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
+      {albums.length === 0 && (
+        <ListNotice
+          empty={LIBRARY_PAGE_COPY.noAlbums}
+          listing={listing}
+          shape={LIST_SHAPES.tiles}
+        />
+      )}
       <TileGrid
         columns={RECENT_COLUMNS}
         items={albums}

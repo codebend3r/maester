@@ -1,0 +1,77 @@
+@use '../../styles/mixins';
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  min-inline-size: 0;
+}
+
+// The words start at the top, so a slot that is showing now and one that is not line up.
+.slot {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  block-size: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  @include mixins.hairline-ring;
+
+  input:checked + & {
+    @include mixins.picked-tile;
+  }
+}
+
+.when {
+  @include mixins.meta-line;
+}
+
+// The name takes the room the dots leave.
+.theme {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+// Three of the slot's theme's colours, which `data-theme` gives them.
+.dots {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+.ground,
+.surface,
+.accent {
+  inline-size: var(--size-theme-dot);
+  block-size: var(--size-theme-dot);
+  border: var(--size-hairline) solid var(--color-line-2);
+  border-radius: var(--radius-pill);
+}
+
+.ground {
+  background: var(--color-bg);
+}
+
+.surface {
+  background: var(--color-surface-2);
+}
+
+.accent {
+  background: var(--color-accent);
+}
+
+.name {
+  @include mixins.one-line;
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.now {
+  color: var(--color-accent-text);
+  font: var(--type-meta-strong);
+}

@@ -1,4 +1,10 @@
-import type { AlbumDetails, AlbumSummary, Artist, PlaylistSummary } from '@raven/core'
+import {
+  type AlbumDetails,
+  type AlbumSummary,
+  type Artist,
+  type PlaylistSummary,
+  albumDateLabel,
+} from '@raven/core'
 
 import { DETAIL_COPY } from '@/copy/screens'
 import { factsLineOf } from '@/copy/kit'
@@ -21,15 +27,18 @@ export const lengthOf = (seconds: number): string | null => {
 
 type AlbumMetaOfProps = {
   details: Pick<AlbumDetails, 'genres'> & {
-    album: Pick<AlbumSummary, 'year' | 'trackCount' | 'duration'>
+    album: Pick<AlbumSummary, 'year' | 'releaseDate' | 'trackCount' | 'duration'>
   }
 }
 
-/** An album's line under its artist: "Pop · 2014 · 20 songs · 1 hr 24 min". */
+/**
+ * An album's line under its artist: "Pop · November 15, 2011 · 17 songs · 1 hr 20 min", its
+ * release date as precise as it is known, else its year.
+ */
 export const albumMetaOf = ({ details: { album, genres } }: AlbumMetaOfProps): string =>
   factsLineOf([
     genres[0] ?? null,
-    album.year === null ? null : String(album.year),
+    albumDateLabel({ releaseDate: album.releaseDate, year: album.year }),
     countsLineOf({ songs: album.trackCount }),
     lengthOf(album.duration),
   ])

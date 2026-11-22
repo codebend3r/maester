@@ -2,7 +2,6 @@ import { QUEUE_SOURCE_KINDS, type Track } from '@raven/core'
 import { useAudioQueue, useIsAudiobook } from '@raven/ui/headless'
 import {
   NOW_PLAYING_COPY,
-  qualityLineOf,
   type ShownLyrics,
   shownLyricsOf,
   sourceIdOf,
@@ -14,9 +13,10 @@ import { useRouter } from 'expo-router'
 import { Platform } from 'react-native'
 
 import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
+import { useQuality } from '@/player/useQuality'
 import { deviceOf } from '@/screens/nowPlaying/device'
 import { WREN_PAGES, pageHref } from '@/routes'
-import { usePlayedStreams } from '@/stores/playedStreams'
+import { useServerName } from '@/stores/wrenPrefs'
 import { useFormFactor } from '@/theme/wrenTheme'
 import type { WrenSession } from '@/useWren'
 
@@ -56,7 +56,8 @@ export const usePlaying = ({ session, track }: UsePlayingProps): Playing => {
   const artist = useQuery(
     session.queries.artistQuery(sourceIdOf({ source, kind: QUEUE_SOURCE_KINDS.artist })),
   )
-  const stream = usePlayedStreams((store) => store.streams[track.id])
+  const quality = useQuality({ track })
+  const serverName = useServerName({ fallback: session.server.name })
   const device = deviceOf({ os: Platform.OS, formFactor })
   const [firstArtist] = track.artists
   const close = () => router.back()
@@ -71,10 +72,10 @@ export const usePlaying = ({ session, track }: UsePlayingProps): Playing => {
     }),
     lyrics: shownLyricsOf({ isAudiobook, lyrics }),
     isAudiobook,
-    output: NOW_PLAYING_COPY.output({ server: session.server.name, device }),
+    output: NOW_PLAYING_COPY.output({ server: serverName, device }),
     playingOn: NOW_PLAYING_COPY.playingOn(device),
     close,
-    quality: stream === undefined ? null : qualityLineOf({ track, stream }),
+    quality,
     openArtist:
       firstArtist === undefined
         ? null

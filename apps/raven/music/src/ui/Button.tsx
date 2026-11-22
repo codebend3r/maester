@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE, type Palette } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
+import { UNSEEN } from '@/ui/Unseen'
 import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
 
 /** What a button is for: the page's action, a quieter one, an outlined one, or one that removes. */
@@ -46,8 +47,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   [BUTTON_VARIANTS.ghost]: { borderColor: colors.line2, borderWidth: SIZE.hairline },
   [BUTTON_VARIANTS.danger]: {},
   label: TYPE.button,
-  // The label keeps its place under the spinner, so the button never changes width.
-  hidden: { opacity: 0 },
   spinner: {
     alignItems: 'center',
     bottom: 0,
@@ -98,7 +97,8 @@ export function Button({
         isDisabled,
       })}
     >
-      <View style={[styles.content, isLoading && styles.hidden]}>
+      {/* The label keeps its place under the spinner, so the button never changes width. */}
+      <View style={[styles.content, isLoading && UNSEEN]}>
         {icon !== undefined && <WrenIcon color={ink} name={icon} size={SIZE.smallIcon} />}
         <Text numberOfLines={1} style={[styles.label, { color: ink }]}>
           {label}

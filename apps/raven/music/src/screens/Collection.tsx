@@ -9,11 +9,8 @@ import { ArtistsCollection } from '@/screens/library/ArtistsCollection'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { PlaylistsCollection } from '@/screens/library/PlaylistsCollection'
 import { SongsCollection } from '@/screens/library/SongsCollection'
-import {
-  FavouritesCollection,
-  FinishedCollection,
-  InProgressCollection,
-} from '@/screens/library/TracksCollection'
+import { FavouritesCollection } from '@/screens/library/FavouritesCollection'
+import { FinishedCollection, InProgressCollection } from '@/screens/library/TracksCollection'
 import { UnmatchedAlbumsCollection } from '@/screens/library/UnmatchedAlbumsCollection'
 import { WREN_ROUTES, WREN_ROUTE_PARAMS } from '@/routes'
 import { type WrenSession, useWren } from '@/useWren'

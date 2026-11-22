@@ -90,6 +90,10 @@ import { ScoresRepository } from '@/metadata/scoresRepository'
 import { ScoreSweep } from '@/metadata/scoreSweep'
 import { METADATA_FETCH, type MetadataFetch, TmdbClient } from '@/metadata/tmdbClient'
 import { AlbumCovers } from '@/music/albumCovers'
+import { ArtistArtClient } from '@/music/artistArtClient'
+import { ArtistAbout } from '@/music/artistAbout'
+import { ArtistBackgroundOptions } from '@/music/artistBackgroundOptions'
+import { WikimediaClient } from '@/music/wikimediaClient'
 import { AlbumClaude } from '@/music/albumClaude'
 import { AlbumMatching } from '@/music/albumMatching'
 import { SmartMatch } from '@/music/smartMatch'
@@ -327,10 +331,14 @@ export class AppModule {
         MusicRepository,
         AudioReader,
         AlbumCovers,
+        ArtistArtClient,
+        ArtistAbout,
+        ArtistBackgroundOptions,
         MusicIndexer,
         MusicCoverStore,
         MusicMatchStore,
         MusicBrainzClient,
+        WikimediaClient,
         LrclibClient,
         MusicFavourites,
         Playlists,

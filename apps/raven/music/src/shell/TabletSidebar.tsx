@@ -1,15 +1,17 @@
 import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
 import { type Href, usePathname, useRouter } from 'expo-router'
+import type { ComponentType } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { WrenLockup } from '@/components/WrenLockup'
+import { WrenLockup, WrenMark } from '@/components/WrenLockup'
 import { WREN_ROUTES, collectionPathOf, libraryHref } from '@/routes'
 import { CATEGORIES, type Category } from '@/screens/library/categories'
 import { type WrenTheme, themedStyles, useIsPortrait, useWrenTheme } from '@/theme/wrenTheme'
 import { FONTS, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
+import { Unseen } from '@/ui/Unseen'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
 import { useWren } from '@/useWren'
 
@@ -24,8 +26,15 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   rail: { width: SHELL_SIZES.tabletRail },
   // Grown to the sidebar's height, so Settings keeps to its foot until the places outgrow it.
   places: { flexGrow: 1, gap: SPACE.s1, paddingBottom: SPACE.s4, paddingHorizontal: SPACE.s3 },
-  railPlaces: { alignItems: 'center' },
-  lockup: { paddingBottom: SPACE.s6, paddingHorizontal: SPACE.s2 },
+  // The lockup's height and the room under it, whichever of the lockup or the mark is drawn.
+  lockup: {
+    justifyContent: 'center',
+    minHeight: SIZE.lockup + SPACE.s6,
+    paddingBottom: SPACE.s6,
+    paddingHorizontal: SPACE.s2,
+  },
+  // The mark stands over the icons, its centre on theirs.
+  railLockup: { paddingHorizontal: SPACE.s3 + (SIZE.navIcon - SIZE.largeIcon) / 2 },
   overline: {
     ...TYPE.overline,
     color: colors.text3,
@@ -42,7 +51,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     minHeight: SHELL_SIZES.sidebarItem,
     paddingHorizontal: SPACE.s3,
   },
-  railItem: { justifyContent: 'center', minHeight: SIZE.touchTarget, paddingHorizontal: 0 },
   active: { backgroundColor: colors.accentSoft },
   label: { ...TYPE.rowTitle, color: colors.text },
   activeLabel: { ...TYPE.rowTitle, color: colors.accentText, fontFamily: FONTS.bodySemiBold },
@@ -85,6 +93,20 @@ const SETTINGS_PLACE = tabPlace({
   path: WREN_ROUTES.settings,
 })
 
+const LOGO_VIEWS = { lockup: 'lockup', mark: 'mark' } as const
+
+type LogoView = (typeof LOGO_VIEWS)[keyof typeof LOGO_VIEWS]
+
+const SidebarMark = () => <WrenMark size={SIZE.largeIcon} />
+
+const SidebarLockup = () => <WrenLockup size={SIZE.lockup} />
+
+/** The lockup on the open sidebar, the bird alone on the rail, as the web's sidebar draws them. */
+const LOGOS = {
+  [LOGO_VIEWS.lockup]: SidebarLockup,
+  [LOGO_VIEWS.mark]: SidebarMark,
+} as const satisfies Record<LogoView, ComponentType>
+
 type SidebarItemProps = { place: SidebarPlace; isRail: boolean }
 
 /** One of the sidebar's places, bright on a soft red ground while it is the page showing. */
@@ -100,7 +122,7 @@ function SidebarItem({ place, isRail }: SidebarItemProps) {
       accessibilityState={{ selected: isActive }}
       onPress={() => router.navigate(place.href)}
       style={pressedStyleOf({
-        style: [styles.item, isRail && styles.railItem, isActive && styles.active],
+        style: [styles.item, isActive && styles.active],
       })}
     >
       <WrenIcon
@@ -115,43 +137,44 @@ function SidebarItem({ place, isRail }: SidebarItemProps) {
 
 /**
  * The tablet's sidebar: the lockup, Home and Search, Library's categories, then Settings and
- * the server's status at its foot. Held upright, it folds to a rail of icons, each still named
- * for a screen reader.
+ * the server's status at its foot. Held upright, it folds to a rail: the same places with only
+ * their words gone, the bird over them, every icon where the open sidebar has it, each still
+ * named for a screen reader.
  */
 export function TabletSidebar() {
   const styles = useStyles()
   const isRail = useIsPortrait()
+  const Logo = LOGOS[isRail ? LOGO_VIEWS.mark : LOGO_VIEWS.lockup]
   const session = useWren()
   const { top } = useSafeAreaInsets()
   return (
     <ScrollView
-      contentContainerStyle={[
-        styles.places,
-        isRail && styles.railPlaces,
-        { paddingTop: top + SPACE.s4 },
-      ]}
+      contentContainerStyle={[styles.places, { paddingTop: top + SPACE.s4 }]}
       showsVerticalScrollIndicator={false}
       style={[styles.sidebar, isRail && styles.rail]}
     >
-      {!isRail && (
-        <View style={styles.lockup}>
-          <WrenLockup size={SIZE.lockup} />
-        </View>
-      )}
+      <View style={[styles.lockup, isRail && styles.railLockup]}>
+        <Logo />
+      </View>
       {TOP_PLACES.map((place) => (
         <SidebarItem isRail={isRail} key={place.key} place={place} />
       ))}
-      {!isRail && (
+      {/* On the rail the overline and the status keep their room, only unseen, so no row moves. */}
+      <Unseen isUnseen={isRail}>
         <Text accessibilityRole="header" style={styles.overline}>
           {LIBRARY_PAGE_COPY.title}
         </Text>
-      )}
+      </Unseen>
       {LIBRARY_PLACES.map((place) => (
         <SidebarItem isRail={isRail} key={place.key} place={place} />
       ))}
       <View style={styles.spacer} />
       <SidebarItem isRail={isRail} place={SETTINGS_PLACE} />
-      {!isRail && session !== null && <ServerStatusChip session={session} />}
+      {session !== null && (
+        <Unseen isUnseen={isRail}>
+          <ServerStatusChip session={session} />
+        </Unseen>
+      )}
     </ScrollView>
   )
 }
