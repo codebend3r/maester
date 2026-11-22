@@ -1,4 +1,11 @@
-import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
+import {
+  HOME_COPY,
+  LIBRARY_LABELS,
+  LIBRARY_PAGE_COPY,
+  SEARCH_COPY,
+  SETTINGS_COPY,
+  SHARED_ORDER,
+} from '@raven/wren'
 import { COLLECTION_KINDS, type CollectionKind, WREN_ROUTES, collectionPath } from '@/routes'
 import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 
@@ -21,34 +28,28 @@ export const TABS = [
   TAB_PLACES.settings,
 ] as const satisfies readonly Place[]
 
-type LibraryPlaceOfProps = { kind: CollectionKind; label: string; icon: WrenIconName }
+/** Each of Library's categories' drawing. */
+const LIBRARY_ICONS = {
+  [COLLECTION_KINDS.albums]: ICONS.album,
+  [COLLECTION_KINDS.artists]: ICONS.artist,
+  [COLLECTION_KINDS.playlists]: ICONS.playlist,
+  [COLLECTION_KINDS.unmatchedAlbums]: ICONS.alert,
+  [COLLECTION_KINDS.inProgress]: ICONS.recent,
+  [COLLECTION_KINDS.favourites]: ICONS.heart,
+  [COLLECTION_KINDS.finished]: ICONS.check,
+  [COLLECTION_KINDS.songs]: ICONS.song,
+} as const satisfies Record<CollectionKind, WrenIconName>
 
-const libraryPlaceOf = ({ kind, label, icon }: LibraryPlaceOfProps) =>
-  ({ kind, label, icon, path: collectionPath(kind) }) as const
+/** One of Library's categories as a place: its kind beside its name, drawing and address. */
+type LibraryPlace = Place & { kind: CollectionKind }
 
 /**
- * Library's categories, in the order Library and the sidebar list them: the apps' but Downloads,
- * which a browser keeps none of.
+ * Library's categories, in the order Library and the sidebar list them: raven's seven music
+ * tabs in raven's order, then Songs; the apps' Downloads is left out, since a browser keeps none.
  */
-export const LIBRARY_PLACES = [
-  libraryPlaceOf({
-    kind: COLLECTION_KINDS.playlists,
-    label: LIBRARY_PAGE_COPY.playlists,
-    icon: ICONS.playlist,
-  }),
-  libraryPlaceOf({
-    kind: COLLECTION_KINDS.artists,
-    label: LIBRARY_PAGE_COPY.artists,
-    icon: ICONS.artist,
-  }),
-  libraryPlaceOf({
-    kind: COLLECTION_KINDS.albums,
-    label: LIBRARY_PAGE_COPY.albums,
-    icon: ICONS.album,
-  }),
-  libraryPlaceOf({
-    kind: COLLECTION_KINDS.songs,
-    label: LIBRARY_PAGE_COPY.songs,
-    icon: ICONS.song,
-  }),
-] as const satisfies readonly Place[]
+export const LIBRARY_PLACES: readonly LibraryPlace[] = SHARED_ORDER.map((kind) => ({
+  kind,
+  label: LIBRARY_LABELS[kind],
+  icon: LIBRARY_ICONS[kind],
+  path: collectionPath(kind),
+}))

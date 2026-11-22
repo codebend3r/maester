@@ -378,11 +378,12 @@ const ALBUM_SCALES = {
   [MUSIC_SORTS.year]: { field: SORT_FIELD_NAMES.release, by: 'year' },
   [MUSIC_SORTS.release]: { field: SORT_FIELD_NAMES.release, by: 'release' },
   [MUSIC_SORTS.added]: { field: SORT_FIELD_NAMES.added, by: 'added' },
+  [MUSIC_SORTS.modified]: { field: SORT_FIELD_NAMES.changed, by: 'modified' },
 } as const
 
 type AlbumEntryProps = {
   album: AlbumSummary
-  by: 'title' | 'artist' | 'year' | 'release' | 'added'
+  by: (typeof ALBUM_SCALES)[keyof typeof ALBUM_SCALES]['by']
 }
 
 const firstYear = (date: string | null): number | null => {
@@ -400,7 +401,7 @@ const fromAlbum = ({ album, by }: AlbumEntryProps): Entry => ({
   year: releaseYearOf(by === 'release' ? (firstYear(album.releaseDate) ?? album.year) : album.year),
   score: null,
   added: album.addedAt,
-  changed: null,
+  changed: album.modifiedAt ?? null,
 })
 
 type AlbumJumpScaleProps = {

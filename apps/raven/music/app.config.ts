@@ -8,6 +8,8 @@ import packageJson from '#package'
  * the app come in by their relative path and extension.
  */
 import { BRAND, COLORS, FONT_FILES } from './src/theme/wrenTokens.ts'
+import { BUILD_EXTRA } from './src/about/buildExtra.ts'
+import { latestVersionTag } from '../../../tooling/web/versionTag.ts'
 import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
 import { CARPLAY_FLAG, withCarPlay } from './plugins/withCarPlay.ts'
 import { withCleartextTraffic } from './plugins/withCleartextTraffic.ts'
@@ -35,6 +37,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug: 'wren',
     scheme: 'wren',
     version: packageJson.version,
+    // The build Settings shows, `0.9.0.15`, where the store version stays package.json's.
+    extra: { ...config.extra, [BUILD_EXTRA.releaseVersion]: latestVersionTag() },
     orientation: 'default',
     /*
      * Wren follows the system's light or dark unless Settings' Appearance keeps one. Android

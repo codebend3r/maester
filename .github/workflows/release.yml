@@ -70,12 +70,13 @@ jobs:
           TAG: ${{ github.ref_name }}
           RAVEN_HOOK: ${{ secrets.NETLIFY_RAVEN_BUILD_HOOK }}
           SPLASH_HOOK: ${{ secrets.NETLIFY_SPLASH_BUILD_HOOK }}
+          WREN_HOOK: ${{ secrets.NETLIFY_WREN_BUILD_HOOK }}
         run: |
           if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "$TAG is a build tag; the sites stay on the last release."
             exit 0
           fi
-          for hook in "$RAVEN_HOOK" "$SPLASH_HOOK"; do
+          for hook in "$RAVEN_HOOK" "$SPLASH_HOOK" "$WREN_HOOK"; do
             [ -n "$hook" ] || continue
             curl --fail --silent --show-error -X POST -d '{}' "$hook?trigger_title=$TAG"
           done

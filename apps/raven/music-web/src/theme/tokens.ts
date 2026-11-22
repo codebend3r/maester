@@ -21,6 +21,7 @@ export const SIZES = {
   playButton: 'var(--size-play-button)',
   rowArt: 'var(--size-row-art)',
   avatar: 'var(--size-avatar)',
+  artistPhoto: 'var(--size-artist-photo)',
   miniArt: 'var(--size-mini-art)',
   sheetArt: 'var(--size-sheet-art)',
   lockup: 'var(--size-lockup)',

@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'bun:test'
-import { ALBUM_TYPES, type AlbumSummary, type Artist, MATCH_STATES, MUSIC_SORTS } from '@raven/core'
+import {
+  ALBUM_TYPES,
+  type AlbumSummary,
+  type Artist,
+  MATCH_STATES,
+  MUSIC_SORTS,
+  type MusicSort,
+} from '@raven/core'
 
 import {
-  LIST_SORTS,
-  LIST_SORT_ORDER,
-  SERVER_SORTS,
+  FIRST_LIST_ORDER,
   RECENT_SERVER_SORTS,
+  listOrderOf,
   matchingAlbums,
   matchingArtists,
   recentAlbums,
@@ -73,16 +79,52 @@ const ALBUMS = [KID_A, BLUE, AMNESIAC]
 
 const idsOf = (albums: readonly AlbumSummary[]) => albums.map(({ id }) => id)
 
+const orderedBy = (sort: MusicSort, seed = 0) =>
+  idsOf(sortedAlbums({ albums: ALBUMS, order: { sort, seed } }))
+
 describe('sortedAlbums', () => {
-  it('puts albums by title, by artist then title, newest year first, or newest added first', () => {
-    expect(idsOf(sortedAlbums({ albums: ALBUMS, sort: LIST_SORTS.title }))).toEqual([3, 2, 1])
-    expect(idsOf(sortedAlbums({ albums: ALBUMS, sort: LIST_SORTS.artist }))).toEqual([2, 3, 1])
-    expect(idsOf(sortedAlbums({ albums: ALBUMS, sort: LIST_SORTS.year }))).toEqual([1, 2, 3])
-    expect(idsOf(sortedAlbums({ albums: ALBUMS, sort: LIST_SORTS.added }))).toEqual([2, 3, 1])
+  it("puts albums in each of raven's orders, as the server lists one library's", () => {
+    expect(orderedBy(MUSIC_SORTS.title)).toEqual([3, 2, 1])
+    expect(orderedBy(MUSIC_SORTS.artist)).toEqual([2, 1, 3])
+    expect(orderedBy(MUSIC_SORTS.year)).toEqual([2, 1, 3])
+    expect(orderedBy(MUSIC_SORTS.added)).toEqual([2, 3, 1])
+    expect(orderedBy(MUSIC_SORTS.release)).toEqual([1, 2, 3])
+  })
+
+  it('puts the most played and the latest played first, the unplayed last', () => {
+    const albums = [
+      { ...KID_A, plays: 2, playedAt: '2026-03-01T00:00:00Z' },
+      { ...BLUE, plays: 5, playedAt: '2026-01-01T00:00:00Z' },
+      { ...AMNESIAC, plays: 0, playedAt: null },
+    ]
+    const by = (sort: MusicSort) => idsOf(sortedAlbums({ albums, order: { sort, seed: 0 } }))
+    expect(by(MUSIC_SORTS.plays)).toEqual([2, 1, 3])
+    expect(by(MUSIC_SORTS.played)).toEqual([1, 2, 3])
+  })
+
+  it('puts the latest changed first, an album with no date last', () => {
+    const albums = [
+      { ...KID_A, modifiedAt: '2026-01-01T00:00:00Z' },
+      BLUE,
+      { ...AMNESIAC, modifiedAt: '2026-05-01T00:00:00Z' },
+    ]
+    expect(idsOf(sortedAlbums({ albums, order: { sort: MUSIC_SORTS.modified, seed: 0 } }))).toEqual(
+      [3, 1, 2],
+    )
+  })
+
+  it('deals a random order by its seed, the same each time for one seed', () => {
+    expect(orderedBy(MUSIC_SORTS.random, 7)).toEqual(orderedBy(MUSIC_SORTS.random, 7))
+    expect(orderedBy(MUSIC_SORTS.random, 7).toSorted()).toEqual([1, 2, 3])
+  })
+
+  it('starts by title, and deals a new seed for each pick', () => {
+    expect(FIRST_LIST_ORDER.sort).toBe(MUSIC_SORTS.title)
+    expect(listOrderOf(MUSIC_SORTS.random).sort).toBe(MUSIC_SORTS.random)
   })
 
   it('leaves the list it was given as it was', () => {
-    sortedAlbums({ albums: ALBUMS, sort: LIST_SORTS.title })
+    sortedAlbums({ albums: ALBUMS, order: FIRST_LIST_ORDER })
     expect(idsOf(ALBUMS)).toEqual([1, 2, 3])
   })
 })
@@ -139,12 +181,5 @@ describe('recentAlbums', () => {
       [RECENT_SORTS.added]: MUSIC_SORTS.added,
       [RECENT_SORTS.release]: MUSIC_SORTS.release,
     })
-  })
-})
-
-describe('the sorts', () => {
-  it("lists every sort, each with the server's own", () => {
-    expect(LIST_SORT_ORDER).toEqual(['title', 'artist', 'year', 'added'])
-    expect(SERVER_SORTS[LIST_SORTS.added]).toBe(MUSIC_SORTS.added)
   })
 })

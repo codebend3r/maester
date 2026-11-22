@@ -153,7 +153,7 @@ export class MusicFavourites {
   albums({ account }: MusicFavouritesAlbumsProps): AlbumSummary[] {
     const locked = this.libraries.lockedIds()
     const ids = this.markedIds({ of: FAVOURITE_TABLES.album, account })
-    const albums = this.music.albums(ids)
+    const albums = this.music.albums({ ids, account })
     return ids.flatMap((id) => {
       const album = albums.get(id)
       return album === undefined || locked.has(album.libraryId) ? [] : [album]

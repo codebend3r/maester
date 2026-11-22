@@ -3,6 +3,7 @@ import {
   MEDIA_SORTS,
   MUSIC_SORTS,
   type MusicSort,
+  SORT_DIRECTIONS,
   musicListQuery,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -162,6 +163,13 @@ describe('MusicRepository', () => {
 
   afterAll(database.close)
 
+  /** The guest who sings on a track of Kid A, found by name since no listing of album artists holds them. */
+  const guestOf = (): number =>
+    database
+      .get()
+      .db.prepare<[string], { id: number }>('SELECT id FROM artists WHERE name = ?')
+      .get('Guest Singer')?.id ?? 0
+
   it('lists a library’s albums with their credits, counts and lengths, by title', () => {
     const albums = repository().listAlbums({ libraryId: state.library, ...LIST })
     expect(
@@ -214,17 +222,120 @@ describe('MusicRepository', () => {
     expect(titles({ sort: MUSIC_SORTS.title, search: 'kid' })).toEqual(['Kid A'])
   })
 
-  it('lists the artists credited in the library, with how many of its albums and tracks are theirs', () => {
-    expect(
+  it('dates each album by its newest file on disk, sorts albums and tracks by it, and keeps undated albums last', () => {
+    const { db } = database.get()
+    const touch = db.prepare('UPDATE media SET mtime_ms = ? WHERE id = ?')
+    const mtimes = [
+      ['/music/Radiohead/OK Computer/01 Airbag.flac', Date.parse('2026-03-01T00:00:00Z')],
+      ['/music/Radiohead/OK Computer/02 Paranoid Android.flac', Date.parse('2026-05-01T00:00:00Z')],
+      ['/music/Radiohead/Kid A/CD 01/01 Everything.flac', Date.parse('2026-04-01T00:00:00Z')],
+      ['/music/Radiohead/Kid A/CD 02/01 Guest.flac', Date.parse('2026-02-01T00:00:00Z')],
+      ['/music/Unknown Band/Demo Tape/take 1.flac', Date.parse('2026-01-01T00:00:00Z')],
+    ] as const
+    mtimes.forEach(([path, mtime]) => touch.run(mtime, state.ids.get(path) ?? 0))
+    type ListedProps = { order?: typeof SORT_DIRECTIONS.ascending }
+    const albums = ({ order }: ListedProps = {}) =>
+      repository().listAlbums({
+        libraryId: state.library,
+        ...LIST,
+        sort: MUSIC_SORTS.modified,
+        order,
+      })
+    expect(albums().map(({ title, modifiedAt }) => ({ title, modifiedAt }))).toEqual([
+      { title: 'OK Computer', modifiedAt: '2026-05-01T00:00:00.000Z' },
+      { title: 'Kid A', modifiedAt: '2026-04-01T00:00:00.000Z' },
+      { title: 'Demo Tape', modifiedAt: '2026-01-01T00:00:00.000Z' },
+    ])
+    expect(albums({ order: SORT_DIRECTIONS.ascending }).map(({ title }) => title)).toEqual([
+      'Demo Tape',
+      'Kid A',
+      'OK Computer',
+    ])
+    const tracks = ({ order }: ListedProps = {}) =>
       repository()
-        .listArtists({ libraryId: state.library, ...LIST })
-        .map(({ name, albumCount, trackCount }) => ({ name, albumCount, trackCount })),
-    ).toEqual([
-      { name: 'Guest Singer', albumCount: 0, trackCount: 1 },
+        .listTracks({ libraryId: state.library, ...LIST, sort: MUSIC_SORTS.modified, order })
+        .tracks.map(({ id }) => id)
+    const newestFirst = [1, 2, 0, 3, 4].map((at) => state.ids.get(mtimes[at]?.[0] ?? '') ?? 0)
+    expect(tracks()).toEqual(newestFirst)
+    expect(tracks({ order: SORT_DIRECTIONS.ascending })).toEqual(newestFirst.toReversed())
+    const queued = repository().listTracks({
+      libraryId: state.library,
+      ...LIST,
+      sort: MUSIC_SORTS.modified,
+      byAlbum: true,
+    })
+    expect([...new Set(queued.tracks.map(({ albumId }) => albumId))]).toEqual(
+      albums().map(({ id }) => id),
+    )
+    // An album with no file left on disk has no date, and lists after every dated one.
+    const empty = db
+      .prepare<[number], { id: number }>(
+        `INSERT INTO albums (library_id, album_key, title, sort_title, added_at)
+         VALUES (?, 'empty', 'Empty', 'Empty', '2026-01-01') RETURNING id`,
+      )
+      .get(state.library)
+    const undated = albums().find(({ title }) => title === 'Empty')
+    expect(undated).toBeDefined()
+    expect(undated).not.toHaveProperty('modifiedAt')
+    expect(albums().at(-1)?.title).toBe('Empty')
+    expect(albums({ order: SORT_DIRECTIONS.ascending }).at(-1)?.title).toBe('Empty')
+    db.prepare('DELETE FROM albums WHERE id = ?').run(empty?.id ?? 0)
+  })
+
+  it('lists the album artists of the library, with how many of its albums are theirs and the tracks on them', () => {
+    const counted = (search = '') =>
+      repository()
+        .listArtists({ libraryId: state.library, ...LIST, search })
+        .map(({ name, albumCount, trackCount }) => ({ name, albumCount, trackCount }))
+    // The guest sings on a track of Kid A but is no album's artist, so is not listed.
+    expect(counted()).toEqual([
       { name: 'Radiohead', albumCount: 2, trackCount: 4 },
       // Filed by its folder, the folder above is its album's artist.
       { name: 'Unknown Band', albumCount: 1, trackCount: 1 },
     ])
+    expect(repository().countArtists(state.library)).toBe(2)
+    expect(repository().countAlbums(state.library)).toBe(3)
+    expect(counted('radio')).toEqual([{ name: 'Radiohead', albumCount: 2, trackCount: 4 }])
+    expect(counted('guest')).toEqual([])
+    // Amnesiac is in the other library, so Radiohead counts one album there.
+    expect(
+      repository()
+        .listArtists({ libraryId: state.other, ...LIST })
+        .map(({ name, albumCount, trackCount }) => ({ name, albumCount, trackCount })),
+    ).toEqual([{ name: 'Radiohead', albumCount: 1, trackCount: 1 }])
+  })
+
+  it('counts an album artist’s tracks as their albums show them, one copy of a track held twice', () => {
+    const copy = '/music/Radiohead/OK Computer/01 Airbag (copy).flac'
+    addFile({
+      path: copy,
+      tags: {
+        album: 'OK Computer',
+        albumArtists: ['Radiohead'],
+        artists: ['Radiohead'],
+        releaseMbid: 'rel-ok',
+        year: 1997,
+        title: 'Airbag',
+        trackNumber: 1,
+      },
+    })
+    const radiohead = repository()
+      .listArtists({ libraryId: state.library, ...LIST })
+      .find(({ name }) => name === 'Radiohead')
+    expect(radiohead).toMatchObject({ albumCount: 2, trackCount: 4 })
+    const page = repository().artist({
+      id: radiohead?.id ?? 0,
+      account: TEST_ACCOUNTS.a,
+      seesLibrary: () => true,
+    })
+    expect(page?.artist).toMatchObject({ albumCount: 3, trackCount: 5 })
+    expect(
+      repository()
+        .artists({ ids: [radiohead?.id ?? 0], hidden: [] })
+        .get(radiohead?.id ?? 0),
+    ).toMatchObject({ albumCount: 3, trackCount: 5 })
+    new MediaIndex(database.get()).remove([state.ids.get(copy) ?? 0])
+    repository().prune()
   })
 
   it('stores one capability-addressed photo lookup for each album artist with a MusicBrainz id', () => {
@@ -310,7 +421,7 @@ describe('MusicRepository', () => {
 
   it('gives an album’s page its tracks in disc order, its discs, label and genres', () => {
     const [, kidA, okComputer] = repository().listAlbums({ libraryId: state.library, ...LIST })
-    const details = repository().album(okComputer?.id ?? 0)
+    const details = repository().album({ id: okComputer?.id ?? 0 })
     expect(details).toMatchObject({
       label: 'Parlophone',
       genres: ['Alternative Rock'],
@@ -321,36 +432,60 @@ describe('MusicRepository', () => {
       '1 Airbag',
       '2 Paranoid Android',
     ])
-    const twoDiscs = repository().album(kidA?.id ?? 0)
+    const twoDiscs = repository().album({ id: kidA?.id ?? 0 })
     expect(twoDiscs?.discCount).toBe(2)
     expect(twoDiscs?.tracks.map(({ artists }) => artists.map(({ name }) => name))).toEqual([
       ['Radiohead'],
       ['Radiohead', 'Guest Singer'],
     ])
-    expect(repository().album(999)).toBeNull()
+    expect(repository().album({ id: 999 })).toBeNull()
   })
 
   it('gives an artist’s page their albums across libraries, and what they appear on, hiding libraries the caller may not see', () => {
     const radiohead = repository()
       .listArtists({ libraryId: state.library, ...LIST })
       .find(({ name }) => name === 'Radiohead')
-    const page = repository().artist({ id: radiohead?.id ?? 0, seesLibrary: () => true })
+    const page = repository().artist({
+      id: radiohead?.id ?? 0,
+      account: TEST_ACCOUNTS.a,
+      seesLibrary: () => true,
+    })
     expect(page?.albums.map(({ title }) => title)).toEqual(['OK Computer', 'Kid A', 'Amnesiac'])
     expect(page?.appearsOn).toEqual([])
     expect(page?.artist).toMatchObject({ name: 'Radiohead', albumCount: 3, trackCount: 5 })
     const hidden = repository().artist({
       id: radiohead?.id ?? 0,
+      account: TEST_ACCOUNTS.a,
       seesLibrary: (libraryId) => libraryId !== state.other,
     })
     expect(hidden?.albums.map(({ title }) => title)).toEqual(['OK Computer', 'Kid A'])
     expect(hidden?.artist.albumCount).toBe(2)
-    const guest = repository()
-      .listArtists({ libraryId: state.library, ...LIST })
-      .find(({ name }) => name === 'Guest Singer')
-    const guestPage = repository().artist({ id: guest?.id ?? 0, seesLibrary: () => true })
+    const guest = guestOf()
+    const guestPage = repository().artist({
+      id: guest,
+      account: TEST_ACCOUNTS.a,
+      seesLibrary: () => true,
+    })
     expect(guestPage?.albums).toEqual([])
     expect(guestPage?.appearsOn.map(({ title }) => title)).toEqual(['Kid A'])
-    expect(repository().artist({ id: 999, seesLibrary: () => true })).toBeNull()
+    // Their page and a favourite's card count the track they sing on, and no album.
+    expect(guestPage?.artist).toMatchObject({ albumCount: 0, trackCount: 1 })
+    expect(
+      repository()
+        .artists({ ids: [guest], hidden: [] })
+        .get(guest),
+    ).toMatchObject({
+      albumCount: 0,
+      trackCount: 1,
+    })
+    expect(
+      repository()
+        .artists({ ids: [radiohead?.id ?? 0], hidden: [state.other] })
+        .get(radiohead?.id ?? 0),
+    ).toMatchObject({ albumCount: 2, trackCount: 4 })
+    expect(
+      repository().artist({ id: 999, account: TEST_ACCOUNTS.a, seesLibrary: () => true }),
+    ).toBeNull()
   })
 
   it('finds an album’s cover by its current version and no other, in the file that embeds it', () => {
@@ -410,15 +545,19 @@ describe('MusicRepository', () => {
       path: '/music/Unknown Band/Demo Tape/take 3.flac',
       tags: { artists: ['Unknown Band'], artistMbids: ['band-1'] },
     })
-    const artists = repository().listArtists({ libraryId: state.library, ...LIST })
-    expect(artists.filter(({ name }) => name === 'Unknown Band')).toMatchObject([
-      { mbid: 'band-1' },
-    ])
+    // Credited only on the track by now, the band is no album's artist, so it is read from the table.
+    expect(
+      database
+        .get()
+        .db.prepare<[string], { mbid: string | null }>('SELECT mbid FROM artists WHERE name = ?')
+        .all('Unknown Band'),
+    ).toEqual([{ mbid: 'band-1' }])
   })
 
   it('keeps a file in its folder album when its tags change, and refreshes track credits', () => {
     const path = '/music/Radiohead/Kid A/CD 02/01 Guest.flac'
     const id = state.ids.get(path) ?? 0
+    const guest = guestOf()
     repository().record({
       mediaId: id,
       libraryId: state.library,
@@ -434,9 +573,12 @@ describe('MusicRepository', () => {
     expect(titles).toContain('Kid A')
     expect(
       repository()
-        .listArtists({ libraryId: state.library, ...LIST })
-        .map(({ name }) => name),
-    ).not.toContain('Guest Singer')
+        .artists({ ids: [guest], hidden: [] })
+        .get(guest),
+    ).toMatchObject({
+      albumCount: 0,
+      trackCount: 0,
+    })
   })
 
   it('sorts precise dates, keeps unknown dates last in either direction, and queues whole albums in grid order', () => {
@@ -529,6 +671,59 @@ describe('MusicRepository', () => {
         .listAlbums(options)
         .map(({ id }) => id),
     )
+  })
+
+  it("answers each album's plays for the calling account alone, wherever albums are listed", () => {
+    // The plays the test above made: account a played Airbag, account b Everything in Its Right Place.
+    type PlaysOfProps = { account: string }
+    const playsOf = ({ account }: PlaysOfProps) =>
+      repository()
+        .listAlbums({ libraryId: state.library, ...LIST, account })
+        .map(({ title, playedAt, plays }) => ({ title, playedAt, plays }))
+    expect(playsOf({ account: TEST_ACCOUNTS.a })).toEqual([
+      { title: 'Demo Tape', playedAt: null, plays: 0 },
+      { title: 'Kid A', playedAt: null, plays: 0 },
+      { title: 'OK Computer', playedAt: '2026-10-01', plays: 1 },
+    ])
+    expect(playsOf({ account: TEST_ACCOUNTS.b })).toEqual([
+      { title: 'Demo Tape', playedAt: null, plays: 0 },
+      { title: 'Kid A', playedAt: '2026-10-02', plays: 1 },
+      { title: 'OK Computer', playedAt: null, plays: 0 },
+    ])
+    const okComputer = repository()
+      .listAlbums({ libraryId: state.library, ...LIST })
+      .find(({ title }) => title === 'OK Computer')
+    const id = okComputer?.id ?? 0
+    expect(
+      repository()
+        .albums({ ids: [id], account: TEST_ACCOUNTS.b })
+        .get(id)?.plays,
+    ).toBe(0)
+    expect(repository().albumsInOrder({ ids: [id], account: TEST_ACCOUNTS.a })[0]?.plays).toBe(1)
+    expect(repository().album({ id, account: TEST_ACCOUNTS.a })?.album.playedAt).toBe('2026-10-01')
+    expect(repository().album({ id, account: TEST_ACCOUNTS.b })?.album).toMatchObject({
+      playedAt: null,
+      plays: 0,
+    })
+    // With no account to bind, the album answers no plays at all.
+    const unbound = repository().album({ id })?.album
+    expect(unbound).not.toHaveProperty('plays')
+    expect(unbound).not.toHaveProperty('playedAt')
+    const radiohead = okComputer?.artists[0]?.id ?? 0
+    type ArtistPlaysProps = { account: string }
+    const artistPlays = ({ account }: ArtistPlaysProps) =>
+      repository()
+        .artist({ id: radiohead, account, seesLibrary: () => true })
+        ?.albums.map(({ title, plays }) => ({ title, plays }))
+    expect(artistPlays({ account: TEST_ACCOUNTS.b })).toEqual([
+      { title: 'OK Computer', plays: 0 },
+      { title: 'Kid A', plays: 1 },
+      { title: 'Amnesiac', plays: 0 },
+    ])
+    expect(artistPlays({ account: TEST_ACCOUNTS.a })?.[0]).toEqual({
+      title: 'OK Computer',
+      plays: 1,
+    })
   })
 
   it('orders a random listing of tracks one track at a time, stable across its pages', () => {

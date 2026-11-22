@@ -4,10 +4,13 @@ import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import {
   APPEARANCES,
   type Appearance,
+  COVER_SIZES,
+  type CoverSize,
   RECENT_SORTS,
   type RecentSort,
   WREN_PREFS_KEY,
   isAppearance,
+  isCoverSize,
   isRecentSort,
 } from '@raven/wren'
 import { create } from 'zustand'
@@ -36,6 +39,8 @@ type WrenPrefsValues = {
   appearance: Appearance
   /** The order of Home's albums. */
   homeSort: RecentSort
+  /** How large Albums draws its covers. */
+  coverSize: CoverSize
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -46,7 +51,7 @@ type WrenPrefs = WrenPrefsValues & {
 /**
  * A fresh install: downloads at 256 kbps, the file itself on cellular as on Wi-Fi (only the
  * listener's own choice streams a transcode; nothing asks whether the device is at home), no
- * storage limit, and the system's appearance.
+ * storage limit, the system's appearance, and Albums' covers at their medium size.
  */
 export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   downloadKbps: AUDIO_BITRATES.standard,
@@ -54,6 +59,7 @@ export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   storageLimitGb: null,
   appearance: APPEARANCES.system,
   homeSort: RECENT_SORTS.added,
+  coverSize: COVER_SIZES.medium,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -71,6 +77,7 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
       : DEFAULT_WREN_PREFS.storageLimitGb,
     appearance: isAppearance(kept.appearance) ? kept.appearance : DEFAULT_WREN_PREFS.appearance,
     homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
+    coverSize: isCoverSize(kept.coverSize) ? kept.coverSize : DEFAULT_WREN_PREFS.coverSize,
   }
 }
 
@@ -100,13 +107,14 @@ export const useWrenPrefs = create<WrenPrefs>()(
       skipHydration: true,
       version: WREN_PREFS_VERSION,
       migrate: migratedPrefsOf,
-      partialize: ({ downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort }) => ({
+      partialize: ({
         downloadKbps,
         cellularKbps,
         storageLimitGb,
         appearance,
         homeSort,
-      }),
+        coverSize,
+      }) => ({ downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort, coverSize }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },
   ),

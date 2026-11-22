@@ -9,6 +9,7 @@ import {
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
   RECENT_SORTS,
+  recentDateLineOf,
 } from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
@@ -61,7 +62,12 @@ describe('Home', () => {
 
   it("greets the listener and shows every music library's newest albums, and opens one", async () => {
     const router = await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
-    const tile = await screen.findByRole('button', { name: `${OK_COMPUTER.title}, Radiohead` })
+    const tile = await screen.findByRole('button', {
+      name: KIT_COPY.labelled({
+        label: `${OK_COMPUTER.title}, Radiohead`,
+        value: recentDateLineOf({ album: OK_COMPUTER, sort: RECENT_SORTS.added }),
+      }),
+    })
     expect(screen.getByRole('header', { name: LIBRARY_PAGE_COPY.recent })).toBeTruthy()
     expect(
       screen.getAllByRole('header').some(({ props }) => GREETINGS.includes(props.children)),
@@ -87,6 +93,9 @@ describe('Home', () => {
       limit: 12,
     })
     expect(useWrenPrefs.getState().homeSort).toBe(RECENT_SORTS.release)
+    expect(
+      await screen.findByText(recentDateLineOf({ album: OK_COMPUTER, sort: RECENT_SORTS.release })),
+    ).toBeTruthy()
   })
 
   it('opens Albums from See all', async () => {

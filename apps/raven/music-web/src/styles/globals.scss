@@ -126,6 +126,10 @@
   --line-meta: 1.125rem;
   --font-size-tile-title: 0.875rem;
   --line-tile-title: 1.1875rem;
+  --font-size-tile-album: 0.875rem;
+  --line-tile-album: 1.1875rem;
+  --font-size-tile-artist: 0.875rem;
+  --line-tile-artist: 1.1875rem;
   --font-size-time: 0.875rem;
   --line-time: 1.125rem;
   --font-size-small: 0.75rem;
@@ -191,6 +195,10 @@
     var(--font-body);
   --type-tile-title: var(--font-weight-semibold)
     var(--font-size-tile-title) / var(--line-tile-title) var(--font-body);
+  --type-tile-album: var(--font-weight-regular) var(--font-size-tile-album) / var(--line-tile-album)
+    var(--font-display);
+  --type-tile-artist: var(--font-weight-semibold)
+    var(--font-size-tile-artist) / var(--line-tile-artist) var(--font-body);
   --type-time: var(--font-weight-regular) var(--font-size-time) / var(--line-time) var(--font-body);
   --type-small: var(--font-weight-regular) var(--font-size-small) / var(--line-small)
     var(--font-body);
@@ -273,10 +281,19 @@
   --size-row-art: 2.75rem;
   --size-track-number: 1.5rem;
   --size-avatar: 3rem;
+  // An artist's card in Artists' grid: the least width a column is given, and its photo.
+  --size-artist-card: 16rem;
+  --size-artist-photo: 5rem;
   --size-mini-art: 2.5rem;
   --size-sheet-art: 3.25rem;
   // An album tile on a shelf that scrolls sideways: Home's Recently added and Search's albums.
   --size-shelf-tile: 9.25rem;
+  // Albums' cover sizes, the least width of a tile, smallest first.
+  --size-cover-extra-small: 6rem;
+  --size-cover-small: 8rem;
+  --size-cover-medium: 10rem;
+  --size-cover-large: 14rem;
+  --size-cover-extra-large: 18rem;
   --size-float-inset: 0.625rem;
   --size-tab-pill-width: 3.25rem;
   --size-tab-pill-height: 1.875rem;

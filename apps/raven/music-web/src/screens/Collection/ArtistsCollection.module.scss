@@ -1,36 +1,27 @@
 @use '../../styles/mixins';
 
-// The rail lies over the list's own area, at its end.
+// The rail lies over the grid's own area, at its end.
 .listing {
   display: grid;
   grid-template-areas: 'list';
   min-inline-size: 0;
 }
 
-.list {
+.grid {
   display: grid;
   grid-area: list;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--size-artist-card), 100%), 1fr));
   align-content: start;
+  // The apps' grid gap across a row, and their space between rows of cards.
+  gap: var(--space-3) var(--size-row-gap);
   min-inline-size: 0;
 }
 
-// Every row is the same height, so a row off screen is skipped until it is scrolled to.
-.row {
-  position: relative;
+// A card off screen is skipped until it is scrolled to.
+.cell {
   display: grid;
-  padding-block-end: var(--size-hairline);
   content-visibility: auto;
-  contain-intrinsic-block-size: auto calc(var(--size-artist-row) + var(--size-hairline));
-
-  // The divider starts under the name, past the avatar.
-  &::after {
-    content: '';
-    position: absolute;
-    inset-block-end: 0;
-    inset-inline: calc(var(--size-avatar) + var(--space-4)) 0;
-    block-size: var(--size-hairline);
-    background: var(--color-line);
-  }
+  contain-intrinsic-block-size: auto calc(var(--size-artist-photo) + 2 * var(--space-2));
 }
 
 /*

@@ -195,8 +195,14 @@ export class Mixes {
   /** The albums the account played last, and those added last, each in a library it sees. */
   recent(scope: MixesRecentProps): RecentAlbums {
     return {
-      played: this.music.albumsInOrder(this.ids({ sql: PLAYED_ALBUMS, scope })),
-      added: this.music.albumsInOrder(this.ids({ sql: ADDED_ALBUMS, scope })),
+      played: this.music.albumsInOrder({
+        ids: this.ids({ sql: PLAYED_ALBUMS, scope }),
+        account: scope.account,
+      }),
+      added: this.music.albumsInOrder({
+        ids: this.ids({ sql: ADDED_ALBUMS, scope }),
+        account: scope.account,
+      }),
     }
   }
 }

@@ -49,7 +49,13 @@ type QueryKeysArtistsProps = { libraryId: number; search: string }
 
 type QueryKeysRecentAlbumsProps = { libraryId: number; limit: number; sort: MusicSort }
 
-type QueryKeysSongsProps = { libraryIds: readonly number[]; search: string; sort: string }
+type QueryKeysSongsProps = {
+  libraryIds: readonly number[]
+  search: string
+  sort: string
+  /** A random listing's seed, so a new deal reads anew. */
+  seed?: number
+}
 
 type QueryKeysSongCountProps = { libraryId: number; search: string }
 
@@ -237,10 +243,10 @@ export const queryKeys = {
   /** Every album's and artist's page: one prefix a match or a scan reads again. */
   music: ['music'],
   /** The tracks of several music libraries, one after another: under the music, since a scan of any of them reads it again. */
-  songs: ({ libraryIds, search, sort }: QueryKeysSongsProps) => [
+  songs: ({ libraryIds, search, sort, seed }: QueryKeysSongsProps) => [
     'music',
     'songs',
-    { libraryIds, search, sort },
+    { libraryIds, search, sort, seed },
   ],
   /** How many tracks a music library holds that `search` finds, under the music like the songs. */
   songCount: ({ libraryId, search }: QueryKeysSongCountProps) => [

@@ -30,16 +30,13 @@ BUILD_JOBS = {
 }
 # Each job that continues a native build in the same run, and the job it waits for.
 FOLLOW_ON_JOBS = {"windows-app": "windows-native", "desktop-app": "desktop-native"}
-# Each end to end job, the build job it reads from or falls back on, and its group.
+# Each end to end job and its group.
 E2E_JOBS = {
-    **{
-        f"e2e-{device}": (f"build-{device}", group)
-        for device, (_, group, has_flows) in DEVICES.items()
-        if has_flows
-    },
-    "desktop-e2e": ("desktop-native", "desktop"),
+    **{f"e2e-{device}": group for device, (_, group, has_flows) in DEVICES.items() if has_flows},
+    "desktop-e2e": "desktop",
 }
-# The native jobs a pull request and main both list: the selection, the builds and the tests.
+# The native jobs a pull request lists: the selection, the builds and the tests. Main lists the
+# selection alone.
 NATIVE_JOBS = ["select", *BUILD_JOBS, *FOLLOW_ON_JOBS, "desktop-test"]
 # Each native job that is more than a build of a device, and the action that holds its steps.
 JOB_ACTIONS = {
@@ -151,13 +148,11 @@ def test_a_pull_request_holds_no_end_to_end_job_not_even_a_skipped_one():
     assert "env.APP_FLOWS" not in (ACTIONS / "raven-app-build/action.yml").read_text()
 
 
-@pytest.mark.parametrize("job_name", NATIVE_JOBS)
-def test_main_lists_the_pull_request_s_native_jobs_unchanged(job_name: str):
-    pull_request = load_workflow(PULL_REQUEST)["jobs"][job_name]
-    main = load_workflow(MAIN)["jobs"][job_name]
+def test_main_lists_the_pull_request_s_selection_unchanged():
+    pull_request = load_workflow(PULL_REQUEST)["jobs"]["select"]
+    main = load_workflow(MAIN)["jobs"]["select"]
     # A pull request's selection waits for its checks; main has none to wait for.
-    waits = {"needs": "checks"} if job_name == "select" else {}
-    assert pull_request == {**main, **waits}
+    assert pull_request == {**main, "needs": "checks"}
 
 
 def test_supabase_reserves_its_ports_before_any_network_activity():
@@ -178,15 +173,12 @@ def test_supabase_reserves_its_ports_before_any_network_activity():
 
 def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
     workflow = load_workflow(MAIN)
-    assert workflow["on"] == {
-        "push": {"branches": ["main"]},
-        "workflow_dispatch": "",
-    }
+    assert workflow["on"] == {"push": {"branches": ["main"]}}
     assert "concurrency" not in workflow
     assert workflow["permissions"]["actions"] == "write"
-    assert set(workflow["jobs"]) == {*NATIVE_JOBS, *E2E_JOBS, "web-e2e", "screen-tests"}
+    assert set(workflow["jobs"]) == {"select", *E2E_JOBS, "web-e2e", "screen-tests"}
     assert all("uses" not in job for job in workflow["jobs"].values())
-    # No base: the selection finds main's last green run, or selects every group by hand.
+    # No base: the selection finds main's last green run.
     assert workflow["env"]["NATIVE_BUILD_SHA"] == "${{ github.sha }}"
     assert workflow["env"]["NATIVE_SELECT_BASE"] == ""
     assert "needs" not in workflow["jobs"]["select"]
@@ -256,9 +248,8 @@ def test_no_workflow_sets_what_the_selection_script_reads(name: str):
     assert "NATIVE_BASE" not in load_workflow(name).get("env", {})
 
 
-@pytest.mark.parametrize("name", [PULL_REQUEST, MAIN])
-def test_native_jobs_have_no_matrix(name: str):
-    jobs = load_workflow(name)["jobs"]
+def test_native_jobs_have_no_matrix():
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
     assert all("strategy" not in jobs[job_name] for job_name in NATIVE_JOBS)
 
 
@@ -325,30 +316,30 @@ def test_the_lookup_never_fails_the_run_and_reads_the_pull_request_s_checks(even
 
 @pytest.mark.parametrize(("job_name", "group"), sorted(BUILD_JOBS.items()))
 def test_build_jobs_run_when_the_plan_says_to_build_their_group(job_name: str, group: str):
-    job = load_workflow(MAIN)["jobs"][job_name]
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
     assert job["needs"] == "select"
     assert job["if"] == f"needs.select.outputs.{group}_build == 'true'"
 
 
-@pytest.mark.parametrize(("job_name", "handoff"), sorted(E2E_JOBS.items()))
-def test_end_to_end_jobs_wait_only_for_their_own_build(job_name: str, handoff: tuple[str, str]):
-    build_job, group = handoff
+@pytest.mark.parametrize(("job_name", "group"), sorted(E2E_JOBS.items()))
+def test_end_to_end_jobs_wait_only_for_the_selection(job_name: str, group: str):
     job = load_workflow(MAIN)["jobs"][job_name]
-    assert job["needs"] == ["select", build_job]
-    # A build skipped because the pull request already made it must not skip its flows.
-    assert job["if"] == (
-        f"${{{{ !cancelled() && needs.select.outputs.{group}_selected == 'true'"
-        f' && contains(fromJSON(\'["success", "skipped"]\'), needs.{build_job}.result) }}}}'
-    )
+    assert job["needs"] == "select"
+    assert job["if"] == f"needs.select.outputs.{group}_selected == 'true'"
+    # Main builds nothing, so a group the plan says to build has no build to test.
+    assert job["env"]["BUILD_MISSING"] == f"${{{{ needs.select.outputs.{group}_build }}}}"
+    guard = job["steps"][0]
+    assert guard["if"] == "env.BUILD_MISSING == 'true'"
+    assert "exit 1" in guard["run"]
     # The flows are the pushed commit's, whichever commit the build is of.
-    assert job["steps"][0]["with"]["ref"] == "${{ github.sha }}"
+    assert job["steps"][1]["with"]["ref"] == "${{ github.sha }}"
     # Main cancels nothing: every push is tested to the end.
     assert all(step.get("name") != CANCEL_STEP["name"] for step in job["steps"])
 
 
 @pytest.mark.parametrize(("job_name", "native_job"), sorted(FOLLOW_ON_JOBS.items()))
 def test_follow_on_jobs_wait_for_their_native_build(job_name: str, native_job: str):
-    job = load_workflow(MAIN)["jobs"][job_name]
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
     assert job["needs"] == native_job
     # A skipped native build skips its follow-ons; a gate of their own would be a second truth.
     assert "if" not in job
@@ -364,9 +355,9 @@ def test_every_native_job_cancels_a_failing_pull_request_run(job_name: str):
 
 
 @pytest.mark.parametrize(("job_name", "action"), sorted(JOB_ACTIONS.items()))
-def test_each_native_job_s_steps_live_in_an_action_both_workflows_run(job_name: str, action: str):
-    job = load_workflow(MAIN)["jobs"][job_name]
-    # A checkout, the action, and the cancel: nothing else to keep the same in two workflows.
+def test_each_native_job_s_steps_live_in_an_action(job_name: str, action: str):
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
+    # A checkout, the action, and the cancel.
     assert [step.get("uses") for step in job["steps"]] == [
         "actions/checkout@v7",
         f"./.github/actions/{action}",
@@ -382,7 +373,7 @@ def runs_of(steps: list[dict]) -> str:
 @pytest.mark.parametrize(("device", "facts"), sorted(DEVICES.items()))
 def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[str, str, bool]):
     name, _, has_flows = facts
-    jobs = load_workflow(MAIN)["jobs"]
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
     build = jobs[f"build-{device}"]
     assert build["name"] == f"🏗️ Build {name}"
     # Every device builds by the same steps; only its job's `APP_*` variables differ.
@@ -399,7 +390,7 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
     )
     assert ":e2e" not in build["env"]["APP_BUILD"]
     assert "APP_FLOWS" not in build["env"]
-    assert (f"e2e-{device}" in jobs) == has_flows
+    assert (f"e2e-{device}" in load_workflow(MAIN)["jobs"]) == has_flows
 
 
 @pytest.mark.parametrize(
@@ -408,7 +399,7 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
 )
 def test_each_device_s_flows_run_on_its_own_build_in_a_job_named_for_it(device: str, name: str):
     jobs = load_workflow(MAIN)["jobs"]
-    job, build = jobs[f"e2e-{device}"], jobs[f"build-{device}"]
+    job, build = jobs[f"e2e-{device}"], load_workflow(PULL_REQUEST)["jobs"][f"build-{device}"]
     assert job["name"] == f"🎬 E2E {name}"
     # A device's two jobs agree on the build that passes between them.
     assert all(job["env"][setting] == build["env"][setting] for setting in HANDOFF_SETTINGS)
@@ -443,7 +434,7 @@ def test_each_device_s_flows_run_on_its_own_build_in_a_job_named_for_it(device: 
 def test_the_mac_s_build_jobs_build_the_named_commit_and_pass_the_handoff(
     job_name: str, action: str
 ):
-    job = load_workflow(MAIN)["jobs"][job_name]
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
     assert job["runs-on"] == "macos-26"
     assert job["steps"][0]["with"] == {"ref": NATIVE_SHA}
     assert action_step(job, action)["with"] == {"sha": NATIVE_SHA}
@@ -460,8 +451,8 @@ def test_the_mac_s_build_jobs_build_the_named_commit_and_pass_the_handoff(
 
 
 def test_the_mac_s_tests_run_with_its_build_and_its_suite_waits_for_main():
-    jobs = load_workflow(MAIN)["jobs"]
-    test, e2e = jobs["desktop-test"], jobs["desktop-e2e"]
+    test = load_workflow(PULL_REQUEST)["jobs"]["desktop-test"]
+    e2e = load_workflow(MAIN)["jobs"]["desktop-e2e"]
     assert (test["name"], e2e["name"]) == ("🧪 Test Mac player", "🎬 E2E Mac")
     # The tests run wherever this run built the native pieces, and only there.
     assert test["needs"] == ["select", "desktop-native"]
@@ -504,7 +495,7 @@ def test_local_desktop_e2e_downloads_main_native_handoffs():
 
 
 def test_main_warms_the_compile_caches_of_every_app_a_pull_request_builds():
-    jobs = load_workflow(MAIN)["jobs"]
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
     built = {
         (jobs[f"build-{device}"]["env"]["APP_SETUP"], jobs[f"build-{device}"]["env"]["APP_PROJECT"])
         for device in DEVICES
@@ -569,7 +560,7 @@ def test_a_release_builds_the_native_pieces_as_the_checks_do():
 def test_main_finds_a_group_only_with_every_build_its_flows_read():
     jobs = load_workflow(MAIN)["jobs"]
     expected: dict[str, set[str]] = {group: set() for group in GROUPS}
-    for job_name, (_, group) in E2E_JOBS.items():
+    for job_name, group in E2E_JOBS.items():
         env = jobs[job_name].get("env", {})
         if "APP_ARTIFACT" not in env:
             continue

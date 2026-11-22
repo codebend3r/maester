@@ -13,9 +13,14 @@
 
 .title {
   color: var(--color-text);
-  font: var(--type-tile-title);
+  font: var(--type-tile-album);
 }
 
 .subtitle {
+  color: var(--color-text);
+  font: var(--type-tile-artist);
+}
+
+.detail {
   @include mixins.meta-line;
 }

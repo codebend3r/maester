@@ -4,7 +4,7 @@ description: >-
   Windows native job uploaded, and uploads the unsigned installer as an artifact named for the
   commit. The caller checks out that commit first.
 
-# Shared by the 🏗️ Build Windows app job of pull-request-checks.yml and of native-checks.yml.
+# The 🏗️ Build Windows app job of pull-request-checks.yml.
 # Forge bundles the addon and libmpv (stage:mpv), so the job waits for the Windows native build.
 inputs:
   sha:

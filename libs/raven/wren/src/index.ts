@@ -48,19 +48,33 @@ export {
 } from '@/library/listState'
 export { albumsByTitle, artistsByName } from '@/library/order'
 export { PLAYLIST_STATES, type PlaylistState, playlistsStateOf } from '@/library/playlistStates'
-export { LIBRARY_SEGMENTS, type LibrarySegment } from '@/library/segments'
+export { FINISHED_SHOWN, libraryValuesOf } from '@/library/libraryCounts'
 export {
-  LIST_SORTS,
-  LIST_SORT_LABELS,
-  LIST_SORT_ORDER,
-  type ListSort,
+  albumIdsOf,
+  inLibraryOrder,
+  listedTracksOf,
+  recentlyFinished,
+  unmatchedAlbumsOf,
+} from '@/library/listedTracks'
+export {
+  LIBRARY_LABELS,
+  LIBRARY_ORDER,
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  SHARED_ORDER,
+  type SharedSegment,
+} from '@/library/segments'
+export {
+  FIRST_LIST_ORDER,
+  type ListOrder,
   RECENT_SERVER_SORTS,
-  SERVER_SORTS,
+  listOrderOf,
   matchingAlbums,
   matchingArtists,
   recentAlbums,
   sortedAlbums,
 } from '@/library/sorts'
+export { recentDateLineOf } from '@/library/recentDates'
 export { nextPageOf, tracksOfPages } from '@/nextPage'
 export {
   LYRIC_TONES,
@@ -95,6 +109,9 @@ export {
 export {
   APPEARANCES,
   type Appearance,
+  COVER_SIZES,
+  type CoverSize,
+  isCoverSize,
   RECENT_SORTS,
   type RecentSort,
   WREN_PREFS_KEY,

@@ -14,23 +14,17 @@ import { WREN_PAGES, pageHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { ArtistRow } from '@/ui/ArtistRow'
+import { ARTIST_CARD_HEIGHT, ArtistCard } from '@/ui/ArtistCard'
+import { GRID_GAP, useGrid } from '@/ui/TileGrid'
 
-// Every row is the same height, so the rail jumps by arithmetic rather than by measuring.
-const ROW_HEIGHT = SIZE.artistRow + SIZE.hairline
+// Every row of cards is the same height, gap included, so the rail jumps by arithmetic.
+const ROW_HEIGHT = ARTIST_CARD_HEIGHT + SPACE.s3
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   page: { backgroundColor: colors.bg, flex: 1 },
   header: { paddingBottom: SPACE.s2 },
-  row: { height: ROW_HEIGHT, justifyContent: 'center' },
-  divider: {
-    backgroundColor: colors.line,
-    bottom: 0,
-    height: SIZE.hairline,
-    left: SIZE.avatar + SPACE.s4,
-    position: 'absolute',
-    right: 0,
-  },
+  row: { height: ROW_HEIGHT },
+  columns: { gap: GRID_GAP },
   rail: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -65,7 +59,10 @@ function IndexRail({ onLetter, top, bottom }: IndexRailProps) {
   )
 }
 
-/** Artists: every music library's, each once, by name, with an A to Z rail to jump the list. */
+/**
+ * Artists: every music library's, each once, by name, as a grid of cards like raven's Artists
+ * tab, with an A to Z rail to jump the grid to the row of the first card under a letter.
+ */
 export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   const styles = useStyles()
   const router = useRouter()
@@ -78,12 +75,14 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
   const [headerEnd, setHeaderEnd] = useState(0)
   const { artists, listing } = useAllArtists({ session, search: '' })
   const { artistPhotoOf } = useCovers(session)
+  const { columns, tileWidth, onLayout } = useGrid({ tile: SIZE.artistCard })
   const shown = matchingArtists({ artists, query: search.query })
   const count = listing.isRead ? plural({ n: shown.length, ...COUNTS_COPY.artists }) : null
   const jump = (letter: Letter) => {
     const at = firstAtLetter({ names: shown.map(({ sortName }) => sortName), letter })
     if (at === null) return
-    list.current?.scrollToOffset({ offset: headerEnd + at * ROW_HEIGHT, animated: false })
+    const row = Math.floor(at / columns)
+    list.current?.scrollToOffset({ offset: headerEnd + row * ROW_HEIGHT, animated: false })
   }
   return (
     <View style={styles.page}>
@@ -102,21 +101,26 @@ export function ArtistsCollection({ session, onBack }: CollectionPageProps) {
             />
           </View>
         }
+        // React Native refuses a row's style on a list of one column.
+        columnWrapperStyle={columns > 1 && styles.columns}
         contentContainerStyle={insets}
         data={shown}
+        key={columns}
         keyExtractor={(artist) => String(artist.id)}
         keyboardDismissMode="on-drag"
+        numColumns={columns}
+        onLayout={onLayout}
         ref={list}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <ArtistRow
+            <ArtistCard
               albumCount={item.albumCount}
               name={item.name}
               onPress={() => router.push(pageHref({ page: WREN_PAGES.artist, id: item.id }))}
               picture={artistPhotoOf(item)}
               trackCount={item.trackCount}
+              width={tileWidth}
             />
-            <View style={styles.divider} />
           </View>
         )}
         showsVerticalScrollIndicator={false}

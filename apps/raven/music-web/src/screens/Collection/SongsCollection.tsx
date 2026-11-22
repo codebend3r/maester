@@ -1,6 +1,13 @@
 import { artistNames, formatDuration, plural } from '@raven/core'
 import { playingIdOf, useAudioQueue } from '@raven/ui/headless'
-import { COUNTS_COPY, LIBRARY_PAGE_COPY, LIST_SORTS, type ListSort, SONG_LEADS } from '@raven/wren'
+import {
+  COUNTS_COPY,
+  FIRST_LIST_ORDER,
+  LIBRARY_PAGE_COPY,
+  type ListOrder,
+  listOrderOf,
+  SONG_LEADS,
+} from '@raven/wren'
 import { useState } from 'react'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
 import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
@@ -8,6 +15,7 @@ import { TrackRow } from '@/components/TrackRow/TrackRow'
 import { useAllSongs, useSongCount } from '@/music/listings'
 import { useCovers } from '@/music/useCovers'
 import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
+import { SortButton } from '@/screens/Collection/SortButton'
 import { useCollectionSearch } from '@/screens/Collection/useCollectionSearch'
 import { ListEnd } from '@/ui/ListEnd/ListEnd'
 import { Page } from '@/shell/Page/Page'
@@ -24,18 +32,18 @@ export function SongsCollection() {
     placeholder: LIBRARY_PAGE_COPY.searchSongs,
     none: LIBRARY_PAGE_COPY.noSongs,
   })
-  const [sort, setSort] = useState<ListSort>(LIST_SORTS.title)
+  const [order, setOrder] = useState<ListOrder>(FIRST_LIST_ORDER)
   const n = useSongCount({ search: search.query })
   const playTracks = useAudioQueue((store) => store.playTracks)
   const playingId = useAudioQueue(playingIdOf)
-  const { tracks, listing, nextPage } = useAllSongs({ search: search.query, sort })
+  const { tracks, listing, nextPage } = useAllSongs({ search: search.query, order })
   return (
     <Page className={collectionStyles.songs}>
       <CollectionHeader
         count={n === null ? null : plural({ n, ...COUNTS_COPY.songs })}
         search={search.field}
-        sort={{ sort, onSort: setSort }}
         title={LIBRARY_PAGE_COPY.songs}
+        tools={<SortButton onSort={(sort) => setOrder(listOrderOf(sort))} sort={order.sort} />}
       >
         {tracks.length > 0 && (
           <div className={styles.actions}>

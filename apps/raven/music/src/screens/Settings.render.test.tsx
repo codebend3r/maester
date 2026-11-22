@@ -13,7 +13,7 @@ import {
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
-import packageJson from '#package'
+import { wrenVersion } from '@/about/version'
 import {
   DOWNLOAD_STATUSES,
   type DownloadEntry,
@@ -100,7 +100,10 @@ describe('Settings', () => {
     expect(await screen.findByLabelText(STATUS_COPY.connected(RAVEN_SERVER.name))).toBeTruthy()
     expect(
       screen.getByLabelText(
-        KIT_COPY.labelled({ label: SETTINGS_COPY.version, value: packageJson.version }),
+        KIT_COPY.labelled({
+          label: SETTINGS_COPY.version,
+          value: SETTINGS_COPY.versionOf(wrenVersion),
+        }),
       ),
     ).toBeTruthy()
   })

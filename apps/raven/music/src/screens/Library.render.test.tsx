@@ -1,23 +1,48 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { MUSIC_PAGE, MUSIC_SORTS, type PlaylistDetails, plural } from '@raven/core'
+import {
+  type AlbumSummary,
+  MATCH_STATES,
+  MUSIC_PAGE,
+  MUSIC_SORT_LABELS,
+  MUSIC_SORTS,
+  type PlaylistDetails,
+  plural,
+} from '@raven/core'
 import type * as Native from '@raven/native'
 import {
   COUNTS_COPY,
+  COVER_SIZES,
+  FINISHED_SHOWN,
   KIT_COPY,
+  LIBRARY_LABELS,
+  LIBRARY_ORDER,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
-  LIST_SORT_LABELS,
-  LIST_SORTS,
   NEW_PLAYLIST_COPY,
   PLAYER_COPY,
+  countsLineOf,
 } from '@raven/wren'
+import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
 import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
 import { useToast } from '@/stores/toast'
-import { LISTENER, MIXTAPE, MUSIC, OK_COMPUTER, RADIOHEAD, musicApi, trackFor } from '@/test/music'
+import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import {
+  AIRBAG,
+  FAVOURITES,
+  LISTENER,
+  LUCKY,
+  MIXTAPE,
+  MUSIC,
+  OK_COMPUTER,
+  PARANOID,
+  RADIOHEAD,
+  musicApi,
+  trackFor,
+} from '@/test/music'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 
@@ -40,6 +65,9 @@ jest.mock('expo-splash-screen', () => ({
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
   apiFor: () => mockApi,
+  // jest has no NetInfo native module to ask; the device is on Wi-Fi.
+  isOnCellular: async () => false,
+  watchNetwork: () => () => undefined,
   cookieJar: { read: async () => ({}), forget: async () => {} },
   secretStore: {
     getItemAsync: async () => null,
@@ -55,11 +83,33 @@ const FIRST_PAGE = Array.from({ length: MUSIC_PAGE.most }, (_, at) =>
 
 const ALBUM_TILE = `${OK_COMPUTER.title}, Radiohead`
 
+/** A second album, before OK Computer by title and after it by year. */
+const AMNESIAC: AlbumSummary = {
+  ...OK_COMPUTER,
+  id: 2,
+  title: 'Amnesiac',
+  sortTitle: 'Amnesiac',
+  year: 2001,
+}
+
+/** The albums' titles in the order the grid shows them. */
+const shownTitles = () =>
+  screen
+    .getAllByText(new RegExp(`^(${AMNESIAC.title}|${OK_COMPUTER.title})$`))
+    .map((title) => title.props.children)
+
+const SORT_BUTTON = LIBRARY_PAGE_COPY.sortLabel(MUSIC_SORT_LABELS[MUSIC_SORTS.title])
+
+const COVER_SIZE_BUTTON = LIBRARY_PAGE_COPY.coverSizeLabel(
+  LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.medium],
+)
+
 describe('Library', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
+    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
   })
 
   it('lists its categories with what each holds, and the newest albums', async () => {
@@ -76,8 +126,16 @@ describe('Library', () => {
     expect(mockApi.listAlbums).toHaveBeenCalledWith(
       expect.objectContaining({ libraryId: MUSIC.id, sort: MUSIC_SORTS.added }),
     )
-    expect(screen.getByRole('button', { name: LIBRARY_PAGE_COPY.albums })).toBeTruthy()
-    expect(screen.getByRole('button', { name: LIBRARY_PAGE_COPY.artists })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.artists, value: '1' }),
+      }),
+    ).toBeTruthy()
     expect(
       screen.getByRole('button', {
         name: KIT_COPY.labelled({
@@ -90,9 +148,34 @@ describe('Library', () => {
     expect(await screen.findByRole('button', { name: ALBUM_TILE })).toBeTruthy()
   })
 
+  it("lists raven's seven music tabs in raven's order, then Songs and Downloads, with the server's counts", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
+    await screen.findByRole('button', {
+      name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
+    })
+    const labels = LIBRARY_ORDER.map((segment) => LIBRARY_LABELS[segment])
+    const rows = screen
+      .getAllByRole('button')
+      .map((row) => String(row.props.accessibilityLabel ?? ''))
+      .flatMap((name) => labels.filter((label) => name === label || name.startsWith(`${label}, `)))
+    expect(rows).toEqual(labels)
+    expect(mockApi.getLibraryCounts).toHaveBeenCalledWith(MUSIC.id)
+    expect(
+      screen.getByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.finished, value: '1' }),
+      }),
+    ).toBeTruthy()
+    // No album is unmatched, so that row says no zero.
+    expect(screen.getByRole('button', { name: LIBRARY_PAGE_COPY.unmatchedAlbums })).toBeTruthy()
+  })
+
   it('opens Albums from its row, and an album from there', async () => {
     const router = await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
-    await fireEvent.press(await screen.findByRole('button', { name: LIBRARY_PAGE_COPY.albums }))
+    await fireEvent.press(
+      await screen.findByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
+      }),
+    )
     expect(await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.albums })).toBeTruthy()
     expect(router.getPathname()).toBe(collectionPathOf(LIBRARY_SEGMENTS.albums))
     expect(mockApi.listAlbums).toHaveBeenCalledWith({
@@ -117,17 +200,63 @@ describe('Library', () => {
     )
     expect(await screen.findByText(LIBRARY_PAGE_COPY.noMatches)).toBeTruthy()
 
+    await fireEvent.press(screen.getByRole('button', { name: SORT_BUTTON }))
     await fireEvent.press(
-      screen.getByRole('button', {
-        name: LIBRARY_PAGE_COPY.sortLabel(LIST_SORT_LABELS[LIST_SORTS.title]),
-      }),
-    )
-    await fireEvent.press(
-      await screen.findByRole('radio', { name: LIST_SORT_LABELS[LIST_SORTS.year] }),
+      await screen.findByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.year] }),
     )
     expect(
       await screen.findByRole('button', {
-        name: LIBRARY_PAGE_COPY.sortLabel(LIST_SORT_LABELS[LIST_SORTS.year]),
+        name: LIBRARY_PAGE_COPY.sortLabel(MUSIC_SORT_LABELS[MUSIC_SORTS.year]),
+      }),
+    ).toBeTruthy()
+  })
+
+  it("offers raven's sorts in raven's order and words, the one in use checked", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.albums) })
+    await fireEvent.press(await screen.findByRole('button', { name: SORT_BUTTON }))
+    const options = await screen.findAllByRole('radio')
+    expect(options.map((option) => option.props.accessibilityLabel)).toEqual(
+      Object.values(MUSIC_SORTS).map((sort) => MUSIC_SORT_LABELS[sort]),
+    )
+    expect(
+      screen.getByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.title], checked: true }),
+    ).toBeTruthy()
+  })
+
+  it('puts the albums in the order picked', async () => {
+    mockApi.listAlbums.mockResolvedValue([OK_COMPUTER, AMNESIAC])
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.albums) })
+    expect(await screen.findByText(AMNESIAC.title)).toBeTruthy()
+    expect(shownTitles()).toEqual([AMNESIAC.title, OK_COMPUTER.title])
+
+    await fireEvent.press(screen.getByRole('button', { name: SORT_BUTTON }))
+    await fireEvent.press(
+      await screen.findByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.year] }),
+    )
+    expect(shownTitles()).toEqual([OK_COMPUTER.title, AMNESIAC.title])
+  })
+
+  it('offers five cover sizes, the one in use checked, and keeps the one picked', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.albums) })
+    await fireEvent.press(await screen.findByRole('button', { name: COVER_SIZE_BUTTON }))
+    const options = await screen.findAllByRole('radio')
+    expect(options.map((option) => option.props.accessibilityLabel)).toEqual(
+      Object.values(COVER_SIZES).map((size) => LIBRARY_PAGE_COPY.coverSizes[size]),
+    )
+    expect(
+      screen.getByRole('radio', {
+        name: LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.medium],
+        checked: true,
+      }),
+    ).toBeTruthy()
+
+    await fireEvent.press(
+      screen.getByRole('radio', { name: LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.large] }),
+    )
+    expect(useWrenPrefs.getState().coverSize).toBe(COVER_SIZES.large)
+    expect(
+      await screen.findByRole('button', {
+        name: LIBRARY_PAGE_COPY.coverSizeLabel(LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.large]),
       }),
     ).toBeTruthy()
   })
@@ -145,6 +274,68 @@ describe('Library', () => {
     expect(await screen.findByRole('button', { name: LIBRARY_PAGE_COPY.jumpTo('R') })).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: LIBRARY_PAGE_COPY.jumpTo('R') }))
     expect(screen.getByText(plural({ n: 1, ...COUNTS_COPY.artists }))).toBeTruthy()
+  })
+
+  it("draws each artist as a card with what they hold, as raven's Artists tab does", async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.artists) })
+    expect(await screen.findByRole('button', { name: RADIOHEAD.name })).toBeTruthy()
+    expect(screen.getByText(countsLineOf({ albums: 1, tracks: 3 }))).toBeTruthy()
+  })
+
+  it('lists the albums no release was found for, from the same listing as Albums', async () => {
+    const unmatched = { ...OK_COMPUTER, id: 8, title: 'Kid A', match: MATCH_STATES.unmatched }
+    mockApi.listAlbums.mockResolvedValue([OK_COMPUTER, unmatched])
+    await renderRouter(WREN_TREE, {
+      initialUrl: collectionPathOf(LIBRARY_SEGMENTS.unmatchedAlbums),
+    })
+    expect(
+      await screen.findByRole('button', {
+        name: KIT_COPY.labelled({ label: unmatched.title, value: RADIOHEAD.name }),
+      }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: ALBUM_TILE })).toBeNull()
+    expect(mockApi.listAlbums).toHaveBeenCalledWith({
+      libraryId: MUSIC.id,
+      search: '',
+      sort: MUSIC_SORTS.title,
+    })
+    mockApi.listAlbums.mockResolvedValue([OK_COMPUTER])
+  })
+
+  it('says every album is matched when none is unmatched', async () => {
+    await renderRouter(WREN_TREE, {
+      initialUrl: collectionPathOf(LIBRARY_SEGMENTS.unmatchedAlbums),
+    })
+    expect(await screen.findByText(LIBRARY_PAGE_COPY.noUnmatchedAlbums)).toBeTruthy()
+  })
+
+  it('lists the songs in progress as their albums keep them, and plays from one', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.inProgress) })
+    await fireEvent.press(await screen.findByRole('button', { name: PARANOID.title }))
+    expect(mockApi.listInProgress).toHaveBeenCalledWith(MUSIC.id)
+    expect(mockApi.getAlbum).toHaveBeenCalledWith(OK_COMPUTER.id)
+    expect(useAudioQueue.getState().queue.items).toHaveLength(1)
+  })
+
+  it('lists the favourite songs and the songs finished most recently', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
+    expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeTruthy()
+    expect(mockApi.listLibraryFavourites).toHaveBeenCalledWith(MUSIC.id)
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.finished) })
+    expect(await screen.findByRole('button', { name: LUCKY.title })).toBeTruthy()
+    expect(mockApi.listHistory).toHaveBeenCalledWith({
+      libraryId: MUSIC.id,
+      limit: FINISHED_SHOWN,
+      watchedOnly: true,
+    })
+  })
+
+  it('says so when there are no favourites, with no Play to press', async () => {
+    mockApi.listLibraryFavourites.mockResolvedValue([])
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
+    expect(await screen.findByText(LIBRARY_PAGE_COPY.noFavourites)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.play })).toBeNull()
+    mockApi.listLibraryFavourites.mockResolvedValue(FAVOURITES)
   })
 
   it('lists the songs a page at a time, asking for the next page at the end of the list', async () => {
@@ -167,6 +358,7 @@ describe('Library', () => {
       libraryId: MUSIC.id,
       search: '',
       sort: MUSIC_SORTS.title,
+      seed: 0,
       limit: MUSIC_PAGE.most,
       offset: 0,
     })
@@ -177,6 +369,7 @@ describe('Library', () => {
       libraryId: MUSIC.id,
       search: '',
       sort: MUSIC_SORTS.title,
+      seed: 0,
       limit: MUSIC_PAGE.most,
       offset: MUSIC_PAGE.most,
     })

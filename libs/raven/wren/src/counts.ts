@@ -45,11 +45,14 @@ type CountValueOfProps = {
   n: number | null
   /** What none reads as, when it is worth saying; left out otherwise. */
   none?: string
+  /** The most its list shows, past which the count reads as that many and more: "48+". */
+  most?: number
 }
 
 /** One of Library's categories' value: its count, "None yet" where that says something, or nothing at all. */
-export const countValueOf = ({ n, none }: CountValueOfProps): string | undefined => {
+export const countValueOf = ({ n, none, most }: CountValueOfProps): string | undefined => {
   if (n === null) return undefined
   if (n === 0) return none
+  if (most !== undefined && n > most) return COUNTS_COPY.orMore(formatCount(most))
   return formatCount(n)
 }

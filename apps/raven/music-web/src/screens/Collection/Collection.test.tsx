@@ -1,17 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
-import { LETTERS, MUSIC_PAGE, MUSIC_SORTS, plural } from '@raven/core'
+import {
+  LETTERS,
+  MATCH_STATES,
+  MUSIC_PAGE,
+  MUSIC_SORTS,
+  MUSIC_SORT_LABELS,
+  type MusicSort,
+  plural,
+} from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import {
   COUNTS_COPY,
+  COVER_SIZES,
   KIT_COPY,
+  FINISHED_SHOWN,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
-  LIST_SORTS,
-  LIST_SORT_LABELS,
   NEW_PLAYLIST_COPY,
   PLAYER_COPY,
+  countsLineOf,
 } from '@raven/wren'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, generatePath } from 'react-router-dom'
 import {
@@ -26,12 +35,16 @@ import {
 } from '@/routes'
 import { Collection } from '@/screens/Collection/Collection'
 import { useToast } from '@/stores/toast'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { reachEnds, watchIntersections } from '@/test/intersection'
 import {
+  AIRBAG,
+  LUCKY,
   MIXTAPE,
   MUSIC,
   OK_COMPUTER,
   OK_COMPUTER_TILE,
+  PARANOID,
   RADIOHEAD,
   ROAD_TRIP,
   mockMusicAndWritesEach,
@@ -50,8 +63,8 @@ const BACK = KIT_COPY.back(LIBRARY_PAGE_COPY.title)
 const LIBRARY_MARK = 'Library is showing'
 const ROAD_TRIP_MARK = 'Road trip is showing'
 
-const sortButtonOf = (sort: keyof typeof LIST_SORT_LABELS): string =>
-  LIBRARY_PAGE_COPY.sortLabel(LIST_SORT_LABELS[sort])
+const sortButtonOf = (sort: MusicSort): string =>
+  LIBRARY_PAGE_COPY.sortLabel(MUSIC_SORT_LABELS[sort])
 
 type RenderCollectionProps = {
   kind: CollectionKind
@@ -123,18 +136,18 @@ describe('Collection', () => {
         OK_COMPUTER_TILE,
       ])
 
-      await userEvent.click(screen.getByRole('button', { name: sortButtonOf(LIST_SORTS.title) }))
+      await userEvent.click(screen.getByRole('button', { name: sortButtonOf(MUSIC_SORTS.title) }))
       await userEvent.click(
-        await screen.findByRole('radio', { name: LIST_SORT_LABELS[LIST_SORTS.year] }),
+        await screen.findByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.year] }),
       )
       expect(
-        await screen.findByRole('button', { name: sortButtonOf(LIST_SORTS.year) }),
+        await screen.findByRole('button', { name: sortButtonOf(MUSIC_SORTS.year) }),
       ).toBeInTheDocument()
       expect(screen.queryByRole('radio')).not.toBeInTheDocument()
-      // Newest year first.
+      // By year, as raven lists a discography: the earliest first.
       expect(titlesShown()).toEqual([
-        KIT_COPY.labelled({ label: second.title, value: 'Radiohead' }),
         OK_COMPUTER_TILE,
+        KIT_COPY.labelled({ label: second.title, value: 'Radiohead' }),
       ])
 
       await userEvent.type(screen.getByLabelText(LIBRARY_PAGE_COPY.searchAlbums), 'ok comp')
@@ -149,14 +162,40 @@ describe('Collection', () => {
     it('marks the sort in use in the sheet', async () => {
       renderCollection({ kind: COLLECTION_KINDS.albums })
       await userEvent.click(
-        await screen.findByRole('button', { name: sortButtonOf(LIST_SORTS.title) }),
+        await screen.findByRole('button', { name: sortButtonOf(MUSIC_SORTS.title) }),
       )
       expect(
-        await screen.findByRole('radio', { name: LIST_SORT_LABELS[LIST_SORTS.title] }),
+        await screen.findByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.title] }),
       ).toBeChecked()
       expect(
-        screen.getByRole('radio', { name: LIST_SORT_LABELS[LIST_SORTS.artist] }),
+        screen.getByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.artist] }),
       ).not.toBeChecked()
+    })
+
+    it("offers raven's sorts, in raven's order and words", async () => {
+      renderCollection({ kind: COLLECTION_KINDS.albums })
+      await userEvent.click(
+        await screen.findByRole('button', { name: sortButtonOf(MUSIC_SORTS.title) }),
+      )
+      const offered = (await screen.findAllByRole('radio')).map((radio) => radio.textContent)
+      expect(offered).toEqual(Object.values(MUSIC_SORTS).map((sort) => MUSIC_SORT_LABELS[sort]))
+    })
+
+    it('draws the covers at the size picked, and keeps it', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.albums })
+      const medium = LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.medium]
+      await userEvent.click(
+        await screen.findByRole('button', { name: LIBRARY_PAGE_COPY.coverSizeLabel(medium) }),
+      )
+      const offered = (await screen.findAllByRole('radio')).map((radio) => radio.textContent)
+      expect(offered).toEqual(
+        Object.values(COVER_SIZES).map((size) => LIBRARY_PAGE_COPY.coverSizes[size]),
+      )
+      await userEvent.click(
+        screen.getByRole('radio', { name: LIBRARY_PAGE_COPY.coverSizes[COVER_SIZES.large] }),
+      )
+      expect(useWrenPrefs.getState().coverSize).toBe(COVER_SIZES.large)
+      act(() => useWrenPrefs.getState().change({ coverSize: COVER_SIZES.medium }))
     })
 
     it('opens for an address naming a list the web has none of', async () => {
@@ -200,12 +239,11 @@ describe('Collection', () => {
   })
 
   describe('Artists', () => {
-    it('lists the artists with how many there are, each opening its page', async () => {
+    it('lays the artists out as cards with how many there are, each opening its page', async () => {
       renderCollection({ kind: COLLECTION_KINDS.artists })
-      expect(await screen.findByRole('link', { name: RADIOHEAD.name })).toHaveAttribute(
-        'href',
-        artistPath(RADIOHEAD.id),
-      )
+      const card = await screen.findByRole('link', { name: RADIOHEAD.name })
+      expect(card).toHaveAttribute('href', artistPath(RADIOHEAD.id))
+      expect(card).toHaveTextContent(countsLineOf({ albums: 1, tracks: 3 }))
       expect(music().listArtists).toHaveBeenCalledWith({ libraryId: MUSIC.id, search: '' })
       expect(screen.getByText(plural({ n: 1, ...COUNTS_COPY.artists }))).toBeInTheDocument()
     })
@@ -233,6 +271,72 @@ describe('Collection', () => {
     })
   })
 
+  describe('Unmatched albums', () => {
+    it('lists the albums no release was found for, from the same listing as Albums', async () => {
+      const unmatched = { ...OK_COMPUTER, id: 8, title: 'Kid A', match: MATCH_STATES.unmatched }
+      music().listAlbums.mockResolvedValue([OK_COMPUTER, unmatched])
+      renderCollection({ kind: COLLECTION_KINDS.unmatchedAlbums })
+      expect(
+        await screen.findByRole('link', {
+          name: KIT_COPY.labelled({ label: unmatched.title, value: RADIOHEAD.name }),
+        }),
+      ).toHaveAttribute('href', albumPath(unmatched.id))
+      expect(screen.queryByRole('link', { name: OK_COMPUTER_TILE })).not.toBeInTheDocument()
+      expect(screen.getByText(plural({ n: 1, ...COUNTS_COPY.albums }))).toBeInTheDocument()
+      expect(music().listAlbums).toHaveBeenCalledWith({
+        libraryId: MUSIC.id,
+        search: '',
+        sort: MUSIC_SORTS.title,
+      })
+    })
+
+    it('says every album is matched when none is unmatched, with no count', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.unmatchedAlbums })
+      expect(await screen.findByText(LIBRARY_PAGE_COPY.noUnmatchedAlbums)).toBeInTheDocument()
+      expect(screen.queryByText(plural({ n: 0, ...COUNTS_COPY.albums }))).not.toBeInTheDocument()
+    })
+  })
+
+  describe('In progress, Favourites and Recently finished', () => {
+    it('lists the songs left partway through as their albums keep them, and plays from one', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.inProgress })
+      await userEvent.click(await screen.findByRole('button', { name: PARANOID.title }))
+      expect(music().listInProgress).toHaveBeenCalledWith(MUSIC.id)
+      expect(music().getAlbum).toHaveBeenCalledWith(OK_COMPUTER.id)
+      expect(useAudioQueue.getState().queue.items).toHaveLength(1)
+      expect(screen.getByText(plural({ n: 1, ...COUNTS_COPY.songs }))).toBeInTheDocument()
+    })
+
+    it('lists the favourite songs', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.favourites })
+      expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeInTheDocument()
+      expect(music().listLibraryFavourites).toHaveBeenCalledWith(MUSIC.id)
+    })
+
+    it('lists the songs played to their end, as many as raven shows', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.finished })
+      expect(await screen.findByRole('button', { name: LUCKY.title })).toBeInTheDocument()
+      expect(music().listHistory).toHaveBeenCalledWith({
+        libraryId: MUSIC.id,
+        limit: FINISHED_SHOWN,
+        watchedOnly: true,
+      })
+    })
+
+    it('says so when there is nothing to list, with no Play to press', async () => {
+      music().listLibraryFavourites.mockResolvedValue([])
+      renderCollection({ kind: COLLECTION_KINDS.favourites })
+      expect(await screen.findByText(LIBRARY_PAGE_COPY.noFavourites)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: PLAYER_COPY.play })).not.toBeInTheDocument()
+    })
+
+    it('says the songs could not be read when raven does not answer', async () => {
+      music().getAlbum.mockRejectedValue(new Error('refused'))
+      renderCollection({ kind: COLLECTION_KINDS.inProgress })
+      expect(await screen.findByText(LIBRARY_PAGE_COPY.failed)).toBeInTheDocument()
+    })
+  })
+
   describe('Songs', () => {
     const pages = () =>
       music().listTracks.mock.calls.filter(([props]) => props.limit === MUSIC_PAGE.most)
@@ -257,6 +361,7 @@ describe('Collection', () => {
         sort: MUSIC_SORTS.title,
         limit: MUSIC_PAGE.most,
         offset: 0,
+        seed: 0,
       })
 
       await reachEnds()
@@ -268,6 +373,7 @@ describe('Collection', () => {
         sort: MUSIC_SORTS.title,
         limit: MUSIC_PAGE.most,
         offset: MUSIC_PAGE.most,
+        seed: 0,
       })
 
       // Nothing is left to ask for once the last page is read.
@@ -288,10 +394,10 @@ describe('Collection', () => {
     it('asks the server for the order picked', async () => {
       renderCollection({ kind: COLLECTION_KINDS.songs })
       await userEvent.click(
-        await screen.findByRole('button', { name: sortButtonOf(LIST_SORTS.title) }),
+        await screen.findByRole('button', { name: sortButtonOf(MUSIC_SORTS.title) }),
       )
       await userEvent.click(
-        await screen.findByRole('radio', { name: LIST_SORT_LABELS[LIST_SORTS.added] }),
+        await screen.findByRole('radio', { name: MUSIC_SORT_LABELS[MUSIC_SORTS.added] }),
       )
       await waitFor(() =>
         expect(music().listTracks).toHaveBeenCalledWith({
@@ -300,6 +406,7 @@ describe('Collection', () => {
           sort: MUSIC_SORTS.added,
           limit: MUSIC_PAGE.most,
           offset: 0,
+          seed: expect.any(Number),
         }),
       )
     })

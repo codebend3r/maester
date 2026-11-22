@@ -3,10 +3,12 @@ import { artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import {
   HOME_COPY,
+  LIBRARY_LABELS,
   LIBRARY_PAGE_COPY,
   PLAYER_COPY,
   SEARCH_COPY,
   SETTINGS_COPY,
+  SHARED_ORDER,
   STATUS_COPY,
   TAB_COPY,
   WREN_LOCKUP_COPY,
@@ -141,10 +143,7 @@ describe("the shell at 48rem and wider, the apps' tablet layout", () => {
     expect(nav.getAllByRole('link').map((link) => link.getAttribute('aria-label'))).toEqual([
       HOME_COPY.title,
       SEARCH_COPY.title,
-      LIBRARY_PAGE_COPY.playlists,
-      LIBRARY_PAGE_COPY.artists,
-      LIBRARY_PAGE_COPY.albums,
-      LIBRARY_PAGE_COPY.songs,
+      ...SHARED_ORDER.map((segment) => LIBRARY_LABELS[segment]),
       SETTINGS_COPY.title,
     ])
     expect(nav.getByRole('heading', { name: LIBRARY_PAGE_COPY.title })).toBeInTheDocument()

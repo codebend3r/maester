@@ -94,7 +94,7 @@ describe('repairing existing album folders', () => {
     })
     expect(
       music()
-        .album(first)
+        .album({ id: first })
         ?.tracks.map(({ id, disc }) => ({ id, disc })),
     ).toEqual(tracks.map((id, at) => ({ id, disc: at + 1 })))
     expect(
@@ -157,7 +157,7 @@ describe('repairing existing album folders', () => {
     expect(repaired).toHaveLength(2)
     expect(
       music()
-        .album(first)
+        .album({ id: first })
         ?.tracks.map(({ id, disc }) => ({ id, disc })),
     ).toEqual(tracks.map((id, at) => ({ id, disc: at + 1 })))
     expect(
@@ -194,7 +194,7 @@ describe('repairing existing album folders', () => {
     const merged = albums()
     expect(merged).toHaveLength(1)
     expect(merged[0]).toMatchObject({ id: solo, trackCount: 2 })
-    expect(music().album(solo)?.tracks).toHaveLength(2)
+    expect(music().album({ id: solo })?.tracks).toHaveLength(2)
     expect(new MusicMatchStore(database.get()).mergeAlbums(state.library)).toBe(0)
     expect(albums()).toEqual(merged)
   })
@@ -208,8 +208,8 @@ describe('repairing existing album folders', () => {
     favourite({ album: second })
     reconcileAlbums({ db: database.get().db })
     expect(albums()).toHaveLength(2)
-    expect(music().album(first)?.mbid).toBe('a')
-    expect(music().album(second)?.mbid).toBe('b')
+    expect(music().album({ id: first })?.mbid).toBe('a')
+    expect(music().album({ id: second })?.mbid).toBe('b')
     expect(
       database
         .get()

@@ -9,7 +9,7 @@ import { CollectionHeader } from '@/screens/Collection/CollectionHeader'
 import { useCollectionSearch } from '@/screens/Collection/useCollectionSearch'
 import { useListStart } from '@/screens/Collection/useListStart'
 import { Page } from '@/shell/Page/Page'
-import { ArtistRow } from '@/ui/ArtistRow/ArtistRow'
+import { ArtistCard } from '@/ui/ArtistCard/ArtistCard'
 import collectionStyles from '@/screens/Collection/Collection.module.scss'
 import styles from '@/screens/Collection/ArtistsCollection.module.scss'
 
@@ -35,13 +35,16 @@ function IndexRail({ onLetter }: IndexRailProps) {
   )
 }
 
-/** Artists: every music library's, each once, by name, with an A to Z rail to jump the list. */
+/**
+ * Artists: every music library's, each once, by name, as a grid of cards like raven's Artists
+ * tab, with an A to Z rail to jump the grid to the first card under a letter.
+ */
 export function ArtistsCollection() {
   const search = useCollectionSearch({
     placeholder: LIBRARY_PAGE_COPY.searchArtists,
     none: LIBRARY_PAGE_COPY.noArtists,
   })
-  const list = useRef<HTMLUListElement>(null)
+  const grid = useRef<HTMLUListElement>(null)
   const { artists, listing } = useAllArtists({ search: '' })
   const { artistPhotoOf } = useCovers()
   const shown = matchingArtists({ artists, query: search.query })
@@ -50,7 +53,7 @@ export function ArtistsCollection() {
   const jump = (letter: Letter) => {
     const at = firstAtLetter({ names: shown.map(({ sortName }) => sortName), letter })
     if (at === null) return
-    list.current?.children.item(at)?.scrollIntoView({ block: 'start' })
+    grid.current?.children.item(at)?.scrollIntoView({ block: 'start' })
   }
   return (
     <Page className={collectionStyles.artists}>
@@ -63,10 +66,10 @@ export function ArtistsCollection() {
       {shown.length === 0 && <ListNotice empty={search.empty} listing={listing} />}
       {shown.length > 0 && (
         <div className={styles.listing} ref={listingStart}>
-          <ul className={styles.list} ref={list}>
+          <ul className={styles.grid} ref={grid}>
             {shown.map((artist) => (
-              <li className={styles.row} key={artist.id}>
-                <ArtistRow
+              <li className={styles.cell} key={artist.id}>
+                <ArtistCard
                   albumCount={artist.albumCount}
                   href={artistPath(artist.id)}
                   name={artist.name}

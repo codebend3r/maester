@@ -44,14 +44,16 @@ def repo(tmp_path: Path) -> Path:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     bunx = bin_dir / "bunx"
-    bunx.write_text('#!/bin/sh\nprintf "BUILT=%s\\n" "${VITE_RAVEN_VERSION:-unset}"\n')
+    bunx.write_text('#!/bin/sh\nprintf "BUILT=%s %s\\n" "${VITE_RAVEN_VERSION:-unset}" "$3"\n')
     bunx.chmod(0o755)
     return checkout
 
 
-def build(repo: Path, *, context: str = "production") -> subprocess.CompletedProcess[str]:
+def build(
+    repo: Path, *, context: str = "production", project: list[str] | None = None
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["bash", str(ROOT / "apps/raven/netlify-build.sh")],
+        ["bash", str(ROOT / "apps/raven/netlify-build.sh"), *(project or [])],
         cwd=repo,
         env={
             **ENV,
@@ -82,7 +84,7 @@ def test_release_commit_uses_base_version(repo: Path):
     git(repo, "checkout", "v0.6.2")
     result = build(repo)
     assert result.returncode == 0, result.stderr
-    assert "BUILT=0.6.2\n" in result.stdout
+    assert "BUILT=0.6.2 @raven/web:build" in result.stdout
 
 
 @pytest.mark.parametrize("context", ["deploy-preview", "branch-deploy"])
@@ -104,3 +106,11 @@ def test_failed_version_lookup_does_not_build(repo: Path):
     result = build(repo)
     assert result.returncode != 0
     assert "BUILT=" not in result.stdout
+
+
+def test_builds_the_project_named(repo: Path):
+    raven = build(repo)
+    assert "@raven/web:build" in raven.stdout
+    wren = build(repo, project=["@raven/music-web"])
+    assert wren.returncode == 0, wren.stderr
+    assert "BUILT=0.6.2.2 @raven/music-web:build" in wren.stdout

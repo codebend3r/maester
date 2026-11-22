@@ -2,23 +2,19 @@ name: 🧱 Native checks
 
 # The end to end suites, which run here and nowhere else: raven's web app in Chrome, and the
 # affected desktop, device app and Wren flows. Every push to main runs it, against the last green
-# ancestor. A pull request only builds the native apps (pull-request-checks.yml), so it hears back
-# sooner; this run takes the builds the merged pull request uploaded and runs the flows on them,
-# building only a group it finds no build for (a push with no pull request, a manual run, an
-# expired artifact, a group the pull request never built). So an end to end failure shows here
-# first, after the merge, and emails the pusher, as any failed run on main does.
+# ancestor. Nothing is built here: a pull request builds the native apps (pull-request-checks.yml)
+# and uploads them, and this run downloads the merged pull request's builds and runs the flows on
+# them. A selected group with no build to find (a push with no pull request, an expired artifact,
+# a group the pull request never built) fails its end to end job, saying so. An end to end failure
+# shows here, after the merge, and emails the pusher, as any failed run on main does.
 # The device apps' screen tests (`test:screens`) run here too, and on no pull request.
-# Run it by hand from the Actions tab on any branch to build and test every group.
 #
-# Every job is listed here: no workflow is called and no job is a matrix row. The build jobs are the pull
-# request's, the same down to their steps, which the shared actions hold; `test_native_ci.py`
-# fails when the two lists differ. A job's name starts with what it does: 🏗️ Build, 🧪 Test or
-# 🎬 E2E. 🎬 E2E iPhone, which waits for 🏗️ Build iPhone alone, runs the flows on its build; what
-# a device needs is its job's `APP_*` variables, and the end to end jobs share one list of steps.
+# Every job is listed here: no workflow is called and no job is a matrix row. The selection is the
+# pull request's, the same down to its steps; `test_native_ci.py` fails when the two differ. What a
+# device needs is its job's `APP_*` variables, and the end to end jobs share one list of steps.
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   actions: write
@@ -32,21 +28,21 @@ env:
   # needs Node 22.18 or newer, wherever Metro or jest-expo runs. `test_native_ci.py` holds every
   # workflow to the same version.
   APP_NODE_VERSION: 24.21.0
-  # What the native jobs build and name their artifacts for. No base: the selection diffs a push
-  # against this workflow's last green run on main, and a manual run selects every group.
+  # The commit the selection plans for. No base: the selection diffs a push against this
+  # workflow's last green run on main.
   NATIVE_BUILD_SHA: ${{ github.sha }}
   NATIVE_SELECT_BASE: ''
 
 # No concurrency group: every push must be tested, without replacing a pending run.
 jobs:
   # Which groups the commit touches (raven's device app, Wren, the desktop) and the plan for each,
-  # which every native job below reads: whether the commit selected it, whether to build it in
-  # this run, and which run and commit hold its builds. The action says how it decides.
+  # which every end to end job below reads: whether the commit selected it and which run and
+  # commit hold its builds. The action says how it decides.
   select:
     name: 🔎 Select affected native checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    permissions: &native-permissions
+    permissions:
       actions: write
       contents: read
     outputs:
@@ -79,8 +75,7 @@ jobs:
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job.
-      - &native-cancel
-        name: 🛑 Cancel the run
+      - name: 🛑 Cancel the run
         if: failure() && github.event_name == 'pull_request'
         continue-on-error: true
         shell: bash
@@ -88,256 +83,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # The pinned prebuilt libmpv, the addon built against it with MSVC, their audit and tests.
-  windows-native:
-    name: 🏗️ Build Windows native
-    needs: select
-    if: needs.select.outputs.desktop_build == 'true'
-    runs-on: windows-2025
-    timeout-minutes: 15
-    permissions: *native-permissions
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v7
-
-      - name: 🔩 Build, audit and test the Windows native pieces
-        uses: ./.github/actions/raven-windows-native
-        with:
-          sha: ${{ env.NATIVE_BUILD_SHA }}
-
-      - *native-cancel
-
-  # Forge bundles the addon and libmpv (stage:mpv), so this waits for the Windows native build.
-  windows-app:
-    name: 🏗️ Build Windows app
-    needs: windows-native
-    runs-on: windows-2025
-    timeout-minutes: 30
-    permissions: *native-permissions
-    steps:
-      # The commit the artifact is named for. The native job checks out with no ref, so on a
-      # pull request its engine was built from the merge commit.
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.NATIVE_BUILD_SHA }}
-
-      - name: 🪟 Build, package, audit and smoke the Windows app
-        uses: ./.github/actions/raven-windows-app
-        with:
-          sha: ${{ env.NATIVE_BUILD_SHA }}
-
-      - *native-cancel
-
-  # The device app's and Wren's builds: the Release build for the device's simulator or emulator,
-  # uploaded as an artifact for main's flows. One job a device, named for it, each on its own
-  # runner; what a device needs is its job's `APP_*` variables, and the builds share their steps,
-  # which the first job holds and the rest reuse.
-  # The iPhone's build runs `prebuild:ios` first (bun runs it before `build:ios`), which
-  # regenerates ios/ and installs the pods; Nx caches only the app and the two lockfiles.
-  build-iphone:
-    name: 🏗️ Build iPhone
-    needs: select
-    if: needs.select.outputs.app_build == 'true'
-    runs-on: macos-26
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: ios
-      APP_PROJECT: apps/raven/app
-      APP_BUILD: bunx nx run @raven/app:build:ios --excludeTaskDependencies
-      APP_ARTIFACT: raven-app-ios-simulator
-      APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Raven.app
-      APP_RUNTIME: iOS
-    steps: &build-steps # The commit named, so the artifact names match the commit that was built.
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.NATIVE_BUILD_SHA }}
-
-      - name: 🏗️ Build and upload the app
-        uses: ./.github/actions/raven-app-build
-        with:
-          sha: ${{ env.NATIVE_BUILD_SHA }}
-          node-version: ${{ env.APP_NODE_VERSION }}
-
-      - *native-cancel
-
-  # The build runs `prebuild:tvos` first, which adds the Siri Remote's XCUITest target; Nx caches
-  # only what the steps and main's flow read: the app, the two lockfiles, the Xcode project, the
-  # remote test target and the pods' support files. Pods/ and DerivedData are left out, since
-  # they ran Nx Cloud's upload out of open files (EMFILE).
-  build-apple-tv:
-    name: 🏗️ Build Apple TV
-    needs: select
-    if: needs.select.outputs.app_build == 'true'
-    runs-on: macos-26
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: tvos
-      APP_PROJECT: apps/raven/app
-      APP_BUILD: bun run ci:app:tvos:build
-      APP_ARTIFACT: raven-app-tvos-simulator
-      APP_BUNDLE: build/tvos/Build/Products/Release-appletvsimulator/Raven.app
-      APP_RUNTIME: tvOS
-      # The remote's XCUITest target is packed beside the app, for main's flow to read.
-      APP_TEST_PROJECT: 'true'
-    steps: *build-steps
-
-  # The build runs `prebuild:android-tv` first, which regenerates android/ with the leanback
-  # launcher, then Gradle's Release APK. Android builds on Linux (Ruling 20): GitHub's macOS arm64
-  # runners cannot run the Android emulator.
-  build-android-tv:
-    name: 🏗️ Build Android TV
-    needs: select
-    if: needs.select.outputs.app_build == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: android-tv
-      APP_PROJECT: apps/raven/app
-      APP_BUILD: bunx nx run @raven/app:build:android-tv --excludeTaskDependencies
-      APP_ARTIFACT: raven-app-android-tv
-      APP_BUNDLE: ''
-    steps: *build-steps
-
-  # The phone prebuild (no leanback launcher, the music service kept) on the Android TV setup, its
-  # caches and its x86_64-only build among them.
-  build-android-phone:
-    name: 🏗️ Build Android phone
-    needs: select
-    if: needs.select.outputs.app_build == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: android-tv
-      APP_PROJECT: apps/raven/app
-      APP_BUILD: bunx nx run @raven/app:build:android --excludeTaskDependencies
-      APP_ARTIFACT: raven-app-android
-      APP_BUNDLE: ''
-    steps: *build-steps
-
-  # Wren, raven's music app, built by the device app's steps, since it builds on the same React
-  # Native and pods.
-  build-wren-iphone:
-    name: 🏗️ Build Wren iPhone
-    needs: select
-    if: needs.select.outputs.music_build == 'true'
-    runs-on: macos-26
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: ios
-      APP_PROJECT: apps/raven/music
-      APP_BUILD: bunx nx run @raven/music:build:ios --excludeTaskDependencies
-      APP_ARTIFACT: raven-music-ios-simulator
-      APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Wren.app
-      APP_RUNTIME: iOS
-    steps: *build-steps
-
-  build-wren-android:
-    name: 🏗️ Build Wren Android
-    needs: select
-    if: needs.select.outputs.music_build == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    permissions: *native-permissions
-    env:
-      APP_SETUP: android-tv
-      APP_PROJECT: apps/raven/music
-      APP_BUILD: bunx nx run @raven/music:build:android --excludeTaskDependencies
-      APP_ARTIFACT: raven-music-android
-      APP_BUNDLE: ''
-    steps: *build-steps
-
-  # One native build feeds packaging, the player's tests and main's suite through an artifact.
-  desktop-native:
-    name: 🏗️ Build Mac native
-    needs: select
-    if: needs.select.outputs.desktop_build == 'true'
-    # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
-    runs-on: macos-26
-    timeout-minutes: 120
-    permissions: *native-permissions
-    steps:
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.NATIVE_BUILD_SHA }}
-
-      - name: 🔩 Build, hand off, audit and test the Mac native pieces
-        uses: ./.github/actions/raven-mac-native
-        with:
-          sha: ${{ env.NATIVE_BUILD_SHA }}
-
-      - *native-cancel
-
-  # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
-  desktop-app:
-    name: 🏗️ Build Mac app
-    needs: desktop-native
-    runs-on: macos-26
-    timeout-minutes: 30
-    permissions: *native-permissions
-    steps:
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.NATIVE_BUILD_SHA }}
-
-      - name: 🍎 Build, package, audit and smoke the Mac app
-        uses: ./.github/actions/raven-mac-app
-        with:
-          sha: ${{ env.NATIVE_BUILD_SHA }}
-
-      - *native-cancel
-
-  # The desktop player against headless libmpv, wherever this run built the native pieces: a
-  # pull request's, or a push to main that found no build to reuse.
-  desktop-test:
-    name: 🧪 Test Mac player
-    needs: [select, desktop-native]
-    runs-on: macos-26
-    timeout-minutes: 30
-    permissions: *native-permissions
-    steps:
-      - name: 📥 Checkout exact commit
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ env.NATIVE_BUILD_SHA }}
-
-      - name: 🧪 Test Mac player
-        uses: ./.github/actions/raven-mac-playback
-        with:
-          target: test:native
-          build-run-id: ${{ needs.select.outputs.desktop_run }}
-          build-sha: ${{ needs.select.outputs.desktop_sha }}
-
-      - *native-cancel
-
   # The flows of every device that has them, against a real raven server: Maestro on the iPhone
   # simulator and on an Android TV emulator, driven by the remote's keys, and an XCUITest that
-  # drives the Apple TV with the Siri Remote. Each on its own device's build, and waiting for
-  # that build alone: the merged pull request's where the selection found it (its build job is
-  # then skipped), else the one that job made in this run. A failed build skips its flows. Each
-  # timeout covers the simulator's or emulator's boot and the flows, twice over when Maestro's
-  # driver is retried.
+  # drives the Apple TV with the Siri Remote. Each on its own device's build, the one the merged
+  # pull request uploaded. Each timeout covers the simulator's or emulator's boot and the flows,
+  # twice over when Maestro's driver is retried.
   #
   # Every flow in `apps/raven/app/e2e` but the remote's (`dpad`), each opening on the accountless
   # fixture's Home. A device's `APP_SETUP`, `APP_PROJECT`, `APP_ARTIFACT` and `APP_BUNDLE` are
-  # its build job's above, which `test_native_ci.py` checks.
+  # its build job's in pull-request-checks.yml, which `test_native_ci.py` checks.
   e2e-iphone:
     name: 🎬 E2E iPhone
-    needs: [select, build-iphone]
-    if: ${{ !cancelled() && needs.select.outputs.app_selected == 'true' && contains(fromJSON('["success", "skipped"]'), needs.build-iphone.result) }}
+    needs: select
+    if: needs.select.outputs.app_selected == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     env:
       # The run that holds the build and the commit it is named for.
       BUILD_RUN_ID: ${{ needs.select.outputs.app_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.app_build }}
       BUILD_SHA: ${{ needs.select.outputs.app_sha }}
       APP_SETUP: ios
       APP_PROJECT: apps/raven/app
@@ -350,7 +114,17 @@ jobs:
       APP_DRIVER: maestro
       APP_FLOWS: bun run app:e2e
       APP_LOGS: raven-app-e2e-logs
-    steps: &e2e-steps # The commit under test, whose flows run on the build.
+    steps: &e2e-steps
+      # The plan asks to build a group the merged pull request left no build of, and main
+      # builds nothing, so say so rather than fail on a missing artifact.
+      - &no-build
+        name: 🚫 No pull request build
+        if: env.BUILD_MISSING == 'true'
+        run: |
+          echo "::error::No build of this group from the merged pull request (none, or expired). Open a pull request so its checks build it."
+          exit 1
+
+      # The commit under test, whose flows run on the build.
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:
@@ -534,12 +308,13 @@ jobs:
   # Menu and find it under Continue watching, all with the Siri Remote.
   e2e-apple-tv:
     name: 🎬 E2E Apple TV
-    needs: [select, build-apple-tv]
-    if: ${{ !cancelled() && needs.select.outputs.app_selected == 'true' && contains(fromJSON('["success", "skipped"]'), needs.build-apple-tv.result) }}
+    needs: select
+    if: needs.select.outputs.app_selected == 'true'
     runs-on: macos-26
     timeout-minutes: 30
     env:
       BUILD_RUN_ID: ${{ needs.select.outputs.app_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.app_build }}
       BUILD_SHA: ${{ needs.select.outputs.app_sha }}
       APP_SETUP: tvos
       APP_PROJECT: apps/raven/app
@@ -559,12 +334,13 @@ jobs:
   # the iPhone uses. The phone's touch flows need a phone emulator of their own, so it has none yet.
   e2e-android-tv:
     name: 🎬 E2E Android TV
-    needs: [select, build-android-tv]
-    if: ${{ !cancelled() && needs.select.outputs.app_selected == 'true' && contains(fromJSON('["success", "skipped"]'), needs.build-android-tv.result) }}
+    needs: select
+    if: needs.select.outputs.app_selected == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       BUILD_RUN_ID: ${{ needs.select.outputs.app_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.app_build }}
       BUILD_SHA: ${{ needs.select.outputs.app_sha }}
       APP_SETUP: android-tv
       APP_PROJECT: apps/raven/app
@@ -579,12 +355,13 @@ jobs:
   # on a simulator of Wren's own, as `ci:wren` makes one. Wren on Android has no flows yet.
   e2e-wren-iphone:
     name: 🎬 E2E Wren iPhone
-    needs: [select, build-wren-iphone]
-    if: ${{ !cancelled() && needs.select.outputs.music_selected == 'true' && contains(fromJSON('["success", "skipped"]'), needs.build-wren-iphone.result) }}
+    needs: select
+    if: needs.select.outputs.music_selected == 'true'
     runs-on: macos-26
     timeout-minutes: 45
     env:
       BUILD_RUN_ID: ${{ needs.select.outputs.music_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.music_build }}
       BUILD_SHA: ${{ needs.select.outputs.music_sha }}
       APP_SETUP: ios
       APP_PROJECT: apps/raven/music
@@ -599,17 +376,20 @@ jobs:
       APP_LOGS: raven-music-e2e-logs
     steps: *e2e-steps
 
-  # Raven's Playwright suite, on the merged pull request's native pieces where the selection found
-  # them (desktop-native is then skipped), else on the ones it built in this run. It runs
+  # Raven's Playwright suite, on the native pieces the merged pull request built. It runs
   # `electron .`, never the packaged app, whose fuses turn off the inspector Playwright needs. The
   # target's `install:electron` step fetches the binary.
   desktop-e2e:
     name: 🎬 E2E Mac
-    needs: [select, desktop-native]
-    if: ${{ !cancelled() && needs.select.outputs.desktop_selected == 'true' && contains(fromJSON('["success", "skipped"]'), needs.desktop-native.result) }}
+    needs: select
+    if: needs.select.outputs.desktop_selected == 'true'
     runs-on: macos-26
     timeout-minutes: 30
+    env:
+      BUILD_MISSING: ${{ needs.select.outputs.desktop_build }}
     steps:
+      - *no-build
+
       - name: 📥 Checkout exact commit
         uses: actions/checkout@v7
         with:

@@ -1,7 +1,6 @@
 import { formatBytes } from '@raven/core'
 import {
   countsLineOf,
-  countValueOf,
   factsLineOf,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
@@ -12,12 +11,8 @@ import { useRouter } from 'expo-router'
 import { ScrollView, View } from 'react-native'
 
 import { useCovers } from '@/music/useCovers'
-import {
-  useDownloadsSummary,
-  usePlaylists,
-  useRecentAlbums,
-  useSongCount,
-} from '@/screens/library/listings'
+import { CATEGORIES } from '@/screens/library/categories'
+import { useDownloadsSummary, useLibraryValues, useRecentAlbums } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
 import { WREN_ROUTES, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
@@ -29,7 +24,7 @@ import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
 import { PageHeader } from '@/ui/PageHeader'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
+import { ICONS } from '@/ui/WrenIcon'
 import { type WrenSession, useWren } from '@/useWren'
 
 /** How many of the newest albums Library's grid shows: three rows on a phone, two on a tablet. */
@@ -46,40 +41,22 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   section: { gap: SPACE.s3 },
 }))
 
-type Category = { kind: LibrarySegment; label: string; icon: WrenIconName }
-
-/** Each category's row: its icon and its name, in the order Library lists them. */
-const CATEGORIES = [
-  { kind: LIBRARY_SEGMENTS.playlists, label: LIBRARY_PAGE_COPY.playlists, icon: ICONS.playlist },
-  { kind: LIBRARY_SEGMENTS.artists, label: LIBRARY_PAGE_COPY.artists, icon: ICONS.artist },
-  { kind: LIBRARY_SEGMENTS.albums, label: LIBRARY_PAGE_COPY.albums, icon: ICONS.album },
-  { kind: LIBRARY_SEGMENTS.songs, label: LIBRARY_PAGE_COPY.songs, icon: ICONS.song },
-  { kind: LIBRARY_SEGMENTS.downloads, label: LIBRARY_PAGE_COPY.downloads, icon: ICONS.downloads },
-] as const satisfies readonly Category[]
-
 type CategoryValuesProps = { session: WrenSession }
 
 /**
- * What each category holds, beside its row, where it costs next to nothing to know: the
- * playlists, the songs (each library's total, from a page of one track) and the downloads. The
- * server counts no albums or artists short of listing them all, so those rows hold no count, and
- * a count still on its way, or one that failed, is left out rather than guessed.
+ * What each category holds, beside its row: the server's counts summed over every music library
+ * (the albums, the artists, the unmatched albums, what is in progress, the favourites and what
+ * was finished), the playlists, each library's total of songs, and the downloads. A count still
+ * on its way, one that failed and a zero are left out rather than guessed.
  */
 const useCategoryValues = ({
   session,
 }: CategoryValuesProps): Record<LibrarySegment, string | undefined> => {
-  const songs = useSongCount({ session, search: '' })
-  const playlists = usePlaylists(session)
+  const shared = useLibraryValues(session)
   const downloads = useDownloadsSummary(session.server.id)
   const downloaded = countsLineOf({ albums: downloads.albums, playlists: downloads.playlists })
   return {
-    [LIBRARY_SEGMENTS.playlists]: countValueOf({
-      n: playlists.data?.length ?? null,
-      none: LIBRARY_PAGE_COPY.noneYet,
-    }),
-    [LIBRARY_SEGMENTS.artists]: undefined,
-    [LIBRARY_SEGMENTS.albums]: undefined,
-    [LIBRARY_SEGMENTS.songs]: countValueOf({ n: songs }),
+    ...shared,
     [LIBRARY_SEGMENTS.downloads]:
       downloaded === ''
         ? LIBRARY_PAGE_COPY.noneYet

@@ -341,6 +341,12 @@ export const isLibraryCounts = object({
   finished: isNumber,
   /** Titles with a Dolby Vision profile 5 file; absent from an older server, whose tab stays hidden. */
   dolbyVisionOnly: optional(isNumber),
+  /** A music library's albums; absent for any other library and from an older server, whose tab shows no count. */
+  albums: optional(isNumber),
+  /** A music library's album artists, as its Artists tab lists them; absent as `albums` is. */
+  artists: optional(isNumber),
+  /** A music library's albums no MusicBrainz release was found for; absent as `albums` is. */
+  unmatchedAlbums: optional(isNumber),
 })
 
 export type LibraryCounts = Infer<typeof isLibraryCounts>

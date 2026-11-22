@@ -128,6 +128,12 @@ export const ICONS = {
     'M7.5 7.5h.01M7.5 16.5h.01',
   ),
   trash: lines('M4.5 7h15M9.5 7V4.5h5V7M6.5 7l.9 12.5h9.2L17.5 7'),
+  grid: lines(
+    rect({ x: 3.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 13.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 3.5, y: 13.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 13.5, y: 13.5, width: 7, height: 7, rx: 1.5 }),
+  ),
   sort: lines('M7 4.5v15M4 16.5l3 3 3-3M17 19.5v-15M14 7.5l3-3 3 3'),
 } as const satisfies Record<string, Drawing>
 

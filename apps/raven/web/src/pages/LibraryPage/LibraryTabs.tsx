@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import type { Library } from '@raven/core'
 import { Icon } from '@raven/ui'
 import { Link } from 'react-router-dom'
-import { libraryCountsQuery } from '@/lib/queries'
+import { libraryCountsQuery, playlistsQuery } from '@/lib/queries'
 import {
+  LIBRARY_SECTIONS,
   type LibrarySection,
   SECTIONS,
   type Tallies,
   countText,
+  hasSection,
   isListed,
   sectionPath,
   sectionsFor,
@@ -23,17 +25,23 @@ type LibraryTabsProps = {
 /**
  * The library's tabs its type has, each a link to its own address, the open
  * one marked, with its icon and the count of what it holds, the account's
- * own counts once they come. A narrow screen shows the icon and count
+ * own counts (and a music library's playlists, the Playlists tab's own
+ * list) once they come, and none while they are on their way or failed. A narrow screen shows the icon and count
  * alone, the name still read aloud. The header already says the library's
  * counts aloud, so beside the tabs they are for the eye. The tabs replace
  * the address rather than stack on it, so Back leaves the library.
  */
 export const LibraryTabs = ({ library, current }: LibraryTabsProps) => {
   const counts = useQuery(libraryCountsQuery(library.id))
+  const playlists = useQuery({
+    ...playlistsQuery,
+    enabled: hasSection({ kind: library.settings.kind, section: LIBRARY_SECTIONS.playlists }),
+  })
   const tallies: Partial<Tallies> = {
     itemCount: library.itemCount,
     unmatchedCount: library.unmatchedCount,
     ...counts.data,
+    ...(playlists.data && { playlists: playlists.data.length }),
   }
   return (
     <nav aria-label={LIBRARY_COPY.sections} className={styles.tabsNav}>

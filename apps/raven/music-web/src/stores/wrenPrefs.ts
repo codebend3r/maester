@@ -2,10 +2,13 @@ import { isRecord } from '@raven/core'
 import {
   APPEARANCES,
   type Appearance,
+  COVER_SIZES,
+  type CoverSize,
   RECENT_SORTS,
   type RecentSort,
   WREN_PREFS_KEY,
   isAppearance,
+  isCoverSize,
   isRecentSort,
 } from '@raven/wren'
 import { create } from 'zustand'
@@ -20,6 +23,8 @@ type WrenPrefsValues = {
   appearance: Appearance
   /** The order of Home's albums. */
   homeSort: RecentSort
+  /** How large Albums draws its covers. */
+  coverSize: CoverSize
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -27,10 +32,11 @@ type WrenPrefs = WrenPrefsValues & {
   change: (change: Partial<WrenPrefsValues>) => void
 }
 
-/** A first visit: the system's appearance, and Home's albums by when they were added. */
+/** A first visit: the system's appearance, Home's albums by when they were added, medium covers. */
 export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   appearance: APPEARANCES.system,
   homeSort: RECENT_SORTS.added,
+  coverSize: COVER_SIZES.medium,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -39,13 +45,14 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
   return {
     appearance: isAppearance(kept.appearance) ? kept.appearance : DEFAULT_WREN_PREFS.appearance,
     homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
+    coverSize: isCoverSize(kept.coverSize) ? kept.coverSize : DEFAULT_WREN_PREFS.coverSize,
   }
 }
 
 /** The version the prefs are kept at, the apps' own, so both read the same shape. */
 const WREN_PREFS_VERSION = 1
 
-/** Settings' appearance and Home's order, persisted to localStorage and guarded when read. */
+/** Settings' appearance, Home's order and Albums' cover size, persisted to localStorage and guarded when read. */
 export const useWrenPrefs = create<WrenPrefs>()(
   persist(
     (set) => ({
@@ -58,7 +65,7 @@ export const useWrenPrefs = create<WrenPrefs>()(
       version: WREN_PREFS_VERSION,
       // Whatever an older version kept is read through the same guard.
       migrate: prefsOf,
-      partialize: ({ appearance, homeSort }) => ({ appearance, homeSort }),
+      partialize: ({ appearance, homeSort, coverSize }) => ({ appearance, homeSort, coverSize }),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },
   ),

@@ -10,6 +10,7 @@ import {
   type ShowListing,
   type UnmatchedFile,
   isRecord,
+  listsAlbums,
   matchTypeFor,
   mediaListQuery,
 } from '@raven/core'
@@ -28,6 +29,8 @@ import { ViewingAccount } from '@/media/viewingAccountParam'
 import { ViewingRepository } from '@/media/viewingRepository'
 import { MetadataRepository } from '@/metadata/metadataRepository'
 import { MetadataService } from '@/metadata/metadataService'
+import { MusicMatchStore } from '@/music/musicMatchStore'
+import { MusicRepository } from '@/music/musicRepository'
 import { QUERY_FLAGS, QUERY_PARAMS, pageLimit } from '@/queryValues'
 import { ROUTE_PARAMS } from '@/requestParts'
 import { LIBRARY_ROUTES } from '@/libraries/libraryRoutes'
@@ -52,6 +55,8 @@ export class LibraryListingsController {
     @Inject(MetadataService) private readonly metadata: MetadataService,
     @Inject(MetadataRepository) private readonly items: MetadataRepository,
     @Inject(TitleFavourites) private readonly titles: TitleFavourites,
+    @Inject(MusicRepository) private readonly music: MusicRepository,
+    @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
   ) {}
 
   /** The library's played videos, last played first; `watched=true` keeps the ones watched. */
@@ -97,7 +102,8 @@ export class LibraryListingsController {
 
   /**
    * How much each of its tabs holds for the caller, but All and Not matched,
-   * which the library counts. Each is counted without reading the listing.
+   * which the library counts, and a music library's Playlists, which are the
+   * account's across every library. Each is counted without reading the listing.
    */
   @Get(':id/counts')
   counts(
@@ -115,6 +121,11 @@ export class LibraryListingsController {
       duplicates: isMovies ? this.splits.count(libraryId) : 0,
       finished: this.viewing.finishedCount({ libraryId, account }),
       dolbyVisionOnly: this.dolbyVisionOnly.count(libraryId),
+      ...(listsAlbums(library.settings.kind) && {
+        albums: this.music.countAlbums(libraryId),
+        artists: this.music.countArtists(libraryId),
+        unmatchedAlbums: this.matches.unmatchedCount(libraryId),
+      }),
     }
   }
 

@@ -4,56 +4,75 @@ import {
   MUSIC_SORTS,
   type MusicSort,
   artistNames,
+  randomMusicSeed,
 } from '@raven/core'
 
 import { byTitle } from '@/library/order'
-import { LIBRARY_PAGE_COPY } from '@/copy/screens'
 import { RECENT_SORTS, type RecentSort } from '@/prefs'
 
-/** The orders Albums and Songs offer. */
-export const LIST_SORTS = {
-  title: 'title',
-  artist: 'artist',
-  year: 'year',
-  added: 'added',
-} as const
+/**
+ * The order Albums or Songs is in: one of raven's music sorts, the same list in the same order
+ * with the same words (core's `MUSIC_SORT_LABELS`), and the seed a random order is dealt by.
+ */
+export type ListOrder = { sort: MusicSort; seed: number }
 
-export type ListSort = (typeof LIST_SORTS)[keyof typeof LIST_SORTS]
+/** Where Albums and Songs start: by title. */
+export const FIRST_LIST_ORDER = { sort: MUSIC_SORTS.title, seed: 0 } as const satisfies ListOrder
 
-/** The sorts in the order the sort sheet lists them. */
-export const LIST_SORT_ORDER = Object.values(LIST_SORTS)
+/** The order a sort picked from the sheet gives, a random one dealt anew each pick. */
+export const listOrderOf = (sort: MusicSort): ListOrder => ({ sort, seed: randomMusicSeed() })
 
-/** What each sort is called on its button and in the sheet. */
-export const LIST_SORT_LABELS = {
-  [LIST_SORTS.title]: LIBRARY_PAGE_COPY.sorts.title,
-  [LIST_SORTS.artist]: LIBRARY_PAGE_COPY.sorts.artist,
-  [LIST_SORTS.year]: LIBRARY_PAGE_COPY.sorts.year,
-  [LIST_SORTS.added]: LIBRARY_PAGE_COPY.sorts.added,
-} as const satisfies Record<ListSort, string>
+type AlbumPair = { a: AlbumSummary; b: AlbumSummary; seed: number }
 
-/** The server's sort for each, which pages the songs in that order. */
-export const SERVER_SORTS = {
-  [LIST_SORTS.title]: MUSIC_SORTS.title,
-  [LIST_SORTS.artist]: MUSIC_SORTS.artist,
-  [LIST_SORTS.year]: MUSIC_SORTS.year,
-  [LIST_SORTS.added]: MUSIC_SORTS.added,
-} as const satisfies Record<ListSort, MusicSort>
+type AlbumOrder = (pair: AlbumPair) => number
 
-type AlbumOrder = (a: AlbumSummary, b: AlbumSummary) => number
+/** When an album came out, as the server orders by it: its date, else its year, else nothing. */
+const releasedOf = ({ releaseDate, year }: AlbumSummary): string | null =>
+  releaseDate ?? (year === null ? null : String(year))
 
-/** How each sort puts albums in order: by title, by artist, newest year first, newest added first. */
+type NewestFirstProps = { a: string | null | undefined; b: string | null | undefined }
+
+/** Newest first, an undated one last. */
+const newestFirst = ({ a, b }: NewestFirstProps): number => (b ?? '').localeCompare(a ?? '')
+
+/** Albums as a discography reads: by year, the undated last, then by title. */
+const byYear = (a: AlbumSummary, b: AlbumSummary): number =>
+  (a.year ?? Number.MAX_SAFE_INTEGER) - (b.year ?? Number.MAX_SAFE_INTEGER) || byTitle(a, b)
+
+type ShuffleRankProps = { id: number; seed: number }
+
+/** An album's place in a random order dealt by `seed`, the server's own hash of its id. */
+const shuffleRankOf = ({ id, seed }: ShuffleRankProps): number =>
+  (id * (1103515245 + seed * 2)) % 2147483647
+
+/**
+ * How each of raven's sorts puts albums in order, in its default direction, as the server
+ * lists one library's (`ALBUM_ORDER` in its music repository), so several libraries merge into
+ * the same order.
+ */
 const ALBUM_ORDERS = {
-  [LIST_SORTS.title]: byTitle,
-  [LIST_SORTS.artist]: (a, b) => artistNames(a).localeCompare(artistNames(b)) || byTitle(a, b),
-  [LIST_SORTS.year]: (a, b) => (b.year ?? 0) - (a.year ?? 0) || byTitle(a, b),
-  [LIST_SORTS.added]: (a, b) => b.addedAt.localeCompare(a.addedAt) || byTitle(a, b),
-} as const satisfies Record<ListSort, AlbumOrder>
+  [MUSIC_SORTS.title]: ({ a, b }) => byTitle(a, b),
+  [MUSIC_SORTS.artist]: ({ a, b }) => artistNames(a).localeCompare(artistNames(b)) || byYear(a, b),
+  [MUSIC_SORTS.year]: ({ a, b }) => byYear(a, b),
+  [MUSIC_SORTS.added]: ({ a, b }) => b.addedAt.localeCompare(a.addedAt) || b.id - a.id,
+  [MUSIC_SORTS.release]: ({ a, b }) =>
+    newestFirst({ a: releasedOf(a), b: releasedOf(b) }) || a.id - b.id,
+  [MUSIC_SORTS.played]: ({ a, b }) => newestFirst({ a: a.playedAt, b: b.playedAt }) || a.id - b.id,
+  [MUSIC_SORTS.plays]: ({ a, b }) => (b.plays ?? 0) - (a.plays ?? 0) || a.id - b.id,
+  [MUSIC_SORTS.random]: ({ a, b, seed }) =>
+    shuffleRankOf({ id: a.id, seed }) - shuffleRankOf({ id: b.id, seed }) || a.id - b.id,
+  [MUSIC_SORTS.modified]: ({ a, b }) =>
+    newestFirst({ a: a.modifiedAt, b: b.modifiedAt }) || a.id - b.id,
+} as const satisfies Record<MusicSort, AlbumOrder>
 
-type SortedAlbumsProps = { albums: readonly AlbumSummary[]; sort: ListSort }
+type SortedAlbumsProps = { albums: readonly AlbumSummary[]; order: ListOrder }
 
-/** The albums in the order `sort` names, a new list each time. */
-export const sortedAlbums = ({ albums, sort }: SortedAlbumsProps): AlbumSummary[] =>
-  albums.toSorted(ALBUM_ORDERS[sort])
+/** The albums in the order `order` names, a new list each time. */
+export const sortedAlbums = ({
+  albums,
+  order: { sort, seed },
+}: SortedAlbumsProps): AlbumSummary[] =>
+  albums.toSorted((a, b) => ALBUM_ORDERS[sort]({ a, b, seed }))
 
 type MatchingAlbumsProps = { albums: readonly AlbumSummary[]; query: string }
 
@@ -83,18 +102,8 @@ export const RECENT_SERVER_SORTS = {
   [RECENT_SORTS.release]: MUSIC_SORTS.release,
 } as const satisfies Record<RecentSort, MusicSort>
 
-/** When an album came out, as the server orders by it: its date, else its year, else nothing. */
-const releasedOf = ({ releaseDate, year }: AlbumSummary): string =>
-  releaseDate ?? (year === null ? '' : String(year))
-
-/** How each puts several libraries' albums in one order, newest first, an undated release last. */
-const RECENT_ORDERS = {
-  [RECENT_SORTS.added]: ALBUM_ORDERS[LIST_SORTS.added],
-  [RECENT_SORTS.release]: (a, b) => releasedOf(b).localeCompare(releasedOf(a)) || byTitle(a, b),
-} as const satisfies Record<RecentSort, AlbumOrder>
-
 type RecentAlbumsProps = { albums: readonly AlbumSummary[]; sort: RecentSort; limit: number }
 
-/** The newest `limit` of several libraries' newest albums by `sort`, newest first. */
+/** The newest `limit` of several libraries' newest albums by `sort`, newest first, as Albums orders them. */
 export const recentAlbums = ({ albums, sort, limit }: RecentAlbumsProps): AlbumSummary[] =>
-  albums.toSorted(RECENT_ORDERS[sort]).slice(0, limit)
+  sortedAlbums({ albums, order: { sort: RECENT_SERVER_SORTS[sort], seed: 0 } }).slice(0, limit)

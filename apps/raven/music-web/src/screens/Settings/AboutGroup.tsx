@@ -1,6 +1,6 @@
 import { SETTINGS_COPY } from '@raven/wren'
 import { useState } from 'react'
-import { version } from '#package'
+import { wrenVersion } from '@/lib/version'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { FactRow } from '@/ui/FactRow/FactRow'
 import { GroupedList } from '@/ui/GroupedList/GroupedList'
@@ -29,7 +29,11 @@ export function AboutGroup() {
   return (
     <>
       <GroupedList heading={SETTINGS_COPY.about}>
-        <FactRow icon={ICONS.info} label={SETTINGS_COPY.version} value={version} />
+        <FactRow
+          icon={ICONS.info}
+          label={SETTINGS_COPY.version}
+          value={SETTINGS_COPY.versionOf(wrenVersion)}
+        />
         <NavigationRow
           label={SETTINGS_COPY.licenses}
           onPress={() => setIsShowingLicenses(true)}

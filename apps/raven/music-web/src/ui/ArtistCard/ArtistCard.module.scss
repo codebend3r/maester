@@ -1,0 +1,39 @@
+@use '../../styles/mixins';
+
+.card {
+  display: grid;
+  // The name and its counts sit together in the middle beside the photo, the name alone too.
+  grid-template-areas:
+    'photo .'
+    'photo name'
+    'photo counts'
+    'photo .';
+  grid-template-columns: var(--size-artist-photo) minmax(0, 1fr);
+  grid-template-rows: 1fr auto auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  inline-size: 100%;
+  padding: var(--space-2);
+  text-align: start;
+
+  @include mixins.card-surface;
+}
+
+.photo {
+  display: grid;
+  grid-area: photo;
+}
+
+.name {
+  grid-area: name;
+  color: var(--color-text);
+  font: var(--type-card-title);
+
+  @include mixins.one-line;
+}
+
+.counts {
+  grid-area: counts;
+
+  @include mixins.meta-line;
+  @include mixins.one-line;
+}

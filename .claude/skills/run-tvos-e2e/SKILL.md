@@ -6,7 +6,7 @@ description: >-
 
 # Run the Apple TV check locally
 
-The `🏗️ Build Apple TV` and `🎬 E2E Apple TV` jobs (the build listed in `.github/workflows/pull-request-checks.yml` and in `.github/workflows/native-checks.yml`, the flow in `native-checks.yml` alone, on main; CI builds on one runner and runs the flow on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🏗️ Build Apple TV` and `🎬 E2E Apple TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flow in `native-checks.yml` alone, on main; CI builds on one runner and runs the flow on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:app:tvos

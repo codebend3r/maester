@@ -8,7 +8,7 @@ $initial-share: 0.42;
   inline-size: var(--avatar-size);
   block-size: var(--avatar-size);
   overflow: hidden;
-  border-radius: var(--radius-pill);
+  border-radius: var(--avatar-radius, var(--radius-pill));
   background: var(--color-surface-2);
 
   > * {

@@ -11,7 +11,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   avatar: {
     alignItems: 'center',
     backgroundColor: colors.surface2,
-    borderRadius: RADIUS.pill,
     justifyContent: 'center',
     overflow: 'hidden',
   },
@@ -21,18 +20,25 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
 type ArtistAvatarProps = {
   name: string
   size?: number
+  /** Its corners, where it is no circle: an artist's card rounds a square. */
+  radius?: number
   /** The artist's picture, or null until the server has one, when the initial stands alone. */
   picture: Cover | null
 }
 
 /** An artist's circle: their picture, or their initial in Young Serif. Decorative beside their name. */
-export function ArtistAvatar({ name, size = SIZE.avatar, picture }: ArtistAvatarProps) {
+export function ArtistAvatar({
+  name,
+  size = SIZE.avatar,
+  radius = RADIUS.pill,
+  picture,
+}: ArtistAvatarProps) {
   const styles = useStyles()
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.avatar, { width: size, height: size }]}
+      style={[styles.avatar, { width: size, height: size, borderRadius: radius }]}
     >
       <Text style={[styles.initial, { fontSize: size * INITIAL_SHARE }]}>
         {name.slice(0, 1).toUpperCase()}

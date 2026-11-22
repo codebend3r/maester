@@ -8,6 +8,13 @@
   }
 }
 
+// As many tiles a row as `--tile-size` allows, each stretched to share the row.
+.fitted {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile-size), 100%), 1fr));
+  gap: var(--space-5) var(--size-row-gap);
+}
+
 .cell {
   display: grid;
   min-inline-size: 0;

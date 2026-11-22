@@ -1,17 +1,11 @@
-import {
-  HOME_COPY,
-  LIBRARY_PAGE_COPY,
-  LIBRARY_SEGMENTS,
-  type LibrarySegment,
-  SEARCH_COPY,
-  SETTINGS_COPY,
-} from '@raven/wren'
+import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
 import { type Href, usePathname, useRouter } from 'expo-router'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { WrenLockup } from '@/components/WrenLockup'
 import { WREN_ROUTES, collectionPathOf, libraryHref } from '@/routes'
+import { CATEGORIES, type Category } from '@/screens/library/categories'
 import { type WrenTheme, themedStyles, useIsPortrait, useWrenTheme } from '@/theme/wrenTheme'
 import { FONTS, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
@@ -24,12 +18,13 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
     backgroundColor: colors.surface,
     borderRightColor: colors.line,
     borderRightWidth: SIZE.hairline,
-    gap: SPACE.s1,
-    paddingBottom: SPACE.s4,
-    paddingHorizontal: SPACE.s3,
+    flexGrow: 0,
     width: SHELL_SIZES.tabletSidebar,
   },
-  rail: { alignItems: 'center', paddingHorizontal: SPACE.s3, width: SHELL_SIZES.tabletRail },
+  rail: { width: SHELL_SIZES.tabletRail },
+  // Grown to the sidebar's height, so Settings keeps to its foot until the places outgrow it.
+  places: { flexGrow: 1, gap: SPACE.s1, paddingBottom: SPACE.s4, paddingHorizontal: SPACE.s3 },
+  railPlaces: { alignItems: 'center' },
   lockup: { paddingBottom: SPACE.s6, paddingHorizontal: SPACE.s2 },
   overline: {
     ...TYPE.overline,
@@ -66,9 +61,8 @@ const tabPlace = ({ label, icon, path }: TabPlaceProps): SidebarPlace => ({
   path,
 })
 
-type CollectionPlaceProps = { kind: LibrarySegment; label: string; icon: WrenIconName }
-
-const collectionPlace = ({ kind, label, icon }: CollectionPlaceProps): SidebarPlace => ({
+/** One of Library's categories as a place the sidebar opens. */
+const collectionPlace = ({ kind, label, icon }: Category): SidebarPlace => ({
   key: kind,
   label,
   icon,
@@ -82,34 +76,8 @@ const TOP_PLACES = [
   tabPlace({ label: SEARCH_COPY.title, icon: ICONS.search, path: WREN_ROUTES.search }),
 ] as const
 
-/** Library's categories, under its overline. */
-const LIBRARY_PLACES = [
-  collectionPlace({
-    kind: LIBRARY_SEGMENTS.playlists,
-    label: LIBRARY_PAGE_COPY.playlists,
-    icon: ICONS.playlist,
-  }),
-  collectionPlace({
-    kind: LIBRARY_SEGMENTS.artists,
-    label: LIBRARY_PAGE_COPY.artists,
-    icon: ICONS.artist,
-  }),
-  collectionPlace({
-    kind: LIBRARY_SEGMENTS.albums,
-    label: LIBRARY_PAGE_COPY.albums,
-    icon: ICONS.album,
-  }),
-  collectionPlace({
-    kind: LIBRARY_SEGMENTS.songs,
-    label: LIBRARY_PAGE_COPY.songs,
-    icon: ICONS.song,
-  }),
-  collectionPlace({
-    kind: LIBRARY_SEGMENTS.downloads,
-    label: LIBRARY_PAGE_COPY.downloads,
-    icon: ICONS.downloads,
-  }),
-] as const
+/** Library's categories, under its overline, in Library's order. */
+const LIBRARY_PLACES = CATEGORIES.map(collectionPlace)
 
 const SETTINGS_PLACE = tabPlace({
   label: SETTINGS_COPY.title,
@@ -156,7 +124,15 @@ export function TabletSidebar() {
   const session = useWren()
   const { top } = useSafeAreaInsets()
   return (
-    <View style={[styles.sidebar, isRail && styles.rail, { paddingTop: top + SPACE.s4 }]}>
+    <ScrollView
+      contentContainerStyle={[
+        styles.places,
+        isRail && styles.railPlaces,
+        { paddingTop: top + SPACE.s4 },
+      ]}
+      showsVerticalScrollIndicator={false}
+      style={[styles.sidebar, isRail && styles.rail]}
+    >
       {!isRail && (
         <View style={styles.lockup}>
           <WrenLockup size={SIZE.lockup} />
@@ -176,6 +152,6 @@ export function TabletSidebar() {
       <View style={styles.spacer} />
       <SidebarItem isRail={isRail} place={SETTINGS_PLACE} />
       {!isRail && session !== null && <ServerStatusChip session={session} />}
-    </View>
+    </ScrollView>
   )
 }

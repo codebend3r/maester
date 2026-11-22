@@ -1,17 +1,25 @@
-import { type Library, MUSIC_SORTS, type Track } from '@raven/core'
+import { type Library, MUSIC_SORTS, type MediaItem, type Track } from '@raven/core'
+import { HISTORY_SHOWS } from '@raven/ui/headless'
 import {
+  albumIdsOf,
   albumsByTitle,
   artistsByName,
-  type ListSort,
+  FINISHED_SHOWN,
+  inLibraryOrder,
+  libraryValuesOf,
+  type ListOrder,
+  type ListState,
   listStateOf,
+  listedTracksOf,
   mergedOf,
   nextPageOf,
   RECENT_SERVER_SORTS,
   type RecentSort,
   recentAlbums,
-  SERVER_SORTS,
+  recentlyFinished,
   songCountOf,
   tracksOfPages,
+  unmatchedAlbumsOf,
 } from '@raven/wren'
 import {
   type QueryKey,
@@ -141,21 +149,22 @@ export const useSongCount = ({ session, search }: UseSongCountProps): number | n
 const NO_TRACKS: readonly Track[] = []
 
 type UseAllSongsProps = ListingsProps & {
-  /** The order the server pages them in. */
-  sort: ListSort
+  /** The order the server pages them in, and the seed it deals a random one by. */
+  order: ListOrder
 }
 
 /**
- * Every music library's songs that `search` finds, a page at a time in the order `sort` names:
+ * Every music library's songs that `search` finds, a page at a time in the order `order` names:
  * what is read so far, where the list stands, and `nextPage`, which a list calls near its end.
  */
-export const useAllSongs = ({ session, search, sort, isEnabled = true }: UseAllSongsProps) => {
+export const useAllSongs = ({ session, search, order, isEnabled = true }: UseAllSongsProps) => {
   const music = useMusicLibraries(session)
   const songs = useInfiniteQuery({
     ...session.queries.songsQuery({
       libraryIds: music.libraries.map(({ id }) => id),
       search,
-      sort: SERVER_SORTS[sort],
+      sort: order.sort,
+      seed: order.seed,
     }),
     enabled: isEnabled,
   })
@@ -168,6 +177,94 @@ export const useAllSongs = ({ session, search, sort, isEnabled = true }: UseAllS
 
 /** The account's playlists and the shared ones. */
 export const usePlaylists = (session: WrenSession) => useQuery(session.queries.playlistsQuery)
+
+/**
+ * Every music library's albums no MusicBrainz release was found for, as one list by title, and
+ * where it stands: Albums' own listing, so the two share what the server sent.
+ */
+export const useUnmatchedAlbums = (session: WrenSession) => {
+  const { entries, listing } = useMergedListing({
+    session,
+    build: (library) => ({
+      ...session.queries.albumsQuery({
+        libraryId: library.id,
+        search: '',
+        sort: MUSIC_SORTS.title,
+      }),
+      select: unmatchedAlbumsOf,
+    }),
+    order: albumsByTitle,
+  })
+  return { albums: entries, listing }
+}
+
+type UseListedTracksProps = {
+  session: WrenSession
+  media: readonly MediaItem[]
+  listing: ListState
+}
+
+/** Music files as the tracks they are, read from their albums' pages, and where the list stands. */
+const useListedTracks = ({ session, media, listing }: UseListedTracksProps) => {
+  const albums = useQueries({
+    queries: albumIdsOf(media).map((id) => session.queries.albumQuery(id)),
+  })
+  return listedTracksOf({ media, listing, albums })
+}
+
+/** The songs left partway through in every music library, each library's most recent first. */
+export const useInProgressTracks = (session: WrenSession) => {
+  const { entries, listing } = useMergedListing({
+    session,
+    build: (library) => session.queries.inProgressQuery(library.id),
+    order: inLibraryOrder,
+  })
+  return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
+}
+
+/** The songs marked a favourite in every music library, each library's most recently marked first. */
+export const useFavouriteTracks = (session: WrenSession) => {
+  const { entries, listing } = useMergedListing({
+    session,
+    build: (library) => session.queries.libraryFavouritesQuery(library.id),
+    order: inLibraryOrder,
+  })
+  return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
+}
+
+/** The songs played to their end most recently in every music library, the newest first. */
+export const useFinishedTracks = (session: WrenSession) => {
+  const { entries, listing } = useMergedListing({
+    session,
+    build: (library) =>
+      session.queries.historyQuery({
+        libraryId: library.id,
+        show: HISTORY_SHOWS.watched,
+        limit: FINISHED_SHOWN,
+      }),
+    order: recentlyFinished,
+  })
+  return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
+}
+
+/**
+ * What each category the web shares holds, added up over every music library from the server's
+ * counts, the playlists and the songs; a count still on its way, failed or none is left out.
+ */
+export const useLibraryValues = (session: WrenSession) => {
+  const { music, listings } = usePerLibrary({
+    session,
+    build: (library) => session.queries.libraryCountsQuery(library.id),
+  })
+  const playlists = usePlaylists(session)
+  const songs = useSongCount({ session, search: '' })
+  return libraryValuesOf({
+    music,
+    counts: listings,
+    playlists: playlists.data?.length ?? null,
+    songs,
+  })
+}
 
 /** What is downloaded from the active server: its albums, playlists and bytes. */
 export const useDownloadsSummary = (serverId: string) => {

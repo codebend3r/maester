@@ -9,6 +9,7 @@ import {
   OFFLINE_COPY,
   RECENT_SORTS,
   type RecentSort,
+  recentDateLineOf,
 } from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { type ComponentType, useState } from 'react'
@@ -234,7 +235,12 @@ function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
         items={albums}
         keyOf={(album) => album.id}
         renderTile={({ item, width }) => (
-          <AlbumTileOf album={item} coverOf={coverOf} width={width} />
+          <AlbumTileOf
+            album={item}
+            coverOf={coverOf}
+            detail={recentDateLineOf({ album: item, sort })}
+            width={width}
+          />
         )}
       />
     </View>

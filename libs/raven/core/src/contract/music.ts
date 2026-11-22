@@ -10,6 +10,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
 } from '@/schema'
 
 /** What a release is, as its tags or MusicBrainz say: `album` when nothing says. */
@@ -83,6 +84,12 @@ export const isAlbumSummary = object({
   match: isMatchState,
   /** When its first track came in. */
   addedAt: isString,
+  /** When its newest file last changed on disk; an older server leaves it out. */
+  modifiedAt: optional(isString),
+  /** When the account last played one of its tracks, null for never; an older server leaves it out. */
+  playedAt: optional(nullable(isString)),
+  /** How many times the account has played its tracks; an older server leaves it out. */
+  plays: optional(isNumber),
 })
 
 export type AlbumSummary = Infer<typeof isAlbumSummary>
