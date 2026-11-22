@@ -1,0 +1,55 @@
+name: ▶️ raven Mac playback check
+description: >-
+  Runs one of the desktop's playback checks on a macOS arm64 runner against the native handoff
+  of whichever run holds it: `bun run desktop:<target>`. The caller checks out the commit first.
+
+# Shared by 🧪 Test Mac player (pull-request-checks.yml and native-checks.yml) and by main's
+# Playwright suite (native-checks.yml). It selects the native build's Xcode, which the cached
+# results are keyed on; the workflow sets NX_CLOUD_ACCESS_TOKEN.
+inputs:
+  target:
+    description: The desktop check to run, the root script's name after `desktop:`.
+    required: true
+  build-run-id:
+    description: The run that holds the native handoff.
+    required: true
+  build-sha:
+    description: The commit the native handoff is named for.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: 🛠️ Xcode
+      uses: ./.github/actions/raven-xcode
+
+    - name: 🍞 Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version-file: package.json
+
+    - name: 📦 Install
+      shell: bash
+      run: bun install --frozen-lockfile
+
+    # The token lets it read another run's artifact, the pull request's.
+    - name: 📥 Playback handoff
+      uses: actions/download-artifact@v8
+      with:
+        name: raven-native-handoff-${{ inputs.build-sha }}
+        run-id: ${{ inputs.build-run-id }}
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}
+
+    - name: 📂 Unpack the playback handoff
+      shell: bash
+      run: tar -xf "$RUNNER_TEMP/raven-native-handoff.tar"
+
+    # Cached on the desktop and native sources and the Xcode version. The source-built ffmpeg
+    # encodes the test clips; `clips.ts` passes `-allow_sw 1`, so VideoToolbox falls back to its
+    # software H.264 encoder on a VM.
+    - name: ▶️ Run the check
+      shell: bash
+      env:
+        RAVEN_E2E_FFMPEG: ${{ github.workspace }}/libs/raven/mpv/native-build/prefix/bin/ffmpeg
+      run: bun run desktop:${{ inputs.target }}

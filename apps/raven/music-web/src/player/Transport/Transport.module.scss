@@ -1,0 +1,28 @@
+// Now Playing's is spread across the width; Up next's and the bar's sit together in the middle.
+@mixin row {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+}
+
+.player,
+.lyrics,
+.column {
+  @include row;
+
+  justify-content: space-between;
+}
+
+.queue {
+  @include row;
+
+  gap: var(--size-player-gutter);
+  justify-content: center;
+}
+
+.bar {
+  @include row;
+
+  gap: var(--space-4);
+  justify-content: center;
+}

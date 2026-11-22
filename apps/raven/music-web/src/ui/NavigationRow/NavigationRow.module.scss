@@ -1,0 +1,42 @@
+@use '../../styles/mixins';
+
+// The label takes the room the end, its value and chevron, leaves.
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: var(--size-nav-row);
+}
+
+// With a lead before the label: Library's icon, or a Settings tile.
+.led {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.label {
+  @include mixins.one-line;
+  color: var(--color-text);
+}
+
+.library {
+  font: var(--type-row-large);
+}
+
+.settings {
+  font: var(--type-row-title);
+}
+
+.end {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.value {
+  color: var(--color-text-3);
+  font: var(--type-body);
+  white-space: nowrap;
+}

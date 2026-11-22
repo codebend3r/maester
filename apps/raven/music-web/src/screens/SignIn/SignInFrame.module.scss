@@ -1,0 +1,121 @@
+// The narrow layout: one column, the server and Maester pushed to its foot.
+.phone {
+  display: grid;
+  grid-template-areas:
+    'head'
+    'body'
+    'foot';
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-8);
+  min-block-size: 100dvh;
+  padding: calc(env(safe-area-inset-top) + var(--size-sign-in-inset)) var(--space-6)
+    calc(env(safe-area-inset-bottom) + var(--space-10));
+}
+
+.head {
+  display: grid;
+  grid-area: head;
+  gap: var(--space-5);
+  justify-items: start;
+}
+
+.titles {
+  display: grid;
+  gap: var(--space-2);
+}
+
+// The wide layout leaves room under the titles, over the form.
+.spaced {
+  padding-block-end: var(--space-2);
+}
+
+.body {
+  display: grid;
+  grid-area: body;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-tablet-title);
+}
+
+.note {
+  color: var(--color-text-2);
+  font: var(--type-body);
+}
+
+.foot {
+  display: grid;
+  grid-area: foot;
+  grid-template-columns: auto;
+  gap: var(--space-2);
+  place-content: end center;
+  justify-items: center;
+}
+
+.family {
+  color: var(--color-text-3);
+  font: var(--type-small);
+}
+
+// The wide layout: the brand's half beside the form's.
+.split {
+  display: grid;
+  grid-template-areas: 'brand side';
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-block-size: 100dvh;
+}
+
+// Night in both themes: the brand's half of the screen never follows the appearance.
+.brand {
+  display: grid;
+  grid-area: brand;
+  grid-template-areas:
+    'lockup'
+    'hero'
+    'tagline';
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-6);
+  padding: var(--size-sign-in-inset);
+  background: var(--color-night);
+}
+
+.lockup {
+  display: grid;
+  grid-area: lockup;
+  justify-items: start;
+}
+
+.hero {
+  display: grid;
+  grid-area: hero;
+  place-items: center;
+}
+
+.tagline {
+  grid-area: tagline;
+  max-inline-size: var(--size-sign-in-tagline);
+  color: var(--color-bark);
+  font: var(--type-lyric);
+}
+
+.side {
+  display: grid;
+  grid-area: side;
+  place-items: center;
+  padding: var(--space-10);
+}
+
+.column {
+  display: grid;
+  gap: var(--space-4);
+  inline-size: 100%;
+  max-inline-size: var(--size-sign-in-form);
+}
+
+// The chip keeps its own width, at the column's end.
+.server {
+  display: grid;
+  grid-template-columns: auto;
+  justify-content: end;
+}

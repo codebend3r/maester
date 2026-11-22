@@ -309,5 +309,5 @@ export const BREAKPOINTS = { tablet: 744 } as const
  */
 export const OPACITIES = { pressed: 0.85, disabled: 0.4, sung: 0.55 } as const
 
-/** How long a sheet or Now Playing takes to rise, and how long a toast stays, in milliseconds. */
-export const MOTION = { sheet: 320, toast: 2400 } as const
+/** How long a sheet or Now Playing takes to rise, in milliseconds. */
+export const MOTION = { sheet: 320 } as const

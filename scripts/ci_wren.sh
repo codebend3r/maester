@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Runs the 🏗️ Build Wren iPhone job and its end to end job, which native-checks.yml runs on
-# two runners, on this Mac: the
-# libraries, the fixture server, the iPhone simulator, Wren's Release build through ccache,
-# the pods check, the install and the Maestro flows. Run again, it reuses the simulator and a
-# fixture server already listening.
+# Runs the 🏗️ Build Wren iPhone job and its end to end job, which CI runs on two runners, on
+# this Mac: the libraries, the fixture server, the iPhone simulator, Wren's Release build
+# through ccache, the pods check, the install and the Maestro flows. Run again, it reuses the
+# simulator and a fixture server already listening.
 #
 #   bun run ci:wren                         every step
 #   bun run ci:wren -- --skip-nx-cache      the flows for real, even on a cached pass

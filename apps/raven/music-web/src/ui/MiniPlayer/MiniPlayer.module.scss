@@ -1,0 +1,34 @@
+@use '../../styles/mixins';
+
+.card {
+  position: relative;
+  display: grid;
+  grid-template-areas: 'open toggle next';
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  block-size: var(--size-mini-player);
+  padding-inline: var(--size-float-inset) var(--space-1);
+  @include mixins.card-surface;
+  background: var(--color-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.open {
+  grid-area: open;
+  gap: var(--space-3);
+  block-size: 100%;
+}
+
+// The thin line along the card's foot for how far the track has played.
+.track {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  display: grid;
+  block-size: var(--size-progress-line);
+}
+
+.progress {
+  inline-size: var(--played);
+  background: var(--color-accent-text);
+}

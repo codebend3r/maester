@@ -1,0 +1,60 @@
+name: 🔩 raven Mac native build and handoff
+description: >-
+  Builds Raven's native pieces on a macOS arm64 runner, uploads them as the handoff the Mac app,
+  the player's tests and main's suite read, audits them and runs the headless libmpv tests. The
+  caller checks out the commit first.
+
+# Shared by the 🏗️ Build Mac native job of pull-request-checks.yml and of native-checks.yml. One
+# native build feeds packaging, the player's tests and main's suite through an artifact. The
+# native build selects Xcode for the steps after it; the workflow sets NX_CLOUD_ACCESS_TOKEN.
+inputs:
+  sha:
+    description: The commit that was checked out, which the artifacts are named for.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Shared with desktop-release.yml so a release builds as this does.
+    - name: 🔩 Build the native pieces
+      uses: ./.github/actions/raven-desktop-native
+
+    # A tar keeps ffmpeg's execute bit, which an artifact drops.
+    - name: 📦 Pack the playback handoff
+      shell: bash
+      run: >-
+        tar -cf "$RUNNER_TEMP/raven-native-handoff.tar"
+        libs/raven/mpv/resources/darwin-arm64
+        libs/raven/mpv/native-build/prefix/bin/ffmpeg
+
+    # The Mac app and the player's tests read it, and so does main's suite once the pull request
+    # merges, which can be weeks after it was built.
+    - name: 📤 Playback handoff
+      uses: actions/upload-artifact@v7
+      with:
+        name: raven-native-handoff-${{ inputs.sha }}
+        path: ${{ runner.temp }}/raven-native-handoff.tar
+        if-no-files-found: error
+        retention-days: 30
+        # A re-run of this job replaces the handoff its first attempt left.
+        overwrite: true
+
+    # Both only read the built resources, so Nx runs them at once.
+    - name: 🔎 Audit native resources and run the real headless libmpv tests
+      shell: bash
+      run: bun run mpv:native
+
+    - name: 📤 Native playback resources
+      uses: actions/upload-artifact@v7
+      with:
+        name: raven-native-darwin-arm64-${{ inputs.sha }}
+        path: libs/raven/mpv/resources/darwin-arm64
+        if-no-files-found: error
+
+    # mpv's GPL and FFmpeg's LGPL want the matching source beside the binaries.
+    - name: 📤 Matching native sources
+      uses: actions/upload-artifact@v7
+      with:
+        name: raven-native-sources-${{ inputs.sha }}
+        path: libs/raven/mpv/native-build/source-bundle
+        if-no-files-found: error

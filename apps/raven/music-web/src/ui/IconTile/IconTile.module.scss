@@ -1,0 +1,17 @@
+.tile {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-icon-tile);
+  block-size: var(--size-icon-tile);
+  border-radius: var(--radius-sm);
+}
+
+.quiet {
+  background: var(--color-surface-2);
+  color: var(--color-text-2);
+}
+
+.accent {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+}

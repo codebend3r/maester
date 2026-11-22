@@ -1,0 +1,47 @@
+@use '../../styles/mixins';
+
+.card {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.press {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+
+  // The card clips what leaves it, so the ring is drawn inside.
+  &:focus-visible {
+    outline-offset: calc(-1 * var(--focus-offset));
+  }
+}
+
+.tile {
+  display: grid;
+  place-items: center;
+  inline-size: var(--size-mini-art);
+  block-size: var(--size-mini-art);
+  border-radius: var(--radius-item);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.accent {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.text {
+  @include mixins.stacked-lines;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.value {
+  @include mixins.meta-line;
+}

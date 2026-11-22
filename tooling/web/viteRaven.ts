@@ -1,4 +1,4 @@
-import { URL_PROTOCOLS } from '@raven/core'
+import { DEFAULT_SERVER_ORIGIN, URL_PROTOCOLS } from '@raven/core'
 import { loadEnv } from 'vite'
 
 // What the Vite configs of raven's web app and Wren's share.
@@ -20,10 +20,22 @@ const NETLIFY_VALUES = { on: 'true' } as const
  * `/api` proxy, with no cookie or token, so only raven's capability pictures (`/api/pictures`) go
  * through it.
  */
-export const NETLIFY_IMAGE_CDN = '/.netlify/images'
+const NETLIFY_IMAGE_CDN = '/.netlify/images'
 
 /** Whether this is a Netlify build, which `netlify.toml` serves with /api proxied to raven. */
-export const IS_NETLIFY = process.env[RAVEN_ENV.netlify] === NETLIFY_VALUES.on
+const IS_NETLIFY = process.env[RAVEN_ENV.netlify] === NETLIFY_VALUES.on
+
+/**
+ * What both builds fill in for the page: where pictures go through Netlify's Image CDN, and
+ * raven's own origin on Netlify, where `netlify.toml` proxies /api, signed, to it, so music plays
+ * from raven itself and never through the proxy. Both are '' when /api is raven itself.
+ * core's `DEFAULT_SERVER_ORIGIN` is that origin, and each app's `netlifyToml.test.ts` fails when
+ * its proxy names any other.
+ */
+export const NETLIFY_DEFINES = {
+  'import.meta.env.VITE_PICTURE_CDN': JSON.stringify(IS_NETLIFY ? NETLIFY_IMAGE_CDN : ''),
+  'import.meta.env.VITE_API_ORIGIN': JSON.stringify(IS_NETLIFY ? DEFAULT_SERVER_ORIGIN : ''),
+} as const
 
 const WEB_PROTOCOLS = new Set<string>([URL_PROTOCOLS.http, URL_PROTOCOLS.https])
 
@@ -40,7 +52,7 @@ type DevApiOriginProps = {
  * The raven the dev server proxies /api to: RAVEN_DEV_API_ORIGIN from the shell, else from
  * raven's `.env`, else the local server. An http or https origin with no path.
  */
-export const devApiOrigin = ({ mode, ravenDir, example }: DevApiOriginProps): string => {
+const devApiOrigin = ({ mode, ravenDir, example }: DevApiOriginProps): string => {
   const origin =
     process.env[RAVEN_ENV.devApiOrigin] ?? loadEnv(mode, ravenDir, '')[RAVEN_ENV.devApiOrigin] ?? ''
   if (!origin) return LOCAL_API_ORIGIN
@@ -62,13 +74,33 @@ const posixId = (id: string) => id.replaceAll('\\', '/')
 const vendorChunkTest = (packages: readonly string[]) => (id: string) =>
   packages.some((name) => posixId(id).includes(`/node_modules/${name}/`))
 
-/** A chunk of its own, and the packages that go in it. */
-type VendorChunk = { name: string; packages: readonly string[] }
+/** The paths the dev server hands to raven. */
+const PROXIED_PATHS = { api: '/api' } as const
 
-/** rolldown's code splitting groups for an app's `VENDOR_CHUNKS`, one chunk each. */
-export const vendorChunkGroups = (chunks: readonly VendorChunk[]) =>
-  chunks.map(({ name, packages }) => ({
-    name,
-    test: vendorChunkTest(packages),
-    priority: VENDOR_PRIORITY,
-  }))
+/**
+ * The dev server's /api proxy to the raven `devApiOrigin` names. raven runs on its own port in
+ * development, or on another machine, so the browser sees one origin and the session's cookie
+ * opens every cover and track; the Host header follows the target, as a raven behind a name
+ * expects.
+ */
+export const apiProxy = (props: DevApiOriginProps) =>
+  ({ [PROXIED_PATHS.api]: { target: devApiOrigin(props), changeOrigin: true } }) as const
+
+/**
+ * The dependencies that change on their own schedule, each in a chunk of its own, so a release
+ * leaves their cached chunks as they were and no chunk nears Vite's 500 kB warning. Everything
+ * else, raven's own libraries included, is rolldown's to split.
+ */
+const VENDOR_CHUNKS = [
+  { name: 'react', packages: ['react', 'react-dom', 'scheduler'] },
+  { name: 'router', packages: ['react-router', 'react-router-dom'] },
+  { name: 'query', packages: ['@tanstack/react-query', '@tanstack/query-core'] },
+  { name: 'supabase', packages: ['@supabase'] },
+] as const
+
+/** rolldown's code splitting groups for the vendor chunks, one chunk each. */
+export const VENDOR_GROUPS = VENDOR_CHUNKS.map(({ name, packages }) => ({
+  name,
+  test: vendorChunkTest(packages),
+  priority: VENDOR_PRIORITY,
+}))

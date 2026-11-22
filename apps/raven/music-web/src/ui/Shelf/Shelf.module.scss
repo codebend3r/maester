@@ -1,0 +1,17 @@
+.shelf {
+  display: grid;
+  grid-auto-columns: var(--size-shelf-tile);
+  grid-auto-flow: column;
+  gap: var(--size-row-gap);
+  justify-content: start;
+  overflow-x: auto;
+  // stylelint-disable-next-line declaration-property-value-allowed-list -- the row runs past the page's gutter to its edges, which no gap or padding can do
+  margin-inline: calc(-1 * var(--page-gutter));
+  padding-inline: var(--page-gutter);
+  scrollbar-width: none;
+}
+
+.cell {
+  display: grid;
+  min-inline-size: 0;
+}

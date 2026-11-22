@@ -9,9 +9,9 @@ Each `ci:*` command runs one CI job on this machine, so a check that fails on a 
 | `bun run ci:app:tvos`       | `scripts/ci_app_tvos.sh`        | The 🏗️ Build Apple TV job and its end to end job: the Release build for the Apple TV simulator, the pods check and the XCUITest driven by the Siri Remote.                          |
 | `bun run ci:app:android-tv` | `scripts/ci_app_android_tv.sh`  | The 🏗️ Build Android TV job and its end to end job: the Android TV emulator (arm64), the Release APK and the Maestro flows. It leaves the emulator running so the next run skips the boot. |
 | `bun run ci:wren`           | `scripts/ci_wren.sh`            | The 🏗️ Build Wren iPhone job and its end to end job: the iPhone simulator, Wren's Release build, the pods check and the Maestro flows.                                          |
-| `bun run ci:desktop:e2e`    | `scripts/ci_desktop_e2e.sh`     | The 🎬 E2E Mac check from `main-native-checks.yml`: Playwright tests against the unpackaged Raven.                                                 |
+| `bun run ci:desktop:e2e`    | `scripts/ci_desktop_e2e.sh`     | The 🎬 E2E Mac check from `native-checks.yml`: Playwright tests against the unpackaged Raven.                                                          |
 
-The ✅ Checks job lives in `.github/workflows/pull-request-checks.yml`. The native jobs live in `.github/workflows/native-checks.yml`, which both the pull request checks and `main-native-checks.yml` call for the groups a change affects, so a pull request runs them before it merges and main runs them again on the merge commit.
+The ✅ Checks job lives in `.github/workflows/pull-request-checks.yml`. The native build jobs are listed there too, one job each with no workflow called, for the groups a change affects; their steps live in the actions under `.github/actions/`. The end to end jobs live in `.github/workflows/native-checks.yml` and nowhere else: it runs on every push to main, on the builds the merged pull request uploaded, and lists the same build jobs for a group it was handed no build of.
 
 ## Options
 

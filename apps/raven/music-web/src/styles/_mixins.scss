@@ -1,0 +1,99 @@
+/*
+ * The blocks more than one module writes the same way. A module reads them with
+ * `@use '../../styles/mixins';`, by its own relative path, since the dead CSS check compiles a
+ * module with sass alone, which resolves no `@/` alias, and each compiles to the declarations
+ * it stands for.
+ */
+
+// One line of text, cut short with an ellipsis where it runs out of room.
+@mixin one-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * How a control answers a press and the pointer: faint while held, a little less so under the
+ * pointer, and dimmed while it is off. The dimming comes last, with the same weight as the other
+ * two, so neither a press nor the pointer over it lifts it.
+ */
+@mixin press-feedback {
+  &:active {
+    opacity: var(--opacity-pressed);
+  }
+
+  @media (hover: hover) {
+    &:hover {
+      opacity: var(--opacity-hover);
+    }
+  }
+
+  &:disabled {
+    opacity: var(--opacity-disabled);
+  }
+}
+
+// Lines of words stacked beside art or an icon, each cut short on one line.
+@mixin stacked-lines {
+  display: grid;
+  min-inline-size: 0;
+
+  > * {
+    @include one-line;
+  }
+}
+
+// The quiet line under a title.
+@mixin meta-line {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+// A hairline drawn inside the box, so it takes no room of its own.
+@mixin hairline-ring($color: var(--color-line-2)) {
+  box-shadow: inset 0 0 0 var(--size-hairline) $color;
+}
+
+// The ring a text field's box wears while the input inside it holds the focus.
+@mixin field-box {
+  &:focus-within {
+    box-shadow: inset 0 0 0 var(--size-focus-ring) var(--color-accent-text);
+  }
+}
+
+// The input inside a field's box: it fills the box and draws nothing of its own, the ring included.
+@mixin field-input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: var(--type-input);
+
+  &::placeholder {
+    color: var(--color-text-3);
+    opacity: 1;
+  }
+
+  // The box wears the ring, so the input inside it draws none of its own.
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+// The small capitals over a group or a name: a list's heading, the sidebar's, the player's.
+@mixin overline {
+  color: var(--color-text-3);
+  font: var(--type-overline);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+}
+
+// A card's surface: its ground, hairline border and corners, which clip what it holds.
+@mixin card-surface {
+  overflow: hidden;
+  border: var(--size-hairline) solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}

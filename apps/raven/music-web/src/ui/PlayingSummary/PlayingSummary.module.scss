@@ -1,0 +1,26 @@
+@use '../../styles/mixins';
+
+.summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.text {
+  @include mixins.stacked-lines;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-strong);
+}
+
+.line {
+  @include mixins.meta-line;
+}
+
+.error {
+  color: var(--color-accent-text);
+  font: var(--type-meta);
+}

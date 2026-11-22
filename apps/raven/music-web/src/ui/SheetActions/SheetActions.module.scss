@@ -1,0 +1,31 @@
+@use '../../styles/mixins';
+
+.groups {
+  display: grid;
+  padding-block-start: var(--space-2);
+}
+
+.group {
+  display: grid;
+  padding-block: var(--space-1);
+
+  & + & {
+    border-block-start: var(--size-hairline) solid var(--color-line);
+  }
+}
+
+.action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+  inline-size: 100%;
+  min-block-size: var(--size-button-large);
+  padding-inline: var(--space-4);
+  color: var(--color-text);
+}
+
+.label {
+  @include mixins.one-line;
+  font: var(--type-row-title);
+}

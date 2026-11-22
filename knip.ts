@@ -42,6 +42,25 @@ export default {
       ignoreBinaries: ['watchman', 'maestro'],
       ignoreDependencies: ['expo-updates'],
     },
+    'apps/raven/music-web': {
+      /*
+       * Temporary: what only the screens of the next pull request in the stack read, the songs'
+       * listing and the fixtures their tests use among it. That pull request removes this entry.
+       */
+      ignore: [
+        'src/music/listings.ts',
+        'src/routes.ts',
+        'src/shell/useGoBack.ts',
+        'src/test/intersection.ts',
+        'src/test/music.ts',
+        'src/test/render.tsx',
+        'src/theme/formFactor.ts',
+        'src/components/Nothing/Nothing.tsx',
+        'src/ui/IconTile/IconTile.tsx',
+        'src/ui/ListEnd/ListEnd.module.scss',
+        'src/ui/ListEnd/ListEnd.tsx',
+      ],
+    },
     'apps/raven/web': {
       /*
        * Netlify runs each function by its folder's file of the same name, and Lighthouse CI the

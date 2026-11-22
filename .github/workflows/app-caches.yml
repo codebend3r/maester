@@ -1,10 +1,10 @@
 name: 🗃️ App build caches
 
-# Builds raven's device app on main and saves what the next build reads: ccache's
+# Builds raven's device app and Wren on main and saves what the next build reads: ccache's
 # objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
 # packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
-# to its own ref, so when each PR saved its own the repo's cache filled with copies;
-# main's are readable by every PR, whose app jobs in native-checks.yml only
+# to its own ref, so a PR saving its own would fill the repo's cache with copies;
+# main's are readable by every PR, whose app jobs in pull-request-checks.yml only
 # restore. The two set up through the same actions, raven-app-setup and
 # raven-android-avd, so the caches match. It runs when what the native projects or those
 # actions are made from changes, weekly so the compile caches follow the sources and are
@@ -17,7 +17,11 @@ on:
       - apps/raven/app/package.json
       - apps/raven/app/app.config.ts
       - apps/raven/app/plugins/**
+      - apps/raven/music/package.json
+      - apps/raven/music/app.config.ts
+      - apps/raven/music/plugins/**
       - .github/actions/raven-app-setup/**
+      - .github/actions/raven-xcode/**
       - .github/actions/raven-android-avd/**
       - .github/workflows/app-caches.yml
   schedule:
@@ -47,15 +51,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # One leg per app and platform a pull request builds, each with the setup and the
+        # build target its build job runs; `test_native_ci.py` checks the two lists agree.
         platform:
           - name: 📱 iPhone and iPad caches
             id: ios
+            project: apps/raven/app
+            target: '@raven/app:build:ios'
             runner: macos-26
           - name: 📺 Apple TV caches
             id: tvos
+            project: apps/raven/app
+            target: '@raven/app:build:tvos'
             runner: macos-26
           - name: 📺 Android TV caches
             id: android-tv
+            project: apps/raven/app
+            target: '@raven/app:build:android-tv'
+            runner: ubuntu-24.04
+          - name: 🎵 Wren iPhone caches
+            id: ios
+            project: apps/raven/music
+            target: '@raven/music:build:ios'
+            runner: macos-26
+          - name: 🎵 Wren Android caches
+            id: android-tv
+            project: apps/raven/music
+            target: '@raven/music:build:android'
             runner: ubuntu-24.04
     steps:
       - name: 📥 Checkout
@@ -66,11 +88,12 @@ jobs:
         uses: ./.github/actions/raven-app-setup
         with:
           platform: ${{ matrix.platform.id }}
+          project: ${{ matrix.platform.project }}
           node-version: ${{ env.APP_NODE_VERSION }}
 
       # Past Nx's cache, which would otherwise restore the build and compile nothing.
       - name: 🔨 Build
-        run: bunx nx run @raven/app:build:${{ matrix.platform.id }} --excludeTaskDependencies --skip-nx-cache
+        run: bunx nx run ${{ matrix.platform.target }} --excludeTaskDependencies --skip-nx-cache
 
       - name: 📊 ccache
         run: ccache --show-stats

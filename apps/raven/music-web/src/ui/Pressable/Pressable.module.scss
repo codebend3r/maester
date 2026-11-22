@@ -1,0 +1,11 @@
+@use '../../styles/mixins';
+
+.pressable {
+  cursor: pointer;
+
+  @include mixins.press-feedback;
+
+  &:disabled {
+    cursor: default;
+  }
+}

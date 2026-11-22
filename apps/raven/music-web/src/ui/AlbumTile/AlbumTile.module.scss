@@ -1,0 +1,21 @@
+@use '../../styles/mixins';
+
+.tile {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  min-inline-size: 0;
+}
+
+.text {
+  @include mixins.stacked-lines;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-tile-title);
+}
+
+.subtitle {
+  @include mixins.meta-line;
+}

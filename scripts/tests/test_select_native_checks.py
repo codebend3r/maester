@@ -32,6 +32,8 @@ def test_project_selection(projects, expected):
         "bun.lock",
         "tsconfig.base.json",
         ".github/workflows/native-checks.yml",
+        ".github/workflows/pull-request-checks.yml",
+        ".github/actions/raven-native-select/action.yml",
         ".github/actions/raven-app-setup/action.yml",
         "scripts/ci_app_ios.sh",
         "scripts/select_native_checks.py",
@@ -59,6 +61,7 @@ def test_base_skips_current_commit_and_non_ancestors(monkeypatch):
 @pytest.mark.parametrize("event", ["push", "workflow_dispatch"])
 def test_no_base_runs_everything(monkeypatch, tmp_path, event):
     destination = tmp_path / "outputs"
+    monkeypatch.delenv("NATIVE_BASE", raising=False)
     monkeypatch.setenv("GITHUB_SHA", "head")
     monkeypatch.setenv("GITHUB_EVENT_NAME", event)
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")
@@ -77,6 +80,7 @@ def test_no_base_runs_everything(monkeypatch, tmp_path, event):
 
 def test_main_passes_explicit_shas_to_nx_and_writes_selection(monkeypatch, tmp_path):
     destination = tmp_path / "outputs"
+    monkeypatch.delenv("NATIVE_BASE", raising=False)
     monkeypatch.setenv("GITHUB_SHA", "head")
     monkeypatch.setenv("GITHUB_EVENT_NAME", "push")
     monkeypatch.setenv("GITHUB_REPOSITORY", "owner/repo")

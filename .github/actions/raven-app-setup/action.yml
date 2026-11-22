@@ -1,20 +1,25 @@
 name: 🧰 raven app build setup
 description: >-
-  Everything before a native build of raven's device app: Bun, Node, the build caches
-  restored, ffmpeg and ccache, the build environment, the install and the libraries.
+  Everything before a native build of raven's device app or Wren: Bun, Node, the build
+  caches restored, ffmpeg and ccache, the build environment, the install and the libraries.
   Restores only; its outputs are each cache's key and path, for app-caches.yml to save.
   An end to end job, which takes its build from the build job, sets up through it too, with
   `compiles` off: the same tools and environment, without the compile's caches or the NDK.
 
-# The single definition of how the app is built, shared by the app jobs in
-# native-checks.yml, by device-release.yml and by app-caches.yml, which builds on main and saves the
-# caches: ccache hashes the compiler and its flags, so a setting either side changed
-# alone would leave every PR compiling cold. A pull request's caches are scoped to its
-# own ref, so each PR saving its own copy filled the repo's cache with duplicates; main's
-# are readable by every PR. The ccache and Gradle keys are per run, so main's newest wins.
+# The single definition of how the app is built, shared by the app jobs in pull-request-checks.yml
+# and native-checks.yml, by device-release.yml and by app-caches.yml, which builds on main and
+# saves the caches: ccache hashes the compiler and its flags, so a setting either side changed
+# alone would leave every PR compiling cold. A pull request's caches are scoped to its own ref,
+# so a PR saving its own copy would fill the repo's cache with duplicates; main's are readable
+# by every PR. The ccache and Gradle keys are per run, so main's newest wins.
+# Every compile cache is keyed by the app too: the two apps compile from their own folders and
+# lock their own pods, so each restores what was saved for it.
 inputs:
   platform:
     description: ios, tvos or android-tv
+    required: true
+  project:
+    description: The app's folder, apps/raven/app or apps/raven/music
     required: true
   node-version:
     description: The Node the app's tooling runs on, at least 22.18 (babel.config.ts)
@@ -54,24 +59,27 @@ runs:
   using: composite
   steps:
     # The runner image pins Homebrew's and apt's package versions, so its name keys them.
-    # A Gradle key is per run, falling back to the newest for the lockfile, then any; a
-    # CocoaPods key is per lockfile, falling back to the newest for the platform; a ccache
-    # key is per run, falling back to the newest for the platform.
+    # A Gradle key is per app and run, falling back to the newest for the app's lockfile, then
+    # the app's any; a CocoaPods key is per app and lockfile, falling back to the newest for
+    # the app; a ccache key is per app and run, falling back to the app's newest, then to the
+    # other app's on the platform, which still serves the sources the two share.
     - name: 🔑 Cache keys
       id: keys
       shell: bash
       env:
         PLATFORM: ${{ inputs.platform }}
-        LOCK: ${{ hashFiles('bun.lock', 'apps/raven/app/package.json') }}
+        PROJECT: ${{ inputs.project }}
+        LOCK: ${{ hashFiles('bun.lock', format('{0}/package.json', inputs.project)) }}
       run: |
+        app="$(basename "$PROJECT")"
         case "$PLATFORM" in
           android-tv)
             packages_prefix=apt-
             packages_path="$HOME/apt-archives"
-            dependencies_prefix="gradle-$RUNNER_OS-"
-            dependencies="gradle-$RUNNER_OS-$LOCK-$GITHUB_RUN_ID"
+            dependencies_prefix="gradle-$RUNNER_OS-$app-"
+            dependencies="gradle-$RUNNER_OS-$app-$LOCK-$GITHUB_RUN_ID"
             dependencies_path="$HOME/.gradle/caches"$'\n'"$HOME/.gradle/wrapper"
-            dependencies_restore="gradle-$RUNNER_OS-$LOCK-"$'\n'"gradle-$RUNNER_OS-"
+            dependencies_restore="gradle-$RUNNER_OS-$app-$LOCK-"$'\n'"gradle-$RUNNER_OS-$app-"
             ccache_path="$HOME/.cache/ccache"
             ;;
           ios | tvos)
@@ -79,10 +87,10 @@ runs:
             # deletes its family's other entries, and a runner image rollout can split them.
             packages_prefix="brew-$PLATFORM-"
             packages_path="$HOME/Library/Caches/Homebrew/downloads"
-            dependencies_prefix="cocoapods-$RUNNER_OS-$PLATFORM-"
-            dependencies="cocoapods-$RUNNER_OS-$PLATFORM-$LOCK"
+            dependencies_prefix="cocoapods-$RUNNER_OS-$PLATFORM-$app-"
+            dependencies="cocoapods-$RUNNER_OS-$PLATFORM-$app-$LOCK"
             dependencies_path="$HOME/Library/Caches/CocoaPods"
-            dependencies_restore="cocoapods-$RUNNER_OS-$PLATFORM-"
+            dependencies_restore="cocoapods-$RUNNER_OS-$PLATFORM-$app-"
             ccache_path="$HOME/Library/Caches/ccache"
             ;;
           *)
@@ -91,7 +99,7 @@ runs:
             ;;
         esac
         packages="$packages_prefix$ImageOS-$ImageVersion-ffmpeg-ccache-v1"
-        ccache_prefix="ccache-$RUNNER_OS-$PLATFORM-"
+        ccache_prefix="ccache-$RUNNER_OS-$PLATFORM-$app-"
         ccache="$ccache_prefix$GITHUB_RUN_ID"
         {
           echo "packages=$packages"
@@ -101,7 +109,7 @@ runs:
           printf 'dependencies-restore<<LIST\n%s\nLIST\n' "$dependencies_restore"
           echo "ccache=$ccache"
           echo "ccache-path=$ccache_path"
-          echo "ccache-restore=$ccache_prefix"
+          printf 'ccache-restore<<LIST\n%s\n%s\nLIST\n' "$ccache_prefix" "ccache-$RUNNER_OS-$PLATFORM-"
           printf 'supersedes<<LIST\n%s %s\n%s %s\n%s %s\nLIST\n' \
             "$packages_prefix" "$packages" "$dependencies_prefix" "$dependencies" "$ccache_prefix" "$ccache"
         } >> "$GITHUB_OUTPUT"
@@ -141,12 +149,19 @@ runs:
         key: ${{ steps.keys.outputs.ccache }}
         restore-keys: ${{ steps.keys.outputs.ccache-restore }}
 
+    # The Xcode every Apple build, and so its ccache objects, are made with.
+    - name: 🛠️ Xcode
+      if: inputs.platform != 'android-tv'
+      uses: ./.github/actions/raven-xcode
+
     # ffmpeg for the fixture server's clips, and ccache for the compile: Expo's Podfile reads
     # USE_CCACHE at `pod install` and points Xcode's compilers at React Native's wrappers.
-    # DEVELOPER_DIR is the Xcode every Apple build, and so its ccache objects, are made with.
     # React Native's compiler wrapper runs `$CCACHE_BINARY clang`, but Xcode passes build
-    # settings to no compiler's environment, so its CCACHE_BINARY setting never arrived and
-    # every compile ran plain clang with ccache's stats at zero; the environment sets it.
+    # settings to no compiler's environment, so a CCACHE_BINARY build setting never reaches it
+    # and every compile would run plain clang; the environment sets it.
+    # CCACHE_BASEDIR and CCACHE_NOHASHDIR read every path under the checkout as relative and
+    # leave the folder a compile ran in out of the hash, so an object one app compiled from a
+    # source the two share (React Native, Hermes, Expo) serves the other app too.
     #
     # CocoaPods fetches the Hermes tarball with plain curl, which without a ~/.curlrc waits
     # out a stalled mirror for as long as the job lasts; this one drops a transfer under
@@ -163,11 +178,12 @@ runs:
         brew install ffmpeg ccache
         printf 'speed-limit = 102400\nspeed-time = 30\nretry = 5\n' > ~/.curlrc
         {
-          echo "DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer"
           echo "USE_CCACHE=1"
           echo "CCACHE_BINARY=$(command -v ccache)"
           echo "CCACHE_DIR=$CCACHE_PATH"
           echo "CCACHE_MAXSIZE=1500M"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+          echo "CCACHE_NOHASHDIR=true"
         } >> "$GITHUB_ENV"
         CCACHE_DIR="$CCACHE_PATH" ccache --zero-stats
 
@@ -175,7 +191,8 @@ runs:
     # Android CMake uses whenever it is on the path. `org.gradle.caching` turns Gradle's build
     # cache on for android/, which each prebuild generates afresh. Gradle runs on the runner's
     # JDK 17. React Native compiles its native code once per ABI, four by default; the flows
-    # run on an x86_64 emulator, so CI builds only that, and its APK runs on no TV.
+    # run on an x86_64 emulator, so CI builds only that, and its APK runs on no TV. ccache reads
+    # paths under the checkout as relative, as the Apple build does.
     - name: 🤖 Android build tools
       if: inputs.platform == 'android-tv'
       shell: bash
@@ -191,6 +208,8 @@ runs:
           echo "JAVA_HOME=$JAVA_HOME_17_X64"
           echo "CCACHE_DIR=$CCACHE_PATH"
           echo "CCACHE_MAXSIZE=1G"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE"
+          echo "CCACHE_NOHASHDIR=true"
           echo "ORG_GRADLE_PROJECT_reactNativeArchitectures=x86_64"
         } >> "$GITHUB_ENV"
         CCACHE_DIR="$CCACHE_PATH" ccache --zero-stats
@@ -218,7 +237,7 @@ runs:
     - name: 🧱 Android NDK
       if: inputs.platform == 'android-tv' && inputs.compiles == 'true'
       shell: bash
-      working-directory: apps/raven/app
+      working-directory: ${{ inputs.project }}
       run: |
         toml="$(node -p "require('path').dirname(require.resolve('react-native/package.json'))")/gradle/libs.versions.toml"
         ndk="$(awk -F'"' '/^ndkVersion = /{ print $2 }' "$toml")"
