@@ -1,0 +1,70 @@
+// The whole screen: the header, the pane picked and the bar that picks it.
+.sheet {
+  display: grid;
+  grid-template-areas:
+    'header'
+    'pane'
+    'bar';
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding-block: calc(env(safe-area-inset-top) + var(--space-2))
+    calc(env(safe-area-inset-bottom) + var(--space-2));
+}
+
+.header {
+  display: grid;
+  grid-area: header;
+  padding-inline: var(--space-3);
+}
+
+.pane {
+  grid-area: pane;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+// The song's compact head, the lyrics or Up next in the room left, and the controls along the foot.
+.compactPane {
+  display: grid;
+  grid-template-areas:
+    'head'
+    'body'
+    'controls';
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.compact {
+  display: grid;
+  grid-area: head;
+  padding: var(--space-4) var(--size-player-gutter) var(--space-3);
+}
+
+.body {
+  display: grid;
+  grid-area: body;
+  grid-template-rows: minmax(0, 1fr);
+  min-block-size: 0;
+}
+
+.lyrics {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-block-size: 0;
+  padding-inline: var(--size-player-gutter);
+}
+
+.controls {
+  display: grid;
+  grid-area: controls;
+  gap: var(--space-3);
+  min-inline-size: 0;
+  padding: var(--space-3) var(--size-player-gutter) 0;
+}
+
+.bar {
+  display: grid;
+  grid-area: bar;
+  min-inline-size: 0;
+  padding: var(--space-3) var(--size-player-gutter) 0;
+}

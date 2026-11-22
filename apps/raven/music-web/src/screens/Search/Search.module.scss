@@ -1,0 +1,21 @@
+// The title, the field, the chips and what they find, each as far from the last as the apps set them.
+.search {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+/*
+ * The title, the field and the chips keep to the top while what they find scrolls under them, as
+ * the apps hold them outside their scroller. The padding keeps the field's focus ring uncut.
+ */
+.pinned {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--layer-chrome);
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+  padding-block: var(--space-2);
+  background: var(--color-bg);
+}

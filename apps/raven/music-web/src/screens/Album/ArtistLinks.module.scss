@@ -1,0 +1,27 @@
+/*
+ * A run of names that wraps, which a grid cannot lay out, so the names sit inline: from the
+ * start of the wide layout's column, centred under the narrow one's centred title.
+ */
+.links {
+  @media (max-width: 48rem) {
+    text-align: center;
+  }
+}
+
+// The room between two names is each name's own, kept even where the run wraps.
+.name {
+  display: inline-block;
+  padding-inline-end: var(--space-2);
+
+  @media (max-width: 48rem) {
+    padding-inline: var(--space-1);
+  }
+}
+
+.link {
+  display: inline-grid;
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+  color: var(--color-accent-text);
+  font: var(--type-row-large);
+}

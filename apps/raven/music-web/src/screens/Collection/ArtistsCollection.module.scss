@@ -1,0 +1,73 @@
+@use '../../styles/mixins';
+
+// The rail lies over the list's own area, at its end.
+.listing {
+  display: grid;
+  grid-template-areas: 'list';
+  min-inline-size: 0;
+}
+
+.list {
+  display: grid;
+  grid-area: list;
+  align-content: start;
+  min-inline-size: 0;
+}
+
+// Every row is the same height, so a row off screen is skipped until it is scrolled to.
+.row {
+  position: relative;
+  display: grid;
+  padding-block-end: var(--size-hairline);
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto calc(var(--size-artist-row) + var(--size-hairline));
+
+  // The divider starts under the name, past the avatar.
+  &::after {
+    content: '';
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline: calc(var(--size-avatar) + var(--space-4)) 0;
+    block-size: var(--size-hairline);
+    background: var(--color-line);
+  }
+}
+
+/*
+ * The rail keeps to the screen while the list scrolls under it, in the page's gutter beside the
+ * list, and fits between where the list starts and the shell's bars, as the apps' does: the page
+ * names where the list starts in `--list-start`, the shell how tall its foot stands in
+ * `--shell-foot`. So every letter shows before the page scrolls, and the rail never makes a
+ * short page taller than the screen.
+ */
+.rail {
+  position: sticky;
+  inset-block-start: var(--list-start, 0);
+  display: grid;
+  grid-area: list;
+  grid-auto-rows: minmax(0, 1fr);
+  place-self: start end;
+  inline-size: var(--size-gutter);
+  block-size: calc(
+    100dvh - var(--list-start, 0rem) - var(--shell-foot, 0rem) - var(--page-pad-end, 0rem)
+  );
+  padding-block: var(--space-2);
+  translate: 100% 0;
+}
+
+.entry {
+  display: grid;
+  min-block-size: 0;
+}
+
+.letter {
+  display: grid;
+  place-items: center;
+  min-block-size: 0;
+  color: var(--color-accent-text);
+  font: var(--type-meta-strong);
+  font-size: var(--font-size-small);
+  line-height: var(--line-tight);
+
+  @include mixins.press-feedback;
+}

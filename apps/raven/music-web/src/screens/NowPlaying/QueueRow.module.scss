@@ -1,0 +1,49 @@
+@use '../../styles/mixins';
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  border-block-end: var(--size-hairline) solid var(--color-line);
+}
+
+// Under the narrow player: the page's ground, inside the player's gutters.
+.sheet {
+  --row-height: var(--size-row);
+
+  padding-inline: var(--size-player-gutter) var(--size-gutter);
+}
+
+// Along the foot of the wide player: the panel's own ground and margins.
+.panel {
+  --row-height: var(--size-nav-row);
+}
+
+.main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--size-row-gap);
+  align-items: center;
+  min-block-size: var(--row-height);
+  min-inline-size: 0;
+}
+
+.text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.title,
+.line {
+  @include mixins.one-line;
+}
+
+.title {
+  color: var(--color-text);
+  font: var(--type-row-title);
+}
+
+.line {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}

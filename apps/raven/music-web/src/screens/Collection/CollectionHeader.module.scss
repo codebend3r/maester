@@ -1,0 +1,31 @@
+.header {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+.countRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-block-size: var(--size-touch-target);
+}
+
+.count {
+  color: var(--color-text-2);
+  font: var(--type-meta);
+}
+
+.tools {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+// The wide layout's field keeps to a short measure beside the title.
+.tabletSearch {
+  inline-size: var(--size-empty-measure);
+  max-inline-size: var(--size-search-measure-max);
+}
