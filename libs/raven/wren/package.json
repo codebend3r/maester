@@ -1,6 +1,6 @@
 {
   "name": "@raven/wren",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "Wren's words and pure models, shared by the phone app and the web app",
   "type": "module",

@@ -1,6 +1,6 @@
 {
   "name": "@raven/splash",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "maester.tv: Maester's home, and the pages for Raven and Wren under it",
   "type": "module",
