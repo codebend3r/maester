@@ -1,4 +1,5 @@
 import { type SkipStep, formatDuration } from '@raven/core'
+import { usePreventRemove } from 'expo-router'
 import { type ComponentType, useEffect, useRef, useState } from 'react'
 import {
   Animated,
@@ -64,6 +65,9 @@ import {
   Centre,
   Heading,
 } from '@/layouts/PlayerParts.dpad'
+
+/** The navigator actions a back press sends, which clear the controls before they leave. */
+export const BACK_ACTIONS = { goBack: 'GO_BACK', pop: 'POP' } as const
 
 /** What hears each of the remote's presses. */
 type RemoteResponder = (event: TVRemoteEvent) => void
@@ -358,7 +362,6 @@ const DpadPlayer = ({
   const [isPicking, setPicking] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(0)
   const styles = useDpadChromeStyles()
-  const isPlaying = transport !== null && !transport.isPaused
   // The last press's flash, counted so the same one twice starts afresh.
   const [flash, setFlash] = useState<CountedFlash | null>(null)
   const flashOf = (flashed: Flash | null) => {
@@ -377,8 +380,9 @@ const DpadPlayer = ({
     isSeeking: () =>
       isSeekingWith({ isShown: isOnButtonsNow.current, isScrubbing: isScrubbing.current }),
   })
-  const { isVisible, isDrawn, opacity, show } = useControlsLinger({
-    isPlaying,
+  // Paused or playing, the TV's controls go after the linger, so a paused picture clears.
+  const { isVisible, isDrawn, opacity, show, hide } = useControlsLinger({
+    canFade: transport !== null,
     isHeld: isPicking || held.isHolding,
   })
   const offer = useUpNextOffer({ next, transport, credits })
@@ -393,6 +397,30 @@ const DpadPlayer = ({
     isOnButtonsNow.current = isOnButtons
     if (!isVisible) isScrubbing.current = false
   }, [isVisible, isOnButtons])
+
+  /*
+   * Back clears the controls first, for an unobstructed picture, and only a second press leaves.
+   * The navigator holds the pop (`usePreventRemove`), never `BackHandler`, which would take Menu
+   * from tvOS's native stack. A picker's open list is its own to close, and anything but a pop
+   * (the next episode's replace) goes straight through.
+   */
+  const [isLeaving, setLeaving] = useState(false)
+  const disablePrevention = usePreventRemove(
+    isVisible && !isPicking && !isLeaving,
+    ({ data, repeat }) => {
+      if (Object.values(BACK_ACTIONS).some((back) => back === data.action.type)) {
+        hide()
+        return
+      }
+      setLeaving(true)
+      repeat()
+    },
+  )
+  const leave = () => {
+    setLeaving(true)
+    disablePrevention()
+    onBack()
+  }
 
   useRemote((event) => {
     if (held.respond(event)) {
@@ -427,7 +455,8 @@ const DpadPlayer = ({
           },
         }
   const shown = shownMarkOf({
-    isPaused: transport?.isPaused ?? false,
+    // The pause mark goes with the controls, so a paused picture is clear.
+    isPaused: (transport?.isPaused ?? false) && isVisible,
     held: held.direction,
     flash,
   })
@@ -476,7 +505,7 @@ const DpadPlayer = ({
             mode={mode}
             next={next}
             previous={previous}
-            onBack={onBack}
+            onBack={leave}
             onBottomHeight={setBottomHeight}
             onPicking={setPicking}
             onSkip={skipBy}

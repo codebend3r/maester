@@ -33,44 +33,49 @@ const useFade = ({ isVisible, isReduced }: UseFadeProps) => {
 }
 
 type UseControlsLingerProps = {
-  /** Whether the video plays: only then do the controls go; paused, opening or ended they stay up. */
-  isPlaying: boolean
+  /**
+   * Whether the controls may fade: the touch chrome lets them only while the video plays, the
+   * TV's whenever there is a video to show, paused or playing.
+   */
+  canFade: boolean
   /** Whether something holds them up while it plays, as a picker's open list or Skip intro's first seconds do; a hold brings them back. */
   isHeld?: boolean
 }
 
 /**
  * What raven's player controls share on every platform that draws its own: they fade once the
- * video has played untouched for the viewer's linger (the player preferences'
- * `controlsLingerSeconds`), and come back on `show`, or on `toggle`, which also hides them. `stir`
- * starts the linger again without changing them, for a touch on a control. They fade over
+ * video has gone untouched for the viewer's linger (the player preferences'
+ * `controlsLingerSeconds`) while they `canFade`, and come back on `show`, or on `toggle`, which
+ * also hides them; `hide` clears them at once. `stir` starts the linger again without changing
+ * them, for a touch on a control. They fade over
  * `FADE_MS`, or go at once when the system asks for less motion, and `isDrawn` says whether
  * there is still something to draw while a fade runs out.
  */
-export const useControlsLinger = ({ isPlaying, isHeld = false }: UseControlsLingerProps) => {
+export const useControlsLinger = ({ canFade, isHeld = false }: UseControlsLingerProps) => {
   const lingerSeconds = usePlayerPrefs((prefs) => prefs.controlsLingerSeconds)
   const isReduced = useReduceMotion((state) => state.isReduced)
   const [isShown, setShown] = useState(true)
   const [stirredAt, setStirredAt] = useState(() => Date.now())
-  const isVisible = isShown || !isPlaying || isHeld
+  const isVisible = isShown || !canFade || isHeld
   const { opacity, isDrawn } = useFade({ isVisible, isReduced })
 
   useEffect(() => {
-    if (!isShown || !isPlaying || isHeld) return undefined
+    if (!isShown || !canFade || isHeld) return undefined
     const left = Math.max(0, stirredAt + lingerSeconds * 1000 - Date.now())
     const timer = setTimeout(() => setShown(false), left)
     return () => clearTimeout(timer)
-  }, [isShown, isPlaying, isHeld, lingerSeconds, stirredAt])
+  }, [isShown, canFade, isHeld, lingerSeconds, stirredAt])
 
   const stir = () => setStirredAt(Date.now())
   const show = () => {
     stir()
     setShown(true)
   }
+  const hide = () => setShown(false)
   const toggle = () => {
     stir()
     setShown(!isVisible)
   }
 
-  return { isVisible, isDrawn, opacity, stir, show, toggle }
+  return { isVisible, isDrawn, opacity, stir, show, hide, toggle }
 }

@@ -176,7 +176,7 @@ const Player = ({
         style={[own.playing, { width: isCentred ? undefined : size }, isCentred && own.centred]}
       >
         <FocusBand>
-          <PlayingCover cover={track.cover} size={size} title={track.title} />
+          <PlayingCover cover={track.cover} isPlaying={isPlaying} size={size} title={track.title} />
         </FocusBand>
         <View style={[own.words, isCentred && own.centredWords]}>
           <Text

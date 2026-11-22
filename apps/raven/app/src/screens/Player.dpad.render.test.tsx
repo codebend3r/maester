@@ -25,6 +25,7 @@ import type { ReactVideoProps } from 'react-native-video'
 import { SelectedTrackType } from 'react-native-video'
 import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
+import { BACK_ACTIONS } from '@/layouts/PlayerChrome.dpad'
 import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
 import { APP_ROUTES, PLAY_FROM } from '@/routes'
 import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@/layouts/remoteKeys'
@@ -62,6 +63,9 @@ import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/vid
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
+type RemoveCall = { data: { action: { type: string } }; repeat: () => void }
+type PreventRemove = (isPrevented: boolean, onPrevent?: (call: RemoveCall) => void) => () => void
+const mockPrevent = jest.fn<PreventRemove>(() => () => {})
 const mockReplace = jest.fn()
 const mockParams = jest.fn((): Record<string, string> => ({
   [APP_ROUTE_PARAMS.mediaId]: String(BUSBOYS_UNSUBTITLED.id),
@@ -104,6 +108,8 @@ jest.mock('react-native-video', () =>
   jest.requireActual<typeof VideoMockModule>('@/test/videoMock').videoModuleMock(),
 )
 jest.mock('expo-router', () => ({
+  usePreventRemove: (isPrevented: boolean, onPrevent?: (call: RemoveCall) => void) =>
+    mockPrevent(isPrevented, onPrevent),
   useRouter: () => ({ push: jest.fn(), back: mockBack, replace: mockReplace }),
   useLocalSearchParams: () => mockParams(),
 }))
@@ -315,14 +321,27 @@ describe('Player on Android TV', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
   })
 
-  it('keeps the controls up while the video is paused', async () => {
+  it('clears the controls after the linger while the video is paused', async () => {
     usePlayerPrefs.setState({ controlsLingerSeconds: BRIEF_LINGER_SECONDS })
     await playing({ id: BUSBOYS_UNSUBTITLED.id })
     await pressRemote({ key: REMOTE_KEYS.playPause })
-    await new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), BRIEF_LINGER_SECONDS * 3000)
-    })
     expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Play' })).toBeNull())
+    await pressRemote({ key: REMOTE_KEYS.down })
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+  })
+
+  it('clears the controls on the first Back and lets the second leave', async () => {
+    await playing({ id: BUSBOYS_UNSUBTITLED.id })
+    await pressRemote({ key: REMOTE_KEYS.playPause })
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
+    const lastCall = () => mockPrevent.mock.calls.at(-1)!
+    expect(lastCall()[0]).toBe(true)
+    await act(async () => {
+      lastCall()[1]!({ data: { action: { type: BACK_ACTIONS.goBack } }, repeat: jest.fn() })
+    })
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Play' })).toBeNull())
+    expect(lastCall()[0]).toBe(false)
   })
 
   it("plays a file with a text track as it is and hands the track to ExoPlayer to draw in the account's look", async () => {
@@ -643,7 +662,6 @@ describe('Player on Android TV', () => {
 
     await pressRemote({ key: REMOTE_KEYS.playPause })
     expect(centre(PLAYER_COPY.paused)).toHaveLength(1)
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 1200))
     expect(centre(PLAYER_COPY.paused)).toHaveLength(1)
 
     await pressRemote({ key: REMOTE_KEYS.playPause })
