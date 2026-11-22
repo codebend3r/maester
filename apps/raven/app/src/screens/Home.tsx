@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import { useMemo } from 'react'
+import type { AlbumShelf } from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import type { BingeCard } from '@/queries/bingeCards'
@@ -87,6 +89,9 @@ const HOME_VIEWS = {
 
 type ServerHomeProps = { session: AppQueries }
 
+// One empty list for albums that cannot be read, so the shelves are not built again for a new one.
+const NO_ALBUMS: readonly AlbumShelf[] = []
+
 const ServerHome = ({ session }: ServerHomeProps) => {
   const { server, api, queries } = session
   const home = useQuery(queries.homeQuery)
@@ -105,24 +110,35 @@ const ServerHome = ({ session }: ServerHomeProps) => {
    * The shelves wait for the albums too, so a music library's row never flips from its files
    * to its covers as they land; albums that cannot be read leave each row as its files.
    */
-  const albumShelves = albums.data ?? (albums.isError ? [] : null)
-  const shelves =
-    home.data === undefined ||
-    libraries.data === undefined ||
-    albumShelves === null ||
-    pictures === null
-      ? []
-      : homeShelvesOf({
-          home: home.data,
-          libraries: libraries.data,
-          albumShelves,
-          arts,
-          ...pictures,
-        })
-  const slides =
-    hero.data === undefined || libraries.data === undefined || pictures === null
-      ? []
-      : heroSlidesOf({ hero: hero.data, libraries: libraries.data, ...pictures })
+  const albumShelves = albums.data ?? (albums.isError ? NO_ALBUMS : null)
+  /*
+   * Built only when what they are made of changes, never on every render: Home renders again as
+   * each of its queries lands, and on a TV's Hermes building hundreds of cards each time held
+   * the remote's focus back for seconds.
+   */
+  const shelves = useMemo(
+    () =>
+      home.data === undefined ||
+      libraries.data === undefined ||
+      albumShelves === null ||
+      pictures === null
+        ? []
+        : homeShelvesOf({
+            home: home.data,
+            libraries: libraries.data,
+            albumShelves,
+            arts,
+            ...pictures,
+          }),
+    [home.data, libraries.data, albumShelves, arts, pictures],
+  )
+  const slides = useMemo(
+    () =>
+      hero.data === undefined || libraries.data === undefined || pictures === null
+        ? []
+        : heroSlidesOf({ hero: hero.data, libraries: libraries.data, ...pictures }),
+    [hero.data, libraries.data, pictures],
+  )
   const failure = home.error ?? libraries.error
   const isBare =
     home.isSuccess &&

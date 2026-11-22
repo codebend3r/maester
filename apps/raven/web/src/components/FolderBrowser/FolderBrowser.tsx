@@ -5,7 +5,7 @@ import { BUTTON_TONES, Button, Icon } from '@raven/ui'
 import { FOLDER_BROWSER_COPY } from '@/components/FolderBrowser/copy'
 import { browseQuery } from '@/lib/queries'
 import styles from '@/components/FolderBrowser/FolderBrowser.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
+import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { QueryView } from '@raven/ui/headless'
 
 type ListingFoldersProps = {
@@ -54,7 +54,9 @@ export const FolderBrowser = ({ onChoose, exclude }: FolderBrowserProps) => {
           disabled={listing.data?.parent == null}
           onClick={() => setPath(listing.data?.parent ?? null)}
         />
-        <span className={styles.path}>{current === '' ? COMMON_COPY.loading : current}</span>
+        <span className={styles.path}>
+          {current === '' ? <RavenLoader size={16} shouldShowLabel={false} /> : current}
+        </span>
       </div>
 
       <QueryView

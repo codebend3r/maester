@@ -1,10 +1,10 @@
 import { BUTTON_TONES, Button, useCanGoBack, useKeyShortcut } from '@raven/ui'
 import { type ComponentType, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import { handled } from '@/lib/handled'
 import { PLAYER_MESSAGE_COPY } from '@/desktop/player/copy'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
 
 /** Whether the player waits for the video or says why it will not play. */
 const MESSAGE_KINDS = { waiting: 'waiting', refused: 'refused' } as const
@@ -13,7 +13,7 @@ type MessageKind = (typeof MESSAGE_KINDS)[keyof typeof MESSAGE_KINDS]
 
 type MessageLineProps = { message: string | null }
 
-const WaitingLine = () => <p aria-live="polite">{COMMON_COPY.loading}</p>
+const WaitingLine = () => <RavenLoader shouldShowLabel={false} />
 
 type RefusedLineProps = MessageLineProps
 

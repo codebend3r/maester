@@ -17,6 +17,7 @@ type PlayingCoverProps = {
   cover: Picture | null
   title: string
   size: number
+  isPlaying: boolean
 }
 
 /**
@@ -24,7 +25,7 @@ type PlayingCoverProps = {
  * for a track with no artwork, the whole square the cover would fill. The remote reaches the
  * cover and a select hides the equalizer or shows it again, which this device keeps.
  */
-export const PlayingCover = ({ cover, title, size }: PlayingCoverProps) => {
+export const PlayingCover = ({ cover, title, size, isPlaying }: PlayingCoverProps) => {
   const view = useRef<ComponentRef<typeof Pressable>>(null)
   const { settle } = useOpeningFocus()
   const note = useLastFocus((state) => state.note)
@@ -49,6 +50,7 @@ export const PlayingCover = ({ cover, title, size }: PlayingCoverProps) => {
         <View pointerEvents="none" style={styles.band}>
           <Equalizer
             height={equalizerBandOf({ size, hasCover, bandShare: BAND_SHARE })}
+            isPlaying={isPlaying}
             width={size}
           />
         </View>

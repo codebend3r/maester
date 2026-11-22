@@ -63,7 +63,7 @@ const PlayerChrome = ({
   const introOffer = useIntroOffer({ intro, transport })
   // The intro's first seconds and Undo hold the controls up, so Skip intro is seen, as on the web.
   const { isVisible, opacity, stir, show, toggle } = useControlsLinger({
-    isPlaying,
+    canFade: isPlaying,
     isHeld: !!introOffer?.isPrompting,
   })
   const { width } = useWindowDimensions()

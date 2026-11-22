@@ -21,6 +21,7 @@ import {
   libraryPath,
 } from '@raven/core'
 import { type ComponentType, useState } from 'react'
+import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
 import {
   BUTTON_TONES,
   ButtonLink,
@@ -59,10 +60,9 @@ import { useServerReach } from '@/stores/serverReach'
 import { WATCH_PAGE_COPY } from '@/pages/WatchPage/copy'
 import { useWatchQueue } from '@/pages/WatchPage/useWatchQueue'
 import styles from '@/pages/WatchPage/WatchPage.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
 import { APP_PATHS } from '@/lib/appPaths'
 
-const WaitingLine = () => <p aria-live="polite">{COMMON_COPY.loading}</p>
+const WaitingLine = () => <RavenLoader shouldShowLabel={false} />
 
 type RefusedLineProps = { message: string }
 

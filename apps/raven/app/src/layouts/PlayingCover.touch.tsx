@@ -18,6 +18,7 @@ type PlayingCoverProps = SkipTarget & {
   cover: Picture | null
   title: string
   size: number
+  isPlaying: boolean
 }
 
 /** The cover's mark sits over the cover itself, which has no insets to keep clear of. */
@@ -31,7 +32,14 @@ const NO_SIDES = {} as const
  * back, 10 seconds and then 20 and 30 as the taps go on, the pair leaving the equalizer as it
  * was, and how far it went shows in the middle of the cover.
  */
-export const PlayingCover = ({ cover, title, size, position, onSeek }: PlayingCoverProps) => {
+export const PlayingCover = ({
+  cover,
+  title,
+  size,
+  isPlaying,
+  position,
+  onSeek,
+}: PlayingCoverProps) => {
   const { isShown, toggle } = useEqualizerShown()
   const styles = useStyles()
   const hasCover = cover !== null
@@ -52,6 +60,7 @@ export const PlayingCover = ({ cover, title, size, position, onSeek }: PlayingCo
         <View pointerEvents="none" style={styles.band}>
           <Equalizer
             height={equalizerBandOf({ size, hasCover, bandShare: BAND_SHARE })}
+            isPlaying={isPlaying}
             width={size}
           />
         </View>

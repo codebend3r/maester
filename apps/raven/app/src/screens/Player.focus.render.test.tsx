@@ -35,6 +35,8 @@ jest.mock('react-native/Libraries/Utilities/Platform', () => {
 })
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: mockBack }),
+  // The chrome holds a pop while its controls show; these tests leave by its Back plate.
+  usePreventRemove: () => () => {},
   useLocalSearchParams: () => mockParams(),
 }))
 const mockApi = jest.fn((_server: AppServer) =>

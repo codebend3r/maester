@@ -125,6 +125,7 @@ const Player = ({
       <View style={[own.player, { width: size }, isCentred && own.centred]}>
         <PlayingCover
           cover={track.cover}
+          isPlaying={isPlaying}
           onSeek={onSeek}
           position={position}
           size={size}

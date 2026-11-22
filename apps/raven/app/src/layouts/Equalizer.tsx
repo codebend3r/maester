@@ -51,35 +51,41 @@ const columnDropsOf = ({ column, height }: ColumnDropsOfProps): number[] =>
 type EqualizerProps = {
   width: number
   height: number
+  /** Whether the track plays: the skyline moves while it does and holds where it is while paused. */
+  isPlaying: boolean
 }
 
 /**
  * The skyline: gapless columns forming one shifting silhouette in the played colour, fading
- * toward the foot they rise from, always moving, as the owner asked. The player hands no
+ * toward the foot they rise from, moving while the track plays and frozen in place while it is
+ * paused, whatever the system's less motion says, as the owner asked. The player hands no
  * spectrum over, so the shape runs on its own loop. Each column is clipped from its top: its
  * window slides down while what is drawn inside slides back up, so the gradient and the crest
  * stay fixed to the room and only the column's height changes, all on the native driver.
  */
-export const Equalizer = ({ width, height }: EqualizerProps) => {
+export const Equalizer = ({ width, height, isPlaying }: EqualizerProps) => {
   const played = useTheme((theme) => theme.palette.played)
   const accent = useTheme((theme) => theme.palette.accent)
   const crest = useTheme((theme) => theme.palette.text)
   const [clock] = useState(() => new Animated.Value(0))
+  // Where in its loop the skyline stands: the clock and every turn it ran before a pause, past the last whole one.
+  const [turn] = useState(() => Animated.modulo(clock, 1))
   const count = Math.max(FEWEST_COLUMNS, Math.round(width / COLUMN_POINTS))
 
   const columns = useMemo(
     () =>
       Array.from({ length: count }, (_, column) => {
-        const drop = clock.interpolate({
+        const drop = turn.interpolate({
           inputRange: INPUT_RANGE,
           outputRange: columnDropsOf({ column, height }),
         })
         return { key: column, drop, lift: Animated.multiply(drop, -1) }
       }),
-    [clock, count, height],
+    [turn, count, height],
   )
 
   useEffect(() => {
+    if (!isPlaying) return
     const loop = Animated.loop(
       Animated.timing(clock, {
         toValue: 1,
@@ -89,8 +95,12 @@ export const Equalizer = ({ width, height }: EqualizerProps) => {
       }),
     )
     loop.start()
-    return () => loop.stop()
-  }, [clock])
+    return () => {
+      loop.stop()
+      // Folds where the clock stopped into its offset on the native side, so the next play loops on from there.
+      clock.extractOffset()
+    }
+  }, [clock, isPlaying])
 
   return (
     <View
