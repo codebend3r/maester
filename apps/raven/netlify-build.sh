@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Production uses the same commit-based build number as CI, even before CI
-# creates its tag. Previews keep package.json's version.
+# creates its tag. Previews keep package.json's version. Builds the Nx project
+# named first, @raven/web when none is (Wren's site names @raven/music-web).
 set -euo pipefail
+
+project=${1:-@raven/web}
 
 unset VITE_RAVEN_VERSION
 if [ "${CONTEXT:-}" = production ] && [ "${BRANCH:-}" = main ]; then
@@ -26,4 +29,4 @@ if [ "${CONTEXT:-}" = production ] && [ "${BRANCH:-}" = main ]; then
 fi
 echo "VITE_RAVEN_VERSION=${VITE_RAVEN_VERSION:-unset}"
 
-exec bunx nx run @raven/web:build
+exec bunx nx run "$project:build"

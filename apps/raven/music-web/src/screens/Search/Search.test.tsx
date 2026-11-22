@@ -86,6 +86,7 @@ describe('Search', () => {
       ...search,
       limit: MUSIC_PAGE.most,
       offset: 0,
+      seed: 0,
     })
   })
 

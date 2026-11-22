@@ -6,7 +6,9 @@
 
 .countRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-columns: auto;
+  grid-auto-flow: column;
   gap: var(--space-3);
   align-items: center;
   min-block-size: var(--size-touch-target);

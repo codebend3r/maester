@@ -1,10 +1,10 @@
-import { LIBRARY_PAGE_COPY, RECENT_SORTS, countValueOf } from '@raven/wren'
+import { LIBRARY_PAGE_COPY, RECENT_SORTS } from '@raven/wren'
 import { useNavigate } from 'react-router-dom'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
 import { Section } from '@/components/Section/Section'
-import { usePlaylists, useRecentAlbums, useSongCount } from '@/music/listings'
-import { COLLECTION_KINDS, type CollectionKind, WREN_ROUTES } from '@/routes'
+import { useLibraryValues, useRecentAlbums } from '@/music/listings'
+import { WREN_ROUTES } from '@/routes'
 import { Page } from '@/shell/Page/Page'
 import { LIBRARY_PLACES } from '@/shell/places'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
@@ -20,26 +20,6 @@ const RECENT_SHOWN = {
   [FORM_FACTORS.phone]: 6,
   [FORM_FACTORS.tablet]: 10,
 } as const satisfies Record<FormFactor, number>
-
-/*
- * What each category holds, beside its row, where it costs next to nothing to know: the
- * playlists and the songs (each library's total, from a page of one track). The server counts
- * no albums or artists short of listing them all, so those rows hold no count, and a count still
- * on its way, or one that failed, is left out rather than guessed.
- */
-const useCategoryValues = (): Record<CollectionKind, string | undefined> => {
-  const songs = useSongCount({ search: '' })
-  const playlists = usePlaylists()
-  return {
-    [COLLECTION_KINDS.playlists]: countValueOf({
-      n: playlists.data?.length ?? null,
-      none: LIBRARY_PAGE_COPY.noneYet,
-    }),
-    [COLLECTION_KINDS.artists]: undefined,
-    [COLLECTION_KINDS.albums]: undefined,
-    [COLLECTION_KINDS.songs]: countValueOf({ n: songs }),
-  }
-}
 
 /** The newest albums of every music library, as a grid. */
 function RecentGrid() {
@@ -61,7 +41,13 @@ function RecentGrid() {
  */
 export function Library() {
   const navigate = useNavigate()
-  const values = useCategoryValues()
+  /*
+   * Each category's count, summed over every music library: the server counts the albums, the
+   * artists, the unmatched albums, what is in progress, the favourites and what was finished;
+   * the playlists are the account's and the songs each library's total. A count still on its
+   * way, one that failed and a zero are left out rather than guessed.
+   */
+  const values = useLibraryValues()
   return (
     <Page>
       <PageHeader

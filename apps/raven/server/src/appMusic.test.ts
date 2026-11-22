@@ -12,6 +12,7 @@ import {
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
+import { DatabaseService } from '@/db/database'
 import { MetadataService } from '@/metadata/metadataService'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
@@ -183,6 +184,23 @@ describe('a music library', () => {
     ])
   })
 
+  it('dates each album by its newest file on disk and answers its plays, on the listing, the album and the artist', async () => {
+    const albums = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.modified })
+    expect(albums).toHaveLength(3)
+    const stamps = albums.map(({ modifiedAt }) => Date.parse(modifiedAt ?? ''))
+    expect(stamps.every(Number.isFinite)).toBe(true)
+    expect(stamps).toEqual(stamps.toSorted((a, b) => b - a))
+    // Nothing is played yet, and the server answers the plays of the caller's account.
+    expect(albums.map(({ playedAt, plays }) => ({ playedAt, plays }))).toEqual(
+      albums.map(() => ({ playedAt: null, plays: 0 })),
+    )
+    const [first] = albums
+    const page = await api().getAlbum(first?.id ?? 0)
+    expect(page.album.modifiedAt).toBe(first?.modifiedAt)
+    const artist = await api().getArtist(page.album.artists[0]?.id ?? 0)
+    expect(artist.albums.find(({ id }) => id === first?.id)?.modifiedAt).toBe(first?.modifiedAt)
+  })
+
   it("gives Home one shelf of the pinned music library's albums, newest releases first", async () => {
     const [shelf, ...rest] = await api().getHomeAlbums()
     const released = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.release })
@@ -316,11 +334,17 @@ describe('a music library', () => {
     expect(tracks.audio).toHaveLength(1)
   })
 
-  it('lists the artists and pages the tracks', async () => {
+  it('lists the album artists, each with their albums and the tracks on them, and pages the tracks', async () => {
     const artists = await api().listArtists({ libraryId: state.library })
+    // Bootlegs is credited on the untagged track alone once its album is matched to Someone Else's release.
     expect(
       artists.map(({ name, albumCount, trackCount }) => `${name} ${albumCount}/${trackCount}`),
-    ).toEqual(['Blur 1/1', 'Bootlegs 0/1', 'Radiohead 1/2', 'Someone Else 1/0'])
+    ).toEqual(['Blur 1/1', 'Radiohead 1/2', 'Someone Else 1/1'])
+    expect(
+      (await api().listArtists({ libraryId: state.library, search: 'radio' })).map(
+        ({ name }) => name,
+      ),
+    ).toEqual(['Radiohead'])
     const radiohead = artists.find(({ name }) => name === 'Radiohead')
     const page = await api().getArtist(radiohead?.id ?? 0)
     expect(page.albums.map(({ title }) => title)).toEqual(['OK Computer'])
@@ -338,6 +362,26 @@ describe('a music library', () => {
       offset: 2,
     })
     expect(rest.tracks.map(({ title }) => title)).toEqual(['Song 2', 'take 1'])
+  })
+
+  it('counts the Albums, Artists and Unmatched albums tabs as they list, without reading the listings', async () => {
+    const { db } = app().get(DatabaseService)
+    const live = (await api().listAlbums({ libraryId: state.library })).find(
+      ({ title }) => title === 'Live 1994',
+    )
+    const setMatch = db.prepare('UPDATE albums SET match = ? WHERE id = ?')
+    setMatch.run(MATCH_STATES.unmatched, live?.id ?? 0)
+    const albums = await api().listAlbums({ libraryId: state.library })
+    const artists = await api().listArtists({ libraryId: state.library })
+    expect(await api().getLibraryCounts(state.library)).toMatchObject({
+      albums: 3,
+      artists: 3,
+      unmatchedAlbums: 1,
+    })
+    expect(albums).toHaveLength(3)
+    expect(artists).toHaveLength(3)
+    expect(albums.filter(({ match }) => match === MATCH_STATES.unmatched)).toHaveLength(1)
+    setMatch.run(live?.match ?? MATCH_STATES.pending, live?.id ?? 0)
   })
 
   it('falls back from a broken selected cover to another local image and changes its version', async () => {

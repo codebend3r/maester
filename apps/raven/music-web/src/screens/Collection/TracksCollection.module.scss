@@ -1,0 +1,16 @@
+.actions {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-3);
+}
+
+.list {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.row {
+  display: grid;
+  min-inline-size: 0;
+}

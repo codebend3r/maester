@@ -125,6 +125,10 @@ export const TYPE = {
   meta: { fontFamily: FONTS.body, fontSize: 13, lineHeight: 18 },
   metaStrong: { fontFamily: FONTS.bodySemiBold, fontSize: 13, lineHeight: 18 },
   tileTitle: { fontFamily: FONTS.bodySemiBold, fontSize: 14, lineHeight: 19 },
+  /** An album's or a playlist's name on its tile. */
+  tileAlbum: { fontFamily: FONTS.display, fontSize: 14, lineHeight: 19 },
+  /** The line under it, the artists: a step over meta, and bold. */
+  tileArtist: { fontFamily: FONTS.bodySemiBold, fontSize: 14, lineHeight: 19 },
   time: { fontFamily: FONTS.body, fontSize: 14, lineHeight: 18, fontVariant: ['tabular-nums'] },
   small: { fontFamily: FONTS.body, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] },
   /** The word under an album's or a playlist's action on a phone. */
@@ -206,10 +210,19 @@ export const SIZE = {
   rowArt: 44,
   trackNumber: 24,
   avatar: 48,
+  /** An artist's card in Artists' grid: the least width a column is given, and its photo. */
+  artistCard: 256,
+  artistPhoto: 80,
   miniArt: 40,
   sheetArt: 52,
   /** An album tile on a shelf that scrolls sideways: Home's Recently added and Search's albums. */
   shelfTile: 148,
+  /** Albums' tile at each of its cover sizes, the web's `--size-cover-*`. */
+  coverExtraSmall: 96,
+  coverSmall: 128,
+  coverMedium: 160,
+  coverLarge: 224,
+  coverExtraLarge: 288,
   floatInset: 10,
   tabPillWidth: 52,
   tabPillHeight: 30,

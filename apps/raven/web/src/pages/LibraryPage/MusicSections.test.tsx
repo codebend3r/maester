@@ -207,7 +207,6 @@ describe('ArtistsSection', () => {
     spyOn(api, 'listArtists').mockResolvedValue([
       artist(),
       artist({ id: 2, name: 'Blur', albumCount: 2, trackCount: 1 }),
-      artist({ id: 3, name: 'Featured guest', albumCount: 0, trackCount: 1 }),
     ])
   })
 
@@ -226,7 +225,6 @@ describe('ArtistsSection', () => {
     const list = screen.getByRole('list', { name: 'Artists' })
     expect(list).toHaveTextContent('1 album · 2 tracks')
     expect(list).toHaveTextContent('2 albums · 1 track')
-    expect(list).not.toHaveTextContent('Featured guest')
   })
 })
 

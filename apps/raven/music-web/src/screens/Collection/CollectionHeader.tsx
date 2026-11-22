@@ -1,7 +1,6 @@
-import { LIBRARY_PAGE_COPY, type ListSort } from '@raven/wren'
+import { LIBRARY_PAGE_COPY } from '@raven/wren'
 import type { ComponentType, ReactNode, Ref } from 'react'
 import { WREN_ROUTES } from '@/routes'
-import { SortButton } from '@/screens/Collection/SortButton'
 import { useGoBack } from '@/shell/useGoBack'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
 import { PageHeader } from '@/ui/PageHeader/PageHeader'
@@ -15,9 +14,6 @@ export type CollectionSearch = {
   placeholder: string
 }
 
-/** A list's order and the way to change it. */
-type CollectionSort = { sort: ListSort; onSort: (sort: ListSort) => void }
-
 type CollectionHeaderProps = {
   title: string
   /** What sits at the title's end: New playlist. */
@@ -25,7 +21,8 @@ type CollectionHeaderProps = {
   search?: CollectionSearch
   /** How many the list holds, "1,980 albums", or null until it is known. */
   count: string | null
-  sort?: CollectionSort
+  /** The list's choices: Sort, and on Albums Cover size. */
+  tools?: ReactNode
   /** What sits between the title and the list's tools: Play and Shuffle. */
   children?: ReactNode
   /** The header's own element, for a page that measures it: the artists' A to Z rail. */
@@ -54,7 +51,7 @@ function PhoneHeader({
   actions,
   search,
   count,
-  sort,
+  tools,
   children,
   ref,
 }: CollectionHeaderProps) {
@@ -69,40 +66,40 @@ function PhoneHeader({
       />
       {children}
       {search !== undefined && <Search search={search} />}
-      {(count !== null || sort !== undefined) && (
+      {(count !== null || tools !== undefined) && (
         <div className={styles.countRow}>
           <p className={styles.count}>{count ?? ''}</p>
-          {sort !== undefined && <SortButton onSort={sort.onSort} sort={sort.sort} />}
+          {tools}
         </div>
       )}
     </div>
   )
 }
 
-/** The wide header: the title with the search and sort at its end, the count under it. */
+/** The wide header: the title with the search and the choices at its end, the count under it. */
 function TabletHeader({
   title,
   actions,
   search,
   count,
-  sort,
+  tools,
   children,
   ref,
 }: CollectionHeaderProps) {
-  const tools = (
+  const end = (
     <div className={styles.tools}>
       {search !== undefined && (
         <div className={styles.tabletSearch}>
           <Search search={search} />
         </div>
       )}
-      {sort !== undefined && <SortButton onSort={sort.onSort} sort={sort.sort} />}
+      {tools}
       {actions}
     </div>
   )
   return (
     <div className={styles.header} ref={ref}>
-      <PageHeader actions={tools} title={title} />
+      <PageHeader actions={end} title={title} />
       {count !== null && <p className={styles.count}>{count}</p>}
       {children}
     </div>

@@ -96,6 +96,8 @@ export const ravenQueriesFor = (api: ApiClient) => {
     libraryIds: readonly number[]
     search: string
     sort: MusicSort
+    /** Deals a random listing; a new seed deals it anew. */
+    seed?: number
   }
   type RavenQueriesForSongCountQueryProps = { libraryId: number; search: string }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
@@ -123,13 +125,21 @@ export const ravenQueriesFor = (api: ApiClient) => {
     libraryIds,
     search,
     sort,
+    seed,
     from: { at, offset },
   }: SongsFromProps): Promise<TrackPage & SongsPage> => {
     const libraryId = libraryIds[at]
     if (libraryId === undefined) throw new Error(`No music library at ${at}`)
-    const page = await api.listTracks({ libraryId, search, sort, limit: MUSIC_PAGE.most, offset })
+    const page = await api.listTracks({
+      libraryId,
+      search,
+      sort,
+      seed,
+      limit: MUSIC_PAGE.most,
+      offset,
+    })
     if (page.tracks.length > 0 || at + 1 >= libraryIds.length) return { ...page, at, offset }
-    return songsFrom({ libraryIds, search, sort, from: { at: at + 1, offset: 0 } })
+    return songsFrom({ libraryIds, search, sort, seed, from: { at: at + 1, offset: 0 } })
   }
 
   /**
@@ -427,13 +437,13 @@ export const ravenQueriesFor = (api: ApiClient) => {
      * The tracks of `libraryIds` as one list, `MUSIC_PAGE.most` a page: each library's to its
      * end, then the next library's from its start. None asks for nothing.
      */
-    songsQuery: ({ libraryIds, search, sort }: RavenQueriesForSongsQueryProps) =>
+    songsQuery: ({ libraryIds, search, sort, seed }: RavenQueriesForSongsQueryProps) =>
       infiniteQueryOptions({
-        queryKey: queryKeys.songs({ libraryIds, search, sort }),
+        queryKey: queryKeys.songs({ libraryIds, search, sort, seed }),
         queryFn:
           libraryIds.length === 0
             ? skipToken
-            : ({ pageParam }) => songsFrom({ libraryIds, search, sort, from: pageParam }),
+            : ({ pageParam }) => songsFrom({ libraryIds, search, sort, seed, from: pageParam }),
         initialPageParam: FIRST_SONGS_PAGE,
         getNextPageParam: (last): SongsPage | null => {
           const next = last.offset + last.tracks.length

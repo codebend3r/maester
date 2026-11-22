@@ -1,17 +1,25 @@
-import { type Library, MUSIC_SORTS, type Track } from '@raven/core'
+import { type Library, MUSIC_SORTS, type MediaItem, type Track } from '@raven/core'
+import { HISTORY_SHOWS } from '@raven/ui/headless'
 import {
-  type ListSort,
+  FINISHED_SHOWN,
+  type ListOrder,
+  type ListState,
   RECENT_SERVER_SORTS,
   type RecentSort,
-  SERVER_SORTS,
+  albumIdsOf,
   albumsByTitle,
   artistsByName,
+  inLibraryOrder,
+  libraryValuesOf,
   listStateOf,
+  listedTracksOf,
   mergedOf,
   nextPageOf,
   recentAlbums,
+  recentlyFinished,
   songCountOf,
   tracksOfPages,
+  unmatchedAlbumsOf,
 } from '@raven/wren'
 import {
   type QueryKey,
@@ -101,21 +109,22 @@ export const useSongCount = ({ search }: UseSongCountProps): number | null => {
 const NO_TRACKS: readonly Track[] = []
 
 type UseAllSongsProps = ListingsProps & {
-  /** The order the server pages them in. */
-  sort: ListSort
+  /** The order the server pages them in, and the seed a random one is dealt by. */
+  order: ListOrder
 }
 
 /**
- * Every music library's songs that `search` finds, a page at a time in the order `sort` names:
+ * Every music library's songs that `search` finds, a page at a time in the order `order` names:
  * what is read so far, where the list stands, and `nextPage`, which a list calls near its end.
  */
-export const useAllSongs = ({ search, sort, isEnabled = true }: UseAllSongsProps) => {
+export const useAllSongs = ({ search, order, isEnabled = true }: UseAllSongsProps) => {
   const music = useMusicLibraries()
   const songs = useInfiniteQuery({
     ...queries.songsQuery({
       libraryIds: music.libraries.map(({ id }) => id),
       search,
-      sort: SERVER_SORTS[sort],
+      sort: order.sort,
+      seed: order.seed,
     }),
     enabled: isEnabled,
   })
@@ -128,3 +137,67 @@ export const useAllSongs = ({ search, sort, isEnabled = true }: UseAllSongsProps
 
 /** The account's playlists and the shared ones. */
 export const usePlaylists = () => useQuery(queries.playlistsQuery)
+
+/**
+ * Every music library's albums no MusicBrainz release was found for, as one list by title, and
+ * where it stands: Albums' own listing, so the two share what the server sent.
+ */
+export const useUnmatchedAlbums = () => {
+  const { music, listings } = usePerLibrary((library) => ({
+    ...queries.albumsQuery({ libraryId: library.id, search: '', sort: MUSIC_SORTS.title }),
+    select: unmatchedAlbumsOf,
+  }))
+  const { entries, ...listing } = mergedOf({ music, listings, order: albumsByTitle })
+  return { albums: entries, listing }
+}
+
+type UseListedTracksProps = { media: readonly MediaItem[]; listing: ListState }
+
+/** Music files as the tracks they are, read from their albums' pages, and where the list stands. */
+const useListedTracks = ({ media, listing }: UseListedTracksProps) => {
+  const albums = useQueries({ queries: albumIdsOf(media).map((id) => queries.albumQuery(id)) })
+  return listedTracksOf({ media, listing, albums })
+}
+
+/** The songs left partway through in every music library, each library's most recent first. */
+export const useInProgressTracks = () => {
+  const { music, listings } = usePerLibrary((library) => queries.inProgressQuery(library.id))
+  const { entries, ...listing } = mergedOf({ music, listings, order: inLibraryOrder })
+  return useListedTracks({ media: entries.map(({ media }) => media), listing })
+}
+
+/** The songs marked a favourite in every music library, each library's most recently marked first. */
+export const useFavouriteTracks = () => {
+  const { music, listings } = usePerLibrary((library) => queries.libraryFavouritesQuery(library.id))
+  const { entries, ...listing } = mergedOf({ music, listings, order: inLibraryOrder })
+  return useListedTracks({ media: entries.map(({ media }) => media), listing })
+}
+
+/** The songs played to their end most recently in every music library, the newest first. */
+export const useFinishedTracks = () => {
+  const { music, listings } = usePerLibrary((library) =>
+    queries.historyQuery({
+      libraryId: library.id,
+      show: HISTORY_SHOWS.watched,
+      limit: FINISHED_SHOWN,
+    }),
+  )
+  const { entries, ...listing } = mergedOf({ music, listings, order: recentlyFinished })
+  return useListedTracks({ media: entries.map(({ media }) => media), listing })
+}
+
+/**
+ * What each of Library's categories holds, added up over every music library from the server's
+ * counts, the playlists and the songs; a count still on its way, failed or none is left out.
+ */
+export const useLibraryValues = () => {
+  const { music, listings } = usePerLibrary((library) => queries.libraryCountsQuery(library.id))
+  const playlists = usePlaylists()
+  const songs = useSongCount({ search: '' })
+  return libraryValuesOf({
+    music,
+    counts: listings,
+    playlists: playlists.data?.length ?? null,
+    songs,
+  })
+}

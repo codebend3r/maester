@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { MUSIC_SORTS } from '@raven/core'
-import { KIT_COPY, LIBRARY_COPY, LIBRARY_PAGE_COPY } from '@raven/wren'
-import { screen, waitFor } from '@testing-library/react'
+import { KIT_COPY, LIBRARY_COPY, LIBRARY_PAGE_COPY, SHARED_ORDER } from '@raven/wren'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { COLLECTION_KINDS, WREN_ROUTES, albumPath, collectionPath } from '@/routes'
@@ -48,11 +48,11 @@ describe('Library', () => {
       sort: MUSIC_SORTS.added,
       limit: 10,
     })
-    expect(screen.getByRole('link', { name: LIBRARY_PAGE_COPY.albums })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: LIBRARY_PAGE_COPY.artists })).toHaveAttribute(
-      'href',
-      collectionPath(COLLECTION_KINDS.artists),
-    )
+    expect(
+      screen.getByRole('link', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.artists, value: '1' }),
+      }),
+    ).toHaveAttribute('href', collectionPath(COLLECTION_KINDS.artists))
     expect(
       screen.getByRole('link', {
         name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.playlists, value: '1' }),
@@ -63,6 +63,48 @@ describe('Library', () => {
       'href',
       albumPath(OK_COMPUTER.id),
     )
+  })
+
+  it("lists raven's seven music tabs in raven's order, then Songs, each with the server's count", async () => {
+    renderLibrary()
+    await screen.findByRole('link', {
+      name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
+    })
+    const rows = screen.getAllByRole('listitem').flatMap((row) => {
+      const link = within(row).queryByRole('link')
+      return link === null ? [] : [link.getAttribute('href')]
+    })
+    expect(rows.slice(0, SHARED_ORDER.length)).toEqual(
+      SHARED_ORDER.map((segment) => collectionPath(segment)),
+    )
+    expect(music().getLibraryCounts).toHaveBeenCalledWith(MUSIC.id)
+    expect(
+      screen.getByRole('link', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.inProgress, value: '1' }),
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.favourites, value: '1' }),
+      }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.finished, value: '1' }),
+      }),
+    ).toBeInTheDocument()
+    // No album is unmatched, so that row says no zero.
+    expect(
+      screen.getByRole('link', { name: LIBRARY_PAGE_COPY.unmatchedAlbums }),
+    ).toBeInTheDocument()
+  })
+
+  it('leaves the counts out when raven cannot count them', async () => {
+    music().getLibraryCounts.mockRejectedValue(new Error('refused'))
+    renderLibrary()
+    await screen.findByRole('link', { name: OK_COMPUTER_TILE })
+    expect(screen.getByRole('link', { name: LIBRARY_PAGE_COPY.albums })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: LIBRARY_PAGE_COPY.artists })).toBeInTheDocument()
   })
 
   it('has no Downloads category, since a browser keeps none', async () => {
@@ -101,7 +143,11 @@ describe('Library', () => {
 
   it('opens Albums from its row', async () => {
     renderLibrary()
-    await userEvent.click(await screen.findByRole('link', { name: LIBRARY_PAGE_COPY.albums }))
+    await userEvent.click(
+      await screen.findByRole('link', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
+      }),
+    )
     expect(await screen.findByText(ALBUMS_MARK)).toBeInTheDocument()
   })
 

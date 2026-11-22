@@ -21,7 +21,7 @@ import type Sqlite from 'better-sqlite3'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
 import { likePattern } from '@/media/mediaSql'
-import type { ByAccount } from '@/media/viewingAccountKeys'
+import type { AccountKey, ByAccount } from '@/media/viewingAccountKeys'
 import { PictureVersions } from '@/metadata/pictureVersions'
 import type { AudioFormat, AudioTags } from '@/music/audioReader'
 import { type Filing, albumTypeOf, albumFolderOf, discOfPath, filingOf } from '@/music/filing'
@@ -48,6 +48,12 @@ type AlbumRow = {
   artists: string
   track_count: number
   duration: number | null
+  /** The newest `mtime_ms` among its tracks' files; null when it has none. */
+  modified_ms: number | null
+  /** The account's last play of one of its tracks, null for never; left out where no account is bound. */
+  played_at?: string | null
+  /** How many times the account played its tracks; left out where no account is bound. */
+  play_count?: number
 }
 
 type AlbumDetailsRow = AlbumRow & {
@@ -122,20 +128,34 @@ const SHOWN_TRACK = `NOT EXISTS (
      AND (COALESCE(copy.bit_depth, 0) * 10000000 + COALESCE(copy.sample_rate, 0), -copy.media_id)
        > (COALESCE(t.bit_depth, 0) * 10000000 + COALESCE(t.sample_rate, 0), -t.media_id))`
 
+/** The account's plays of album `a`'s tracks, each found by the account's key. */
+const ALBUM_PLAYS = `FROM tracks listened
+  JOIN plays pl INDEXED BY plays_account ON pl.account_id = @account AND pl.media_id = listened.media_id
+  WHERE listened.album_id = a.id`
+const LAST_PLAY = `(SELECT MAX(pl.played_at) ${ALBUM_PLAYS})`
+const PLAY_COUNT = `(SELECT COUNT(*) ${ALBUM_PLAYS})`
+
+/** The calling account's plays of an album's tracks: a query that adds them binds `@account`. */
+const ACCOUNT_PLAYS = `, ${LAST_PLAY} AS played_at, ${PLAY_COUNT} AS play_count`
+
 /** An album with its credits, track count and length; `more` adds columns the album's page reads. */
 const selectAlbums = (more = ''): string =>
   `SELECT a.id, a.library_id, a.title, a.sort_title, a.year, a.release_date, a.type, a.is_compilation,
           a.cover_source, a.cover_ref, a.cover_stamp, a.mbid, a.match, a.added_at, ${ALBUM_ARTISTS} AS artists,
-          COUNT(t.media_id) AS track_count, SUM(m.duration) AS duration${more}
+          COUNT(t.media_id) AS track_count, SUM(m.duration) AS duration,
+          MAX(m.mtime_ms) AS modified_ms${more}
      FROM albums a
      LEFT JOIN tracks t ON t.album_id = a.id AND ${SHOWN_TRACK}
      LEFT JOIN media m ON m.id = t.media_id`
 
-const SELECT_ALBUMS = selectAlbums()
+const SELECT_ALBUMS = selectAlbums(ACCOUNT_PLAYS)
 
-const SELECT_ALBUM_DETAILS = selectAlbums(
-  ', a.label, a.genres, a.mbid, COUNT(DISTINCT t.disc) AS disc_count',
-)
+const ALBUM_DETAILS = ', a.label, a.genres, a.mbid, COUNT(DISTINCT t.disc) AS disc_count'
+
+/** An album's page with no account to bind, so without its plays. */
+const SELECT_ALBUM_DETAILS = selectAlbums(ALBUM_DETAILS)
+
+const SELECT_ACCOUNT_ALBUM_DETAILS = selectAlbums(`${ALBUM_DETAILS}${ACCOUNT_PLAYS}`)
 
 const SELECT_TRACKS = `SELECT m.id AS media_id, m.library_id, t.album_id, t.title, t.disc, t.number,
                               m.duration, m.container, m.audio_codec, m.bitrate, t.sample_rate,
@@ -156,11 +176,10 @@ const FIRST_ARTIST = `(SELECT ar.sort_name FROM album_artists aa JOIN artists ar
 /** Albums as a discography reads: by year, the undated last, then by title. */
 const BY_ALBUM = 'a.year IS NULL, a.year, a.sort_title COLLATE NOCASE'
 
-const LAST_PLAY = `(SELECT MAX(p.played_at) FROM plays p JOIN tracks pt ON pt.media_id = p.media_id
-  WHERE p.account_id = @account AND pt.album_id = a.id)`
-const PLAY_COUNT = `(SELECT COUNT(*) FROM plays p JOIN tracks pt ON pt.media_id = p.media_id
-  WHERE p.account_id = @account AND pt.album_id = a.id)`
 const RELEASE_DATE = 'COALESCE(a.release_date, CAST(a.year AS TEXT))'
+/** When the album's newest file last changed on disk; a subquery, since a track listing orders by it ungrouped. */
+const MODIFIED = `(SELECT MAX(mm.mtime_ms) FROM tracks mt JOIN media mm ON mm.id = mt.media_id
+  WHERE mt.album_id = a.id)`
 
 const ALBUM_FIELDS = {
   [MUSIC_SORTS.title]: 'a.sort_title COLLATE NOCASE',
@@ -168,6 +187,7 @@ const ALBUM_FIELDS = {
   [MUSIC_SORTS.year]: 'a.year',
   [MUSIC_SORTS.added]: 'a.added_at',
   [MUSIC_SORTS.release]: RELEASE_DATE,
+  [MUSIC_SORTS.modified]: MODIFIED,
   [MUSIC_SORTS.played]: LAST_PLAY,
   [MUSIC_SORTS.plays]: PLAY_COUNT,
   [MUSIC_SORTS.random]: '((a.id * (1103515245 + @seed * 2)) % 2147483647)',
@@ -179,6 +199,7 @@ const ALBUM_ORDER: Record<MusicSort, string> = {
   [MUSIC_SORTS.year]: `${BY_ALBUM}, a.id`,
   [MUSIC_SORTS.added]: 'a.added_at DESC, a.id DESC',
   [MUSIC_SORTS.release]: `${RELEASE_DATE} IS NULL, ${RELEASE_DATE} DESC, a.id`,
+  [MUSIC_SORTS.modified]: `${MODIFIED} IS NULL, ${MODIFIED} DESC, a.id`,
   [MUSIC_SORTS.played]: `${LAST_PLAY} IS NULL, ${LAST_PLAY} DESC, a.id`,
   [MUSIC_SORTS.plays]: `${PLAY_COUNT} DESC, a.id`,
   [MUSIC_SORTS.random]: `${ALBUM_FIELDS[MUSIC_SORTS.random]}, a.id`,
@@ -214,6 +235,10 @@ const trackOrderOf = ({ sort, order, byAlbum = false }: TrackOrderOfProps): stri
   if (!byAlbum && sort === MUSIC_SORTS.added) {
     const addedDirection = order === SORT_DIRECTIONS.ascending ? 'ASC' : 'DESC'
     return `m.added_at ${addedDirection}, m.id`
+  }
+  if (!byAlbum && sort === MUSIC_SORTS.modified) {
+    const modifiedDirection = order === SORT_DIRECTIONS.ascending ? 'ASC' : 'DESC'
+    return `m.mtime_ms ${modifiedDirection}, m.id`
   }
   return `${albumOrderOf({ sort, order })}, t.disc, t.number IS NULL, t.number, t.title COLLATE NOCASE, m.id`
 }
@@ -266,7 +291,15 @@ type MusicRepositoryListAlbumsProps = { libraryId: number } & ByAccount &
 
 type MusicRepositoryListTracksProps = { libraryId: number } & ByAccount & MusicListParams
 
-type MusicRepositoryArtistProps = {
+type MusicRepositoryAlbumsProps = { ids: readonly number[] } & ByAccount
+
+type MusicRepositoryAlbumProps = {
+  id: number
+  /** Whose plays the album answers; left out, it answers none. */
+  account?: AccountKey
+}
+
+type MusicRepositoryArtistProps = ByAccount & {
   id: number
   /** Whether the caller sees a library, so a locked one's albums stay out of the page. */
   seesLibrary: (libraryId: number) => boolean
@@ -332,6 +365,11 @@ export class MusicRepository implements OnModuleInit {
       }),
       match: isMatchState(row.match) ? row.match : MATCH_STATES.pending,
       addedAt: row.added_at,
+      ...(row.modified_ms !== null && { modifiedAt: new Date(row.modified_ms).toISOString() }),
+      ...(row.play_count !== undefined && {
+        playedAt: row.played_at ?? null,
+        plays: row.play_count,
+      }),
     }
   }
 
@@ -689,31 +727,58 @@ export class MusicRepository implements OnModuleInit {
     )
   }
 
-  /** A library's artists, by name, each with how many of that library's albums and tracks credit them. */
+  /**
+   * A library's album artists, by name, each with how many of its albums
+   * credit them as the album's artist and the tracks those albums show. An
+   * artist credited only on a track (a featured guest) is not listed.
+   */
   listArtists({ libraryId, search }: MusicRepositoryListArtistsProps): Artist[] {
     return this.db
       .prepare<{ libraryId: number; pattern: string }, ArtistRow>(
-        `WITH album_counts AS (
-           SELECT aa.artist_id, COUNT(*) AS count FROM albums a
-           JOIN album_artists aa ON aa.album_id = a.id
-           WHERE a.library_id = @libraryId GROUP BY aa.artist_id
-         ), track_counts AS (
-           SELECT ta.artist_id, COUNT(*) AS count FROM media m
-           JOIN track_artists ta ON ta.media_id = m.id
-           WHERE m.library_id = @libraryId GROUP BY ta.artist_id
-         ), credited AS (
-           SELECT artist_id FROM album_counts UNION SELECT artist_id FROM track_counts
+        `WITH credits AS (
+           SELECT DISTINCT aa.artist_id, aa.album_id FROM album_artists aa
+             JOIN albums a ON a.id = aa.album_id
+            WHERE a.library_id = @libraryId
+         ), shown AS (
+           SELECT t.album_id, COUNT(*) AS count FROM tracks t
+            WHERE t.album_id IN (SELECT album_id FROM credits) AND ${SHOWN_TRACK}
+            GROUP BY t.album_id
          )
          SELECT ar.id, ar.name, ar.sort_name, ar.mbid,
-                COALESCE(ac.count, 0) AS album_count, COALESCE(tc.count, 0) AS track_count
-           FROM credited JOIN artists ar ON ar.id = credited.artist_id
-           LEFT JOIN album_counts ac ON ac.artist_id = ar.id
-           LEFT JOIN track_counts tc ON tc.artist_id = ar.id
+                COUNT(*) AS album_count, COALESCE(SUM(shown.count), 0) AS track_count
+           FROM credits
+           JOIN artists ar ON ar.id = credits.artist_id
+           LEFT JOIN shown ON shown.album_id = credits.album_id
           WHERE ar.name LIKE @pattern ESCAPE '\\'
+          GROUP BY ar.id
           ORDER BY ar.sort_name COLLATE NOCASE, ar.id`,
       )
       .all({ libraryId, pattern: likePattern(search.trim()) })
       .map((row) => this.toArtist(row))
+  }
+
+  /** How many albums a library holds, as its unsearched listing lists them. */
+  countAlbums(libraryId: number): number {
+    return (
+      this.db
+        .prepare<[number], { total: number }>(
+          'SELECT COUNT(*) AS total FROM albums WHERE library_id = ?',
+        )
+        .get(libraryId)?.total ?? 0
+    )
+  }
+
+  /** How many album artists a library holds, as its unsearched `listArtists` lists them. */
+  countArtists(libraryId: number): number {
+    return (
+      this.db
+        .prepare<[number], { total: number }>(
+          `SELECT COUNT(DISTINCT aa.artist_id) AS total FROM album_artists aa
+             JOIN albums a ON a.id = aa.album_id
+            WHERE a.library_id = ?`,
+        )
+        .get(libraryId)?.total ?? 0
+    )
   }
 
   /** A library's albums in `sort` order; search matches the title and the artists' names. */
@@ -787,36 +852,42 @@ export class MusicRepository implements OnModuleInit {
   }
 
   /** The albums among `ids` in the order `ids` lists them; an id that is no album is left out. */
-  albumsInOrder(ids: readonly number[]): AlbumSummary[] {
-    const byId = this.albums(ids)
+  albumsInOrder({ ids, account }: MusicRepositoryAlbumsProps): AlbumSummary[] {
+    const byId = this.albums({ ids, account })
     return ids.flatMap((id) => byId.get(id) ?? [])
   }
 
   /** The albums among `ids`, by id; an id that is no album is not in the map. */
-  albums(ids: readonly number[]): Map<number, AlbumSummary> {
+  albums({ ids, account }: MusicRepositoryAlbumsProps): Map<number, AlbumSummary> {
     const albums = this.db
-      .prepare<[string], AlbumRow>(
-        `${SELECT_ALBUMS} WHERE a.id IN (SELECT value FROM json_each(?)) GROUP BY a.id`,
+      .prepare<{ ids: string; account: string }, AlbumRow>(
+        `${SELECT_ALBUMS} WHERE a.id IN (SELECT value FROM json_each(@ids)) GROUP BY a.id`,
       )
-      .all(JSON.stringify([...new Set(ids)]))
+      .all({ ids: JSON.stringify([...new Set(ids)]), account })
       .map((row) => this.toAlbum(row))
     return new Map(albums.map((album) => [album.id, album]))
   }
 
   /**
-   * The artists among `ids`, by id, each counted over the albums and
-   * tracks outside `hidden`; one credited on nothing else counts 0 and 0.
+   * The artists among `ids`, by id, each counted over the libraries outside
+   * `hidden` as an artist's page counts them: the albums they are the
+   * album's artist of, and the tracks shown on those albums or credited to
+   * them on another's. One credited on nothing else counts 0 and 0.
    */
   artists({ ids, hidden }: MusicRepositoryArtistsProps): Map<number, Artist> {
     const artists = this.db
       .prepare<{ ids: string; hidden: string }, ArtistRow>(
         `SELECT ar.id, ar.name, ar.sort_name, ar.mbid,
-                (SELECT COUNT(*) FROM album_artists aa JOIN albums a ON a.id = aa.album_id
+                (SELECT COUNT(DISTINCT aa.album_id) FROM album_artists aa JOIN albums a ON a.id = aa.album_id
                   WHERE aa.artist_id = ar.id
                     AND a.library_id NOT IN (SELECT value FROM json_each(@hidden))) AS album_count,
-                (SELECT COUNT(*) FROM track_artists ta JOIN media m ON m.id = ta.media_id
-                  WHERE ta.artist_id = ar.id
-                    AND m.library_id NOT IN (SELECT value FROM json_each(@hidden))) AS track_count
+                (SELECT COUNT(*) FROM tracks t JOIN albums a ON a.id = t.album_id
+                  WHERE t.media_id IN (
+                          SELECT own.media_id FROM album_artists aa JOIN tracks own ON own.album_id = aa.album_id
+                           WHERE aa.artist_id = ar.id
+                          UNION SELECT ta.media_id FROM track_artists ta WHERE ta.artist_id = ar.id)
+                    AND a.library_id NOT IN (SELECT value FROM json_each(@hidden))
+                    AND ${SHOWN_TRACK}) AS track_count
            FROM artists ar
           WHERE ar.id IN (SELECT value FROM json_each(@ids))`,
       )
@@ -826,10 +897,19 @@ export class MusicRepository implements OnModuleInit {
   }
 
   /** An album with its tracks in disc and number order, or null when there is no such album. */
-  album(id: number): AlbumPage | null {
-    const row = this.db
-      .prepare<[number], AlbumDetailsRow>(`${SELECT_ALBUM_DETAILS} WHERE a.id = ? GROUP BY a.id`)
-      .get(id)
+  album({ id, account }: MusicRepositoryAlbumProps): AlbumPage | null {
+    const row =
+      account === undefined
+        ? this.db
+            .prepare<[number], AlbumDetailsRow>(
+              `${SELECT_ALBUM_DETAILS} WHERE a.id = ? GROUP BY a.id`,
+            )
+            .get(id)
+        : this.db
+            .prepare<{ id: number; account: string }, AlbumDetailsRow>(
+              `${SELECT_ACCOUNT_ALBUM_DETAILS} WHERE a.id = @id GROUP BY a.id`,
+            )
+            .get({ id, account })
     if (!row) return null
     const tracks = this.db
       .prepare<[number], TrackRow>(
@@ -851,9 +931,11 @@ export class MusicRepository implements OnModuleInit {
   /**
    * An artist's page: their albums, then the albums of others they are
    * credited on a track of, each in the libraries the caller sees, and
-   * their counts over those; null when there is no such artist.
+   * their counts over those: their albums, and the tracks those albums
+   * show with the shown tracks credited to them on the others; null when
+   * there is no such artist.
    */
-  artist({ id, seesLibrary }: MusicRepositoryArtistProps): ArtistPage | null {
+  artist({ id, seesLibrary, account }: MusicRepositoryArtistProps): ArtistPage | null {
     const row = this.db
       .prepare<[number], Omit<ArtistRow, 'album_count' | 'track_count'>>(
         'SELECT id, name, sort_name, mbid FROM artists WHERE id = ?',
@@ -861,35 +943,35 @@ export class MusicRepository implements OnModuleInit {
       .get(id)
     if (!row) return null
     const albums = this.db
-      .prepare<[number], AlbumRow>(
+      .prepare<{ id: number; account: string }, AlbumRow>(
         `${SELECT_ALBUMS}
-          WHERE a.id IN (SELECT album_id FROM album_artists WHERE artist_id = ?)
+          WHERE a.id IN (SELECT album_id FROM album_artists WHERE artist_id = @id)
           GROUP BY a.id
           ORDER BY ${BY_ALBUM}, a.id`,
       )
-      .all(id)
+      .all({ id, account })
       .map((album) => this.toAlbum(album))
       .filter((album) => seesLibrary(album.libraryId))
     const appearsOn = this.db
-      .prepare<[number, number], AlbumRow>(
+      .prepare<{ id: number; account: string }, AlbumRow>(
         `${SELECT_ALBUMS}
           WHERE a.id IN (SELECT t2.album_id FROM track_artists ta JOIN tracks t2 ON t2.media_id = ta.media_id
-                          WHERE ta.artist_id = ?)
-            AND a.id NOT IN (SELECT album_id FROM album_artists WHERE artist_id = ?)
+                          WHERE ta.artist_id = @id)
+            AND a.id NOT IN (SELECT album_id FROM album_artists WHERE artist_id = @id)
           GROUP BY a.id
           ORDER BY ${BY_ALBUM}, a.id`,
       )
-      .all(id, id)
+      .all({ id, account })
       .map((album) => this.toAlbum(album))
       .filter((album) => seesLibrary(album.libraryId))
-    const seen = [...albums, ...appearsOn].map((album) => album.id)
-    const trackCount =
+    const featured =
       this.db
         .prepare<[number, string], { count: number }>(
-          `SELECT COUNT(*) AS count FROM track_artists ta JOIN tracks t ON t.media_id = ta.media_id
-            WHERE ta.artist_id = ? AND t.album_id IN (SELECT value FROM json_each(?))`,
+          `SELECT COUNT(DISTINCT t.media_id) AS count FROM track_artists ta JOIN tracks t ON t.media_id = ta.media_id
+            WHERE ta.artist_id = ? AND t.album_id IN (SELECT value FROM json_each(?)) AND ${SHOWN_TRACK}`,
         )
-        .get(id, JSON.stringify(seen))?.count ?? 0
+        .get(id, JSON.stringify(appearsOn.map((album) => album.id)))?.count ?? 0
+    const trackCount = albums.reduce((sum, album) => sum + album.trackCount, featured)
     return {
       artist: this.toArtist({ ...row, album_count: albums.length, track_count: trackCount }),
       albums,

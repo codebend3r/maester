@@ -1,5 +1,5 @@
 import { oneOf, orElse } from '@raven/core'
-import { LIBRARY_SEGMENTS, type LibrarySegment } from '@raven/wren'
+import { LIBRARY_SEGMENTS, type SharedSegment } from '@raven/wren'
 import { generatePath } from 'react-router-dom'
 
 /** Wren's pages, one per file under the phone and tablet apps' `app/`, by the same names. */
@@ -36,11 +36,15 @@ export const playlistPath = (id: number): string =>
  * Downloads, since a browser keeps none.
  */
 export const COLLECTION_KINDS = {
-  playlists: LIBRARY_SEGMENTS.playlists,
-  artists: LIBRARY_SEGMENTS.artists,
   albums: LIBRARY_SEGMENTS.albums,
+  artists: LIBRARY_SEGMENTS.artists,
+  playlists: LIBRARY_SEGMENTS.playlists,
+  unmatchedAlbums: LIBRARY_SEGMENTS.unmatchedAlbums,
+  inProgress: LIBRARY_SEGMENTS.inProgress,
+  favourites: LIBRARY_SEGMENTS.favourites,
+  finished: LIBRARY_SEGMENTS.finished,
   songs: LIBRARY_SEGMENTS.songs,
-} as const satisfies Partial<Record<LibrarySegment, LibrarySegment>>
+} as const satisfies Record<string, SharedSegment>
 
 export type CollectionKind = (typeof COLLECTION_KINDS)[keyof typeof COLLECTION_KINDS]
 

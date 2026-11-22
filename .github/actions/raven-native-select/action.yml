@@ -6,8 +6,8 @@ description: >-
 
 # Shared by the 🔎 Select affected native checks job of pull-request-checks.yml and of
 # native-checks.yml, whose native jobs read this plan and nothing else. A pull request diffs
-# against the base it names; a push to main against its last green run; a manual run, or a push
-# with no green ancestor, selects every group. A change to a shared file, a workflow or a script
+# against the base it names; a push to main against its last green run; a push with no green
+# ancestor selects every group. A change to a shared file, a workflow or a script
 # selects every group too.
 #
 # On a push to main it looks for the pull request the pushed commit merged, that pull request's

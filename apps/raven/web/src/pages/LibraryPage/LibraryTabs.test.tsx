@@ -21,6 +21,7 @@ import {
   unmatchedFile,
 } from '@/test/fixtures'
 import { fakeAccount } from '@/test/authClient'
+import { playlistSummary } from '@/test/music'
 import { renderLibraryPage } from '@/test/libraryPage'
 import { pollFast } from '@/test/polls'
 
@@ -41,6 +42,8 @@ describe('LibraryPage tabs', () => {
     duplicates: spyOn(api, 'listDuplicates'),
     dolbyVisionOnly: spyOn(api, 'listDolbyVisionOnly'),
     counts: spyOn(api, 'getLibraryCounts'),
+    albums: spyOn(api, 'listAlbums'),
+    playlists: spyOn(api, 'listPlaylists'),
     history: spyOn(api, 'listHistory'),
     lockState: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
@@ -58,6 +61,8 @@ describe('LibraryPage tabs', () => {
     spies.duplicates.mockImplementation(async () => [])
     spies.dolbyVisionOnly.mockImplementation(async () => ({ shows: [], files: [] }))
     spies.counts.mockImplementation(async () => libraryCounts())
+    spies.albums.mockImplementation(async () => [])
+    spies.playlists.mockImplementation(async () => [])
     spies.history.mockImplementation(async () => [])
     spies.lockState.mockImplementation(async () => ({ available: false, unlocked: false }))
     spies.health.mockImplementation(async () => metadataHealth())
@@ -146,6 +151,45 @@ describe('LibraryPage tabs', () => {
     expect(spies.counts).toHaveBeenCalledWith(2)
     // The header says the counts aloud, so beside the tabs they are for the eye.
     expect(within(all).getByText('1,204')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('counts every tab of a music library: its albums, album artists, the playlists it lists and the unmatched albums', async () => {
+    spies.counts.mockImplementation(async () =>
+      libraryCounts({ albums: 1480, artists: 212, unmatchedAlbums: 9, inProgress: 1 }),
+    )
+    spies.playlists.mockImplementation(async () => [
+      playlistSummary({ id: 1, name: 'Mine' }),
+      playlistSummary({ id: 2, name: 'Theirs', isOwn: false }),
+    ])
+    open({ kind: 'music' })
+    expect(await screen.findByRole('link', { name: 'Albums' })).toHaveTextContent('Albums1,480')
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveTextContent('Artists212')
+    expect(await screen.findByRole('link', { name: 'Playlists' })).toHaveTextContent('Playlists2')
+    expect(screen.getByRole('link', { name: 'Unmatched albums' })).toHaveTextContent(
+      'Unmatched albums9',
+    )
+    expect(screen.getByRole('link', { name: 'In progress' })).toHaveTextContent('In progress1')
+  })
+
+  it('leaves a music tab uncounted while its count is on its way, and after it fails', async () => {
+    spies.counts.mockImplementation(() => new Promise(() => undefined))
+    spies.playlists.mockImplementation(async () => {
+      throw new Error('Playlists unavailable')
+    })
+    open({ kind: 'music' })
+    expect(await screen.findByRole('link', { name: 'Albums' })).toHaveTextContent(/^Albums$/)
+    expect(screen.getByRole('link', { name: 'Artists' })).toHaveTextContent(/^Artists$/)
+    expect(screen.getByRole('link', { name: 'Unmatched albums' })).toHaveTextContent(
+      /^Unmatched albums$/,
+    )
+    await waitFor(() => expect(spies.playlists).toHaveBeenCalled())
+    expect(screen.getByRole('link', { name: 'Playlists' })).toHaveTextContent(/^Playlists$/)
+  })
+
+  it('asks for no playlists in a video library, which has no Playlists tab', async () => {
+    open()
+    await screen.findByRole('link', { name: 'In progress' })
+    expect(spies.playlists).not.toHaveBeenCalled()
   })
 
   it('counts Not matched as 0 while every file is matched, as every other tab counts', async () => {

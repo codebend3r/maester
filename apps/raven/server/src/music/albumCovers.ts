@@ -142,7 +142,7 @@ export class AlbumCovers implements OnApplicationBootstrap, OnModuleDestroy {
     const embedded = files
       .slice(0, EMBEDDED_RETRIES)
       .map((file) => ({ source: COVER_SOURCES.embedded, ref: String(file.id) }))
-    const mbid = this.music.album(id)?.mbid ?? null
+    const mbid = this.music.album({ id })?.mbid ?? null
     const archive = mbid === null ? [] : [{ source: COVER_SOURCES.coverArtArchive, ref: mbid }]
     const alternatives = [...local, ...archive, ...embedded].filter(
       (candidate) => candidate.source !== cover.source || candidate.ref !== cover.ref,

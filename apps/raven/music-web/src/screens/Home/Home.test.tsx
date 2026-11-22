@@ -9,7 +9,9 @@ import {
   LIBRARY_PAGE_COPY,
   OFFLINE_COPY,
   RECENT_SORTS,
+  type RecentSort,
   WREN_LOCKUP_COPY,
+  recentDateLineOf,
 } from '@raven/wren'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -28,6 +30,14 @@ import {
 } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
+
+/** OK Computer's tile on Home, read out with the date its order is by. */
+const homeTileOf = (sort: RecentSort) =>
+  KIT_COPY.labelled({
+    label: OK_COMPUTER_TILE,
+    value: recentDateLineOf({ album: OK_COMPUTER, sort }),
+  })
+const HOME_TILE = homeTileOf(RECENT_SORTS.added)
 
 const ALBUM_MARK = 'The album is showing'
 const ALBUMS_MARK = 'Albums is showing'
@@ -62,7 +72,7 @@ describe('Home', () => {
 
   it("greets the listener and shows every music library's newest albums, and opens one", async () => {
     renderHome()
-    const tile = await screen.findByRole('link', { name: OK_COMPUTER_TILE })
+    const tile = await screen.findByRole('link', { name: HOME_TILE })
     expect(screen.getByRole('heading', { name: LIBRARY_PAGE_COPY.recent })).toBeInTheDocument()
     expect(GREETINGS).toContain(screen.getByRole('heading', { level: 1 }).textContent)
     // Six rows of six on the wide layout.
@@ -78,7 +88,7 @@ describe('Home', () => {
 
   it('asks for six rows of two on the narrow layout, under the lockup and the server chip', async () => {
     renderHome({ formFactor: FORM_FACTORS.phone })
-    await screen.findByRole('link', { name: OK_COMPUTER_TILE })
+    await screen.findByRole('link', { name: HOME_TILE })
     expect(music().listAlbums).toHaveBeenCalledWith({
       libraryId: MUSIC.id,
       sort: MUSIC_SORTS.added,
@@ -104,6 +114,16 @@ describe('Home', () => {
       }),
     )
     expect(useWrenPrefs.getState().homeSort).toBe(RECENT_SORTS.release)
+    expect(
+      await screen.findByRole('link', { name: homeTileOf(RECENT_SORTS.release) }),
+    ).toHaveTextContent(recentDateLineOf({ album: OK_COMPUTER, sort: RECENT_SORTS.release }))
+  })
+
+  it('shows each album the day it was added, while Home is by date added', async () => {
+    renderHome()
+    expect(await screen.findByRole('link', { name: HOME_TILE })).toHaveTextContent(
+      recentDateLineOf({ album: OK_COMPUTER, sort: RECENT_SORTS.added }),
+    )
   })
 
   it('opens Albums from See all', async () => {
@@ -182,7 +202,7 @@ describe('Home', () => {
 
   it('offers to continue the queue where it stands, and resumes it', async () => {
     renderHome({ formFactor: FORM_FACTORS.phone })
-    await screen.findByRole('link', { name: OK_COMPUTER_TILE })
+    await screen.findByRole('link', { name: HOME_TILE })
     act(() => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID], startAt: 1 }))
     act(() => useAudioQueue.getState().pause())
     const line = HOME_COPY.continueLine({
@@ -200,7 +220,7 @@ describe('Home', () => {
 
   it("names the track after its place on the wide layout's card", async () => {
     renderHome()
-    await screen.findByRole('link', { name: OK_COMPUTER_TILE })
+    await screen.findByRole('link', { name: HOME_TILE })
     act(() => useAudioQueue.getState().playTracks({ tracks: [AIRBAG, PARANOID], startAt: 1 }))
     const line = HOME_COPY.continueLine({
       artists: HOME_COPY.continueLine({

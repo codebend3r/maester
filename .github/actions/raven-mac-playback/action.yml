@@ -3,7 +3,7 @@ description: >-
   Runs one of the desktop's playback checks on a macOS arm64 runner against the native handoff
   of whichever run holds it: `bun run desktop:<target>`. The caller checks out the commit first.
 
-# Shared by 🧪 Test Mac player (pull-request-checks.yml and native-checks.yml) and by main's
+# Shared by 🧪 Test Mac player (pull-request-checks.yml) and by main's
 # Playwright suite (native-checks.yml). It selects the native build's Xcode, which the cached
 # results are keyed on; the workflow sets NX_CLOUD_ACCESS_TOKEN.
 inputs:

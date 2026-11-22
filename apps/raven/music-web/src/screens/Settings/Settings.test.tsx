@@ -4,7 +4,7 @@ import { APPEARANCES, KIT_COPY, SETTINGS_COPY, STATUS_COPY } from '@raven/wren'
 import { QueryClient } from '@tanstack/react-query'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { version } from '#package'
+import { wrenVersion } from '@/lib/version'
 import { api } from '@/lib/api'
 import type { AuthClient } from '@/lib/authClient'
 import { WREN_ROUTES } from '@/routes'
@@ -72,7 +72,7 @@ describe('Settings', () => {
     expect(screen.getByText(STATUS_COPY.raven)).toBeInTheDocument()
     expect(await screen.findByText(STATUS_COPY.connected(STATUS_COPY.raven))).toBeInTheDocument()
     expect(screen.getByText(SETTINGS_COPY.version)).toBeInTheDocument()
-    expect(screen.getByText(version)).toBeInTheDocument()
+    expect(screen.getByText(SETTINGS_COPY.versionOf(wrenVersion))).toBeInTheDocument()
   })
 
   it("says when the server can't be reached", async () => {

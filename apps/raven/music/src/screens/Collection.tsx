@@ -9,6 +9,12 @@ import { ArtistsCollection } from '@/screens/library/ArtistsCollection'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { PlaylistsCollection } from '@/screens/library/PlaylistsCollection'
 import { SongsCollection } from '@/screens/library/SongsCollection'
+import {
+  FavouritesCollection,
+  FinishedCollection,
+  InProgressCollection,
+} from '@/screens/library/TracksCollection'
+import { UnmatchedAlbumsCollection } from '@/screens/library/UnmatchedAlbumsCollection'
 import { WREN_ROUTES, WREN_ROUTE_PARAMS } from '@/routes'
 import { type WrenSession, useWren } from '@/useWren'
 
@@ -21,8 +27,12 @@ function DownloadsCollection({ session, onBack }: CollectionPageProps) {
 const COLLECTION_PAGES = {
   [LIBRARY_SEGMENTS.albums]: AlbumsCollection,
   [LIBRARY_SEGMENTS.artists]: ArtistsCollection,
-  [LIBRARY_SEGMENTS.songs]: SongsCollection,
   [LIBRARY_SEGMENTS.playlists]: PlaylistsCollection,
+  [LIBRARY_SEGMENTS.unmatchedAlbums]: UnmatchedAlbumsCollection,
+  [LIBRARY_SEGMENTS.inProgress]: InProgressCollection,
+  [LIBRARY_SEGMENTS.favourites]: FavouritesCollection,
+  [LIBRARY_SEGMENTS.finished]: FinishedCollection,
+  [LIBRARY_SEGMENTS.songs]: SongsCollection,
   [LIBRARY_SEGMENTS.downloads]: DownloadsCollection,
 } as const satisfies Record<LibrarySegment, ComponentType<CollectionPageProps>>
 

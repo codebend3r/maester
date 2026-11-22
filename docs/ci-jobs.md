@@ -2,7 +2,7 @@
 
 How long each GitHub Actions job runs, slowest first, and whether Nx can restore its work from the remote cache (Nx Cloud) instead of running it.
 
-The times are a snapshot: the 150 most recent completed workflow runs, 15 to 21 November 2026, counting successful jobs only, from the job's start to its end (time spent waiting for a runner is left out). A job that runs in both the pull request checks and the native checks is one row. Measure again before leaning on a number; the release and cache jobs have only 2 to 8 runs each, and Wren's two jobs one each.
+The times are a snapshot: the 150 most recent completed workflow runs, 15 to 21 November 2026, counting successful jobs only, from the job's start to its end (time spent waiting for a runner is left out). Measure again before leaning on a number; the release and cache jobs have only 2 to 8 runs each, and Wren's two jobs one each.
 
 The "Nx cached" column describes the configuration as it stands in the repo, not what those 150 runs did: several rows were made cacheable after the measurement, so their times predate the cache.
 
@@ -10,28 +10,28 @@ Rows 1, 2, 3 and 6 were measured with each job building the app and running its 
 
 | # | Job | Workflow | Avg | Fastest | Slowest | Runs | Nx cached | What Nx restores |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 🏗️ Build Wren iPhone | PR checks, native checks | 32m 41s | 32m 41s | 32m 41s | 1 | Yes | The simulator build; the flows' pass, in its end to end job |
-| 2 | 🏗️ Build iPhone | PR checks, native checks | 25m 59s | 8m 14s | 43m 06s | 57 | Yes | The simulator build; the flows' pass, in its end to end job |
-| 3 | 🏗️ Build Android TV | PR checks, native checks | 20m 14s | 14m 45s | 24m 34s | 57 | Yes | The APK; the flows' pass, in its end to end job |
+| 1 | 🏗️ Build Wren iPhone | PR checks | 32m 41s | 32m 41s | 32m 41s | 1 | Yes | The simulator build; the flows' pass, in its end to end job |
+| 2 | 🏗️ Build iPhone | PR checks | 25m 59s | 8m 14s | 43m 06s | 57 | Yes | The simulator build; the flows' pass, in its end to end job |
+| 3 | 🏗️ Build Android TV | PR checks | 20m 14s | 14m 45s | 24m 34s | 57 | Yes | The APK; the flows' pass, in its end to end job |
 | 4 | 🖥️ Build Raven for macOS arm64 | Desktop release | 19m 04s | 18m 14s | 19m 54s | 2 | Partly | The libmpv source build; the app is always made, signed, audited and smoke-tested afresh |
-| 5 | 🏗️ Build Mac native | PR checks, native checks | 14m 48s | 1m 55s | 24m 46s | 72 | Mostly | The libmpv source build and the native tests; the addon build and its audit always run |
-| 6 | 🏗️ Build Apple TV | PR checks, native checks | 12m 19s | 2m 50s | 22m 02s | 70 | Yes | The simulator build; the remote flow's pass, in its end to end job |
+| 5 | 🏗️ Build Mac native | PR checks | 14m 48s | 1m 55s | 24m 46s | 72 | Mostly | The libmpv source build and the native tests; the addon build and its audit always run |
+| 6 | 🏗️ Build Apple TV | PR checks | 12m 19s | 2m 50s | 22m 02s | 70 | Yes | The simulator build; the remote flow's pass, in its end to end job |
 | 7 | 📺 Build and attach the Android TV APK | Device app release | 9m 37s | 8m 48s | 10m 27s | 2 | Reruns | The APK, on a rerun of the same tag; a new version always builds |
 | 8 | 📱 iPhone and iPad caches | App build caches | 9m 25s | 4m 41s | 19m 51s | 8 | No | Nothing, on purpose (see below) |
-| 9 | 🏗️ Build Wren Android | PR checks, native checks | 9m 21s | 9m 21s | 9m 21s | 1 | Yes | The Release APK |
+| 9 | 🏗️ Build Wren Android | PR checks | 9m 21s | 9m 21s | 9m 21s | 1 | Yes | The Release APK |
 | 10 | 📺 Apple TV caches | App build caches | 9m 12s | 6m 24s | 14m 10s | 8 | No | Nothing, on purpose (see below) |
 | 11 | 📺 Android TV caches | App build caches | 8m 16s | 7m 07s | 9m 17s | 8 | No | Nothing, on purpose (see below) |
-| 12 | 🏗️ Build Android phone | PR checks, native checks | 5m 42s | 1m 36s | 8m 35s | 13 | Yes | The APK |
+| 12 | 🏗️ Build Android phone | PR checks | 5m 42s | 1m 36s | 8m 35s | 13 | Yes | The APK |
 | 13 | 🪟 Build Raven for Windows x64 | Desktop release | 5m 04s | 4m 58s | 5m 11s | 2 | Partly | The libmpv fetch, the addon, the native tests and the app's build; not the installer |
 | 14 | 🔦 Lighthouse | PR checks | 4m 13s | 0m 31s | 6m 19s | 66 | Yes | The pass, while the web app and the server are unchanged |
-| 15 | 🏗️ Build Windows app | PR checks, native checks | 4m 07s | 2m 54s | 5m 36s | 76 | Partly | The app's build; not the installer, its audit or its smoke test |
+| 15 | 🏗️ Build Windows app | PR checks | 4m 07s | 2m 54s | 5m 36s | 76 | Partly | The app's build; not the installer, its audit or its smoke test |
 | 16 | 🧠 Evals | Sparrow evals | 3m 05s | 2m 49s | 3m 29s | 7 | Nightly | The last pass, on the nightly run; a run from the Actions tab always runs |
 | 17 | 🎬 E2E Mac | Native checks | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
-| 18 | 🏗️ Build Windows native | PR checks, native checks | 2m 31s | 1m 48s | 4m 40s | 80 | Yes | The libmpv fetch, the addon, its audit and the native tests |
+| 18 | 🏗️ Build Windows native | PR checks | 2m 31s | 1m 48s | 4m 40s | 80 | Yes | The libmpv fetch, the addon, its audit and the native tests |
 | 19 | 🧪 Tests | PR checks | 2m 07s | 0m 34s | 4m 34s | 71 | Yes | Each project's pass |
-| 20 | 🏗️ Build Mac app | PR checks, native checks | 2m 05s | 1m 23s | 3m 15s | 67 | Partly | The app's build; not the packaged app, its audit or its smoke test |
+| 20 | 🏗️ Build Mac app | PR checks | 2m 05s | 1m 23s | 3m 15s | 67 | Partly | The app's build; not the packaged app, its audit or its smoke test |
 | 21 | 🌐 Web end to end | Native checks | 1m 30s | 0m 33s | 2m 40s | 67 | Yes | The pass, while the web app and the server are unchanged |
-| 22 | 🧪 Test Mac player | PR checks, native checks | 1m 17s | 0m 30s | 2m 06s | 67 | Yes | The tests' pass |
+| 22 | 🧪 Test Mac player | PR checks | 1m 17s | 0m 30s | 2m 06s | 67 | Yes | The tests' pass |
 | 23 | 🗄️ Supabase | PR checks | 1m 11s | 0m 23s | 2m 01s | 76 | Yes | The Edge Function checks, and the database tests and lint with the stack they start |
 | 24 | 📸 Screen tests | Native checks | 1m 06s | 0m 20s | 2m 13s | 73 | Yes | Each project's pass |
 | 25 | 🩺 raven build and health check | PR checks, main smoke test | 1m 00s | 0m 45s | 1m 35s | 101 | No | Nothing: a Docker image build and a health check, which run no Nx task |
@@ -41,7 +41,7 @@ Every other job averages under a minute. Of those, the lint, format, type-check,
 
 ## Where the end to end tests run
 
-No end to end suite runs on a pull request. A pull request's checks build each native app and upload the build as an artifact named for its head commit, so it hears back sooner; the push to main that merges it runs the suites (`native-checks.yml`, the only workflow that holds an end to end job). There, 🔎 Select affected native checks (the same job a pull request runs, through the `raven-native-select` action) looks up the merged pull request's passing checks run (`scripts/find_pr_builds.sh`) and plans each group once (`scripts/plan_native_builds.sh`): whether the push selected it, whether to build it, and which run holds its builds. The end to end jobs download the pull request's builds, so main compiles nothing it was already handed. A group with no build to find (a push with no pull request, a manual run, an expired artifact, a group the pull request never built) is built on main first. An end to end failure therefore shows after the merge, on main, where it emails the pusher. On main a build job runs only as that fallback.
+No end to end suite runs on a pull request. A pull request's checks build each native app and upload the build as an artifact named for its head commit, so it hears back sooner; the push to main that merges it runs the suites (`native-checks.yml`, the only workflow that holds an end to end job). There, 🔎 Select affected native checks (the same job a pull request runs, through the `raven-native-select` action) looks up the merged pull request's passing checks run (`scripts/find_pr_builds.sh`) and plans each group once (`scripts/plan_native_builds.sh`): whether the push selected it, whether to build it, and which run holds its builds. The end to end jobs download the pull request's builds; main lists no build job and compiles nothing. A selected group with no build to find (a push with no pull request, an expired artifact, a group the pull request never built) fails its end to end job with a 🚫 No pull request build step that says so. An end to end failure therefore shows after the merge, on main, where it emails the pusher.
 
 Every suite runs in a job of its own. The device app's and Wren's run after the job that builds the app, on a second runner: the build job uploads the build as an artifact (the simulator app, or the APK; the Apple TV's also uploads the Xcode project and the remote test target), and the end to end job downloads it, boots the simulator or emulator, starts the fixture server and runs the flows. It sets up through the same `raven-app-setup` action with `compiles: false`, which leaves out the CocoaPods, Gradle and ccache caches and the NDK. A failed build skips its end to end job.
 

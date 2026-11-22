@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { releaseVersion } from '@/lib/version'
+import { releaseVersion } from '@/releaseVersion'
 
 const packageVersion = '0.5.3'
 

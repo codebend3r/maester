@@ -1,4 +1,4 @@
-import { APPEARANCES, RECENT_SORTS, WREN_PREFS_KEY } from '@raven/wren'
+import { APPEARANCES, COVER_SIZES, RECENT_SORTS, WREN_PREFS_KEY } from '@raven/wren'
 import { beforeEach, describe, expect, it } from 'bun:test'
 import { AUDIO_BITRATES } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
@@ -22,21 +22,22 @@ const memoryStorage = ({ entries = [] }: MemoryStorageProps = {}) => {
 }
 
 const prefsOf = () => {
-  const { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort } =
+  const { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort, coverSize } =
     useWrenPrefs.getState()
-  return { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort }
+  return { downloadKbps, cellularKbps, storageLimitGb, appearance, homeSort, coverSize }
 }
 
 describe('useWrenPrefs', () => {
   beforeEach(() => useWrenPrefs.setState(DEFAULT_WREN_PREFS))
 
-  it('starts downloads at 256 kbps and cellular on the file itself, with no storage limit, following the system appearance', () => {
+  it('starts downloads at 256 kbps and cellular on the file itself, with no storage limit, following the system appearance, covers at medium', () => {
     expect(prefsOf()).toEqual({
       downloadKbps: AUDIO_BITRATES.standard,
       cellularKbps: null,
       storageLimitGb: null,
       appearance: APPEARANCES.system,
       homeSort: RECENT_SORTS.added,
+      coverSize: COVER_SIZES.medium,
     })
   })
 
@@ -46,6 +47,7 @@ describe('useWrenPrefs', () => {
     useWrenPrefs.getState().change({ downloadKbps: AUDIO_BITRATES.high, cellularKbps: null })
     useWrenPrefs.getState().change({ storageLimitGb: 5, appearance: APPEARANCES.light })
     useWrenPrefs.getState().change({ homeSort: RECENT_SORTS.release })
+    useWrenPrefs.getState().change({ coverSize: COVER_SIZES.extraSmall })
 
     const relaunch = memoryStorage({ entries: [...items] })
     useWrenPrefs.setState(DEFAULT_WREN_PREFS)
@@ -56,12 +58,19 @@ describe('useWrenPrefs', () => {
       storageLimitGb: 5,
       appearance: APPEARANCES.light,
       homeSort: RECENT_SORTS.release,
+      coverSize: COVER_SIZES.extraSmall,
     })
   })
 
   it('falls back to the default for each value it cannot use, and keeps the rest', async () => {
     const saved = {
-      state: { downloadKbps: 192, cellularKbps: '128', storageLimitGb: 10, appearance: 'sepia' },
+      state: {
+        downloadKbps: 192,
+        cellularKbps: '128',
+        storageLimitGb: 10,
+        appearance: 'sepia',
+        coverSize: 'huge',
+      },
     }
     const { storage } = memoryStorage({ entries: [[WREN_PREFS_KEY, JSON.stringify(saved)]] })
     await configureWrenPrefs({ storage })
@@ -86,6 +95,7 @@ describe('useWrenPrefs', () => {
       storageLimitGb: 5,
       appearance: APPEARANCES.dark,
       homeSort: RECENT_SORTS.added,
+      coverSize: COVER_SIZES.medium,
     })
   })
 

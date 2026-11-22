@@ -12,6 +12,7 @@ export const MUSIC_SORTS = {
   played: 'played',
   plays: 'plays',
   random: 'random',
+  modified: 'modified',
 } as const
 
 export const MUSIC_LIST_PARAMS = {
@@ -30,6 +31,7 @@ export const MUSIC_DEFAULT_ORDERS = {
   [MUSIC_SORTS.played]: SORT_DIRECTIONS.descending,
   [MUSIC_SORTS.plays]: SORT_DIRECTIONS.descending,
   [MUSIC_SORTS.random]: SORT_DIRECTIONS.ascending,
+  [MUSIC_SORTS.modified]: SORT_DIRECTIONS.descending,
 } as const
 
 export const isMusicSort = oneOf(Object.values(MUSIC_SORTS))
@@ -46,6 +48,7 @@ export const MUSIC_SORT_LABELS = {
   [MUSIC_SORTS.played]: 'Date Played',
   [MUSIC_SORTS.plays]: 'Plays',
   [MUSIC_SORTS.random]: 'Randomly',
+  [MUSIC_SORTS.modified]: 'Date Modified',
 } as const satisfies Record<MusicSort, string>
 
 /** What each direction of a music sort is called, on the button that reverses it. */

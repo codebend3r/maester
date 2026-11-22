@@ -71,6 +71,7 @@ describe('Search', () => {
     expect(mockApi.listArtists).toHaveBeenCalledWith({ libraryId: MUSIC.id, search: 'radio' })
     expect(mockApi.listTracks).toHaveBeenCalledWith({
       ...search,
+      seed: 0,
       limit: MUSIC_PAGE.most,
       offset: 0,
     })

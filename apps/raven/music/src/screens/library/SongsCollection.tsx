@@ -1,6 +1,12 @@
 import { plural } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { COUNTS_COPY, LIBRARY_PAGE_COPY, LIST_SORTS, type ListSort } from '@raven/wren'
+import {
+  COUNTS_COPY,
+  FIRST_LIST_ORDER,
+  LIBRARY_PAGE_COPY,
+  type ListOrder,
+  listOrderOf,
+} from '@raven/wren'
 import { useState } from 'react'
 import { FlatList, View } from 'react-native'
 
@@ -11,6 +17,7 @@ import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { useAllSongs, useSongCount } from '@/screens/library/listings'
 import { ListNotice } from '@/screens/library/ListNotice'
+import { SortButton } from '@/screens/library/SortButton'
 import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
@@ -34,16 +41,16 @@ export function SongsCollection({ session, onBack }: CollectionPageProps) {
     placeholder: LIBRARY_PAGE_COPY.searchSongs,
     none: LIBRARY_PAGE_COPY.noSongs,
   })
-  const [sort, setSort] = useState<ListSort>(LIST_SORTS.title)
+  const [order, setOrder] = useState<ListOrder>(FIRST_LIST_ORDER)
   const n = useSongCount({ session, search: search.query })
   const playTracks = useAudioQueue((store) => store.playTracks)
-  const { tracks, listing, nextPage } = useAllSongs({ session, search: search.query, sort })
+  const { tracks, listing, nextPage } = useAllSongs({ session, search: search.query, order })
   const header = (
     <CollectionHeader
       count={n === null ? null : plural({ n, ...COUNTS_COPY.songs })}
       onBack={onBack}
       search={search.field}
-      sort={{ sort, onSort: setSort }}
+      tools={<SortButton onSort={(sort) => setOrder(listOrderOf(sort))} sort={order.sort} />}
       title={LIBRARY_PAGE_COPY.songs}
     >
       {tracks.length > 0 && (

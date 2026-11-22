@@ -284,11 +284,10 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
 
 type ArtistsSectionProps = { library: Library }
 
-/** A music library's artists by name, each with how many of its albums and tracks are theirs. */
+/** A music library's album artists by name, each with how many of its albums are theirs and their tracks. */
 export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
   const search = useAddressSearch()
   const artists = useQuery(artistsQuery({ libraryId: library.id, search: search.query }))
-  const albumArtists = artists.data?.filter(({ albumCount }) => albumCount > 0)
   return (
     <div className={styles.section}>
       <div className={styles.musicToolbar}>
@@ -300,7 +299,7 @@ export const ArtistsSection = ({ library }: ArtistsSectionProps) => {
         />
       </div>
       <SectionQuery
-        query={keptRead({ data: albumArtists, error: artists.error })}
+        query={keptRead(artists)}
         shape={<ArtistListSkeleton />}
         loading={LIBRARY_COPY.loadingArtists}
         isEmpty={isNone}

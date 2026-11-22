@@ -126,9 +126,9 @@ export class AlbumsController {
 
   /** The album's page, with whether the caller's account marked it a favourite. */
   private find({ id, request }: AlbumsControllerFindProps): AlbumDetails {
-    const album = this.music.album(id)
-    if (!album) throw new NotFoundException(`No album ${id}`)
     const account = this.accounts.keyOf({ request })
+    const album = this.music.album({ id, account })
+    if (!album) throw new NotFoundException(`No album ${id}`)
     return { ...album, isFavourite: this.favourites.isAlbum({ albumId: id, account }) }
   }
 
@@ -210,9 +210,9 @@ export class ArtistsController {
   /** The artist's page as this caller may see it, with whether its account marked them a favourite. */
   private find({ id, request }: ArtistsControllerFindProps): ArtistDetails {
     const { seesLibrary } = this.lock.viewer({ request })
-    const artist = this.music.artist({ id, seesLibrary })
-    if (!artist) throw new NotFoundException(`No artist ${id}`)
     const account = this.accounts.keyOf({ request })
+    const artist = this.music.artist({ id, seesLibrary, account })
+    if (!artist) throw new NotFoundException(`No artist ${id}`)
     return { ...artist, isFavourite: this.favourites.isArtist({ artistId: id, account }) }
   }
 

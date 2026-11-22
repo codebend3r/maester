@@ -8,6 +8,7 @@ import {
   countsLineOf,
   greetingOf,
   lineValueOf,
+  recentDateLineOf,
 } from '@raven/wren'
 import { useState } from 'react'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
@@ -143,7 +144,11 @@ function RecentlyAdded() {
         selected={sort}
       />
       {albums.length === 0 && <ListNotice empty={LIBRARY_PAGE_COPY.noAlbums} listing={listing} />}
-      <AlbumGrid albums={albums} columns={RECENT_COLUMNS} />
+      <AlbumGrid
+        albums={albums}
+        columns={RECENT_COLUMNS}
+        detailOf={(album) => recentDateLineOf({ album, sort })}
+      />
     </Section>
   )
 }

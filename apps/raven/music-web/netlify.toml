@@ -7,11 +7,11 @@
 # src/netlifyToml.test.ts checks the /api proxy below names it.
 
 [build]
-command = "bun run build:wren:web"
+command = "bash apps/raven/netlify-build.sh @raven/music-web"
 publish = "apps/raven/music-web/dist"
 # Production builds only on release, through a build hook; previews only when
 # something the site bundles changed (netlify-ignore.sh).
-ignore = "bash apps/raven/netlify-ignore.sh apps/raven/music-web libs/raven/core libs/raven/ui libs/raven/wren libs/shared/http"
+ignore = "bash apps/raven/netlify-ignore.sh apps/raven/music-web apps/raven/netlify-build.sh scripts/bump_version.sh libs/raven/core libs/raven/ui libs/raven/wren libs/shared/http"
 
 [build.environment]
 BUN_VERSION = "1.4.2"

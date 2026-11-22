@@ -51,4 +51,9 @@ describe('countValueOf', () => {
     expect(countValueOf({ n: 0 })).toBeUndefined()
     expect(countValueOf({ n: null, none: 'None yet' })).toBeUndefined()
   })
+
+  it('reads a count past the most its list shows as that many and more', () => {
+    expect(countValueOf({ n: 49, most: 48 })).toBe('48+')
+    expect(countValueOf({ n: 48, most: 48 })).toBe('48')
+  })
 })

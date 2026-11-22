@@ -628,6 +628,27 @@ describe('ravenQueriesFor', () => {
     cache.clear()
   })
 
+  it('deals a random listing of songs by its seed, and a new seed reads it anew', async () => {
+    const { api, calls } = recordingApi({ body: { tracks: [track()], total: 1 } })
+    type ShuffledProps = { seed: number }
+    const shuffled = ({ seed }: ShuffledProps) =>
+      ravenQueriesFor(api).songsQuery({
+        libraryIds: [2, 3],
+        search: '',
+        sort: MUSIC_SORTS.random,
+        seed,
+      })
+    const cache = new QueryClient()
+    await cache.fetchInfiniteQuery({ ...shuffled({ seed: 7 }), pages: 2 })
+    const page = `limit=${MUSIC_PAGE.most}`
+    expect(calls.map(({ url }) => url)).toEqual([
+      `/api/libraries/2/tracks?sort=random&seed=7&${page}`,
+      `/api/libraries/3/tracks?sort=random&seed=7&${page}`,
+    ])
+    expect(shuffled({ seed: 8 }).queryKey).not.toEqual(shuffled({ seed: 7 }).queryKey)
+    cache.clear()
+  })
+
   it('passes over a library with no songs, so no page between two others is empty', async () => {
     const asked: string[] = []
     const api = createApiClient({

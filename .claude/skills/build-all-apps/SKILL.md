@@ -61,7 +61,7 @@ bun run desktop:smoke:packaged
 
 `mpv:native:windows` places the pinned libmpv DLL under `libs/raven/mpv/resources/win32-x64` and tests it; the installer lands in `apps/raven/desktop/out/make`.
 
-From the Mac, the only way is CI: a manual run of `🧱 Native checks` on the branch runs every job, Windows included. Starting it publishes a run on GitHub, so do it only when the user asks: `gh workflow run native-checks.yml --ref <branch>`, then `gh run watch`.
+From the Mac, the only way is CI: a pull request's checks build Windows (`🏗️ Build Windows native` and `🏗️ Build Windows app`) whenever the change affects the desktop. `🧱 Native checks` on main builds nothing.
 
 ## On screen
 

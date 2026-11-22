@@ -38,6 +38,8 @@ export const SETTINGS_COPY = {
   dark: 'Dark',
   about: 'About',
   version: 'Version',
+  /** Which build this is: "v0.9.0.15". */
+  versionOf: (version: string) => `v${version}`,
   licenses: 'Licenses',
   licensesNote: 'The fonts Wren is set in',
   fonts: [
@@ -104,7 +106,14 @@ export const HOME_COPY = {
   latestReleases: 'Latest releases',
   /** What the two orders of Home's albums are chosen under. */
   sortAlbums: 'Sort albums by',
-  sorts: { added: 'Date added', release: 'Latest release' },
+  sorts: { added: 'Date added', release: 'Latest released' },
+  /** The date each album's tile shows under the order it is in, so the order can be seen. */
+  dates: {
+    released: (date: string) => `Released ${date}`,
+    added: (date: string) => `Added ${date}`,
+    releaseUnknown: 'Release date unknown',
+    addedUnknown: 'Date added unknown',
+  },
   /** Where the queue stands: "Track 11 of 20". */
   trackOf: ({ at, count }: TrackOfProps) => `Track ${at} of ${count}`,
   /** The card's line under the album: "Sia · Track 11 of 20". */
@@ -124,6 +133,11 @@ export const LIBRARY_PAGE_COPY = {
   artists: 'Artists',
   songs: 'Songs',
   playlists: 'Playlists',
+  /** raven's music tabs past Playlists, in raven's own words. */
+  unmatchedAlbums: 'Unmatched albums',
+  inProgress: 'In progress',
+  favourites: 'Favourites',
+  finished: 'Recently finished',
   downloads: 'Downloads',
   recent: 'Recently added',
   search: 'Search',
@@ -131,6 +145,10 @@ export const LIBRARY_PAGE_COPY = {
   noAlbums: 'No albums yet.',
   noArtists: 'No artists yet.',
   noSongs: 'No songs yet.',
+  noUnmatchedAlbums: 'Every album has a MusicBrainz match.',
+  noInProgress: 'Nothing in progress. A song left partway through waits here.',
+  noFavourites: 'No favourite songs yet.',
+  noFinished: 'Nothing finished yet. A song counts once it plays to its end.',
   noMatches: 'Nothing matches that search.',
   searchAlbums: 'Search albums',
   searchArtists: 'Search artists',
@@ -138,11 +156,15 @@ export const LIBRARY_PAGE_COPY = {
   sortBy: 'Sort by',
   /** The sort button read out: "Sort by, Title". */
   sortLabel: (sort: string) => `Sort by, ${sort}`,
-  sorts: {
-    title: 'Title',
-    artist: 'Artist',
-    year: 'Year',
-    added: 'Recently added',
+  /** The sheet that picks how large Albums draws its covers, and what each size is called. */
+  coverSize: 'Cover size',
+  coverSizeLabel: (size: string) => `Cover size, ${size}`,
+  coverSizes: {
+    extraSmall: 'Extra small',
+    small: 'Small',
+    medium: 'Medium',
+    large: 'Large',
+    extraLarge: 'Extra large',
   },
   /** The A to Z rail's letter read out: "Jump to A". */
   jumpTo: (letter: string) => `Jump to ${letter}`,

@@ -1,9 +1,7 @@
-import type { ListSort } from '@raven/wren'
 import type { ComponentType, ReactNode } from 'react'
 import { Text, View } from 'react-native'
 
 import { LIBRARY_PAGE_COPY } from '@raven/wren'
-import { SortButton } from '@/screens/library/SortButton'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { PageHeader } from '@/ui/PageHeader'
@@ -31,9 +29,6 @@ export type CollectionSearch = {
   placeholder: string
 }
 
-/** A list's order and the way to change it. */
-type CollectionSort = { sort: ListSort; onSort: (sort: ListSort) => void }
-
 type CollectionHeaderProps = {
   title: string
   /** "< Library": the way back on a phone; the tablet's sidebar is its way back. */
@@ -43,7 +38,8 @@ type CollectionHeaderProps = {
   search?: CollectionSearch
   /** How many the list holds, "1,980 albums", or null until it is known. */
   count: string | null
-  sort?: CollectionSort
+  /** The list's choice buttons: Sort, and Albums' Cover size after it. */
+  tools?: ReactNode
   /** What sits between the title and the list's tools: Play and Shuffle, the storage card. */
   children?: ReactNode
 }
@@ -61,14 +57,14 @@ function Search({ search }: SearchProps) {
   )
 }
 
-/** A phone's header: back, the title, what sits under it, the search, then the count and sort. */
+/** A phone's header: back, the title, what sits under it, the search, then the count and tools. */
 function PhoneHeader({
   title,
   onBack,
   actions,
   search,
   count,
-  sort,
+  tools,
   children,
 }: CollectionHeaderProps) {
   const styles = useStyles()
@@ -81,33 +77,33 @@ function PhoneHeader({
       />
       {children}
       {search !== undefined && <Search search={search} />}
-      {(count !== null || sort !== undefined) && (
+      {(count !== null || tools !== undefined) && (
         <View style={styles.countRow}>
           <Text style={styles.count}>{count ?? ''}</Text>
-          {sort !== undefined && <SortButton onSort={sort.onSort} sort={sort.sort} />}
+          {tools !== undefined && <View style={styles.tools}>{tools}</View>}
         </View>
       )}
     </View>
   )
 }
 
-/** A tablet's header: the title with the search and sort at its end, the count under it. */
-function TabletHeader({ title, actions, search, count, sort, children }: CollectionHeaderProps) {
+/** A tablet's header: the title with the search and tools at its end, the count under it. */
+function TabletHeader({ title, actions, search, count, tools, children }: CollectionHeaderProps) {
   const styles = useStyles()
-  const tools = (
+  const end = (
     <View style={styles.tools}>
       {search !== undefined && (
         <View style={styles.tabletSearch}>
           <Search search={search} />
         </View>
       )}
-      {sort !== undefined && <SortButton onSort={sort.onSort} sort={sort.sort} />}
+      {tools}
       {actions}
     </View>
   )
   return (
     <View style={styles.header}>
-      <PageHeader actions={tools} title={title} />
+      <PageHeader actions={end} title={title} />
       {count !== null && <Text style={styles.count}>{count}</Text>}
       {children}
     </View>

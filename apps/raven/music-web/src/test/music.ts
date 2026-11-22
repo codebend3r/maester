@@ -1,10 +1,14 @@
 import type { PlaylistSummary } from '@raven/core'
 import {
   AIRBAG_LYRICS,
+  FAVOURITES,
   FILMS,
+  FINISHED,
+  IN_PROGRESS,
   MIXTAPE,
   MIXTAPE_PAGE,
   MUSIC,
+  MUSIC_COUNTS,
   OK_COMPUTER,
   OK_COMPUTER_PAGE,
   RADIOHEAD,
@@ -70,6 +74,10 @@ export const mockMusicApi = () =>
     listPlaylists: spyOn(api, 'listPlaylists').mockResolvedValue([MIXTAPE]),
     getPlaylist: spyOn(api, 'getPlaylist').mockResolvedValue(MIXTAPE_PAGE),
     getLyrics: spyOn(api, 'getLyrics').mockResolvedValue(AIRBAG_LYRICS),
+    getLibraryCounts: spyOn(api, 'getLibraryCounts').mockResolvedValue(MUSIC_COUNTS),
+    listInProgress: spyOn(api, 'listInProgress').mockResolvedValue(IN_PROGRESS),
+    listLibraryFavourites: spyOn(api, 'listLibraryFavourites').mockResolvedValue(FAVOURITES),
+    listHistory: spyOn(api, 'listHistory').mockResolvedValue(FINISHED),
   })
 
 /** A playlist the server makes when asked for a new one, empty until tracks are put in it. */

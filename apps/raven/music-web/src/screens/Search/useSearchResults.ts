@@ -1,4 +1,4 @@
-import { LIST_SORTS, resultStateOf } from '@raven/wren'
+import { FIRST_LIST_ORDER, resultStateOf } from '@raven/wren'
 import { useAllAlbums, useAllArtists, useAllSongs } from '@/music/listings'
 
 type UseSearchResultsProps = { query: string }
@@ -11,7 +11,7 @@ export const useSearchResults = ({ query }: UseSearchResultsProps) => {
   const isAsked = query !== ''
   const { albums, listing: albumListing } = useAllAlbums({ search: query, isEnabled: isAsked })
   const { artists, listing: artistListing } = useAllArtists({ search: query, isEnabled: isAsked })
-  const songs = useAllSongs({ search: query, sort: LIST_SORTS.title, isEnabled: isAsked })
+  const songs = useAllSongs({ search: query, order: FIRST_LIST_ORDER, isEnabled: isAsked })
   return {
     ...resultStateOf({
       albums: albumListing,

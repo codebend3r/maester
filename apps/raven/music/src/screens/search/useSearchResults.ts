@@ -1,4 +1,4 @@
-import { LIST_SORTS, resultStateOf } from '@raven/wren'
+import { FIRST_LIST_ORDER, resultStateOf } from '@raven/wren'
 
 import { useAllAlbums, useAllArtists, useAllSongs } from '@/screens/library/listings'
 import type { WrenSession } from '@/useWren'
@@ -24,7 +24,7 @@ export const useSearchResults = ({ session, query }: UseSearchResultsProps) => {
   const songs = useAllSongs({
     session,
     search: query,
-    sort: LIST_SORTS.title,
+    order: FIRST_LIST_ORDER,
     isEnabled: isAsked,
   })
   return {

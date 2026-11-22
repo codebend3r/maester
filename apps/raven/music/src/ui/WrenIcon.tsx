@@ -139,10 +139,10 @@ export const ICONS = {
   dragHandle: lines('M5 9.5h14M5 14.5h14'),
   sort: lines('M7 4.5v15M4 16.5l3 3 3-3M17 19.5v-15M14 7.5l3-3 3 3'),
   grid: lines(
-    rect({ x: 4, y: 4, width: 7, height: 7, rx: 1.8 }),
-    rect({ x: 13, y: 4, width: 7, height: 7, rx: 1.8 }),
-    rect({ x: 4, y: 13, width: 7, height: 7, rx: 1.8 }),
-    rect({ x: 13, y: 13, width: 7, height: 7, rx: 1.8 }),
+    rect({ x: 3.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 13.5, y: 3.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 3.5, y: 13.5, width: 7, height: 7, rx: 1.5 }),
+    rect({ x: 13.5, y: 13.5, width: 7, height: 7, rx: 1.5 }),
   ),
 } as const satisfies Record<string, Drawing>
 

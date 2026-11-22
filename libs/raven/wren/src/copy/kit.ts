@@ -44,6 +44,8 @@ export const COUNTS_COPY = {
   tracks: { one: 'track', many: 'tracks' },
   songs: { one: 'song', many: 'songs' },
   playlists: { one: 'playlist', many: 'playlists' },
+  /** A count past the most a list shows: "48+". */
+  orMore: (most: string) => `${most}+`,
   /** Part of an album downloaded: "1 of 20 tracks". */
   partOf: ({ done, total }: PartOfProps) => `${done} of ${total} tracks`,
 } as const

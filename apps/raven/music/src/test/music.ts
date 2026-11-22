@@ -4,22 +4,29 @@ import {
   type AlbumSummary,
   type Artist,
   type ArtistDetails,
+  type HistoryEntry,
   type Library,
+  type LibraryCounts,
   type Lyrics,
   type MusicListOptions,
   NO_LYRICS,
   type PlaylistDetails,
   type PlaylistSummary,
+  type PosterEntry,
   type TrackPage,
   createApiClient,
 } from '@raven/core'
 import {
   AIRBAG,
   AIRBAG_LYRICS,
+  FAVOURITES,
   FILMS,
+  FINISHED,
+  IN_PROGRESS,
   MIXTAPE,
   MIXTAPE_PAGE,
   MUSIC,
+  MUSIC_COUNTS,
   OK_COMPUTER,
   OK_COMPUTER_PAGE,
   RADIOHEAD,
@@ -31,6 +38,8 @@ import {
 export {
   AIRBAG,
   AUDIOBOOKS,
+  FAVOURITES,
+  LUCKY,
   MIXTAPE,
   MIXTAPE_PAGE,
   MUSIC,
@@ -51,6 +60,8 @@ export const LISTENER = {
 }
 
 type ListProps = { libraryId: number } & MusicListOptions
+
+type HistoryProps = { libraryId: number; limit: number; watchedOnly: boolean }
 
 type AppendProps = { id: number; mediaIds: readonly number[] }
 
@@ -92,6 +103,10 @@ export const musicApi = () => ({
       isFavourite: favourite,
     }),
   ),
+  getLibraryCounts: jest.fn(async (_id: number): Promise<LibraryCounts> => MUSIC_COUNTS),
+  listInProgress: jest.fn(async (_id: number): Promise<PosterEntry[]> => IN_PROGRESS),
+  listLibraryFavourites: jest.fn(async (_id: number): Promise<PosterEntry[]> => FAVOURITES),
+  listHistory: jest.fn(async (_props: HistoryProps): Promise<HistoryEntry[]> => FINISHED),
   getLyrics: jest.fn(async (id: number): Promise<Lyrics> =>
     id === AIRBAG.id ? AIRBAG_LYRICS : NO_LYRICS,
   ),

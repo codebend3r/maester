@@ -4,7 +4,7 @@ description: >-
   emulator, and uploads it as an artifact named for the commit. The caller checks out that
   commit first and names the device in its job's `APP_*` variables.
 
-# Shared by every 🏗️ Build job of a device, in pull-request-checks.yml and in native-checks.yml:
+# Shared by every 🏗️ Build job of a device, in pull-request-checks.yml:
 # one list of steps, and what a device needs is its job's `APP_*` variables. A composite action
 # reads no secrets: the workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 # One Release build of React Native takes up to an hour cold, its compile cached by ccache, and by

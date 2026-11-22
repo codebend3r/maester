@@ -44,8 +44,12 @@ const matchedFiles = (kind: LibraryKind): boolean =>
 /** Every library but music lists its files or shows; music lists albums, with its artists on a tab of their own. */
 const listsFiles = (kind: LibraryKind): boolean => !listsAlbums(kind)
 
-/** Every count a tab can show: those the library carries, and the account's own from its counts. */
-export type Tallies = Pick<Library, 'itemCount' | 'unmatchedCount'> & LibraryCounts
+/**
+ * Every count a tab can show: those the library carries, the account's own
+ * from its counts, and its playlists, which span every music library.
+ */
+export type Tallies = Pick<Library, 'itemCount' | 'unmatchedCount'> &
+  LibraryCounts & { playlists: number }
 
 /** How many finished videos Recently finished lists; the History page has the rest. */
 export const FINISHED_LIMIT = 48
@@ -71,7 +75,7 @@ export const SECTIONS = {
     label: LIBRARY_COPY.sectionLabels.albums,
     icon: 'disc',
     isFor: listsAlbums,
-    tally: null,
+    tally: 'albums',
     most: null,
     onlyWhenAny: false,
   },
@@ -79,7 +83,7 @@ export const SECTIONS = {
     label: LIBRARY_COPY.sectionLabels.artists,
     icon: 'music',
     isFor: listsAlbums,
-    tally: null,
+    tally: 'artists',
     most: null,
     onlyWhenAny: false,
   },
@@ -88,7 +92,7 @@ export const SECTIONS = {
     label: LIBRARY_COPY.sectionLabels.playlists,
     icon: 'list',
     isFor: listsAlbums,
-    tally: null,
+    tally: 'playlists',
     most: null,
     onlyWhenAny: false,
   },
@@ -96,7 +100,7 @@ export const SECTIONS = {
     label: LIBRARY_COPY.sectionLabels.unmatchedAlbums,
     icon: 'alert',
     isFor: listsAlbums,
-    tally: null,
+    tally: 'unmatchedAlbums',
     most: null,
     onlyWhenAny: false,
   },
@@ -163,8 +167,8 @@ export const SECTIONS = {
     label: string
     icon: IconName
     isFor: (kind: LibraryKind) => boolean
-    /** The count beside the tab; null for a tab that shows none. */
-    tally: keyof Tallies | null
+    /** The count beside the tab. */
+    tally: keyof Tallies
     most: number | null
     /** Whether the tab shows only once its tally is more than none. */
     onlyWhenAny: boolean
@@ -181,7 +185,7 @@ type CountTextProps = {
 /** The count beside a tab, `48+` past the most it lists; null while its tally is on its way. */
 export const countText = ({ section, tallies }: CountTextProps): string | null => {
   const { tally, most } = SECTIONS[section]
-  const n = tally === null ? null : tallies[tally]
+  const n = tallies[tally]
   if (n == null) return null
   return most != null && n > most ? `${count.format(most)}+` : count.format(n)
 }
@@ -204,7 +208,7 @@ type IsListedProps = { section: LibrarySection; tallies: Partial<Tallies> }
 export const isListed = ({ section, tallies }: IsListedProps): boolean => {
   const { onlyWhenAny, tally } = SECTIONS[section]
   if (!onlyWhenAny) return true
-  return tally != null && (tallies[tally] ?? 0) > 0
+  return (tallies[tally] ?? 0) > 0
 }
 
 type SectionPathProps = {

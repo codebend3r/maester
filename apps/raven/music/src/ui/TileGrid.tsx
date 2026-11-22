@@ -4,7 +4,7 @@ import { type LayoutChangeEvent, StyleSheet, View, useWindowDimensions } from 'r
 import { usePageInsets } from '@/shell/useShell'
 import { useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
-import { tileWidthOf } from '@/ui/tileWidth'
+import { columnsFitting, tileWidthOf } from '@/ui/tileWidth'
 
 /** How many tiles a grid's row holds on each form factor. */
 export type GridColumns = Record<FormFactor, number>
@@ -29,19 +29,23 @@ const useInnerWidth = (): number => {
   return screen.width - paddingLeft - paddingRight
 }
 
-type UseGridProps = { columns?: GridColumns }
+/** A grid's columns by the form factor, or a tile's width to fit as many columns of as the width holds. */
+type UseGridProps = { columns?: GridColumns; tile?: never } | { tile: number; columns?: never }
 
 /**
  * A virtualized grid's columns and tile width inside the page's padding, for a `FlatList` of
- * `numColumns`. It measures the list it is handed `onLayout` by, so a tablet's sidebar is never
- * counted, and starts from the window until it has.
+ * `numColumns`: `columns` to a row by the form factor, or, given a `tile`, as many as fit at
+ * that size, stretched to fill the row. It measures the list it is handed `onLayout` by, so a
+ * tablet's sidebar is never counted, and starts from the window until it has.
  */
-export const useGrid = ({ columns = GRID_COLUMNS }: UseGridProps = {}) => {
-  const count = columns[useFormFactor()]
+export const useGrid = ({ columns = GRID_COLUMNS, tile }: UseGridProps = {}) => {
+  const formFactor = useFormFactor()
   const insets = usePageInsets()
   const guess = useInnerWidth()
   const [measured, setMeasured] = useState<number | null>(null)
   const width = measured === null ? guess : measured - insets.paddingLeft - insets.paddingRight
+  const count =
+    tile === undefined ? columns[formFactor] : columnsFitting({ width, tile, gap: GRID_GAP })
   return {
     columns: count,
     tileWidth: tileWidthOf({ width, columns: count, gap: GRID_GAP }),

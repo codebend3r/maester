@@ -4,7 +4,7 @@ description: >-
   the player's tests and main's suite read, audits them and runs the headless libmpv tests. The
   caller checks out the commit first.
 
-# Shared by the 🏗️ Build Mac native job of pull-request-checks.yml and of native-checks.yml. One
+# The 🏗️ Build Mac native job of pull-request-checks.yml. One
 # native build feeds packaging, the player's tests and main's suite through an artifact. The
 # native build selects Xcode for the steps after it; the workflow sets NX_CLOUD_ACCESS_TOKEN.
 inputs:

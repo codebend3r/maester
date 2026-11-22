@@ -140,9 +140,9 @@ jobs:
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
       # A fork's read-only token can't cancel, which is why this never fails the job. Every
-      # job here shares this step, the native jobs too, whose copies in native-checks.yml it
-      # must match: the event test keeps a failure on main from cancelling, and is always
-      # true here.
+      # job here shares this step, the native jobs too, and the selection's copy in
+      # native-checks.yml must match it: the event test keeps a failure on main from
+      # cancelling, and is always true here.
       - &native-cancel
         name: 🛑 Cancel the run
         if: failure() && github.event_name == 'pull_request'
@@ -241,9 +241,9 @@ jobs:
 
       - *native-cancel
 
-  # The native jobs the PR affects, on its head commit, each listed here as a job of its own and
-  # the same as main's (native-checks.yml), down to their steps, which the shared actions hold;
-  # `test_native_ci.py` fails when the two lists differ. They start after the cheap checks, beside
+  # The native jobs the PR affects, on its head commit, each listed here as a job of its own, their
+  # steps held by the shared actions. Main builds nothing (native-checks.yml): it runs the flows on
+  # these builds, and its selection is this one, which `test_native_ci.py` checks. They start after the cheap checks, beside
   # the build above, so a lint or test failure stops the run before a macOS runner starts, and so
   # the jobs Nx Cloud counts at once stay within what it includes. Each build is uploaded for
   # main's run to test. A failing selection or build cancels the run, as a check does.

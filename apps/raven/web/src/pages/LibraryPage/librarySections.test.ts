@@ -77,7 +77,7 @@ describe('the tabs of a library', () => {
     ])
   })
 
-  it("counts All and Not matched from the library, and the rest from the account's counts once they come", () => {
+  it("counts All and Not matched from the library, Playlists from the account's playlists, and the rest from the account's counts once they come", () => {
     const library = { itemCount: 1204, unmatchedCount: 0 }
     const counts = libraryCounts({
       inProgress: 2,
@@ -86,15 +86,18 @@ describe('the tabs of a library', () => {
       duplicates: 4,
       dolbyVisionOnly: 6,
       finished: 31,
+      albums: 1480,
+      artists: 212,
+      unmatchedAlbums: 9,
     })
     const countOf = (section: LibrarySection) =>
-      countText({ section, tallies: { ...library, ...counts } })
+      countText({ section, tallies: { ...library, ...counts, playlists: 7 } })
     expect(Object.values(LIBRARY_SECTIONS).map(countOf)).toEqual([
       '1,204',
-      null,
-      null,
-      null,
-      null,
+      '1,480',
+      '212',
+      '7',
+      '9',
       '2',
       '5',
       '3',
