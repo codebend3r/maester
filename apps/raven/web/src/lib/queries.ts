@@ -57,6 +57,7 @@ export const {
   playlistQuery,
   scrobblingQuery,
   lyricsQuery,
+  albumMatchDiagnosisQuery,
   albumMatchSearchQuery,
   matchSearchQuery,
   browseQuery,

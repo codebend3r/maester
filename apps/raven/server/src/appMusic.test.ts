@@ -5,6 +5,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
   LIBRARY_KINDS,
+  MATCH_FACTS,
   MATCH_STATES,
   MUSIC_SORTS,
   NOTIFICATION_TONES,
@@ -14,6 +15,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@/app'
 import { DatabaseService } from '@/db/database'
 import { MetadataService } from '@/metadata/metadataService'
+import type { AiExplanation } from '@/music/albumClaude'
+import { AlbumDiagnoses } from '@/music/albumDiagnoses'
+import { MusicMatchStore } from '@/music/musicMatchStore'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, testConfig } from '@/test/app'
 import { encodeImage, encodeTrack, jpegSize } from '@/test/clips'
@@ -58,11 +62,14 @@ describe('a music library', () => {
     admin: string
     library: number
     app: NestFastifyApplication | null
+    /** Called before each MusicBrainz request, to look at the library while a pass searches. */
+    onRequest: () => void
   } = {
     root: '',
     admin: '',
     library: 0,
     app: null,
+    onRequest: () => undefined,
   }
   const app = (): NestFastifyApplication => {
     if (!state.app) throw new Error('app not started')
@@ -108,9 +115,13 @@ describe('a music library', () => {
     await encodeTrack({ path: at('Bootlegs', 'Live 1994', 'take 1.m4a') })
     await encodeImage({ path: at('Bootlegs', 'Live 1994', 'folder.jpg'), size: '120x120' })
     // A video in the music folder is not a track.
+    const musicBrainz = fakeMusicBrainz({ releases: RELEASES, cover: await readFile(cover) })
     state.app = await createApp({
       config: testConfig({ dataDir: join(state.root, 'data'), mediaDir: state.root }),
-      metadataFetch: fakeMusicBrainz({ releases: RELEASES, cover: await readFile(cover) }).fetch,
+      metadataFetch: async (request) => {
+        state.onRequest()
+        return musicBrainz.fetch(request)
+      },
       quiet: true,
       watch: NOT_WATCHING,
     })
@@ -229,9 +240,21 @@ describe('a music library', () => {
   })
 
   it('smart matches the unmatched albums in the background, telling the caller of each as a notification', async () => {
+    const { db } = app().get(DatabaseService)
+    const matchOfLive = db.prepare<[string], { match: string }>(
+      'SELECT match FROM albums WHERE title = ?',
+    )
+    const seen: string[] = []
+    state.onRequest = () => {
+      seen.push(matchOfLive.get('Live 1994')?.match ?? '')
+    }
     const started = await api().smartMatchAlbums(state.library)
     expect(started).toEqual({ albums: 1 })
     await app().get(MetadataService).whenIdle()
+    state.onRequest = () => undefined
+    // Searched again where it stands, so the Unmatched albums tab keeps it until a release is found.
+    expect(seen.length).toBeGreaterThan(0)
+    expect(new Set(seen)).toEqual(new Set([MATCH_STATES.unmatched]))
     const notices = await api().listNotifications()
     expect(notices.map(({ message, tone }) => ({ message, tone }))).toEqual([
       {
@@ -272,6 +295,82 @@ describe('a music library', () => {
     })
     const retried = await api().matchLibrary(state.library)
     expect(retried.id).toBe(state.library)
+  })
+
+  it('says why an album matched or not: the closest release, each fact weighed against it, and no summary without AI', async () => {
+    const albums = await api().listAlbums({ libraryId: state.library })
+    const blur = albums.find(({ title }) => title === 'Blur')
+    const live = albums.find(({ title }) => title === 'Live 1994')
+    const diagnosis = await api().getAlbumMatchDiagnosis(blur?.id ?? 0)
+    expect(diagnosis.closest).toMatchObject({ mbid: MBIDS.blur, title: 'Blur', artist: 'Blur' })
+    expect(diagnosis).toMatchObject({ reason: null, fix: null })
+    expect(
+      diagnosis.facts.map(({ fact, points, most, album, release }) => ({
+        fact,
+        points,
+        most,
+        album,
+        release,
+      })),
+    ).toEqual([
+      { fact: MATCH_FACTS.title, points: 45, most: 45, album: 'Blur', release: 'Blur' },
+      { fact: MATCH_FACTS.artist, points: 30, most: 30, album: 'Blur', release: 'Blur' },
+      { fact: MATCH_FACTS.year, points: 10, most: 10, album: '1997', release: '1997' },
+      { fact: MATCH_FACTS.trackCount, points: 0, most: 10, album: '1', release: '14' },
+      { fact: MATCH_FACTS.official, points: 5, most: 5, album: null, release: null },
+    ])
+    // Its folder's name finds the release, though its tags name no title to weigh.
+    const bootleg = await api().getAlbumMatchDiagnosis(live?.id ?? 0)
+    expect(bootleg.closest?.mbid).toBe(MBIDS.live)
+    expect(bootleg.facts.find(({ fact }) => fact === MATCH_FACTS.title)).toMatchObject({
+      points: 45,
+      release: 'Live 1994',
+    })
+    await expect(api().getAlbumMatchDiagnosis(999_999)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('keeps a diagnosis smart match explained until the tags change, and asks again for one it could not', async () => {
+    const live = (await api().listAlbums({ libraryId: state.library })).find(
+      ({ title }) => title === 'Live 1994',
+    )
+    const album = app()
+      .get(MusicMatchStore)
+      .albumToMatch(live?.id ?? 0)
+    if (album === null) throw new Error('no album')
+    const asks = { searches: 0, explanations: 0 }
+    const diagnosesWith = (explained: AiExplanation | null) =>
+      new AlbumDiagnoses(
+        app().get(DatabaseService),
+        {
+          closest: async () => {
+            asks.searches += 1
+            return []
+          },
+        },
+        {
+          explain: async () => {
+            asks.explanations += 1
+            return explained
+          },
+        },
+      )
+    const unexplained = diagnosesWith(null)
+    await unexplained.diagnose(album)
+    await unexplained.diagnose(album)
+    expect(asks).toEqual({ searches: 2, explanations: 2 })
+    const explained = diagnosesWith({ reason: 'Nothing found.', fix: 'Name the artist.' })
+    const first = await explained.diagnose(album)
+    expect(first).toEqual({
+      closest: null,
+      facts: [],
+      reason: 'Nothing found.',
+      fix: 'Name the artist.',
+    })
+    // Kept in the database, so another instance, as after a restart, answers it too.
+    await expect(diagnosesWith(null).diagnose(album)).resolves.toEqual(first)
+    expect(asks).toEqual({ searches: 3, explanations: 3 })
+    await explained.diagnose({ ...album, year: 1990 })
+    expect(asks).toEqual({ searches: 4, explanations: 4 })
   })
 
   it("serves an album's cover by its capability address, square and scaled, to anyone, and no other version", async () => {

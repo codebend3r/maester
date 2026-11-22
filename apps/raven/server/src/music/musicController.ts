@@ -15,6 +15,7 @@ import {
 import {
   type AlbumDetails,
   type AlbumMatchCandidate,
+  type AlbumMatchDiagnosis,
   type AlbumSummary,
   type Artist,
   type ArtistAbout as About,
@@ -37,6 +38,7 @@ import { PrivateBy, Public } from '@/lock/lockGuard'
 import { LockService, PRIVACIES } from '@/lock/lockService'
 import { favouriteAnswered } from '@/media/favouriteOutcomes'
 import { ViewingAccounts } from '@/media/viewingAccounts'
+import { AlbumDiagnoses } from '@/music/albumDiagnoses'
 import { AlbumMatching } from '@/music/albumMatching'
 import { ArtistAbout } from '@/music/artistAbout'
 import { ArtistBackgroundOptions, BACKGROUND_CHOICES } from '@/music/artistBackgroundOptions'
@@ -125,6 +127,7 @@ export class AlbumsController {
     @Inject(MusicRepository) private readonly music: MusicRepository,
     @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
     @Inject(AlbumMatching) private readonly matching: AlbumMatching,
+    @Inject(AlbumDiagnoses) private readonly diagnoses: AlbumDiagnoses,
     @Inject(MusicFavourites) private readonly favourites: MusicFavourites,
     @Inject(ViewingAccounts) private readonly accounts: ViewingAccounts,
   ) {}
@@ -180,6 +183,17 @@ export class AlbumsController {
     return this.matching
       .search({ album, query: typed === '' ? undefined : typed })
       .catch(musicBrainzFailed)
+  }
+
+  /** Why the album is unmatched: the closest release found now, each fact weighed against it and Claude's summary. */
+  @AdminOnly()
+  @Get(':id/match/diagnosis')
+  async diagnoseMatch(
+    @Param(ROUTE_PARAMS.id, ParseIntPipe) id: number,
+  ): Promise<AlbumMatchDiagnosis> {
+    const album = this.matches.albumToMatch(id)
+    if (!album) throw new NotFoundException(`No album ${id}`)
+    return this.diagnoses.diagnose(album).catch(musicBrainzFailed)
   }
 
   /** Saves a Fix match: `{ mbid }` says which release the album is, `{ mbid: null }` that it is none MusicBrainz lists. */

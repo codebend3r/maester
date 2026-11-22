@@ -16,7 +16,7 @@ import {
 } from '@shared/server'
 
 /** The effort levels the AI lookup can ask for, as `output_config.effort` takes them. */
-const AI_MATCH_EFFORT_LEVELS = {
+export const AI_MATCH_EFFORT_LEVELS = {
   low: 'low',
   medium: 'medium',
   high: 'high',

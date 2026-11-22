@@ -72,7 +72,7 @@ const editDistance = ({ a, b }: EditDistanceProps): number => {
 type SimilarityProps = { a: string; b: string }
 
 /** 1 for the same text, falling with each edit, by the longer's length. */
-const similarity = ({ a, b }: SimilarityProps): number => {
+export const similarity = ({ a, b }: SimilarityProps): number => {
   const charsA = [...a]
   const charsB = [...b]
   const longer = Math.max(charsA.length, charsB.length)

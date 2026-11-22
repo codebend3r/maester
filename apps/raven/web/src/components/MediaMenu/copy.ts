@@ -1,5 +1,6 @@
 export const MEDIA_MENU_COPY = {
   findingFile: 'Finding the file',
+  ellipsis: '...',
   copied: 'Copied',
   copyPath: 'Copy file path',
   removeFavourite: 'Remove favourite',

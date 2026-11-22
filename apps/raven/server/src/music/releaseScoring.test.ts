@@ -1,6 +1,6 @@
 import { ALBUM_TYPES, CONFIDENCE_STRONG } from '@raven/core'
 import { describe, expect, it } from 'vitest'
-import { aiChoiceOf, aiSearchOf } from '@/music/albumClaude'
+import { aiChoiceOf, aiExplanationOf, aiSearchOf } from '@/music/albumClaude'
 import { FALLBACK_ARTISTS } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
 import type { AlbumToMatch } from '@/music/musicMatchStore'
@@ -136,6 +136,68 @@ describe('scoreRelease for damaged tags', () => {
   })
 })
 
+describe('scoreRelease for a near title', () => {
+  const canibus: AlbumToMatch = {
+    id: 2,
+    title: 'B.C. (Before Can-I-Bus)',
+    artist: 'Canibus',
+    year: 2008,
+    trackCount: 15,
+    folder: null,
+  }
+  const twoThousandBc = release({
+    title: '2000 B.C. (Before Can-I-Bus)',
+    artist: 'Canibus',
+    artists: [{ name: 'Canibus', mbid: 'art-3' }],
+    year: 2000,
+    trackCount: 15,
+  })
+
+  it('is sure of a release whose title holds the tag and one word more, by the artist with the track count', () => {
+    expect(scoreRelease({ album: canibus, release: twoThousandBc })).toBeGreaterThanOrEqual(
+      CONFIDENCE_STRONG,
+    )
+  })
+
+  it('is sure of a title a typo apart by the artist in its year', () => {
+    expect(
+      scoreRelease({
+        album: { ...OK_COMPUTER, title: 'OK Computr', trackCount: 13 },
+        release: release(),
+      }),
+    ).toBeGreaterThanOrEqual(CONFIDENCE_STRONG)
+  })
+
+  it('counts a near title for less than the same title', () => {
+    expect(scoreRelease({ album: canibus, release: twoThousandBc })).toBeLessThan(
+      scoreRelease({
+        album: { ...canibus, title: '2000 B.C. (Before Can-I-Bus)' },
+        release: twoThousandBc,
+      }),
+    )
+  })
+
+  it('is not sure of a near title with nothing but the artist beside it', () => {
+    expect(
+      scoreRelease({ album: canibus, release: { ...twoThousandBc, trackCount: 20 } }),
+    ).toBeLessThan(CONFIDENCE_STRONG)
+  })
+
+  it('never takes one word inside a longer title, or a title two words longer, as near', () => {
+    const greatest = { ...OK_COMPUTER, title: 'Hits', year: null, trackCount: 9 }
+    expect(
+      scoreRelease({ album: greatest, release: release({ title: 'Greatest Hits', year: null }) }),
+    ).toBe(scoreRelease({ album: greatest, release: release({ title: 'Kid A', year: null }) }))
+    const volume = { ...OK_COMPUTER, title: 'Greatest Hits', year: null, trackCount: 9 }
+    expect(
+      scoreRelease({
+        album: volume,
+        release: release({ title: 'Greatest Hits Volume 2', year: null }),
+      }),
+    ).toBe(scoreRelease({ album: volume, release: release({ title: 'Kid A', year: null }) }))
+  })
+})
+
 describe('searchesFor', () => {
   it('searches the tags, then the plain title, then the folder, each once', () => {
     expect(
@@ -175,6 +237,23 @@ describe('aiSearchOf', () => {
     expect(aiSearchOf({ album: null, artist: 'Shakira' })).toBeNull()
     expect(aiSearchOf({ album: '  ', artist: null })).toBeNull()
     expect(aiSearchOf('Fijación Oral')).toBeNull()
+  })
+})
+
+describe('aiExplanationOf', () => {
+  it('takes a reason and a fix, each trimmed', () => {
+    expect(
+      aiExplanationOf({
+        reason: ' Year is 2008; MusicBrainz says 2000. ',
+        fix: 'Set the year to 2000.',
+      }),
+    ).toEqual({ reason: 'Year is 2008; MusicBrainz says 2000.', fix: 'Set the year to 2000.' })
+  })
+
+  it('takes nothing when either is empty or missing, or the answer is malformed', () => {
+    expect(aiExplanationOf({ reason: '  ', fix: 'Set the year.' })).toBeNull()
+    expect(aiExplanationOf({ reason: 'Years differ.' })).toBeNull()
+    expect(aiExplanationOf('Years differ.')).toBeNull()
   })
 })
 

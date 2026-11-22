@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
-import { LIBRARY_KINDS, MUSIC_LIST_PARAMS, MUSIC_SORTS, SORT_DIRECTIONS } from '@raven/core'
+import {
+  LIBRARY_KINDS,
+  MATCH_FACTS,
+  MUSIC_LIST_PARAMS,
+  MUSIC_SORTS,
+  SORT_DIRECTIONS,
+} from '@raven/core'
 import { useToasts } from '@raven/ui'
 import { useAudioQueue } from '@raven/ui/headless'
 import { api } from '@/lib/api'
@@ -199,6 +205,118 @@ describe('UnmatchedAlbumsSection', () => {
         'Smart match started on 1 unmatched album. Each result shows here as it lands, and stays in Notifications.',
       ]),
     )
+  })
+})
+
+describe('UnmatchedAlbumsSection on hover', () => {
+  afterEach(() => {
+    cleanup()
+    mock.restore()
+  })
+
+  it('says over the cover how close the nearest release came, each fact, and Claude’s summary, asking once', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album({ id: 9, title: 'B.C.', sortTitle: 'B.C.', year: 2008, match: 'unmatched' }),
+    ])
+    const diagnose = spyOn(api, 'getAlbumMatchDiagnosis').mockResolvedValue({
+      closest: {
+        mbid: '11111111-1111-4111-8111-000000000001',
+        title: '2000 B.C.',
+        artist: 'Canibus',
+        year: 2000,
+        trackCount: 15,
+        type: 'album',
+        country: 'US',
+        confidence: 70,
+      },
+      facts: [
+        { fact: MATCH_FACTS.title, points: 35, most: 45, album: 'B.C.', release: '2000 B.C.' },
+        { fact: MATCH_FACTS.artist, points: 30, most: 30, album: 'Canibus', release: 'Canibus' },
+        { fact: MATCH_FACTS.year, points: 0, most: 10, album: '2008', release: '2000' },
+        { fact: MATCH_FACTS.trackCount, points: 0, most: 10, album: '14', release: '15' },
+        { fact: MATCH_FACTS.official, points: 5, most: 5, album: null, release: null },
+      ],
+      reason: 'Year is 2008; MusicBrainz says 2000.',
+      fix: 'Set the year to 2000.',
+    })
+    renderWithProviders({
+      ui: <UnmatchedAlbumsSection library={MUSIC} />,
+      route: '/libraries/3/unmatched-albums',
+    })
+    const title = await screen.findByRole('link', { name: 'B.C.' })
+    const card = title.closest('li')
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(diagnose).not.toHaveBeenCalled()
+    fireEvent.pointerEnter(card ?? title)
+    const hint = await screen.findByRole('tooltip')
+    expect(await screen.findByText('Closest match: 70 of 100, 80 needed')).toBeTruthy()
+    expect(hint).toHaveTextContent('2000 B.C. by Canibus, 2000')
+    expect(hint).toHaveTextContent('Yours: 2008. MusicBrainz: 2000.')
+    expect(hint).toHaveTextContent('An official release')
+    expect(hint).toHaveTextContent('Smart match says: Year is 2008; MusicBrainz says 2000.')
+    expect(hint).toHaveTextContent('How to fix')
+    expect(hint).toHaveTextContent('Set the year to 2000.')
+    expect(title).toHaveAttribute('aria-describedby', hint.id)
+    fireEvent.pointerLeave(card ?? title)
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    fireEvent.pointerEnter(card ?? title)
+    await screen.findByText('Closest match: 70 of 100, 80 needed')
+    expect(diagnose).toHaveBeenCalledTimes(1)
+    expect(diagnose).toHaveBeenCalledWith(9)
+  })
+})
+
+describe('UnmatchedAlbumsSection on hover with no word from smart match', () => {
+  afterEach(() => {
+    cleanup()
+    mock.restore()
+  })
+
+  it('reads the fix off the first fact that differs, or says what to check when nothing was found', async () => {
+    spyOn(api, 'listAlbums').mockResolvedValue([
+      album({ id: 9, title: 'B.C.', sortTitle: 'B.C.', match: 'unmatched' }),
+      album({ id: 10, title: 'Lulu', sortTitle: 'Lulu', match: 'unmatched' }),
+    ])
+    spyOn(api, 'getAlbumMatchDiagnosis').mockImplementation(async (albumId) =>
+      albumId === 9
+        ? {
+            closest: {
+              mbid: '11111111-1111-4111-8111-000000000001',
+              title: '2000 B.C.',
+              artist: 'Canibus',
+              year: 2000,
+              trackCount: 15,
+              type: 'album',
+              country: null,
+              confidence: 70,
+            },
+            facts: [
+              {
+                fact: MATCH_FACTS.title,
+                points: 35,
+                most: 45,
+                album: 'B.C.',
+                release: '2000 B.C.',
+              },
+              { fact: MATCH_FACTS.year, points: 0, most: 10, album: '2008', release: '2000' },
+            ],
+            reason: null,
+            fix: null,
+          }
+        : { closest: null, facts: [], reason: null, fix: null },
+    )
+    renderWithProviders({
+      ui: <UnmatchedAlbumsSection library={MUSIC} />,
+      route: '/libraries/3/unmatched-albums',
+    })
+    const bc = await screen.findByRole('link', { name: 'B.C.' })
+    fireEvent.pointerEnter(bc.closest('li') ?? bc)
+    await screen.findByText('Rename the title to “2000 B.C.”.')
+    expect(screen.getByRole('tooltip')).not.toHaveTextContent('Smart match says')
+    fireEvent.pointerLeave(bc.closest('li') ?? bc)
+    const lulu = screen.getByRole('link', { name: 'Lulu' })
+    fireEvent.pointerEnter(lulu.closest('li') ?? lulu)
+    await screen.findByText('Check the title and artist tags, or use Fix match.')
   })
 })
 

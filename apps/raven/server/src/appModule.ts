@@ -95,6 +95,7 @@ import { ArtistAbout } from '@/music/artistAbout'
 import { ArtistBackgroundOptions } from '@/music/artistBackgroundOptions'
 import { WikimediaClient } from '@/music/wikimediaClient'
 import { AlbumClaude } from '@/music/albumClaude'
+import { AlbumDiagnoses } from '@/music/albumDiagnoses'
 import { AlbumMatching } from '@/music/albumMatching'
 import { SmartMatch } from '@/music/smartMatch'
 import { MusicBrainzClient } from '@/music/musicBrainzClient'
@@ -362,6 +363,7 @@ export class AppModule {
         LoudnessScan,
         AlbumClaude,
         AlbumMatching,
+        AlbumDiagnoses,
         SmartMatch,
         MatchFiles,
         AiDecisions,
