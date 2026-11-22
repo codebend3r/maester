@@ -104,6 +104,7 @@ export const ravenQueriesFor = (api: ApiClient) => {
   }
   type RavenQueriesForSongCountQueryProps = { libraryId: number; search: string }
   type RavenQueriesForAlbumMatchSearchQueryProps = { albumId: number; query: string }
+  type RavenQueriesForAlbumMatchDiagnosisQueryProps = { albumId: number; isWanted: boolean }
   type RavenQueriesForEveryonesHistoryQueryProps = {
     accountId: string | null
     show: PlayHistoryShow
@@ -586,6 +587,18 @@ export const ravenQueriesFor = (api: ApiClient) => {
      */
     chaptersQuery: (id: number | null) =>
       queryOptions({ ...markersQuery(id), select: (markers) => markers.chapters }),
+
+    /** Why an album is unmatched, asked only while `isWanted`, since it searches MusicBrainz and asks Claude. */
+    albumMatchDiagnosisQuery: ({
+      albumId,
+      isWanted,
+    }: RavenQueriesForAlbumMatchDiagnosisQueryProps) =>
+      queryOptions({
+        queryKey: queryKeys.albumMatchDiagnosis(albumId),
+        queryFn: isWanted ? () => api.getAlbumMatchDiagnosis(albumId) : skipToken,
+        staleTime: Infinity,
+        retry: false,
+      }),
 
     /** MusicBrainz's releases for an album's Fix match; `query` '' searches by the album's own name. */
     albumMatchSearchQuery: ({ albumId, query }: RavenQueriesForAlbumMatchSearchQueryProps) =>

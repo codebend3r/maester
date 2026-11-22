@@ -173,7 +173,6 @@ export class LibraryJobsController {
       throw new BadRequestException('Only a library of music has albums to match.')
     }
     const { id } = library
-    // Counted first: the queue may start the match at once, which puts the albums back to pending.
     const albums = this.matches.unmatchedCount(id)
     this.metadata.schedule({
       key: queueKeyOf({ kind: QUEUE_KEYS.smartMatch, parts: [id] }),

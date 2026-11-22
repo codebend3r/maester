@@ -70,6 +70,8 @@ export type MatchTally = { matched: number; searched: number; total: number }
 
 type AlbumMatchingMatchLibraryProps = {
   libraryId: number
+  /** Whether the albums no release was found for are searched again too, staying unmatched until one is. */
+  isRetrying?: boolean
   /** Told of each album as it is matched or not. */
   onOutcome?: (outcome: AlbumOutcome) => void
 }
@@ -128,6 +130,11 @@ export class AlbumMatching {
     }, Promise.resolve([]))
   }
 
+  /** Every release the album's own searches find, best first, for how close they come. */
+  async closest(album: AlbumToMatch): Promise<Scored[]> {
+    return this.searchInTurn({ album, searches: searchesFor(album) })
+  }
+
   /** What a search Claude suggests finds: a sure release, or Claude's pick of what it found. */
   private async bySuggestion(album: AlbumToMatch): Promise<Scored | null> {
     const tracks = this.matches.trackTitlesOf({ id: album.id, most: AI_TRACK_TITLES_MOST })
@@ -178,9 +185,10 @@ export class AlbumMatching {
    */
   private async matchPending({
     libraryId,
+    isRetrying = false,
     onOutcome = () => undefined,
   }: AlbumMatchingMatchLibraryProps): Promise<MatchTally> {
-    const pending = this.matches.albumsToMatch(libraryId)
+    const pending = this.matches.albumsToMatch({ libraryId, isRetrying })
     const enrichment = this.matches.albumsToEnrich(libraryId)
     if (pending.length === 0 && enrichment.length === 0) return NOTHING_PENDING
     const guard = new PassGuard({

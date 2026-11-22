@@ -20,9 +20,11 @@ import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlbumGrid, AlbumGridSkeleton } from '@/components/AlbumGrid/AlbumGrid'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
+import { AlbumMatchWhy } from '@/components/AlbumMatchWhy/AlbumMatchWhy'
 import { JumpPicker } from '@/components/JumpPicker/JumpPicker'
 import { ArtistList, ArtistListSkeleton } from '@/components/ArtistList/ArtistList'
 import { SearchField } from '@/components/SearchField/SearchField'
+import { useCanManage } from '@/lib/management'
 import { libraryTracks } from '@/lib/music'
 import { albumsQuery, artistsQuery } from '@/lib/queries'
 import { useAddressSearch } from '@/lib/useSearch'
@@ -239,6 +241,7 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
     thisYear,
   })
   const showToast = useToasts((state) => state.show)
+  const canManage = useCanManage()
   // Each outcome arrives as a notification; the list follows the library's events as albums change.
   const smartMatch = useMutation({
     mutationFn: () => api.smartMatchAlbums(library.id),
@@ -273,7 +276,8 @@ export const UnmatchedAlbumsSection = ({ library }: UnmatchedAlbumsSectionProps)
       >
         {(listed) => (
           <>
-            <AlbumGrid albums={listed} />
+            {/* Why each is unmatched is asked of an owner-only route, so only who may manage sees it. */}
+            <AlbumGrid albums={listed} hint={canManage ? AlbumMatchWhy : undefined} />
             {scale && <JumpPicker scale={scale} scope={cards} />}
           </>
         )}

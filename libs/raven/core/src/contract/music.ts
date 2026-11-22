@@ -243,6 +243,48 @@ export type AlbumMatchCandidate = Infer<typeof isAlbumMatchCandidate>
 
 export const isAlbumMatchCandidateList = listOf(isAlbumMatchCandidate)
 
+/** The facts raven weighs when it decides whether a release is an album. */
+export const MATCH_FACTS = {
+  title: 'title',
+  artist: 'artist',
+  year: 'year',
+  trackCount: 'trackCount',
+  official: 'official',
+} as const
+
+export const isMatchFact = oneOf(Object.values(MATCH_FACTS))
+
+export type MatchFact = Infer<typeof isMatchFact>
+
+/** One fact of an album weighed against a release: what each says, and what it earned of what it could. */
+export const isMatchFactCheck = object({
+  fact: isMatchFact,
+  points: isNumber,
+  most: isNumber,
+  /** What the album's tags say, as text; null when they say nothing. */
+  album: nullable(isString),
+  /** What MusicBrainz says of the release, as text; null when it says nothing. */
+  release: nullable(isString),
+})
+
+export type MatchFactCheck = Infer<typeof isMatchFactCheck>
+
+/**
+ * `GET /api/albums/:id/match/diagnosis`: why an album is unmatched. The
+ * closest release MusicBrainz finds for it, or null for none, each fact
+ * weighed against it, and smart match's word on why in one short sentence
+ * and on what to change in another; both null when there is no AI key or
+ * no lookups left.
+ */
+export const isAlbumMatchDiagnosis = object({
+  closest: nullable(isAlbumMatchCandidate),
+  facts: listOf(isMatchFactCheck),
+  reason: nullable(isString),
+  fix: nullable(isString),
+})
+
+export type AlbumMatchDiagnosis = Infer<typeof isAlbumMatchDiagnosis>
+
 /** `PUT /api/albums/:id/match`: the release the album is, or null for none that MusicBrainz lists. */
 export const isAlbumMatchChoice = object({ mbid: nullable(isMbid) })
 

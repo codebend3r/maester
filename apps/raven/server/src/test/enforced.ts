@@ -156,6 +156,7 @@ export const ROUTES = {
   libraryTracks: { method: GET, path: '/api/libraries/:id/tracks', account: approved },
   album: { method: GET, path: '/api/albums/:id', account: approved },
   albumMatchSearch: { method: GET, path: '/api/albums/:id/match/search', account: owner },
+  albumMatchDiagnosis: { method: GET, path: '/api/albums/:id/match/diagnosis', account: owner },
   setAlbumMatch: { method: PUT, path: '/api/albums/:id/match', account: owner },
   albumFavourite: { method: PUT, path: '/api/albums/:id/favourite', account: approved },
   artist: { method: GET, path: '/api/artists/:id', account: approved },

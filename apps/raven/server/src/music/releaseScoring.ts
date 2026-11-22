@@ -1,4 +1,11 @@
-import { type AlbumMatchCandidate, CONFIDENCE_STRONG, foldTitle } from '@raven/core'
+import {
+  type AlbumMatchCandidate,
+  CONFIDENCE_STRONG,
+  MATCH_FACTS,
+  type MatchFactCheck,
+  foldTitle,
+} from '@raven/core'
+import { similarity } from '@/metadata/matchConfidence'
 import { plainAlbumTitle } from '@/music/albumTitles'
 import { artistToMatch } from '@/music/filing'
 import type { Release } from '@/music/musicBrainzClient'
@@ -7,6 +14,7 @@ import type { AlbumToMatch } from '@/music/musicMatchStore'
 /** What each fact is worth when a release agrees with the album, out of 100. */
 const WEIGHTS = {
   title: 45,
+  titleNear: 35,
   artist: 30,
   year: 10,
   yearNear: 5,
@@ -41,6 +49,44 @@ const titlesToMatch = (album: AlbumToMatch): Set<string> =>
 
 type ScoreReleaseProps = { album: AlbumToMatch; release: Release }
 
+/** How alike two folded titles must be, by edits over the longer's length, to be near: a typo or two. */
+const NEAR_SIMILARITY = 0.85
+
+/** The most words one title may have past a title it holds whole and still be near, as "2000" before "B.C.". */
+const NEAR_EXTRA_WORDS = 1
+
+/** The fewest words a title held inside another must have, so "Hits" is never near "Greatest Hits". */
+const NEAR_HELD_WORDS = 2
+
+type TitlePairProps = { a: string; b: string }
+
+/** Whether the shorter title's words run unbroken inside the longer's, with at most `NEAR_EXTRA_WORDS` more. */
+const holdsWhole = ({ a, b }: TitlePairProps): boolean => {
+  const [held, holder] = [a.split(' '), b.split(' ')].toSorted((x, y) => x.length - y.length)
+  if (held === undefined || holder === undefined) return false
+  const extra = holder.length - held.length
+  if (held.length < NEAR_HELD_WORDS || extra < 1 || extra > NEAR_EXTRA_WORDS) return false
+  return Array.from({ length: extra + 1 }, (_, at) => holder.slice(at, at + held.length)).some(
+    (run) => run.join(' ') === held.join(' '),
+  )
+}
+
+/** Whether two folded titles are near, though not the same: a typo apart, or one holding the other and a word more. */
+const isNearTitle = (pair: TitlePairProps): boolean =>
+  similarity(pair) >= NEAR_SIMILARITY || holdsWhole(pair)
+
+/** The title's share: whole for the same title, less for a near one, none otherwise. */
+const titlePoints = ({ album, release }: ScoreReleaseProps): number => {
+  const titles = titlesToMatch(album)
+  const released = [release.title, plainAlbumTitle(release.title)].map(foldTitle)
+  if (released.some((title) => titles.has(title))) return WEIGHTS.title
+  const isNear = [...titles].some((a) => released.some((b) => isNearTitle({ a, b })))
+  return isNear ? WEIGHTS.titleNear : 0
+}
+
+/** A number as a fact shows it, or null for none. */
+const textOf = (value: number | null): string | null => (value === null ? null : String(value))
+
 /** The year's share for releases `apart` years from the album, nothing when either has no year. */
 const yearPoints = (apart: number | null): number => {
   if (apart === 0) return WEIGHTS.year
@@ -48,34 +94,71 @@ const yearPoints = (apart: number | null): number => {
 }
 
 /**
- * How sure raven is that `release` is the album, 0 to 100: the title and
- * the artist count most, then the year (one either side half counts, as
+ * Each fact of the album weighed against `release`: the title and the
+ * artist count most, then the year (one either side half counts, as
  * releases differ by country) and the track count, and an official release
  * edges out a bootleg of the same name. A title counts with its edition
  * taken off on either side, or as the album's folder names it, so "Pac's
- * Life (Bonus Track)" is MusicBrainz's "Pac's Life". A compilation has no
+ * Life (Bonus Track)" is MusicBrainz's "Pac's Life". A near title, a typo
+ * apart or missing a word ("B.C. (Before Can-I-Bus)" for "2000 B.C. (Before
+ * Can-I-Bus)"), counts for less, so it needs the artist and the year or the
+ * track count beside it to be sure. A compilation has no
  * artist to agree on, so its artist's share rides on the title. Every
  * pressing of one release scores alike; the pass takes MusicBrainz's first,
  * since they are the same album.
  */
-export const scoreRelease = ({ album, release }: ScoreReleaseProps): number => {
-  const titles = titlesToMatch(album)
-  const isSameTitle =
-    titles.has(foldTitle(release.title)) || titles.has(foldTitle(plainAlbumTitle(release.title)))
+export const factChecksOf = ({ album, release }: ScoreReleaseProps): MatchFactCheck[] => {
+  const title = titlePoints({ album, release })
   const isSameArtist =
-    artistsToMatch(album).length === 0 ? isSameTitle : creditsArtist({ album, release })
+    artistsToMatch(album).length === 0 ? title === WEIGHTS.title : creditsArtist({ album, release })
   const apart =
     album.year === null || release.year === null ? null : Math.abs(album.year - release.year)
-  const score =
-    (isSameTitle ? WEIGHTS.title : 0) +
-    (isSameArtist ? WEIGHTS.artist : 0) +
-    yearPoints(apart) +
-    (release.trackCount !== null && release.trackCount === album.trackCount
-      ? WEIGHTS.trackCount
-      : 0) +
-    (release.isOfficial ? WEIGHTS.official : 0)
-  return Math.min(100, score)
+  const isSameCount = release.trackCount !== null && release.trackCount === album.trackCount
+  return [
+    {
+      fact: MATCH_FACTS.title,
+      points: title,
+      most: WEIGHTS.title,
+      album: album.title,
+      release: release.title,
+    },
+    {
+      fact: MATCH_FACTS.artist,
+      points: isSameArtist ? WEIGHTS.artist : 0,
+      most: WEIGHTS.artist,
+      album: artistToMatch(album) ?? album.folder?.artist ?? null,
+      release: release.artist,
+    },
+    {
+      fact: MATCH_FACTS.year,
+      points: yearPoints(apart),
+      most: WEIGHTS.year,
+      album: textOf(album.year),
+      release: textOf(release.year),
+    },
+    {
+      fact: MATCH_FACTS.trackCount,
+      points: isSameCount ? WEIGHTS.trackCount : 0,
+      most: WEIGHTS.trackCount,
+      album: textOf(album.trackCount),
+      release: textOf(release.trackCount),
+    },
+    {
+      fact: MATCH_FACTS.official,
+      points: release.isOfficial ? WEIGHTS.official : 0,
+      most: WEIGHTS.official,
+      album: null,
+      release: null,
+    },
+  ]
 }
+
+/** How sure raven is that `release` is the album, 0 to 100: what its facts earned (`factChecksOf`). */
+export const scoreRelease = (props: ScoreReleaseProps): number =>
+  Math.min(
+    100,
+    factChecksOf(props).reduce((sum, { points }) => sum + points, 0),
+  )
 
 /** A release with how sure raven is that it is the album. */
 export type Scored = { release: Release; confidence: number }
@@ -92,7 +175,8 @@ export const scoredOf = ({ album, releases }: ScoredOfProps): Scored[] =>
     .map((release) => ({ release, confidence: scoreRelease({ album, release }) }))
     .toSorted(byConfidence)
 
-const toCandidate = ({ release, confidence }: Scored): AlbumMatchCandidate => ({
+/** A scored release as Fix match and the diagnosis offer it. */
+export const toCandidate = ({ release, confidence }: Scored): AlbumMatchCandidate => ({
   mbid: release.mbid,
   title: release.title,
   artist: release.artist,

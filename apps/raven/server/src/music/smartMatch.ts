@@ -38,7 +38,8 @@ type SmartMatchRunProps = { libraryId: number; account: AccountKey }
  * Smart match, for the account that asked: each unmatched album whose
  * tracks belong to another album by where they sit is folded into it
  * first (`foldStrayAlbums`), then every album still unmatched is searched
- * again by a pass (`AlbumMatching.matchLibrary`). The account is told of each fold and each
+ * again by a pass (`AlbumMatching.matchLibrary`), staying unmatched, and so
+ * listed, until a release is found for it. The account is told of each fold and each
  * album as it goes, and of the total at the end, each a notification; a
  * failure is told too, as nothing else would show it.
  */
@@ -48,7 +49,7 @@ export class SmartMatch {
 
   constructor(
     @Inject(MusicMatchStore) private readonly matches: MusicMatchStore,
-    @Inject(AlbumMatching) private readonly matching: Pick<AlbumMatching, 'matchLibrary' | 'retry'>,
+    @Inject(AlbumMatching) private readonly matching: Pick<AlbumMatching, 'matchLibrary'>,
     @Inject(Notices) private readonly notices: Notices,
     @Inject(ServerEvents) private readonly events: ServerEvents,
   ) {}
@@ -62,9 +63,9 @@ export class SmartMatch {
       folds.forEach((fold) =>
         notify({ message: SMART_MATCH_COPY.folded(fold), tone: NOTIFICATION_TONES.success }),
       )
-      this.matching.retry(libraryId)
       const tally = await this.matching.matchLibrary({
         libraryId,
+        isRetrying: true,
         onOutcome: (outcome) => notify(noticeOf(outcome)),
       })
       notify({

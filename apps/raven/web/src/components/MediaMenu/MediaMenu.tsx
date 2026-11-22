@@ -74,6 +74,16 @@ const WrappingPath = ({ path }: WrappingPathProps) =>
     </Fragment>
   ))
 
+/** The wait for the path: the words pulse through the palette and the dots tick on after them. */
+const FindingFile = () => (
+  <span className={styles.finding}>
+    {MEDIA_MENU_COPY.findingFile}
+    <span className={styles.dots} aria-hidden="true">
+      {MEDIA_MENU_COPY.ellipsis}
+    </span>
+  </span>
+)
+
 type LocationItemProps = { media: MediaItem }
 
 /**
@@ -84,7 +94,6 @@ const LocationItem = ({ media }: LocationItemProps) => {
   const [copied, setCopied] = useState(false)
   const location = useQuery(mediaLocationQuery(media.id))
   const path = location.data?.path ?? null
-  const waiting = location.isError ? location.error.message : MEDIA_MENU_COPY.findingFile
   return (
     <li role="none" className={styles.location}>
       <button
@@ -100,7 +109,8 @@ const LocationItem = ({ media }: LocationItemProps) => {
         </span>
         <span className={styles.path}>
           {path && <WrappingPath path={path} />}
-          {!path && waiting}
+          {!path && location.isError && location.error.message}
+          {!path && !location.isError && <FindingFile />}
         </span>
       </button>
     </li>

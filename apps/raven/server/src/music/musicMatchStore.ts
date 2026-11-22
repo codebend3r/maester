@@ -30,6 +30,8 @@ const SELECT_TO_MATCH = `SELECT a.id, a.title, a.year, COUNT(t.media_id) AS trac
 
 type MusicMatchStoreEnrichProps = { id: number; release: Release }
 
+type MusicMatchStoreAlbumsToMatchProps = { libraryId: number; isRetrying: boolean }
+
 type MusicMatchStoreSaveMatchProps = {
   id: number
   release: Release | null
@@ -115,13 +117,21 @@ export class MusicMatchStore {
     })()
   }
 
-  /** The library's albums no pass has looked at yet, oldest first. */
-  albumsToMatch(libraryId: number): AlbumToMatch[] {
+  /**
+   * The library's albums no pass has looked at yet, oldest first, and with
+   * `isRetrying` those no release was found for too, which stay unmatched
+   * while they are searched again.
+   */
+  albumsToMatch({ libraryId, isRetrying }: MusicMatchStoreAlbumsToMatchProps): AlbumToMatch[] {
     return this.db
-      .prepare<[string, number], AlbumToMatchRow>(
-        `${SELECT_TO_MATCH} WHERE a.match = ? AND a.library_id = ? GROUP BY a.id ORDER BY a.id`,
+      .prepare<[string, string, number], AlbumToMatchRow>(
+        `${SELECT_TO_MATCH} WHERE a.match IN (?, ?) AND a.library_id = ? GROUP BY a.id ORDER BY a.id`,
       )
-      .all(MATCH_STATES.pending, libraryId)
+      .all(
+        MATCH_STATES.pending,
+        isRetrying ? MATCH_STATES.unmatched : MATCH_STATES.pending,
+        libraryId,
+      )
       .map((row) => this.toAlbumToMatch(row))
   }
 

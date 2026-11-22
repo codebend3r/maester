@@ -4,6 +4,7 @@ import {
   type AlbumDetails,
   type AlbumMatchCandidate,
   type AlbumMatchChoice,
+  type AlbumMatchDiagnosis,
   type AlbumSummary,
   type Artist,
   type ArtistBackgroundChoice,
@@ -79,6 +80,10 @@ export const musicCalls = ({ ask }: Transport) => ({
       params: { id: albumId },
       query: query === undefined ? {} : { query },
     }),
+
+  /** Why an album is unmatched: the closest release found, each fact weighed against it and Claude's summary. */
+  getAlbumMatchDiagnosis: (albumId: number): Promise<AlbumMatchDiagnosis> =>
+    ask({ route: ROUTES.getAlbumMatchDiagnosis, params: { id: albumId } }),
 
   /** Points an album at a MusicBrainz release, or at none, and answers with its page. */
   setAlbumMatch: ({ albumId, mbid }: SetAlbumMatchProps): Promise<AlbumDetails> =>
