@@ -1,12 +1,12 @@
 ---
 name: run-desktop-e2e
 description: >-
-  Use when running the `🎬 E2E Mac` CI check locally on a Mac, or `desktop:e2e`: "run the desktop e2e", "run the Desktop end to end check locally", "run the Playwright tests for Raven", "the desktop e2e failed, run it here", "reproduce the desktop-playback job", "run ci:desktop:e2e". Covers the one command that runs the check, what it installs, its Nx caching, the traces and what appears on screen.
+  Use when running the `🎬 E2E Raven Mac desktop` CI check locally on a Mac, or `desktop:e2e`: "run the desktop e2e", "run the Desktop end to end check locally", "run the Playwright tests for Raven", "the desktop e2e failed, run it here", "reproduce the desktop-playback job", "run ci:desktop:e2e". Covers the one command that runs the check, what it installs, its Nx caching, the traces and what appears on screen.
 ---
 
 # Run the Desktop end to end check locally
 
-The `🎬 E2E Mac` job (`desktop-e2e` in `.github/workflows/native-checks.yml`, which CI runs on main once a pull request merges), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🎬 E2E Raven Mac desktop` job (`desktop-e2e` in `.github/workflows/native-checks.yml`, which CI runs on main once a pull request merges), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:desktop:e2e

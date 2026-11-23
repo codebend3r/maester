@@ -1,12 +1,12 @@
 ---
 name: run-android-tv-e2e
 description: >-
-  Use when running the `🏗️ Build Android TV` and `🎬 E2E Android TV` CI jobs locally on a Mac, or any of its steps: "run the Android TV CI locally", "build the Android TV APK", "run the Android TV e2e", "run app:e2e:android-tv", "reproduce the Android TV job", "the Android TV check failed, run it here", "run ci:app:android-tv". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+  Use when running the `🏗️ Build Android TV` and `🎬 E2E Raven Android TV` CI jobs locally on a Mac, or any of its steps: "run the Android TV CI locally", "build the Android TV APK", "run the Android TV e2e", "run app:e2e:android-tv", "reproduce the Android TV job", "the Android TV check failed, run it here", "run ci:app:android-tv". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the Android TV check locally
 
-The `🏗️ Build Android TV` and `🎬 E2E Android TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flows in `native-checks.yml` alone, on main; CI builds on one runner and runs the flows on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🏗️ Build Android TV` and `🎬 E2E Raven Android TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flows in `native-checks.yml` alone, on main; CI builds on one runner and runs the flows on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:app:android-tv

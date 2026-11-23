@@ -412,12 +412,12 @@ GROUPS: tuple[Group, ...] = (
                 "One or more targets on Wren's web app alone, as its job in the PR checks runs them: ci:wren:web lighthouse.",
             ),
             Command(
-                "ci:wren", "The 🏗️ Build Wren iPhone job and its end to end job.", "macOS + Xcode"
+                "ci:wren", "The 🎵 Build Wren iPhone job and its end to end job.", "macOS + Xcode"
             ),
-            Command("ci:desktop:e2e", "The 🎬 E2E Mac job.", "macOS"),
+            Command("ci:desktop:e2e", "The 🎬 E2E Raven Mac desktop job.", "macOS"),
             Command(
                 "web:e2e",
-                "The 🌐 Web end to end job: Playwright drives the web app against a fixture server.",
+                "The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.",
                 "Chrome + ffmpeg",
             ),
             Command(

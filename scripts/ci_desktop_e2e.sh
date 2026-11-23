@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🎬 E2E Mac check, which CI runs on main (native-checks.yml), on this Mac:
+# Runs the 🎬 E2E Raven Mac desktop check, which CI runs on main (native-checks.yml), on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
 # from a recent run. `xcodebuild -version` is in the target's Nx cache key, which is

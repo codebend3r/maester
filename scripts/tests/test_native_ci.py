@@ -29,6 +29,15 @@ DEVICES = {
     "wren-iphone": ("Wren iPhone", "music", True),
     "wren-android": ("Wren Android", "music", False),
 }
+# Each device with flows and its end to end job's name, which names the app it tests.
+E2E_NAMES = {
+    "iphone": "🎬 E2E Raven iPhone",
+    "apple-tv": "🎬 E2E Raven Apple TV",
+    "android-tv": "🎬 E2E Raven Android TV",
+    "wren-iphone": "🎵 E2E Wren iPhone",
+}
+# Each group's build job emoji: Wren's jobs wear its musical note.
+BUILD_EMOJI = {"app": "🏗️", "music": "🎵"}
 # Each job that builds for a group when the plan says to, and the group.
 BUILD_JOBS = {
     **{f"build-{device}": group for device, (_, group, _) in DEVICES.items()},
@@ -374,10 +383,10 @@ def runs_of(steps: list[dict]) -> str:
 
 @pytest.mark.parametrize(("device", "facts"), sorted(DEVICES.items()))
 def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[str, str, bool]):
-    name, _, has_flows = facts
+    name, group, has_flows = facts
     jobs = load_workflow(PULL_REQUEST)["jobs"]
     build = jobs[f"build-{device}"]
-    assert build["name"] == f"🏗️ Build {name}"
+    assert build["name"] == f"{BUILD_EMOJI[group]} Build {name}"
     # Every device builds by the same steps; only its job's `APP_*` variables differ.
     assert build["steps"] == jobs["build-iphone"]["steps"]
     assert build["steps"][0]["with"] == {"ref": NATIVE_SHA}
@@ -395,14 +404,11 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
     assert (f"e2e-{device}" in load_workflow(MAIN)["jobs"]) == has_flows
 
 
-@pytest.mark.parametrize(
-    ("device", "name"),
-    sorted((device, name) for device, (name, _, has_flows) in DEVICES.items() if has_flows),
-)
+@pytest.mark.parametrize(("device", "name"), sorted(E2E_NAMES.items()))
 def test_each_device_s_flows_run_on_its_own_build_in_a_job_named_for_it(device: str, name: str):
     jobs = load_workflow(MAIN)["jobs"]
     job, build = jobs[f"e2e-{device}"], load_workflow(PULL_REQUEST)["jobs"][f"build-{device}"]
-    assert job["name"] == f"🎬 E2E {name}"
+    assert job["name"] == name
     # A device's two jobs agree on the build that passes between them.
     assert all(job["env"][setting] == build["env"][setting] for setting in HANDOFF_SETTINGS)
     # The Siri Remote's flow reads the test project its build packed beside the app.
@@ -455,7 +461,7 @@ def test_the_mac_s_build_jobs_build_the_named_commit_and_pass_the_handoff(
 def test_the_mac_s_tests_run_with_its_build_and_its_suite_waits_for_main():
     test = load_workflow(PULL_REQUEST)["jobs"]["desktop-test"]
     e2e = load_workflow(MAIN)["jobs"]["desktop-e2e"]
-    assert (test["name"], e2e["name"]) == ("🧪 Test Mac player", "🎬 E2E Mac")
+    assert (test["name"], e2e["name"]) == ("🧪 Test Mac player", "🎬 E2E Raven Mac desktop")
     # The tests run wherever this run built the native pieces, and only there.
     assert test["needs"] == ["select", "desktop-native"]
     assert "if" not in test

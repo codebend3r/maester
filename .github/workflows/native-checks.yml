@@ -93,7 +93,7 @@ jobs:
   # fixture's Home. A device's `APP_SETUP`, `APP_PROJECT`, `APP_ARTIFACT` and `APP_BUNDLE` are
   # its build job's in pull-request-checks.yml, which `test_native_ci.py` checks.
   e2e-iphone:
-    name: 🎬 E2E iPhone
+    name: 🎬 E2E Raven iPhone
     needs: select
     if: needs.select.outputs.app_selected == 'true'
     runs-on: macos-26
@@ -307,7 +307,7 @@ jobs:
   # The XCUITests the tvOS prebuild added (`tvos-e2e/`) open on Home, play the film, leave with
   # Menu and find it under Continue watching, all with the Siri Remote.
   e2e-apple-tv:
-    name: 🎬 E2E Apple TV
+    name: 🎬 E2E Raven Apple TV
     needs: select
     if: needs.select.outputs.app_selected == 'true'
     runs-on: macos-26
@@ -333,7 +333,7 @@ jobs:
   # emulator's 127.0.0.1:8490 at the runner's with `adb reverse`, so the app signs in to the address
   # the iPhone uses. The phone's touch flows need a phone emulator of their own, so it has none yet.
   e2e-android-tv:
-    name: 🎬 E2E Android TV
+    name: 🎬 E2E Raven Android TV
     needs: select
     if: needs.select.outputs.app_selected == 'true'
     runs-on: ubuntu-24.04
@@ -354,7 +354,7 @@ jobs:
   # Every flow in `apps/raven/music/e2e`: open on Home, play the fixture's album, and download it,
   # on a simulator of Wren's own, as `ci:wren` makes one. Wren on Android has no flows yet.
   e2e-wren-iphone:
-    name: 🎬 E2E Wren iPhone
+    name: 🎵 E2E Wren iPhone
     needs: select
     if: needs.select.outputs.music_selected == 'true'
     runs-on: macos-26
@@ -380,7 +380,7 @@ jobs:
   # `electron .`, never the packaged app, whose fuses turn off the inspector Playwright needs. The
   # target's `install:electron` step fetches the binary.
   desktop-e2e:
-    name: 🎬 E2E Mac
+    name: 🎬 E2E Raven Mac desktop
     needs: select
     if: needs.select.outputs.desktop_selected == 'true'
     runs-on: macos-26
@@ -395,7 +395,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: 🎬 E2E Mac
+      - name: 🎬 E2E Raven Mac desktop
         uses: ./.github/actions/raven-mac-playback
         with:
           target: e2e
@@ -417,7 +417,7 @@ jobs:
   # on in the project graph, and the target's inputs name the server's sources, so Nx
   # restores it from the cache when neither changed.
   web-e2e:
-    name: 🌐 Web end to end
+    name: 🌐 E2E Raven web
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -442,7 +442,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       # `static` keeps every test's output; Nx's CI default collapses passing tasks.
-      - name: 🌐 Web end to end
+      - name: 🌐 E2E Raven web
         run: bunx nx run-many --outputStyle=static -t e2e:browser
 
       # Playwright keeps a failed test's trace, which shows each step's page.
