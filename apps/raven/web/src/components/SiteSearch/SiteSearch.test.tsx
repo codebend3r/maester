@@ -3,7 +3,7 @@ import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { HomeSearch, Rating } from '@raven/core'
 import { Link, Route, Routes, useLocation } from 'react-router-dom'
-import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
+import { SEARCH_ASK, SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
 import { itemSummary, library, matchedMovie, showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -95,6 +95,14 @@ describe('SiteSearch', () => {
     expect(spies.upcoming).toHaveBeenLastCalledWith('gladiator')
     await userEvent.keyboard('{Enter}')
     await waitFor(() => expect(address()).toHaveTextContent('/coming-soon/movie/558449'))
+  })
+
+  it('takes the cursor when a way in asks for the search, as the phone More sheet does', () => {
+    renderWithProviders({ ui: <SiteSearch />, route: '/', state: SEARCH_ASK })
+    expect(searchbox()).toHaveFocus()
+    cleanup()
+    renderWithProviders({ ui: <SiteSearch />, route: '/' })
+    expect(searchbox()).not.toHaveFocus()
   })
 
   it('starts empty away from home, whatever the page asks for', () => {

@@ -783,4 +783,31 @@ describe('the bug report calls', () => {
     expect(calls[0]?.init?.method ?? null).toBe('PUT')
     expect(calls[0]?.init?.body ?? null).toBe(JSON.stringify({ status: BUG_REPORT_STATUSES.fixed }))
   })
+
+  it('archives the report its id names, or brings it back', async () => {
+    const archived = bugReport({ id: 4, archivedAt: '2026-11-23T18:00:00.000Z' })
+    const { client, calls } = clientReturning(respond({ body: archived }))
+    expect(await client.archiveBugReport({ id: 4, isArchived: true })).toEqual(archived)
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/reports/4/archive')
+    expect(calls[0]?.init?.method ?? null).toBe('PUT')
+    expect(calls[0]?.init?.body ?? null).toBe(JSON.stringify({ isArchived: true }))
+  })
+
+  it('archives every report with a status at once, reading back the ones it archived', async () => {
+    const archived = [bugReport({ status: BUG_REPORT_STATUSES.fixed, archivedAt: 'now' })]
+    const { client, calls } = clientReturning(respond({ body: archived }))
+    expect(await client.archiveBugReportsByStatus({ status: BUG_REPORT_STATUSES.fixed })).toEqual(
+      archived,
+    )
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/reports/archive')
+    expect(calls[0]?.init?.method ?? null).toBe('POST')
+    expect(calls[0]?.init?.body ?? null).toBe(JSON.stringify({ status: BUG_REPORT_STATUSES.fixed }))
+  })
+
+  it('deletes the report its id names', async () => {
+    const { client, calls } = clientReturning(respond({ status: 204 }))
+    await client.deleteBugReport(4)
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/reports/4')
+    expect(calls[0]?.init?.method ?? null).toBe('DELETE')
+  })
 })

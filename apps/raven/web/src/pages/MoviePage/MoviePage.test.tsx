@@ -273,6 +273,22 @@ describe('MoviePage', () => {
     expect(screen.getByText('Watching 7')).toBeInTheDocument()
   })
 
+  it('words Resume as its spot alone, with Play from the beginning beside it', async () => {
+    open({ details: itemDetails({ versions: [matchedMovie({ position: 2530 })] }) })
+    const resume = await screen.findByRole('link', { name: 'Resume from 42:10' })
+    expect(resume).toHaveTextContent(/^42:10$/)
+    expect(screen.getByRole('link', { name: 'Play from the beginning' })).toHaveAttribute(
+      'href',
+      '/watch/7',
+    )
+  })
+
+  it('offers no Play from the beginning for a movie not started', async () => {
+    open({ details: itemDetails({ versions: [matchedMovie()] }) })
+    await screen.findByRole('link', { name: 'Play' })
+    expect(screen.queryByRole('link', { name: 'Play from the beginning' })).toBeNull()
+  })
+
   it('plays the file a split card names', async () => {
     const details = itemDetails({
       versions: [

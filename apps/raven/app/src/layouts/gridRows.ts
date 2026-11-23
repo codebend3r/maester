@@ -4,9 +4,12 @@ import type { GridSection } from '@/queries/libraryGrid'
 /** A grid as a list draws it: one row at a time, a bucket's heading or a run of cards. */
 export const GRID_ROWS = { header: 'header', cards: 'cards' } as const
 
+/** How a run of cards is drawn, which sets how many fit a row: their shape, and whether they are panels. */
+export type CardRun = { shape: CardShape; hasPanels: boolean }
+
 export type GridRow =
   | { kind: typeof GRID_ROWS.header; key: string; section: GridSection; isOpen: boolean }
-  | { kind: typeof GRID_ROWS.cards; key: string; shape: CardShape; cards: ShelfCard[] }
+  | ({ kind: typeof GRID_ROWS.cards; key: string; cards: ShelfCard[] } & CardRun)
 
 export type GridRowKind = GridRow['kind']
 
@@ -16,18 +19,18 @@ export type GridRowOf<K extends GridRowKind> = Extract<GridRow, { kind: K }>
 type GridColumnsOfProps = {
   room: number
   gap: number
-  leastOf: (shape: CardShape) => number
+  leastOf: (run: CardRun) => number
 }
 
 /**
- * How a grid `room` points wide lays out each shape of card: in as many columns of at least
+ * How a grid `room` points wide lays out each run of cards: in as many columns of at least
  * `leastOf` it as fit with `gap` between them, and never none, each card as wide as its share.
  */
 export const gridColumnsOf = ({ room, gap, leastOf }: GridColumnsOfProps) => {
-  const columnsOf = (shape: CardShape): number =>
-    Math.max(1, Math.floor((room + gap) / (leastOf(shape) + gap)))
-  const widthOf = (shape: CardShape): number => {
-    const columns = columnsOf(shape)
+  const columnsOf = (run: CardRun): number =>
+    Math.max(1, Math.floor((room + gap) / (leastOf(run) + gap)))
+  const widthOf = (run: CardRun): number => {
+    const columns = columnsOf(run)
     return (room - (columns - 1) * gap) / columns
   }
   return { columnsOf, widthOf }
@@ -36,20 +39,26 @@ export const gridColumnsOf = ({ room, gap, leastOf }: GridColumnsOfProps) => {
 /** Whether a section folds: a bucket does, and the untitled run of a plain grid never. */
 export const isBucket = (section: GridSection): boolean => section.title !== null
 
+/** How a section's cards are drawn. */
+const cardRunOf = (section: GridSection): CardRun => ({
+  shape: section.shape,
+  hasPanels: !!section.hasPanels,
+})
+
 type CardRowsProps = { section: GridSection; columns: number }
 
 const cardRows = ({ section, columns }: CardRowsProps): GridRow[] =>
   Array.from({ length: Math.ceil(section.cards.length / columns) }, (_, at) => ({
     kind: GRID_ROWS.cards,
     key: `${section.key}:${at}`,
-    shape: section.shape,
+    ...cardRunOf(section),
     cards: section.cards.slice(at * columns, (at + 1) * columns),
   }))
 
 type GridRowsOfProps = {
   sections: readonly GridSection[]
   open: ReadonlySet<string>
-  columnsOf: (shape: CardShape) => number
+  columnsOf: (run: CardRun) => number
 }
 
 /**
@@ -57,7 +66,7 @@ type GridRowsOfProps = {
  */
 export const gridRowsOf = ({ sections, open, columnsOf }: GridRowsOfProps): GridRow[] =>
   sections.flatMap((section) => {
-    const cards = cardRows({ section, columns: columnsOf(section.shape) })
+    const cards = cardRows({ section, columns: columnsOf(cardRunOf(section)) })
     if (!isBucket(section)) return cards
     const isOpen = open.has(section.key)
     const header: GridRow = { kind: GRID_ROWS.header, key: section.key, section, isOpen }

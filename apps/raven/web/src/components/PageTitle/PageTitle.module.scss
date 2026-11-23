@@ -16,3 +16,12 @@
   grid-area: name;
   overflow-wrap: anywhere;
 }
+
+// On a phone, every page's title at the phone app's size, whatever the page sets its heading in.
+@media (max-width: 40rem) {
+  .line {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-tight);
+    letter-spacing: normal;
+  }
+}

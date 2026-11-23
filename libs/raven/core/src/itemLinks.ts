@@ -10,7 +10,7 @@ import {
 } from '@/contract'
 import { primaryVersion } from '@/items'
 import { toQueryString } from '@/query'
-import { type Infer, object, optional } from '@/schema'
+import { type Infer, isBoolean, object, optional } from '@/schema'
 
 /** An address in the app, from its root. */
 export type AppPath = `/${string}`
@@ -183,7 +183,8 @@ export const sessionOf = (media: MediaItem): ViewingSession =>
  * A session that keeps no order of its own (a queue, a shuffle) also carries
  * the videos `played` before this one, oldest first, for Previous to go back
  * through, and a queue dealt from inside the player the session it was
- * `shuffledFrom`, for turning the shuffle off again.
+ * `shuffledFrom`, for turning the shuffle off again. A link that starts the
+ * video over says so in `isFromStart`, so the player ignores its saved spot.
  */
 const isWatchState = object({
   media: isMediaItem,
@@ -191,6 +192,7 @@ const isWatchState = object({
   upNext: isMediaList,
   played: optional(isMediaList),
   shuffledFrom: optional(isViewingSession),
+  isFromStart: optional(isBoolean),
 })
 
 export type WatchState = Infer<typeof isWatchState>
@@ -207,6 +209,8 @@ type WatchLinkProps = {
   upNext?: WatchState['upNext']
   played?: WatchState['upNext']
   shuffledFrom?: ViewingSession | null
+  /** Whether the video plays from the beginning rather than from where it stopped. */
+  isFromStart?: boolean
 }
 
 /** How many videos a link remembers as played, so its router state stays small. */
@@ -224,6 +228,7 @@ export const watchLink = ({
   upNext = [],
   played = [],
   shuffledFrom = null,
+  isFromStart = false,
 }: WatchLinkProps): WatchLink => ({
   to: watchPageOf(media.id),
   state: {
@@ -232,6 +237,7 @@ export const watchLink = ({
     upNext,
     ...(played.length > 0 && { played: played.slice(-PLAYED_KEPT) }),
     ...(shuffledFrom !== null && { shuffledFrom }),
+    ...(isFromStart && { isFromStart }),
   },
 })
 

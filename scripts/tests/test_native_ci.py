@@ -502,7 +502,12 @@ def test_main_warms_the_compile_caches_of_every_app_a_pull_request_builds():
         (jobs[f"build-{device}"]["env"]["APP_SETUP"], jobs[f"build-{device}"]["env"]["APP_PROJECT"])
         for device in DEVICES
     }
-    legs = load_workflow("app-caches.yml")["jobs"]["build"]["strategy"]["matrix"]["platform"]
+    caches = load_workflow("app-caches.yml")["jobs"]
+    legs = [
+        leg
+        for job in ("build-apple", "build-android")
+        for leg in caches[job]["strategy"]["matrix"]["platform"]
+    ]
     assert {(leg["id"], leg["project"]) for leg in legs} == built
     # Each leg builds its own app, past Nx's cache, so the compile fills the caches it saves.
     assert all(leg["target"].startswith(PROJECTS[leg["project"]] + ":build:") for leg in legs)

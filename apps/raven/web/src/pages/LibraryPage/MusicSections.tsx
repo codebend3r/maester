@@ -102,6 +102,7 @@ const AlbumsToolbar = ({
         </select>
       </label>
       <Button
+        icon={order}
         className={styles.musicOrder}
         onClick={onOrder}
         disabled={sort === MUSIC_SORTS.random}

@@ -15,12 +15,18 @@ describe('BugReportsPage', () => {
   const spies = {
     list: spyOn(api, 'listBugReports'),
     status: spyOn(api, 'setBugReportStatus'),
+    archive: spyOn(api, 'archiveBugReport'),
+    archiveFixed: spyOn(api, 'archiveBugReportsByStatus'),
+    remove: spyOn(api, 'deleteBugReport'),
   }
 
   afterEach(() => {
     cleanup()
     spies.list.mockReset()
     spies.status.mockReset()
+    spies.archive.mockReset()
+    spies.archiveFixed.mockReset()
+    spies.remove.mockReset()
     Reflect.deleteProperty(window, 'isSecureContext')
   })
 
@@ -217,5 +223,127 @@ describe('BugReportsPage', () => {
     })
     renderWithProviders({ ui: <BugReportsPage /> })
     expect(await screen.findByRole('alert')).toHaveTextContent('The server did not answer: Boom')
+  })
+
+  const ARCHIVED_AT = '2026-11-23T18:00:00.000Z'
+
+  it('opens on the current reports, with the archived ones on a tab of their own', async () => {
+    spies.list.mockImplementation(async () => [
+      bugReport({ id: 3, title: 'Heat (1995)' }),
+      bugReport({ id: 2, title: 'Silo', archivedAt: ARCHIVED_AT }),
+      bugReport({ id: 1, title: 'Hokum (2026)', archivedAt: ARCHIVED_AT }),
+    ])
+    renderWithProviders({ ui: <BugReportsPage /> })
+
+    const current = await screen.findByRole('tab', { name: 'Current 1' })
+    expect(current).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('1 report, 1 new')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Heat (1995)' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Silo' })).toBeNull()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Archived 2' }))
+    expect(screen.getByRole('heading', { name: 'Silo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Hokum (2026)' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Heat (1995)' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull()
+  })
+
+  it('says so when nothing has been archived', async () => {
+    spies.list.mockImplementation(async () => [bugReport()])
+    renderWithProviders({ ui: <BugReportsPage /> })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Archived 0' }))
+    expect(screen.getByText('Nothing has been archived')).toBeInTheDocument()
+  })
+
+  it('moves a report to the archive, before the server answers', async () => {
+    spies.list.mockImplementation(async () => [bugReport({ id: 4 })])
+    const answer = Promise.withResolvers<ReturnType<typeof bugReport>>()
+    spies.archive.mockImplementation(() => answer.promise)
+    renderWithProviders({ ui: <BugReportsPage /> })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Archive' }))
+    expect(spies.archive).toHaveBeenCalledWith({ id: 4, isArchived: true })
+    expect(screen.getByText('Nothing has been reported')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Archived 1' })).toBeInTheDocument()
+
+    const archived = bugReport({ id: 4, archivedAt: ARCHIVED_AT })
+    spies.list.mockImplementation(async () => [archived])
+    answer.resolve(archived)
+    await waitFor(() => expect(spies.list).toHaveBeenCalledTimes(2))
+  })
+
+  it('archives every fixed report at once, offered only while there are some', async () => {
+    const reports = [
+      bugReport({ id: 3, title: 'Heat (1995)', status: BUG_REPORT_STATUSES.fixed }),
+      bugReport({ id: 2, title: 'Silo' }),
+      bugReport({ id: 1, title: 'Hokum (2026)', status: BUG_REPORT_STATUSES.fixed }),
+    ]
+    spies.list.mockImplementation(async () => reports)
+    const archived = reports.map((report) =>
+      report.status === BUG_REPORT_STATUSES.fixed ? { ...report, archivedAt: ARCHIVED_AT } : report,
+    )
+    spies.archiveFixed.mockImplementation(async () => {
+      spies.list.mockImplementation(async () => archived)
+      return archived.filter(({ archivedAt }) => archivedAt !== null)
+    })
+    renderWithProviders({ ui: <BugReportsPage /> })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Archive all fixed (2)' }))
+    expect(spies.archiveFixed).toHaveBeenCalledWith({ status: BUG_REPORT_STATUSES.fixed })
+    await waitFor(() => expect(spies.list).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('heading', { name: 'Silo' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Heat (1995)' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Archive all fixed/ })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Archived 2' })).toBeInTheDocument()
+  })
+
+  it('brings an archived report back to the current list', async () => {
+    spies.list.mockImplementation(async () => [bugReport({ id: 5, archivedAt: ARCHIVED_AT })])
+    spies.archive.mockImplementation(async () => {
+      const back = bugReport({ id: 5 })
+      spies.list.mockImplementation(async () => [back])
+      return back
+    })
+    renderWithProviders({ ui: <BugReportsPage /> })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Archived 1' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }))
+
+    expect(spies.archive).toHaveBeenCalledWith({ id: 5, isArchived: false })
+    await waitFor(() => expect(spies.list).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('tab', { name: 'Current 1' })).toBeInTheDocument()
+    expect(screen.getByText('Nothing has been archived')).toBeInTheDocument()
+  })
+
+  it('deletes an archived report only once asked twice', async () => {
+    spies.list.mockImplementation(async () => [bugReport({ id: 6, archivedAt: ARCHIVED_AT })])
+    spies.remove.mockImplementation(async () => {
+      spies.list.mockImplementation(async () => [])
+    })
+    renderWithProviders({ ui: <BugReportsPage /> })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Archived 1' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(spies.remove).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
+    expect(spies.remove).toHaveBeenCalledWith(6)
+    await waitFor(() => expect(spies.list).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('Nothing has been archived')).toBeInTheDocument()
+  })
+
+  it('keeps a report the server would not delete, and says why', async () => {
+    spies.list.mockImplementation(async () => [bugReport({ id: 6, archivedAt: ARCHIVED_AT })])
+    spies.remove.mockImplementation(async () => {
+      throw new ApiError({ status: 409, message: 'Archive the report before deleting it.' })
+    })
+    renderWithProviders({ ui: <BugReportsPage /> })
+    await userEvent.click(await screen.findByRole('tab', { name: 'Archived 1' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete for good' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not change the report: Archive the report before deleting it.',
+    )
+    expect(screen.getByRole('heading', { name: 'Busboys (2026)' })).toBeInTheDocument()
+    await waitFor(() => expect(spies.list).toHaveBeenCalledTimes(2))
   })
 })

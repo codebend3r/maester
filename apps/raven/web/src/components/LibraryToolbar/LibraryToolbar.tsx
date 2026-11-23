@@ -8,6 +8,7 @@ import {
   SORT_DIRECTION_LABELS,
   SORT_FIELD_LABELS,
   groupingsFor,
+  isLibraryView,
   isMediaGroupBy,
   isSortFieldName,
   reversedDirection,
@@ -18,7 +19,7 @@ import {
   viewsFor,
 } from '@raven/core'
 import { type ReactNode, useId } from 'react'
-import { BUTTON_TONES, Button, Icon } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon, classNames } from '@raven/ui'
 import type { IconName } from '@raven/ui'
 import { PlayButtons } from '@/components/PlayButtons/PlayButtons'
 import { SearchField } from '@/components/SearchField/SearchField'
@@ -76,34 +77,74 @@ const VIEW_ICONS = {
   [LIBRARY_VIEWS.grouped]: 'grouped',
 } as const satisfies Record<LibraryView, IconName>
 
-type ShowLevelPickerProps = { level: ShowLevel; onChange: (level: ShowLevel) => void }
+type ToolbarPickerProps<T extends string> = {
+  /** Where the toolbar's grid places it. */
+  className: string | undefined
+  /** What a phone shows in place of its words; Sort and the level keep their words. */
+  icon?: IconName
+  label: string
+  value: T
+  options: readonly T[]
+  labels: Readonly<Record<T, string>>
+  isOption: (value: string) => value is T
+  onPick: (value: T) => void
+}
 
-/**
- * A TV library's choice of what its page lists: its shows, their seasons or
- * their episodes. It stands where the grouping would, which a TV library never has.
- */
-export const ShowLevelPicker = ({ level, onChange }: ShowLevelPickerProps) => {
+/** One of the toolbar's labelled choices: the sort, the view, the grouping or the level. */
+const ToolbarPicker = <T extends string>({
+  className,
+  icon,
+  label,
+  value,
+  options,
+  labels,
+  isOption,
+  onPick,
+}: ToolbarPickerProps<T>) => {
   const id = useId()
   return (
-    <div className={`${styles.picker} ${styles.level}`}>
+    <div className={classNames([styles.picker, className])}>
+      {!!icon && (
+        <span className={styles.pickerIcon} aria-hidden="true">
+          <Icon name={icon} size={18} />
+        </span>
+      )}
       <label htmlFor={id} className={styles.label}>
-        {LIBRARY_TOOLBAR_COPY.showBy}
+        {label}
       </label>
       <select
         id={id}
         className={styles.select}
-        value={level}
-        onChange={(event) => isShowLevel(event.target.value) && onChange(event.target.value)}
+        value={value}
+        onChange={(event) => isOption(event.target.value) && onPick(event.target.value)}
       >
-        {Object.values(SHOW_LEVELS).map((each) => (
-          <option key={each} value={each}>
-            {LIBRARY_TOOLBAR_COPY.levels[each]}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {labels[option]}
           </option>
         ))}
       </select>
     </div>
   )
 }
+
+type ShowLevelPickerProps = { level: ShowLevel; onChange: (level: ShowLevel) => void }
+
+/**
+ * A TV library's choice of what its page lists: its shows, their seasons or
+ * their episodes. It stands where the grouping would, which a TV library never has.
+ */
+export const ShowLevelPicker = ({ level, onChange }: ShowLevelPickerProps) => (
+  <ToolbarPicker
+    className={styles.level}
+    label={LIBRARY_TOOLBAR_COPY.showBy}
+    value={level}
+    options={Object.values(SHOW_LEVELS)}
+    labels={LIBRARY_TOOLBAR_COPY.levels}
+    isOption={isShowLevel}
+    onPick={onChange}
+  />
+)
 
 type LibraryToolbarProps = {
   name: string
@@ -121,7 +162,10 @@ type LibraryToolbarProps = {
  * Two rows: search, then what the library is sorted on and beside it which
  * way, where that means something, and the grouping in the grouped view;
  * under them Play, Shuffle and Select, and at the far end the views as one
- * segmented control. Sort, view and grouping are the library's own
+ * segmented control. On a phone they are the phone app's chips: the search
+ * as an underline, then Shuffle, Sort with its word and choice, the
+ * direction, Play, Select and the views, every one but Sort its icon alone,
+ * and the grouping as its icon. Sort, view and grouping are the library's own
  * settings, already coherent with its type, so the options are its type's:
  * `onChange` gets just the one that changed. Play and Shuffle are always
  * there, and wait until there is something to play; Select starts select
@@ -137,68 +181,59 @@ export const LibraryToolbar = ({
   onShuffle,
   children,
 }: LibraryToolbarProps) => {
-  const ids = { search: useId(), sort: useId(), group: useId() }
+  const searchId = useId()
   return (
     <search className={styles.toolbar}>
       <div className={styles.find}>
         <div className={styles.search}>
-          <label htmlFor={ids.search} className="visually-hidden">
+          <label htmlFor={searchId} className="visually-hidden">
             {LIBRARY_TOOLBAR_COPY.search(name)}
           </label>
           <span className={styles.searchIcon}>
             <Icon name="search" size={18} />
           </span>
           <SearchField
-            id={ids.search}
+            id={searchId}
             search={search}
             className={styles.input}
             placeholder={LIBRARY_TOOLBAR_COPY.search(name)}
           />
         </div>
 
-        <div className={`${styles.picker} ${styles.sort}`}>
-          <label htmlFor={ids.sort} className={styles.label}>
-            {COMMON_COPY.sort}
-          </label>
-          <select
-            id={ids.sort}
-            className={styles.select}
-            value={sortParts(settings.sort).field}
-            onChange={(event) =>
-              isSortFieldName(event.target.value) &&
-              onChange({ sort: startingSort(event.target.value) })
-            }
-          >
-            {sortFieldsFor(settings.kind).map((field) => (
-              <option key={field} value={field}>
-                {SORT_FIELD_LABELS[field]}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ToolbarPicker
+          className={styles.sort}
+          label={COMMON_COPY.sort}
+          value={sortParts(settings.sort).field}
+          options={sortFieldsFor(settings.kind)}
+          labels={SORT_FIELD_LABELS}
+          isOption={isSortFieldName}
+          onPick={(field) => onChange({ sort: startingSort(field) })}
+        />
         <DirectionButton sort={settings.sort} onChange={onChange} />
+        {/* A phone's view chip, the phone app's one picker in place of the row of views. */}
+        <ToolbarPicker
+          className={styles.viewPicker}
+          icon={VIEW_ICONS[settings.view]}
+          label={LIBRARY_TOOLBAR_COPY.view}
+          value={settings.view}
+          options={viewsFor(settings.kind)}
+          labels={LIBRARY_VIEW_LABELS}
+          isOption={isLibraryView}
+          onPick={(view) => onChange({ view })}
+        />
         {children}
 
         {settings.view === LIBRARY_VIEWS.grouped && (
-          <div className={`${styles.picker} ${styles.group}`}>
-            <label htmlFor={ids.group} className={styles.label}>
-              {LIBRARY_TOOLBAR_COPY.groupBy}
-            </label>
-            <select
-              id={ids.group}
-              className={styles.select}
-              value={settings.groupBy}
-              onChange={(event) =>
-                isMediaGroupBy(event.target.value) && onChange({ groupBy: event.target.value })
-              }
-            >
-              {groupingsFor(settings.kind).map((grouping) => (
-                <option key={grouping} value={grouping}>
-                  {GROUPING_LABELS[grouping]}
-                </option>
-              ))}
-            </select>
-          </div>
+          <ToolbarPicker
+            className={styles.group}
+            icon={VIEW_ICONS[LIBRARY_VIEWS.grouped]}
+            label={LIBRARY_TOOLBAR_COPY.groupBy}
+            value={settings.groupBy}
+            options={groupingsFor(settings.kind)}
+            labels={GROUPING_LABELS}
+            isOption={isMediaGroupBy}
+            onPick={(groupBy) => onChange({ groupBy })}
+          />
         )}
       </div>
 

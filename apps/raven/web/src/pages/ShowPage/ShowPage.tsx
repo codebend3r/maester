@@ -46,6 +46,7 @@ import { SelectionScope, sourceOf } from '@/components/SelectionScope/SelectionS
 import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
+import { WATCHED_TOGGLE_COPY } from '@/components/WatchedToggle/copy'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { HeroToggle } from '@/components/HeroToggle/HeroToggle'
 import { api } from '@/lib/api'
@@ -161,7 +162,7 @@ const ShowView = ({ details }: ShowViewProps) => {
             </ShuffleButton>
           )}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: details.id }} />
-          <WatchedToggle {...toggle} />
+          <WatchedToggle {...toggle} phoneWords={WATCHED_TOGGLE_COPY.show} />
           <SelectButton />
         </ItemHeader>
 

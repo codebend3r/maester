@@ -217,6 +217,7 @@ const watchViewOf = ({
           upNext: handed?.upNext ?? [],
           played: handed?.played ?? [],
           shuffledFrom: handed?.shuffledFrom ?? null,
+          isFromStart: !!handed?.isFromStart,
           backTo: libraryPath(page.data.libraryId),
         },
       },
@@ -239,6 +240,8 @@ type WatchPlayerProps = {
   played: readonly MediaItem[]
   /** The session a queue was dealt from inside the player; null for any other. */
   shuffledFrom: ViewingSession | null
+  /** Whether the link asked for the beginning rather than the saved spot. */
+  isFromStart: boolean
   backTo: string
 }
 
@@ -249,6 +252,7 @@ export const WatchPlayer = ({
   upNext,
   played,
   shuffledFrom,
+  isFromStart,
   backTo,
 }: WatchPlayerProps) => {
   const queryClient = useQueryClient()
@@ -297,7 +301,7 @@ export const WatchPlayer = ({
       logo,
       homeTo: media.item == null ? null : titleHomePath(media.item),
       duration: media.duration,
-      resumeAt: resumeAtFor({ at: 0, media }),
+      resumeAt: isFromStart ? 0 : resumeAtFor({ at: 0, media }),
       backTo,
       markers,
       next: offered

@@ -279,6 +279,15 @@
   min-width: 0;
 }
 
+/*
+ * The title with who made it and the facts, then the scores and the actions:
+ * of the body's own grid on a wider screen, apart from each other on a phone.
+ */
+.words,
+.more {
+  display: contents;
+}
+
 // The container the action rows' queries measure.
 .body {
   container-type: inline-size;
@@ -548,5 +557,141 @@
 
   .group:has(> [data-wide]):has(> :nth-child(7)) {
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  }
+}
+
+/*
+ * A phone lays the head out as the phone app's item page does
+ * (`ItemLayout.touch`): a small poster, or a still, at the left beside what
+ * the item is, its title, who made it and the facts, then the scores and the
+ * actions across the page. The actions run on in one row and wrap, a button
+ * with words taking three of the row's cells and an icon alone one, where a
+ * wider screen breaks them into even cells. The way back already leads to the
+ * library, so the library's own link above the title goes, as it has no place
+ * in the phone app.
+ */
+@media (max-width: 40rem) {
+  .hero {
+    --poster-width: 7rem;
+    --still-width: 11rem;
+  }
+
+  // The poster close under the way back, as the phone app's, with or without a backdrop.
+  .hero,
+  .withBackdrop,
+  .pullUp.withBackdrop {
+    row-gap: var(--space-3);
+  }
+
+  .content.withPicture {
+    grid-template-columns: var(--poster-width) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'picture lead'
+      'picture words'
+      'picture .'
+      'more more';
+    align-items: start;
+    gap: 0 var(--space-3);
+
+    .details,
+    .body {
+      display: contents;
+    }
+
+    .lead {
+      grid-area: lead;
+      gap: var(--space-0);
+      padding-bottom: var(--space-0);
+    }
+
+    .words {
+      grid-area: words;
+      display: grid;
+      gap: var(--space-0);
+    }
+
+    .more {
+      grid-area: more;
+      display: grid;
+      gap: var(--space-3);
+      padding-top: var(--space-3);
+    }
+
+    .picture {
+      width: auto;
+    }
+  }
+
+  .content.withStill {
+    grid-template-columns: var(--still-width) minmax(0, 1fr);
+  }
+
+  .library {
+    display: none;
+  }
+
+  .title {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-tight);
+    letter-spacing: normal;
+  }
+
+  .logoImage {
+    max-height: var(--space-8);
+  }
+
+  .byline,
+  .facts {
+    font-size: var(--font-size-sm);
+  }
+
+  .actions {
+    padding-top: 0;
+  }
+
+  .group,
+  .group:has(> [data-wide]) {
+    grid-auto-flow: row dense;
+    gap: var(--space-1);
+    grid-template-columns: repeat(auto-fill, minmax(var(--control-size), 1fr));
+    justify-content: stretch;
+
+    > *,
+    > :first-child {
+      grid-column: span 3;
+    }
+
+    > :is([data-icon-only], :has(> [data-icon-only]:only-child), [data-phone-icon-only]) {
+      grid-column: auto;
+    }
+
+    > :is([data-phone-words], :has(> [data-phone-words]:only-child)) {
+      grid-column: span 3;
+    }
+
+    > [data-wide] {
+      grid-column: 1 / -1;
+    }
+  }
+
+  /*
+   * The words on each action on a phone: Play its icon alone until there is a
+   * spot to resume from, and a show's or season's Watched worded beside its
+   * check, which wider screens draw alone.
+   */
+  .group [data-phone-icon-only] {
+    gap: 0;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .group [data-phone-words] {
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-md);
+
+    &::after {
+      content: attr(data-phone-words);
+    }
   }
 }

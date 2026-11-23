@@ -36,7 +36,10 @@ export const BUG_REPORT_PARAMS = { id: 'id' } as const
 
 export const BUG_REPORT_PATHS = {
   reports: '/api/reports',
+  report: '/api/reports/:id',
   status: '/api/reports/:id/status',
+  archive: '/api/reports/:id/archive',
+  archiveByStatus: '/api/reports/archive',
 } as const
 
 /** The most a report's body may weigh as JSON; the server refuses anything heavier. */
@@ -181,6 +184,8 @@ export const isBugReport = object({
   /** The first problem the player listed. */
   summary: isString,
   mediaId: nullable(isNumber),
+  /** When the admin archived it, or null while it is on the current list. */
+  archivedAt: nullable(isString),
   diagnostics: isRecord,
 })
 
@@ -188,7 +193,12 @@ export type BugReport = Infer<typeof isBugReport>
 
 export const isBugReportList = listOf(isBugReport)
 
-/** `PUT /api/reports/:id/status`. */
+/** `PUT /api/reports/:id/status`, and `POST /api/reports/archive` for every current report with the status. */
 export const isBugReportStatusChange = object({ status: isBugReportStatus })
 
 export type BugReportStatusChange = Infer<typeof isBugReportStatusChange>
+
+/** `PUT /api/reports/:id/archive`: true moves a report to the archive, false brings it back. */
+export const isBugReportArchiveChange = object({ isArchived: isBoolean })
+
+export type BugReportArchiveChange = Infer<typeof isBugReportArchiveChange>

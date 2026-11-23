@@ -173,3 +173,25 @@
     justify-items: start;
   }
 }
+
+.panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.bulk {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.empty {
+  color: var(--color-lichen);
+}
+
+.actionError {
+  color: var(--color-birch);
+  font-size: var(--font-size-sm);
+}

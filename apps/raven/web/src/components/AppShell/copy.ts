@@ -12,6 +12,7 @@ export const APP_SHELL_COPY = {
   design: 'Design',
   manage: 'Manage',
   more: 'More',
+  search: 'Search',
   closeMore: 'Close More',
   showManage: 'Show Manage',
   hideManage: 'Hide Manage',

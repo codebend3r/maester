@@ -391,3 +391,11 @@
       background-color 150ms ease;
   }
 }
+
+// On a phone, the card's name in the display face, as the phone app's cards set it.
+@media (max-width: 40rem) {
+  .title {
+    font-family: var(--font-display);
+    font-weight: 400;
+  }
+}

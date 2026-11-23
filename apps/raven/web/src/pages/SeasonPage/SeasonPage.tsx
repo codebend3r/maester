@@ -52,6 +52,7 @@ import { ShuffleButton } from '@/components/ShuffleButton/ShuffleButton'
 import { Summary } from '@/components/Summary/Summary'
 import { TmdbCredit } from '@/components/TmdbCredit/TmdbCredit'
 import { WatchedMark } from '@/components/WatchedMark/WatchedMark'
+import { WATCHED_TOGGLE_COPY } from '@/components/WatchedToggle/copy'
 import { WatchedToggle } from '@/components/WatchedToggle/WatchedToggle'
 import { api } from '@/lib/api'
 import { itemQuery } from '@/lib/queries'
@@ -240,7 +241,7 @@ const SeasonView = ({ show, season }: SeasonViewProps) => {
             </ShuffleButton>
           )}
           <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.item, itemId: season.id }} />
-          <WatchedToggle {...toggle} />
+          <WatchedToggle {...toggle} phoneWords={WATCHED_TOGGLE_COPY.season} />
           <SelectButton />
         </ItemHeader>
 

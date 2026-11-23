@@ -14,6 +14,8 @@ export const HOME_COPY = {
   timeLeft: (left: string) => `${left} left`,
   playTitle: (title: string) => `Play ${title}`,
   seeAll: (count: number) => `See all ${count}`,
+  /** A shelf heading's way into its library on a phone, the phone app's words. */
+  seeAllShelf: 'See all',
   seeAllLabel: (count: number) => `See all ${count} in Continue watching, on a page of its own`,
   carousel: 'carousel',
   slide: 'slide',

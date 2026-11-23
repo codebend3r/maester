@@ -488,6 +488,34 @@
   }
 }
 
+/*
+ * A phone keeps the search on Home alone, as the phone app does. Away from
+ * Home the bar has only its corner, which sits over the page's top right,
+ * level with the way back, so the page starts at the top.
+ */
+@media (max-width: 40rem) {
+  .awayFromHome {
+    --page-start: var(--page-top);
+
+    position: relative;
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'page';
+    row-gap: 0;
+
+    // Placed against the page's padding box, not a grid area.
+    .bar {
+      grid-area: auto;
+      position: absolute;
+      top: var(--page-top);
+      right: var(--gutter);
+    }
+
+    .search {
+      display: none;
+    }
+  }
+}
+
 // A phone or tablet has no B key to tell of.
 @media (max-width: 48rem), (hover: none) {
   .tip {

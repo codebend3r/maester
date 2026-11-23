@@ -70,18 +70,17 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: 400;
   line-height: var(--line-tight);
 }
 
+// A group's name, Pinned or Manage, as the phone app's sheet words it.
 .eyebrow {
   padding-top: var(--space-1);
   color: var(--color-lichen);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  letter-spacing: var(--tracking-eyebrow);
-  text-transform: uppercase;
 }
 
 .tiles {
@@ -106,16 +105,12 @@
   padding: var(--space-1);
   border-radius: var(--radius-lg);
   background: var(--color-canopy-hi);
-  color: var(--color-lichen);
-  font-size: var(--font-size-xs);
+  color: var(--color-bark);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: var(--line-tight);
   text-align: center;
   text-decoration: none;
-
-  &:hover {
-    color: var(--color-bark);
-  }
 
   &:focus-visible {
     outline: var(--focus-ring);

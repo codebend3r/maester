@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FlatList } from 'react-native'
 
-import type { CardShape } from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
 import {
+  type CardRun,
   GRID_ROWS,
   type GridRow,
   gridRowsOf,
@@ -15,7 +15,7 @@ import { useReduceMotion } from '@/stores/reduceMotion'
 
 type UseGridProps = {
   sections: readonly GridSection[]
-  columnsOf: (shape: CardShape) => number
+  columnsOf: (run: CardRun) => number
   heightOf: (row: GridRow) => number
   top: number
 }

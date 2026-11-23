@@ -17,6 +17,7 @@ import { type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
 import { FocusCard, focusCaptionHeightOf, TV_WATCHED_BADGE } from '@/layouts/FocusCard'
 import { FocusBand } from '@/layouts/FocusBand'
+import { PanelFace, type PanelScale, panelHeightOf } from '@/layouts/PanelCard'
 import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { GRID_SIZE_COPY } from '@/layouts/copy'
@@ -35,6 +36,7 @@ import {
   isRowView,
 } from '@/layouts/gridKit'
 import {
+  type CardRun,
   GRID_ROWS,
   type GridRow,
   type GridRowKind,
@@ -58,6 +60,7 @@ import {
   captionHeightOf,
   cardWidthForRows,
   GRID_ROWS_AT_ONCE,
+  panelFitOf,
 } from '@/layouts/gridSizes.focus'
 
 const SizePicker = focusPicker.Picker
@@ -178,7 +181,8 @@ type GridRowContext = {
   view: LibraryView
   preferred: string | null
   heightOf: (row: GridRow) => number
-  widthOf: (shape: CardShape) => number
+  widthOf: (run: CardRun) => number
+  panel: PanelScale
   hasCaption: (shape: CardShape) => boolean
   jumpOf: (card: ShelfCard) => JumpFocus | null
   toggle: ReturnType<typeof useGrid>['toggle']
@@ -216,9 +220,48 @@ const CardCell = ({ card, width, grid }: CardCellProps) => (
   />
 )
 
+type PanelCellProps = GridCellProps
+
+/**
+ * A show as the web's wide show card, the remote's to move to, ringed while focused. It takes
+ * the focus back when the page it opened goes back, and select held down opens its menu of
+ * marks, as a `FocusCard` does.
+ */
+const PanelCell = ({ card, width, grid }: PanelCellProps) => {
+  const pressable = useRef<ComponentRef<typeof Pressable>>(null)
+  const styles = useStyles()
+  useJumpFocus({ jump: grid.jumpOf(card), view: pressable })
+  const tvCard = useTvCard({
+    card,
+    place: card.key,
+    view: pressable,
+    onPress: () => grid.onOpen(card),
+  })
+  return (
+    <Pressable
+      ref={pressable}
+      accessibilityLabel={cardLabelOf({ card })}
+      accessibilityRole="button"
+      hasTVPreferredFocus={card.key === grid.preferred}
+      onBlur={tvCard.onBlur}
+      onFocus={tvCard.onFocus}
+      onPress={tvCard.onPress}
+      style={[
+        styles.panel,
+        { borderRadius: grid.panel.radius },
+        tvCard.isFocused && styles.panelFocused,
+      ]}
+    >
+      <PanelFace card={card} scale={grid.panel} width={width - 2 * TV_SIZES.tvFocusRing} />
+      {tvCard.menu}
+    </Pressable>
+  )
+}
+
 const GRID_CELLS = {
   [CARD_LAYOUTS.rows]: RowCell,
   [CARD_LAYOUTS.cards]: CardCell,
+  [CARD_LAYOUTS.panels]: PanelCell,
 } as const satisfies Record<CardLayout, ComponentType<GridCellProps>>
 
 type GridRowPartProps<K extends GridRowKind> = { row: GridRowOf<K>; grid: GridRowContext }
@@ -254,17 +297,18 @@ type CardsRowProps = GridRowPartProps<typeof GRID_ROWS.cards>
 /** A run of cards across the grid. */
 const CardsRow = ({ row, grid }: CardsRowProps) => {
   const styles = useStyles()
-  const Cell = GRID_CELLS[cardLayoutOf(grid.view)]
+  const layout = cardLayoutOf({ view: grid.view, hasPanels: row.hasPanels })
+  const Cell = GRID_CELLS[layout]
   return (
     <View
       style={[
         styles.cards,
-        isRowView(grid.view) && styles.rowCards,
+        layout !== CARD_LAYOUTS.cards && styles.rowCards,
         { height: grid.heightOf(row) },
       ]}
     >
       {row.cards.map((card) => (
-        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row.shape)} />
+        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row)} />
       ))}
     </View>
   )
@@ -319,13 +363,16 @@ const Grid = ({
   const hasCaption = (shape: CardShape): boolean => hasPosterCaptions || hasCaptionOf(shape)
   const captionOf = (shape: CardShape): number =>
     hasPosterCaptions ? captionHeight : captionHeightOf({ shape, captionHeight })
+  const panel = panelFitOf(size)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - 2 * TV_GUTTER,
     gap: GAP,
-    leastOf: (shape) =>
-      isRows
+    leastOf: ({ shape, hasPanels }) => {
+      if (hasPanels) return panel.least
+      return isRows
         ? LEAST_ROW_WIDTH
-        : cardWidthForRows({ shape, listHeight, captionHeight: captionOf(shape), size }),
+        : cardWidthForRows({ shape, listHeight, captionHeight: captionOf(shape), size })
+    },
   })
   const wordsHeight = linesHeightOf({
     sizes: [TV_SIZES.textLg, TV_SIZES.text],
@@ -333,6 +380,14 @@ const Grid = ({
   })
   const heightOf = (row: GridRow): number => {
     if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
+    if (row.hasPanels) {
+      return (
+        panelHeightOf({ scale: panel.scale, fontScale: screen.fontScale }) +
+        2 * TV_SIZES.tvFocusRing +
+        2 * TV_SIZES.space1 +
+        TV_SIZES.space2
+      )
+    }
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       const words =
@@ -345,7 +400,7 @@ const Grid = ({
       )
     }
     return (
-      pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
+      pictureHeightOf({ shape: row.shape, width: widthOf(row) }) +
       captionOf(row.shape) +
       2 * GROWTH_ROOM
     )
@@ -387,6 +442,7 @@ const Grid = ({
     preferred,
     heightOf,
     widthOf,
+    panel: panel.scale,
     hasCaption,
     jumpOf,
     toggle,
@@ -545,6 +601,8 @@ const useStyles = themedStyles((colours) =>
     count: { color: colours.muted, fontSize: TV_SIZES.textLg },
     cards: { flexDirection: 'row', gap: GAP, paddingVertical: GROWTH_ROOM },
     rowCards: { paddingVertical: TV_SIZES.space1 },
+    panel: { borderWidth: TV_SIZES.tvFocusRing, borderColor: 'transparent' },
+    panelFocused: { borderColor: colours.text },
     rowCard: {
       flexDirection: 'row',
       alignItems: 'center',

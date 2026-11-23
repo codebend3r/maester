@@ -3,6 +3,8 @@ export const LIBRARY_GRID_COPY = {
   shows: { one: 'show', many: 'shows' },
   episodes: { one: 'episode', many: 'episodes' },
   matched: 'Matched',
+  /** Between a show panel's facts: "1 season · 6 episodes". */
+  factsSeparator: ' · ',
   notMatched: (count: string) => `Not matched, ${count}`,
 } as const
 

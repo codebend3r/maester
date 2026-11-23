@@ -1,3 +1,4 @@
+import type { Library } from '@raven/core'
 import { type ComponentType, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
@@ -30,6 +31,8 @@ const useHostTabs = (): readonly TabTarget[] => {
 type TabBarProps = {
   /** Whether a music library exists, so the tabs offer the music mode. */
   hasMusic: boolean
+  /** The pinned libraries, which More lists under the rest, as the phone app's sheet does. */
+  pinned: readonly Library[]
 }
 
 /** While Raven cannot reach its server: the pages that need none, with no More. */
@@ -44,7 +47,7 @@ const OfflineTabBar = () => {
   )
 }
 
-const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
+const OnlineTabBar = ({ hasMusic, pinned }: TabBarProps) => {
   const { pathname } = useLocation()
   const hostTabs = useHostTabs()
   const moreButton = useRef<HTMLButtonElement>(null)
@@ -93,6 +96,7 @@ const OnlineTabBar = ({ hasMusic }: TabBarProps) => {
       {isOpen && (
         <MoreSheet
           entries={moreTabs}
+          pinned={pinned}
           manageEntries={MANAGE_TABS}
           onClose={closeMore}
           onChoose={leaveMore}
@@ -116,13 +120,13 @@ const TAB_BARS = {
  * Favourites, Music while a music library exists or else Binge, then More,
  * which opens a sheet of the rest: Binge when Music took its place, Coming soon, Play
  * history, Notifications, Downloads wherever the page keeps any, Settings,
- * and for whoever may manage, Admin, Streams and Reports. More is marked while its sheet is open
+ * then the pinned libraries, and for whoever may manage, Admin, Streams and Reports. More is marked while its sheet is open
  * or one of its pages is. The sheet closes on a choice, Escape, a tap on the
  * page or a new page. While the server cannot be reached, the bar keeps only
  * Downloads and Settings, with no More.
  */
-export const TabBar = ({ hasMusic }: TabBarProps) => {
+export const TabBar = ({ hasMusic, pinned }: TabBarProps) => {
   const isOffline = useServerReach((state) => state.isOffline)
   const Bar = TAB_BARS[isOffline ? REACH_KINDS.offline : REACH_KINDS.online]
-  return <Bar hasMusic={hasMusic} />
+  return <Bar hasMusic={hasMusic} pinned={pinned} />
 }

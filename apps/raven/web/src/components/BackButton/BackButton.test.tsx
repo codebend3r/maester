@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { screen } from '@testing-library/react'
+import { cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { type BackFallback, BackButton } from '@/components/BackButton/BackButton'
@@ -41,6 +41,17 @@ describe('BackButton', () => {
     window.history.replaceState({ idx: 2, key: 'k' }, '')
     renderWithProviders({ ui: app(FALLBACK), route: '/people/7' })
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-    expect(screen.queryByRole('link')).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Movies' })).toBeNull()
+  })
+
+  it('stands a phone Home button beside the way back, unless the way back goes Home', () => {
+    renderWithProviders({ ui: app(FALLBACK), route: '/people/7', behind: ['/movies/3'] })
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+    cleanup()
+    renderWithProviders({ ui: app(FALLBACK), route: '/people/7' })
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
+    cleanup()
+    renderWithProviders({ ui: app({ to: '/', label: 'Home' }), route: '/people/7' })
+    expect(screen.getAllByRole('link', { name: 'Home' })).toHaveLength(1)
   })
 })

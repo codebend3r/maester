@@ -702,6 +702,7 @@ describe('AppShell', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual([
+      'Search',
       'Coming soon',
       'Play history',
       'Notifications',

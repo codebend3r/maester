@@ -1,4 +1,5 @@
 import { BUG_REPORT_STATUSES, PLAYBACK_MODES } from '@raven/core'
+import { REPORT_TABS } from '@/pages/BugReportsPage/reportTabs'
 type SummaryProps = { reports: string; fresh: number }
 
 type ReportedByProps = { reporter: string; accountId: string }
@@ -8,7 +9,6 @@ export const BUG_REPORTS_COPY = {
   managersOnlyFor: 'read what viewers reported',
   serverDidNotAnswer: 'The server did not answer: ',
   loading: 'Looking for bug reports',
-  nothingReported: 'Nothing has been reported',
   report: 'report',
   reports: 'reports',
   summary: ({ reports, fresh }: SummaryProps) => `${reports}, ${fresh} new`,
@@ -26,6 +26,14 @@ export const BUG_REPORTS_COPY = {
   triedNothing: 'Nothing, it could not start',
   browser: 'Browser',
   triedSeparator: ', then ',
+  tabs: 'Which reports',
+  archive: 'Archive',
+  restore: 'Restore',
+  delete: 'Delete',
+  deleteForGood: 'Delete for good',
+  archiveAllFixed: (fixed: number) => `Archive all fixed (${fixed})`,
+  changeFailed: 'Could not change the report: ',
+  archiveFixedFailed: 'Could not archive the fixed reports: ',
   debug: {
     heading: (id: number) => `raven bug report #${id}`,
     status: (status: string) => `Status: ${status}`,
@@ -52,4 +60,16 @@ export const BUG_REPORT_MODE_COPY = {
   [PLAYBACK_MODES.direct]: 'Direct play',
   [PLAYBACK_MODES.remux]: 'Remux',
   [PLAYBACK_MODES.transcode]: 'Transcode',
+} as const
+
+/** What each tab of the page is called. */
+export const BUG_REPORT_TAB_COPY = {
+  [REPORT_TABS.current]: 'Current',
+  [REPORT_TABS.archived]: 'Archived',
+} as const
+
+/** What an empty tab says. */
+export const BUG_REPORT_EMPTY_COPY = {
+  [REPORT_TABS.current]: 'Nothing has been reported',
+  [REPORT_TABS.archived]: 'Nothing has been archived',
 } as const

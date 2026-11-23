@@ -1,24 +1,33 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { ADMIN_LOCK_STATES, type AdminLock, DESKTOP_PATHS } from '@raven/core'
+import { ADMIN_LOCK_STATES, type AdminLock, DESKTOP_PATHS, type Library } from '@raven/core'
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useServerReach } from '@/stores/serverReach'
 import { asDesktop, downloadsMain } from '@/test/desktop'
+import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 
 type RenderBarProps = {
   route?: string
   hasMusic?: boolean
+  pinned?: readonly Library[]
   adminLock?: AdminLock
 }
 
-const renderBar = ({ route = '/', hasMusic = false, adminLock }: RenderBarProps = {}) =>
+const NO_PINNED: readonly Library[] = []
+
+const renderBar = ({
+  route = '/',
+  hasMusic = false,
+  pinned = NO_PINNED,
+  adminLock,
+}: RenderBarProps = {}) =>
   renderWithProviders({
     ui: (
       <Routes>
-        <Route path="*" element={<TabBar hasMusic={hasMusic} />} />
+        <Route path="*" element={<TabBar hasMusic={hasMusic} pinned={pinned} />} />
       </Routes>
     ),
     route,
@@ -90,6 +99,7 @@ describe('TabBar', () => {
     expect(more().className).toContain('marked')
     const [main, manage] = within(sheet()).getAllByRole('list')
     expect(main && linksOf(main)).toEqual([
+      ['Search', '/'],
       ['Binge', '/binge'],
       ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
@@ -104,6 +114,7 @@ describe('TabBar', () => {
       ['Reports', '/reports'],
     ])
     expect(within(sheet()).getAllByRole('link').map(iconOf)).toEqual([
+      'search',
       'popcorn',
       'calendar',
       'history',
@@ -115,10 +126,33 @@ describe('TabBar', () => {
     ])
   })
 
+  it('lists the pinned libraries under Pinned, before Manage, marking the one open', async () => {
+    renderBar({
+      route: '/libraries/2',
+      pinned: [library({ id: 2, name: 'Films' }), library({ id: 5, name: 'Series' })],
+    })
+    await userEvent.click(more())
+    const pinned = within(sheet()).getByRole('list', { name: 'Pinned' })
+    expect(linksOf(pinned)).toEqual([
+      ['Films', '/libraries/2'],
+      ['Series', '/libraries/5'],
+    ])
+    expect(within(pinned).getByRole('link', { name: 'Films' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(
+      within(sheet())
+        .getAllByRole('heading', { level: 3 })
+        .map((h) => h.textContent),
+    ).toEqual(['Pinned', 'Manage'])
+  })
+
   it('leaves Binge out of the sheet while it has its own slot', async () => {
     renderBar()
     await userEvent.click(more())
     expect(linksOf(sheet())).toEqual([
+      ['Search', '/'],
       ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
@@ -134,6 +168,7 @@ describe('TabBar', () => {
     await userEvent.click(more())
     expect(within(sheet()).queryByRole('heading', { name: 'Manage' })).toBeNull()
     expect(linksOf(sheet())).toEqual([
+      ['Search', '/'],
       ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],
@@ -148,6 +183,7 @@ describe('TabBar', () => {
     await userEvent.click(more())
     const [main] = within(sheet()).getAllByRole('list')
     expect(main && linksOf(main)).toEqual([
+      ['Search', '/'],
       ['Coming soon', '/coming-soon'],
       ['Play history', '/history'],
       ['Notifications', '/notifications'],

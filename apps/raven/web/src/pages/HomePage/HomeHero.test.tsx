@@ -154,6 +154,40 @@ describe('HomeHero', () => {
     expect(title()).toBe('Movie 2')
   })
 
+  it('opens the arrival from its title, as a phone opens it from the picture', () => {
+    open()
+    expect(
+      within(within(slide()).getByRole('heading', { level: 2 })).getByRole('link', {
+        name: 'Movie 1',
+      }),
+    ).toHaveAttribute('href', '/movies/101?library=2')
+  })
+
+  it('steps on a swipe either way round, and lets a short drag or a tap be', () => {
+    open()
+    type SwipeProps = { from: number; to: number }
+    const swipe = ({ from, to }: SwipeProps) => {
+      fireEvent.touchStart(hero(), { touches: [{ clientX: from }] })
+      fireEvent.touchEnd(hero(), { changedTouches: [{ clientX: to }] })
+    }
+    swipe({ from: 300, to: 100 })
+    expect(title()).toBe('Movie 2')
+    swipe({ from: 100, to: 300 })
+    swipe({ from: 100, to: 300 })
+    expect(title()).toBe('Movie 3')
+    swipe({ from: 200, to: 180 })
+    expect(title()).toBe('Movie 3')
+  })
+
+  it('marks which arrival is up with a dot apiece, hidden from a screen reader', () => {
+    open()
+    const dots = hero().querySelector('[aria-hidden="true"]:has(> span + span)')
+    expect(dots?.children).toHaveLength(3)
+    expect(dots?.children[0]?.className).toContain('dotUp')
+    fireEvent.click(within(hero()).getByRole('button', { name: 'Next' }))
+    expect(dots?.children[1]?.className).toContain('dotUp')
+  })
+
   it('steps with the arrow keys on its controls, and lets other keys be', () => {
     open()
     const next = within(hero()).getByRole('button', { name: 'Next' })

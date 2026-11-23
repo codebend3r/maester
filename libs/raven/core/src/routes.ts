@@ -370,6 +370,13 @@ export const ROUTES = {
   reportPlaybackError: { method: post, path: BUG_REPORT_PATHS.reports, reply: isBugReport },
   listBugReports: { method: get, path: BUG_REPORT_PATHS.reports, reply: isBugReportList },
   setBugReportStatus: { method: put, path: BUG_REPORT_PATHS.status, reply: isBugReport },
+  archiveBugReport: { method: put, path: BUG_REPORT_PATHS.archive, reply: isBugReport },
+  archiveBugReportsByStatus: {
+    method: post,
+    path: BUG_REPORT_PATHS.archiveByStatus,
+    reply: isBugReportList,
+  },
+  deleteBugReport: { method: remove, path: BUG_REPORT_PATHS.report, reply: null },
   listNotifications: { method: get, path: NOTIFICATION_PATHS.own, reply: isNotificationList },
   logNotification: { method: post, path: NOTIFICATION_PATHS.own, reply: isNotification },
   listLiveStreams: { method: get, path: '/api/streams', reply: isLiveStreamList },

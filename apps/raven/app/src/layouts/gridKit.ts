@@ -39,13 +39,18 @@ const ROW_VIEWS: ReadonlySet<LibraryView> = new Set([LIBRARY_VIEWS.list, LIBRARY
 
 export const isRowView = (view: LibraryView): boolean => ROW_VIEWS.has(view)
 
-/** How a grid draws each card: as a row of words, or as a card. */
-export const CARD_LAYOUTS = { rows: 'rows', cards: 'cards' } as const
+/** How a grid draws each card: as a row of words, as a card, or as a panel, its poster beside its words. */
+export const CARD_LAYOUTS = { rows: 'rows', cards: 'cards', panels: 'panels' } as const
 
 export type CardLayout = (typeof CARD_LAYOUTS)[keyof typeof CARD_LAYOUTS]
 
-export const cardLayoutOf = (view: LibraryView): CardLayout =>
-  isRowView(view) ? CARD_LAYOUTS.rows : CARD_LAYOUTS.cards
+type CardLayoutOfProps = { view: LibraryView; hasPanels: boolean }
+
+/** How a run of cards is drawn: as panels where its section asks for them, else as its view lays cards out. */
+export const cardLayoutOf = ({ view, hasPanels }: CardLayoutOfProps): CardLayout => {
+  if (hasPanels) return CARD_LAYOUTS.panels
+  return isRowView(view) ? CARD_LAYOUTS.rows : CARD_LAYOUTS.cards
+}
 
 /** A section's heading as it is read out: "Matched, 3 videos". */
 export const headingLabelOf = (section: GridSection): string =>

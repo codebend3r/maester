@@ -176,12 +176,19 @@ const libraryShelfViewOf = ({
 
 type ShelfHeadingLinkProps = { to: string; children: ReactNode }
 
-/** A shelf's heading as the way into its library: the whole line, the name at the left and an arrow at the right. */
+/**
+ * A shelf's heading as the way into its library: the whole line, the name at
+ * the left and an arrow at the right, which a phone words as See all, as the
+ * phone app does.
+ */
 const ShelfHeadingLink = ({ to, children }: ShelfHeadingLinkProps) => (
   <Link to={to} className={styles.headingLink}>
     <span className={styles.headingName}>{children}</span>
     <span className={styles.headingArrow}>
       <Icon name="next" size={24} />
+    </span>
+    <span className={styles.headingSeeAll} aria-hidden="true">
+      {HOME_COPY.seeAllShelf}
     </span>
   </Link>
 )

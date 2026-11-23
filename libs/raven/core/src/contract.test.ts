@@ -5,6 +5,7 @@ import {
   isAudioBitrate,
   BUG_REPORT_STATUSES,
   isBugReport,
+  isBugReportArchiveChange,
   isBugReportList,
   isBugReportStatus,
   isBugReportStatusChange,
@@ -862,6 +863,14 @@ describe('the bug report guards', () => {
     )
     expect(isBugReport({ ...bugReport(), diagnostics: 'text' })).toBe(false)
     expect(isBugReport({ ...bugReport(), reporter: { accountId: 'local' } })).toBe(false)
+  })
+
+  it('reads when a report was archived, null while it is current', () => {
+    expect(isBugReport(bugReport({ archivedAt: '2026-11-23T18:00:00.000Z' }))).toBe(true)
+    const { archivedAt: _archivedAt, ...unsaid } = bugReport()
+    expect(isBugReport(unsaid)).toBe(false)
+    expect(isBugReportArchiveChange({ isArchived: false })).toBe(true)
+    expect(isBugReportArchiveChange({ isArchived: 'yes' })).toBe(false)
   })
 })
 

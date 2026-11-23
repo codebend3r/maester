@@ -14,6 +14,9 @@ export const GRID_SIZE_COPY = {
   sizes: { small: 'Small', medium: 'Medium', large: 'Large' },
 } as const
 
+/** What a show panel says at its words' foot once every episode is watched. */
+export const PANEL_COPY = { allWatched: 'All watched' } as const
+
 /** The menus' way to the account's favourites. */
 export const FAVOURITES_ENTRY = { label: 'Favourites' } as const
 

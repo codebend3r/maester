@@ -92,6 +92,8 @@
   // The canopy over the page: a popover, a menu.
   --color-canopy-glass: color-mix(in srgb, var(--color-canopy) 96%, transparent);
   --color-canopy-haze: color-mix(in srgb, var(--color-canopy) 85%, transparent);
+  // A plate of words over a backdrop that shows through: a phone's synopsis.
+  --color-canopy-plate: color-mix(in srgb, var(--color-canopy) 75%, transparent);
   /*
    * Faint marks over the picture: the timeline's track and the spinner's
    * ring, and what of the timeline is loaded.

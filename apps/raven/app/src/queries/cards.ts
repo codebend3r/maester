@@ -19,6 +19,7 @@ import {
   mediaLabel,
   progressOf,
   showEntryKey,
+  showCountFacts,
   showSortFact,
   showYears,
   sortFact,
@@ -26,6 +27,7 @@ import {
   type Rating,
 } from '@raven/core'
 
+import { LIBRARY_GRID_COPY } from '@/queries/copy'
 import type { EpisodeWords } from '@/queries/episodeMark'
 import { ROUTE_TARGETS, type RouteTarget, itemTarget } from '@/routes'
 
@@ -62,6 +64,8 @@ export type ShelfCard = {
   logo?: Picture | null
   /** An episode's own name and place, set under the picture in place of `line`. */
   episode?: EpisodeWords | null
+  /** What a panel says under `line`, the web's wide show card's facts: "1 season · 6 episodes". */
+  facts?: string | null
   /** The picture's chips drawn under `line`: an episode's `DV5`. */
   chips?: readonly FactPart[]
   /** A movie's scores, in a small ratings panel under a row's words: a saga's movies. */
@@ -269,4 +273,16 @@ export const showCard = ({ entry, api, headersFor, order = null }: ShowCardProps
   subject: { kind: CARD_SUBJECTS.item, itemId: entry.show.id },
   isWatched: isAllWatched({ watched: entry.watchedEpisodes, total: entry.episodes }),
   target: itemTarget(entry.show.id),
+})
+
+type ShowPanelCardProps = Pictures & { entry: ShowEntry; order: NonNullable<Order> }
+
+/**
+ * A show as the web's wide show card draws it in a TV library's grid: its poster beside its
+ * title, the value the grid is sorted by, if the order has one, and its seasons and episodes.
+ */
+export const showPanelCard = ({ entry, order, ...pictures }: ShowPanelCardProps): ShelfCard => ({
+  ...showCard({ entry, order, ...pictures }),
+  line: showSortFact({ entry, ...order }),
+  facts: showCountFacts(entry).join(LIBRARY_GRID_COPY.factsSeparator),
 })
