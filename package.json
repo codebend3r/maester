@@ -79,6 +79,7 @@
     "preview:raven:splash": "nx run @raven/splash:preview",
     "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "dev:wren:web": "nx run-many -t dev -p @raven/server @raven/music-web",
+    "e2e": "bun run --sequential web:e2e ci:desktop:e2e ci:app:ios ci:wren ci:app:tvos ci:app:android-tv",
     "format": "nx run-many -t format",
     "format:check": "nx run-many -t format:check",
     "graph": "nx graph",

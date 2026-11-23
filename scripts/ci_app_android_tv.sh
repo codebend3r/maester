@@ -23,8 +23,9 @@ source "$(dirname "$0")/local_ci_app.sh"
 
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
-# Gradle runs on Android Studio's JDK, as apps/raven/app/CLAUDE.md says.
-export JAVA_HOME="${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
+# Gradle runs on Android Studio's JDK, as apps/raven/app/CLAUDE.md says, whatever the shell's
+# JAVA_HOME names: a newer JDK (Homebrew's 27) fails the build with "Unsupported class file".
+export JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home'
 # React Native compiles its native code once per ABI, four by default; the emulator here
 # is arm64, so the build makes only that. An Nx input of the build and the flows.
 export ORG_GRADLE_PROJECT_reactNativeArchitectures=arm64-v8a

@@ -106,9 +106,11 @@ await_fixture() {
 }
 
 # find_runtime <iOS|tvOS>: sets SIM_RUNTIME to the available runtime matching $SIM_SDK,
-# or to nothing.
+# or to nothing. A device's own runtime (iOS-27-2-iPhone19-4, for the iPhone Duo alone) can
+# share the SDK's version, so the one supporting the most device types wins, which is the
+# general runtime with CI's iPhone 16 in it.
 find_runtime() {
-  SIM_RUNTIME="$(xcrun simctl list -j runtimes "$1" | jq -r --arg sdk "$SIM_SDK" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | last | .identifier // empty')"
+  SIM_RUNTIME="$(xcrun simctl list -j runtimes "$1" | jq -r --arg sdk "$SIM_SDK" '[.runtimes[] | select(.isAvailable and (.version == $sdk or (.version | startswith($sdk + "."))))] | max_by(.supportedDeviceTypes | length) | .identifier // empty')"
 }
 
 # The tools every app build needs: ffmpeg for the fixture's clips, ccache for the
@@ -185,6 +187,13 @@ apple_runtime() {
   SIM_SDK="$(xcrun --sdk "$2" --show-sdk-version)"
   find_runtime "$1"
   [ -n "$SIM_RUNTIME" ] || { echo "No $1 $SIM_SDK simulator runtime: run the job's tools step first." >&2; exit 1; }
+}
+
+# find_iphone_type: sets IPHONE_TYPE to CI's iPhone 16 on SIM_RUNTIME, or the runtime's newest
+# iPhone when it has none.
+find_iphone_type() {
+  # shellcheck disable=SC2034  # read by the scripts that source this
+  IPHONE_TYPE="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$SIM_RUNTIME" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier | endswith(".iPhone-16"))) + .) | first | .identifier')"
 }
 
 # find_simulator <name> <device type>: sets SIM_DEVICE to the simulator of that name on

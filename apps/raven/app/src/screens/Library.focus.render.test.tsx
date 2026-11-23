@@ -12,7 +12,7 @@ import {
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
 import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
@@ -124,6 +124,17 @@ const renderLibrary = async ({ id }: RenderLibraryProps) => {
   await layOut()
   return rendered
 }
+
+/** A little longer than a returning card waits before its last ask. */
+const PAST_LAST_ASK_MS = 450
+
+const waitPastLastAsk = async (): Promise<void> =>
+  act(
+    () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, PAST_LAST_ASK_MS)
+      }),
+  )
 
 describe('Library on a TV', () => {
   beforeEach(() => {
@@ -349,6 +360,28 @@ describe('Library on a TV', () => {
     // Once as the screen comes to the front, again as the transition that reveals it ends.
     expect(askedFor()).toEqual(['Night Train', 'Night Train'])
     expect(preferred(FILM_TITLES)).toEqual([])
+  })
+
+  it('asks a last time while the screen stays in front', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Night Train' })
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    await waitPastLastAsk()
+    expect(askedFor()).toEqual(['Night Train', 'Night Train', 'Night Train'])
+  })
+
+  it('asks no last time once another screen covers it within the wait', async () => {
+    await renderLibrary({ id: FILMS.id })
+    const card = await screen.findByRole('button', { name: 'Night Train' })
+    await fireEvent.press(card)
+    await leaveTestScreen()
+    await returnToTestScreen()
+    await leaveTestScreen()
+    await waitPastLastAsk()
+    // Asked from behind the screen on top, the card took the remote off Android TV's screen.
+    expect(askedFor()).toEqual(['Night Train', 'Night Train'])
   })
 
   it('takes it back to a card of the list view too', async () => {

@@ -31,11 +31,10 @@ fi
 SIMULATOR=raven-phone
 APP=apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
 
-# Sets IPHONE_TYPE to CI's iPhone 16, or the runtime's newest iPhone when it has none, and
-# SIM_DEVICE to the simulator of that type.
+# Sets IPHONE_TYPE (find_iphone_type) and SIM_DEVICE to the simulator of that type.
 find_iphone() {
   apple_runtime iOS iphonesimulator
-  IPHONE_TYPE="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$SIM_RUNTIME" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier | endswith(".iPhone-16"))) + .) | first | .identifier')"
+  find_iphone_type
   find_simulator "$SIMULATOR" "$IPHONE_TYPE"
 }
 
