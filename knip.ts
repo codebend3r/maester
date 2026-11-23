@@ -48,7 +48,17 @@ export default {
        * server lighthouserc.json names; no import names either.
        */
       entry: ['netlify/functions/*/*.ts', 'lighthouse/serve.ts'],
-      // The Lighthouse server makes its certificate with the OS's openssl.
+      // Its `dead-code` runs the root's knip on this workspace alone.
+      ignoreBinaries: ['knip'],
+    },
+    'apps/raven/music-web': {
+      // Lighthouse CI runs the server lighthouserc.json names, which no import names.
+      entry: ['lighthouse/serve.ts'],
+      // Its `dead-code` runs the root's knip on this workspace alone.
+      ignoreBinaries: ['knip'],
+    },
+    'tooling/web': {
+      // The web apps' Lighthouse server makes its certificate with the OS's openssl.
       ignoreBinaries: ['openssl'],
     },
     'apps/raven/desktop': {

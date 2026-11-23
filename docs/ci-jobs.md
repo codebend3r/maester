@@ -23,7 +23,7 @@ Rows 1, 2, 3 and 6 were measured with each job building the app and running its 
 | 11 | 📺 Android TV caches | App build caches | 8m 16s | 7m 07s | 9m 17s | 8 | No | Nothing, on purpose (see below) |
 | 12 | 🏗️ Build Android phone | PR checks | 5m 42s | 1m 36s | 8m 35s | 13 | Yes | The APK |
 | 13 | 🪟 Build Raven for Windows x64 | Desktop release | 5m 04s | 4m 58s | 5m 11s | 2 | Partly | The libmpv fetch, the addon, the native tests and the app's build; not the installer |
-| 14 | 🔦 Lighthouse | PR checks | 4m 13s | 0m 31s | 6m 19s | 66 | Yes | The pass, while the web app and the server are unchanged |
+| 14 | 🔦 Lighthouse | PR checks (now 🦅 Raven web) | 4m 13s | 0m 31s | 6m 19s | 66 | Yes | The pass, while the web app and the server are unchanged |
 | 15 | 🏗️ Build Windows app | PR checks | 4m 07s | 2m 54s | 5m 36s | 76 | Partly | The app's build; not the installer, its audit or its smoke test |
 | 16 | 🧠 Evals | Sparrow evals | 3m 05s | 2m 49s | 3m 29s | 7 | Nightly | The last pass, on the nightly run; a run from the Actions tab always runs |
 | 17 | 🎬 E2E Mac | Native checks | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
@@ -59,6 +59,8 @@ The step times are from the same 150 runs, which ran the device app's and Wren's
 - The Android TV step's time includes booting the emulator, since one action boots it and runs the flows.
 - Wren's jobs (🏗️ Build Wren iPhone, its 🎬 E2E Wren iPhone, and 🏗️ Build Wren Android) run whenever a change touches Wren. The two build jobs ran once in those runs.
 - Android phones, Raven on Windows and Wren on the web have no end to end suite in CI: the first two jobs build and smoke-test only, and `@raven/music-web` has no e2e target.
+
+Raven's and Wren's web apps each have a matrix job of their own in the PR checks, `raven-web` (🦅 Raven web) and `wren-web` (🐦 Wren web), beside the workspace's checks: neither waits for any other job, a failing check leaves the app's others running, and neither cancels the run. Each runs the workspace matrix's twelve checks, the build and Lighthouse on its app alone (`bun run ci:raven:web <target>`, `bun run ci:wren:web <target>`), every one Nx cached, whenever 🔎 Select affected web apps counts the app affected, and ✅ Checks waits for both. The workspace's checks and build pass `--exclude` for the two apps; its repository-wide rule checks (spellcheck, comment style and the rest) still read every file, and its dead code check still reads the apps, since they are what keeps a library's export alive.
 
 The native workflow has no matrix: each device is a build job named for it (`build-iphone`) and, where it has flows, an end to end job (`e2e-iphone`) that waits for that build alone, so one slow device never holds another's flows. What a device needs is its job's `APP_*` variables; the builds share one list of steps, and the end to end jobs share theirs. 🔦 Lighthouse is a job of its own beside the checks matrix, so the build and the native jobs never wait for it.
 

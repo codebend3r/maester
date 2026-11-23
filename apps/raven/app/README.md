@@ -27,6 +27,7 @@ Run every script through Nx from the repo root, as `bunx nx run @raven/app:<scri
 | `e2e`                                            | Maestro flows in `e2e/` on the iPhone, against `@raven/server`'s `serve:fixture`           |
 | `e2e:tvos`                                       | The Apple TV's XCUITest in `tvos-e2e/`, driven by the Siri Remote, against the same server |
 | `e2e:android-tv`                                 | The Maestro flows the remote drives, on the Android TV emulator, against the same server   |
+| `e2e:android`                                    | The touch Maestro flows, on the Android phone emulator `ANDROID_SERIAL` names              |
 
 `ios/`, `android/` and `build/` are generated and gitignored. `prebuild:ios` and `prebuild:tvos` write the same `ios/` folder. Each `build:*` runs its own `prebuild:*` first (bun runs a `pre` script before the script it names), so a build always starts from a fresh native project for its platform.
 

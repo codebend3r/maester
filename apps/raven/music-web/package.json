@@ -9,17 +9,27 @@
   },
   "scripts": {
     "build": "vite build",
+    "comment-style": "bash ../../../scripts/check_comment_style.sh",
+    "dead-code": "knip --no-progress --directory ../../.. --workspace apps/raven/music-web",
+    "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
     "dev": "vite",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "lighthouse": "bun run --sequential lighthouse:mobile lighthouse:desktop",
+    "lighthouse:desktop": "lhci autorun --collect.settings.preset=desktop --upload.outputDir=.lighthouseci/desktop",
+    "lighthouse:mobile": "lhci autorun --upload.outputDir=.lighthouseci/mobile",
     "lint:css": "gale \"src/**/*.scss\"",
     "lint:css:fix": "gale --fix \"src/**/*.scss\"",
+    "lint:py": "uv run --project ../../sparrow/api ruff check --config ../../sparrow/api/pyproject.toml .",
     "lint:ts": "oxlint",
     "lint:ts:fix": "oxlint --fix",
+    "one-command-per-script": "bash ../../../scripts/check_one_command_per_script.sh",
     "preview": "vite preview",
+    "spellcheck": "uvx typos@1.51.1",
     "test": "bun test --dots",
     "test:watch": "bun test --dots --watch",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "typescript-only": "bash ../../../scripts/check_typescript_only.sh"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -38,6 +48,7 @@
   },
   "devDependencies": {
     "@codebend3r/gale": "0.4.1",
+    "@lhci/cli": "0.16.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
@@ -71,7 +82,15 @@
       "format",
       "format:check",
       "test",
-      "test:watch"
+      "test:watch",
+      "comment-style",
+      "dead-code",
+      "dead-css",
+      "lint:py",
+      "one-command-per-script",
+      "spellcheck",
+      "typescript-only",
+      "lighthouse"
     ],
     "targets": {
       "build": {
@@ -81,6 +100,94 @@
           {
             "env": "NETLIFY"
           }
+        ]
+      },
+      "comment-style": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/**/*.{ts,tsx,scss}",
+          "{workspaceRoot}/scripts/check_comment_style.sh"
+        ]
+      },
+      "dead-code": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/knip.ts",
+          {
+            "externalDependencies": [
+              "knip"
+            ]
+          }
+        ]
+      },
+      "dead-css": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "{projectRoot}/**/*.{ts,tsx,scss}",
+          "{projectRoot}/tsconfig*.json",
+          "^production",
+          "{workspaceRoot}/tooling/tsconfig/*.json",
+          "{workspaceRoot}/tooling/web/check-dead-css.ts",
+          {
+            "externalDependencies": [
+              "sass",
+              "typescript"
+            ]
+          }
+        ]
+      },
+      "lint:py": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/**/*.py",
+          "{workspaceRoot}/apps/sparrow/api/pyproject.toml"
+        ]
+      },
+      "one-command-per-script": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/**/package.json",
+          "{workspaceRoot}/scripts/check_one_command_per_script.sh"
+        ]
+      },
+      "spellcheck": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/**/*",
+          "{workspaceRoot}/typos.toml"
+        ]
+      },
+      "typescript-only": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/**/*.{js,jsx,mjs,cjs}",
+          "{workspaceRoot}/scripts/check_typescript_only.sh"
+        ]
+      },
+      "lighthouse": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
         ]
       }
     }
