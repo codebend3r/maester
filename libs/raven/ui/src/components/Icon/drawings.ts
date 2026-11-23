@@ -60,7 +60,8 @@ const TV_FILL = roundRect({ x: 3, y: 7.5, w: 18, h: 13, r: 2.5 })
 const TV = `${TV_FILL}M8.5 3.5l3.5 4 3.5-4`
 const HEART =
   'M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z'
-const PLAY = 'M8 5.6v12.8a1 1 0 0 0 1.5.9l10.2-6.4a1 1 0 0 0 0-1.8L9.5 4.7A1 1 0 0 0 8 5.6z'
+// Its box sits half a unit right of centre, so the triangle's weight reads centred in a round plate.
+const PLAY = 'M6.5 5.6v12.8a1 1 0 0 0 1.5.9l10.2-6.4a1 1 0 0 0 0-1.8L8 4.7A1 1 0 0 0 6.5 5.6z'
 /** Two arrows chasing each other round, for repeat. */
 const REPEAT = 'M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3'
 
@@ -173,6 +174,10 @@ export const DRAWINGS = {
   copy: {
     stroke: `${roundRect({ x: 8.5, y: 8.5, w: 11, h: 11, r: 2 })}M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2`,
     fill: roundRect({ x: 8.5, y: 8.5, w: 11, h: 11, r: 2 }),
+  },
+  archive: {
+    stroke: `${roundRect({ x: 3.5, y: 4.5, w: 17, h: 4, r: 1 })}M5 8.5V18a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V8.5M10 12.5h4`,
+    fill: 'M5 8.5V18a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V8.5z',
   },
   trash: {
     stroke:

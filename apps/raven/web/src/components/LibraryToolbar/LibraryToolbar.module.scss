@@ -91,6 +91,16 @@
   cursor: pointer;
 }
 
+// The grouping's and the view's icons, which a phone shows in place of their words.
+.pickerIcon {
+  display: none;
+}
+
+// A phone's one view chip; a wider screen has the row of views.
+.viewPicker {
+  display: none;
+}
+
 .select {
   align-self: stretch;
   min-width: 0;
@@ -198,10 +208,27 @@
 }
 
 /*
- * On a phone the views take a row of their own, under Play, and the play
- * buttons go two or three to a line, as the width has room for.
+ * On a phone the sort takes the row beside its direction, so its choice
+ * reads whole, as the phone app's Sort chip does; the views take a row of
+ * their own, under Play, and the play buttons go two or three to a line, as
+ * the width has room for.
  */
 @container (max-width: 30rem) {
+  .find {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'search search'
+      'sort direction';
+  }
+
+  .find:has(.group, .level) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'search search'
+      'sort direction'
+      'group group';
+  }
+
   .act {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -216,5 +243,177 @@
 
   .views {
     justify-self: start;
+  }
+}
+
+/*
+ * A phone's toolbar is the phone app's row of chips (`LibraryToolbar` and
+ * `Chip.touch` there): the search as an underline in the display face, then
+ * Shuffle, Sort with its word and choice and the direction, then the web's
+ * own Play, Select and views, with the grouping and a TV library's level
+ * after them. Every chip but Sort and the level shows its icon alone, a
+ * square a finger wide, its words still read aloud. The rows are named, as
+ * the toolbar holds a known set; the grouping and the level take rows of
+ * their own under them.
+ */
+@media (max-width: 30rem) {
+  .toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'search search search search'
+      'shuffle sort direction view'
+      'play select . .';
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .toolbar:has(.group) {
+    grid-template-areas:
+      'search search search search'
+      'shuffle sort direction view'
+      'play select . .'
+      'group group group group';
+  }
+
+  .toolbar:has(.level) {
+    grid-template-areas:
+      'search search search search'
+      'shuffle sort direction view'
+      'play select . .'
+      'level level level level';
+  }
+
+  .toolbar:has(.group):has(.level) {
+    grid-template-areas:
+      'search search search search'
+      'shuffle sort direction view'
+      'play select . .'
+      'group group group group'
+      'level level level level';
+  }
+
+  .find,
+  .act,
+  .play {
+    display: contents;
+  }
+
+  .search {
+    padding-bottom: var(--space-1);
+  }
+
+  .searchIcon {
+    padding-inline-start: 0;
+    color: var(--color-lichen);
+  }
+
+  .input {
+    min-height: var(--field-size);
+    padding-inline-start: var(--space-5);
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 0;
+    background: transparent;
+    font-family: var(--font-display);
+    font-size: var(--font-size-xl);
+
+    &:focus-visible {
+      border-bottom-color: var(--color-bark);
+      box-shadow: none;
+    }
+  }
+
+  .sort {
+    justify-self: stretch;
+  }
+
+  .play > :nth-child(1) {
+    grid-area: play;
+  }
+
+  .play > :nth-child(2) {
+    grid-area: shuffle;
+  }
+
+  .play > :nth-child(3) {
+    grid-area: select;
+    justify-self: start;
+  }
+
+  .find .direction {
+    border-color: transparent;
+    border-radius: var(--radius-md);
+    background: var(--color-moss);
+  }
+
+  // The icon alone: the words shrink to nothing, still in the name a screen reader hears.
+  .toolbar .play > *,
+  .toolbar .find .direction {
+    min-width: var(--field-size);
+    min-height: var(--field-size);
+    gap: 0;
+    padding: 0;
+    border-radius: var(--radius-md);
+    font-size: 0;
+  }
+
+  .toolbar .play > :nth-child(3):not([aria-pressed='true']) {
+    background: var(--color-moss);
+  }
+
+  .views {
+    display: none;
+  }
+
+  .group {
+    grid-area: group;
+    justify-self: start;
+  }
+
+  .level {
+    grid-area: level;
+    justify-self: start;
+  }
+
+  // The view and the grouping as squares holding their icons, the choice still open under a press.
+  .viewPicker,
+  .group {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'field';
+    width: var(--field-size);
+    padding: 0;
+    border-color: transparent;
+    background: var(--color-moss);
+
+    > * {
+      grid-area: field;
+    }
+
+    .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .select {
+      padding: 0;
+      color: transparent;
+      cursor: pointer;
+    }
+  }
+
+  .viewPicker {
+    grid-area: view;
+  }
+
+  .pickerIcon {
+    display: grid;
+    place-self: center;
+    pointer-events: none;
   }
 }

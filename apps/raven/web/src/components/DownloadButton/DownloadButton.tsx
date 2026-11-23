@@ -118,7 +118,7 @@ type DownloadButtonProps = {
  * is greyed out, with a note saying DV5 downloads are unsupported. Elsewhere it is shown only where this browser says Raven is
  * installed, as Settings' toggle does, and opens a `raven://download` link. It is the
  * download arrow alone, a round button like its neighbours, its name in its aria-label and
- * hover title.
+ * hover title, on a phone as everywhere else.
  */
 export const DownloadButton = ({ target, isDolbyVisionOnly = false }: DownloadButtonProps) => {
   const host = useDownloadsHostOrNone()

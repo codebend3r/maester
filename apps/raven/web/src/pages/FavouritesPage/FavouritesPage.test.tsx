@@ -129,7 +129,7 @@ describe('FavouritesPage', () => {
   it('explains how to add one when there are none', async () => {
     const spy = spyOn(api, 'listFavourites').mockImplementation(async () => [])
     renderWithProviders({ ui: <FavouritesPage /> })
-    expect(await screen.findByText(/No favourites yet/)).toBeInTheDocument()
+    expect(await screen.findByText(/Nothing is a favourite yet/)).toBeInTheDocument()
     spy.mockRestore()
   })
 

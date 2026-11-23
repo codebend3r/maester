@@ -32,3 +32,29 @@
   min-height: var(--space-5);
   padding: 0;
 }
+
+/*
+ * On a phone, the phone app's synopsis: the tagline and the summary at body
+ * size on a raised plate, faintly see-through so a backdrop shows.
+ */
+@media (max-width: 40rem) {
+  .summary {
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-canopy-plate);
+  }
+
+  .tagline {
+    font-family: var(--font-body);
+    font-size: var(--font-size-md);
+    font-style: italic;
+    line-height: var(--line-body);
+  }
+
+  .text {
+    color: var(--color-bark);
+    font-size: var(--font-size-md);
+    line-height: var(--line-body);
+  }
+}

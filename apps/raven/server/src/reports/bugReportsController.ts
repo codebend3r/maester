@@ -1,8 +1,11 @@
 import {
   Body,
+  ConflictException,
   Controller,
+  Delete,
   Get,
   Header,
+  HttpCode,
   HttpException,
   Inject,
   NotFoundException,
@@ -18,6 +21,7 @@ import {
   BUG_REPORT_PATHS,
   type BugReport,
   MAX_BUG_REPORT_BYTES,
+  isBugReportArchiveChange,
   isBugReportStatusChange,
   isPlaybackDiagnostics,
   withoutTickets,
@@ -28,7 +32,7 @@ import { AdminOnly, ForViewers } from '@/admin/adminGuard'
 import { AuthSessions, accountOf } from '@/auth/authSessions'
 import { Public } from '@/lock/lockGuard'
 import { parseBody } from '@/parseBody'
-import { BugReportsRepository } from '@/reports/bugReportsRepository'
+import { BUG_REPORT_DELETIONS, BugReportsRepository } from '@/reports/bugReportsRepository'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 import type { AccountKey } from '@/media/viewingAccountKeys'
 
@@ -104,5 +108,55 @@ export class BugReportsController {
     const report = this.reports.setStatus({ id, status, at: new Date() })
     if (report === null) throw new NotFoundException('No report')
     return report
+  }
+
+  /** Moves a report to the archive, or brings it back to the current list. */
+  @AdminOnly()
+  @Public()
+  @Put(BUG_REPORT_PATHS.archive)
+  archive(@Param(BUG_REPORT_PARAMS.id, ParseIntPipe) id: number, @Body() body: unknown): BugReport {
+    const { isArchived } = parseBody({
+      guard: isBugReportArchiveChange,
+      body,
+      message: 'Expected whether the report is archived.',
+    })
+    const report = this.reports.archive({ id, isArchived, at: new Date() })
+    if (report === null) throw new NotFoundException('No report')
+    return report
+  }
+
+  /** Archives every report on the current list with the status named, answering with them. */
+  @AdminOnly()
+  @Public()
+  @HttpCode(HTTP_STATUSES.ok)
+  @Post(BUG_REPORT_PATHS.archiveByStatus)
+  archiveByStatus(@Body() body: unknown): BugReport[] {
+    const { status } = parseBody({
+      guard: isBugReportStatusChange,
+      body,
+      message: 'Expected the status of the reports to archive.',
+    })
+    return this.reports.archiveByStatus({ status, at: new Date() })
+  }
+
+  /** Deletes an archived report, so no list shows it again; one on the current list is refused. */
+  @AdminOnly()
+  @Public()
+  @HttpCode(HTTP_STATUSES.noContent)
+  @Delete(BUG_REPORT_PATHS.report)
+  remove(@Param(BUG_REPORT_PARAMS.id, ParseIntPipe) id: number): void {
+    const outcome = this.reports.delete({ id, at: new Date() })
+    switch (outcome) {
+      case BUG_REPORT_DELETIONS.deleted:
+        return
+      case BUG_REPORT_DELETIONS.current:
+        throw new ConflictException('Archive the report before deleting it.')
+      case BUG_REPORT_DELETIONS.missing:
+        throw new NotFoundException('No report')
+      default: {
+        const unreachable: never = outcome
+        throw new Error(`Unknown deletion: ${JSON.stringify(unreachable)}`)
+      }
+    }
   }
 }

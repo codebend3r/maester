@@ -56,7 +56,9 @@ type ButtonProps = Shared & ComponentProps<'button'>
 
 /**
  * A button with an optional leading icon. Icon-only buttons must pass an
- * aria-label, which is also their hover title unless they pass one of their own.
+ * aria-label, which is also their hover title unless they pass one of their own,
+ * and say so in `data-icon-only`, so a row that lays out its buttons can give
+ * one with words more room than one without.
  */
 export const Button = ({
   tone = BUTTON_TONES.quiet,
@@ -72,6 +74,7 @@ export const Button = ({
     type={type}
     className={classes({ tone, size, iconOnly: !children, extra: className })}
     title={title ?? rest['aria-label']}
+    data-icon-only={!children || undefined}
     {...rest}
   >
     {!!icon && <Icon name={icon} size={ICON_SIZES[size]} />}
@@ -94,6 +97,7 @@ export const ButtonLink = ({
   <Link
     className={classes({ tone, size, iconOnly: !children, extra: className })}
     title={title ?? rest['aria-label']}
+    data-icon-only={!children || undefined}
     {...rest}
   >
     {!!icon && <Icon name={icon} size={ICON_SIZES[size]} />}

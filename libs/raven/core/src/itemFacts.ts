@@ -9,6 +9,7 @@ import {
   type MediaItem,
   type MediaTracks,
   type SeasonSummary,
+  type ShowEntry,
   VIDEO_RANGES,
 } from '@/contract'
 import { formatBitrate, formatBytes, formatChannels, formatRuntime } from '@/format'
@@ -31,6 +32,19 @@ export const showYears = ({ year, endedYear }: ShowYearsProps): string | null =>
   if (endedYear == null) return `${year} to now`
   return endedYear === year ? String(year) : `${year} to ${endedYear}`
 }
+
+type ShowCountFactsProps = Pick<ShowEntry, 'seasons' | 'episodes' | 'totalEpisodes'>
+
+/** A show's card facts: its seasons, where the server counted them, and its episodes, "1 season", "6 episodes". */
+export const showCountFacts = ({
+  seasons,
+  episodes,
+  totalEpisodes,
+}: ShowCountFactsProps): string[] =>
+  present([
+    seasons == null ? null : plural({ n: seasons, one: 'season', many: 'seasons' }),
+    plural({ n: totalEpisodes ?? episodes, one: 'episode', many: 'episodes' }),
+  ])
 
 type RuntimeFactProps = {
   file: MediaItem | undefined

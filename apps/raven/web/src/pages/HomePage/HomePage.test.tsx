@@ -28,6 +28,15 @@ const AddressProbe = () => {
   return <output aria-label="Current address">{`${pathname}${search}`}</output>
 }
 
+/** An element's words as a screen reader hears them, leaving out what is hidden from it (a phone's See all). */
+const spokenText = (element: Element): string =>
+  [...element.childNodes]
+    .map((node) => {
+      if (!(node instanceof Element)) return node.textContent ?? ''
+      return node.getAttribute('aria-hidden') === 'true' ? '' : spokenText(node)
+    })
+    .join('')
+
 describe('HomePage', () => {
   const spies = {
     home: spyOn(api, 'getHome'),
@@ -128,9 +137,12 @@ describe('HomePage', () => {
       ],
     })
     await screen.findByRole('heading', { name: 'Films' })
-    expect(
-      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Continue watching', 'Films', 'Series', 'Clips'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map(spokenText)).toEqual([
+      'Continue watching',
+      'Films',
+      'Series',
+      'Clips',
+    ])
     expect(
       within(shelf('Continue watching')).getByRole('link', {
         name: `Play ${mediaLabel(EPISODE_TWO)}`,
@@ -166,9 +178,12 @@ describe('HomePage', () => {
     const hero = await screen.findByRole('region', { name: 'Featured' })
     expect(within(hero).getByText('Featured in Films')).toBeInTheDocument()
     expect(within(hero).getByText('A line from the server.')).toBeInTheDocument()
-    expect(
-      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Busboys', 'Continue watching', 'Films', 'Series'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map(spokenText)).toEqual([
+      'Busboys',
+      'Continue watching',
+      'Films',
+      'Series',
+    ])
   })
 
   it('puts binge shows above the hero, in the desktop app too', async () => {
@@ -186,9 +201,7 @@ describe('HomePage', () => {
     open({ inProgress: [], shelves: [] })
     const binge = await screen.findByRole('region', { name: 'Binge' })
     await screen.findByRole('region', { name: 'Featured' })
-    expect(
-      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Busboys'])
+    expect(screen.getAllByRole('heading', { level: 2 }).map(spokenText)).toEqual(['Busboys'])
     expect(within(binge).getByRole('link', { name: /Severance/ })).toHaveAttribute(
       'href',
       '/shows/4',
@@ -383,9 +396,10 @@ describe('HomePage', () => {
       await userEvent.type(searchbox(), 'bus{Enter}')
       await screen.findByRole('heading', { name: 'Films' })
       expect(spies.search.mock.calls).toEqual([['bus']])
-      expect(
-        screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-      ).toEqual(['Films', 'Series'])
+      expect(screen.getAllByRole('heading', { level: 2 }).map(spokenText)).toEqual([
+        'Films',
+        'Series',
+      ])
       expect(within(shelf('Films')).getByRole('link', { name: 'Busboys' })).toHaveAttribute(
         'href',
         '/movies/40?library=2',

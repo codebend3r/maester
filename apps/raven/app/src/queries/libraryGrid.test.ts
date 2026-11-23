@@ -35,6 +35,18 @@ const EPISODE = mediaItemFor({
   match: MATCH_STATES.unmatched,
 })
 
+const ASHFALL_SHOW = {
+  show: { ...BUSBOYS.item!, id: 60, title: 'Ashfall', type: ITEM_TYPES.show, year: 2020 },
+  episodes: 8,
+  seasons: 1,
+  totalEpisodes: 8,
+  watchedEpisodes: 0,
+  endedYear: 2022,
+  addedAt: '2026-10-16T00:00:00.000Z',
+  bitrate: null,
+  next: null,
+}
+
 describe('librarySectionsOf', () => {
   it('lays a movies library out as one run of posters, each under its year in a title sort', () => {
     const sections = librarySectionsOf({
@@ -96,9 +108,9 @@ describe('librarySectionsOf', () => {
     })
   })
 
-  it("lays a show library's shows out as one run of posters when every file found its show", () => {
+  it("lays a show library's shows out as one run of posters under their years in the tiles view", () => {
     const sections = librarySectionsOf({
-      settings: SERIES.settings,
+      settings: { ...SERIES.settings, view: LIBRARY_VIEWS.tiles },
       listing: {
         shows: [
           {
@@ -124,6 +136,31 @@ describe('librarySectionsOf', () => {
       line: '2020 to 2022',
       target: { kind: ROUTE_TARGETS.item, itemId: 60, libraryId: null, fileId: null },
     })
+  })
+
+  it("draws a show library's shows in the grid view as the web's wide show cards", () => {
+    const [shows] = librarySectionsOf({
+      settings: { ...SERIES.settings, view: LIBRARY_VIEWS.grid, sort: MEDIA_SORTS.added },
+      listing: {
+        shows: [ASHFALL_SHOW, { ...ASHFALL_SHOW, seasons: undefined, totalEpisodes: 1 }],
+        files: [],
+      },
+      ...pictures,
+    })
+    expect(shows!.hasPanels).toBe(true)
+    expect(shows!.cards.map(({ line, facts }) => [line, facts])).toEqual([
+      ['Added 4 days ago', '1 season · 8 episodes'],
+      ['Added 4 days ago', '1 episode'],
+    ])
+  })
+
+  it("leaves a show library's shows in the list view as rows, with no panels", () => {
+    const [shows] = librarySectionsOf({
+      settings: { ...SERIES.settings, view: LIBRARY_VIEWS.list },
+      listing: { shows: [ASHFALL_SHOW], files: [] },
+      ...pictures,
+    })
+    expect(shows!.hasPanels).toBe(false)
   })
 
   it("puts a show library's files no show was found for after its shows, by show folder", () => {

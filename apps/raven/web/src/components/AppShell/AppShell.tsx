@@ -2,7 +2,7 @@ import { musicLibrariesOf, libraryPath } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { BUTTON_TONES, Button, Icon, type IconName, useKeyShortcut } from '@raven/ui'
+import { BUTTON_TONES, Button, Icon, type IconName, classNames, useKeyShortcut } from '@raven/ui'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
@@ -242,7 +242,9 @@ const PINNED_MARKS = {
  * step aside. A phone has no side menu but a tab bar along the foot of the
  * screen. Over every page, a bar holds the search through every library
  * and, in its corner, the theme button and, for whoever is signed in, the
- * account button with Sign out. While a card's picture is behind the page,
+ * account button with Sign out; on a phone, as in the phone app, only Home
+ * keeps the search, and elsewhere the corner sits level with the page's way
+ * back. While a card's picture is behind the page,
  * the menu frosts over it. While the frame is open, what the pages show
  * follows the server's changes, and the admin lock coming on or going off.
  * The player leaves the frame behind for the whole screen. Inside raven
@@ -358,7 +360,9 @@ export const AppShell = () => {
           )}
         </div>
       </nav>
-      <main className={styles.main}>
+      <main
+        className={classNames([styles.main, pathname !== APP_PATHS.home && styles.awayFromHome])}
+      >
         <div className={styles.bar}>
           {!isOffline && <SiteSearch className={styles.search} />}
           <div className={styles.corner}>
@@ -370,7 +374,7 @@ export const AppShell = () => {
           <ShellOutlet pageKey={key} />
         </div>
       </main>
-      <TabBar hasMusic={hasMusic} />
+      <TabBar hasMusic={hasMusic} pinned={pinned} />
     </div>
   )
 }

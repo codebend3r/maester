@@ -223,6 +223,69 @@ describe('bug reports on a server without accounts', () => {
     ).rejects.toMatchObject({ status: 404 })
     expect((await admin().listBugReports())[0]?.status ?? null).toBe(BUG_REPORT_STATUSES.new)
   })
+
+  it('archives a report and brings it back, keeping it listed either way', async () => {
+    const sent = await viewer().reportPlaybackError(diagnostics())
+    expect(sent.archivedAt).toBeNull()
+    const archived = await admin().archiveBugReport({ id: sent.id, isArchived: true })
+    expect(archived.archivedAt).toEqual(expect.any(String))
+    expect((await admin().listBugReports())[0]?.archivedAt ?? null).toBe(archived.archivedAt)
+    const back = await admin().archiveBugReport({ id: sent.id, isArchived: false })
+    expect(back.archivedAt).toBeNull()
+    await expect(
+      admin().archiveBugReport({ id: sent.id + 100, isArchived: true }),
+    ).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('archives every current report with the status named at once, and nothing else', async () => {
+    const [first, second, third] = await Promise.all(
+      ['First', 'Second', 'Third'].map((title) =>
+        viewer().reportPlaybackError(diagnostics({ title })),
+      ),
+    )
+    if (!first || !second || !third) throw new Error('reports not sent')
+    await Promise.all(
+      [first, third].map(({ id }) =>
+        admin().setBugReportStatus({ id, status: BUG_REPORT_STATUSES.fixed }),
+      ),
+    )
+    const fixed = { status: BUG_REPORT_STATUSES.fixed }
+    const archived = await admin().archiveBugReportsByStatus(fixed)
+    expect(archived.map(({ id }) => id)).toEqual([third.id, first.id])
+    expect(await admin().archiveBugReportsByStatus(fixed)).toEqual([])
+    const listed = await admin().listBugReports()
+    expect(listed.map(({ id, archivedAt }) => [id, archivedAt === null])).toEqual(
+      [third.id, second.id, first.id].toSorted((a, b) => b - a).map((id) => [id, id === second.id]),
+    )
+  })
+
+  it('deletes only an archived report, which no list shows again', async () => {
+    const sent = await viewer().reportPlaybackError(diagnostics())
+    await expect(admin().deleteBugReport(sent.id)).rejects.toMatchObject({ status: 409 })
+    await admin().archiveBugReport({ id: sent.id, isArchived: true })
+    await admin().deleteBugReport(sent.id)
+    expect(await admin().listBugReports()).toEqual([])
+    await expect(admin().deleteBugReport(sent.id)).rejects.toMatchObject({ status: 404 })
+    await expect(
+      admin().setBugReportStatus({ id: sent.id, status: BUG_REPORT_STATUSES.fixed }),
+    ).rejects.toMatchObject({ status: 404 })
+    await expect(
+      admin().archiveBugReport({ id: sent.id, isArchived: false }),
+    ).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('archives and deletes for the admin alone', async () => {
+    const sent = await viewer().reportPlaybackError(diagnostics())
+    await expect(
+      viewer().archiveBugReport({ id: sent.id, isArchived: true }),
+    ).rejects.toMatchObject({ status: 403 })
+    await expect(
+      viewer().archiveBugReportsByStatus({ status: BUG_REPORT_STATUSES.fixed }),
+    ).rejects.toMatchObject({ status: 403 })
+    await admin().archiveBugReport({ id: sent.id, isArchived: true })
+    await expect(viewer().deleteBugReport(sent.id)).rejects.toMatchObject({ status: 403 })
+    expect(await admin().listBugReports()).toHaveLength(1)
+  })
 })
 
 describe('bug reports on a server with accounts', () => {

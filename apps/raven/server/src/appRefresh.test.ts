@@ -199,6 +199,8 @@ describe('upgrading cached anime release dates', () => {
     db.exec('ALTER TABLE media DROP COLUMN dolby_vision_profile')
     db.exec('ALTER TABLE artists DROP COLUMN background')
     db.exec('DROP TABLE album_diagnoses')
+    db.exec('ALTER TABLE bug_reports DROP COLUMN archived_at')
+    db.exec('ALTER TABLE bug_reports DROP COLUMN deleted_at')
     db.pragma('user_version = 50')
     tmdb.state.down = true
     await server.restart()

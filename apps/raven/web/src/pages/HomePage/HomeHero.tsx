@@ -1,5 +1,6 @@
 import { BUTTON_TONES, Button, ButtonLink, FactParts, classNames } from '@raven/ui'
-import { Fragment, type KeyboardEvent, useEffect, useState } from 'react'
+import { Fragment, type KeyboardEvent, type TouchEvent, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { Featured } from '@/pages/HomePage/featured'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
@@ -80,6 +81,20 @@ export const WASH_SIZES = '(max-width: 47.5rem) 100vw, 47.5rem'
 
 const STEPS: Readonly<Partial<Record<string, number>>> = { ArrowLeft: -1, ArrowRight: 1 }
 
+/** How far a finger travels sideways across the hero before it counts as a swipe, in CSS pixels. */
+const SWIPE_DISTANCE = 48
+
+type DotsProps = { count: number; at: number }
+
+/** Which arrival is up, as a row of dots over the picture's foot; a phone's in place of Previous and Next. */
+const Dots = ({ count, at }: DotsProps) => (
+  <span className={styles.dots} aria-hidden="true">
+    {Array.from({ length: count }, (_, index) => (
+      <span key={index} className={classNames([styles.dot, index === at && styles.dotUp])} />
+    ))}
+  </span>
+)
+
 /**
  * Whether `node` has the pointer over it or the focus inside it, followed
  * as they come and go. A focus moving between controls inside it stays.
@@ -134,7 +149,9 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
   >
     <p className={styles.eyebrow}>{entry.eyebrow}</p>
     <h2 className={classNames([styles.title, TITLE_SIZES[titleSize(entry.title)]])}>
-      {entry.title}
+      <Link to={entry.details} className={styles.titleLink}>
+        {entry.title}
+      </Link>
     </h2>
     <p className={styles.line}>{entry.line}</p>
     <div className={styles.actions}>
@@ -151,7 +168,11 @@ const Slide = ({ entry, place, isCurrent }: SlideProps) => (
             {COMMON_COPY.play}
           </ButtonLink>
         )}
-        <ButtonLink size="large" to={entry.details}>
+        <ButtonLink
+          size="large"
+          to={entry.details}
+          className={entry.play ? styles.besidePlay : undefined}
+        >
           {HOME_COPY.details}
         </ButtonLink>
       </div>
@@ -204,6 +225,20 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
   const current = featured[at]
 
   const step = (by: number) => setTurn({ index: (at + by + count) % count, from: at })
+  const touchStart = useRef<number | null>(null)
+  const onTouchStart = (event: TouchEvent) => {
+    touchStart.current = event.touches[0]?.clientX ?? null
+  }
+  // A swipe left brings the next arrival in, a swipe right the one before, as the phone app's does.
+  const onTouchEnd = (event: TouchEvent) => {
+    const from = touchStart.current
+    const to = event.changedTouches[0]?.clientX ?? null
+    touchStart.current = null
+    if (from === null || to === null || count < 2) return
+    const travel = to - from
+    if (Math.abs(travel) < SWIPE_DISTANCE) return
+    step(travel < 0 ? 1 : -1)
+  }
   const onKeyDown = (event: KeyboardEvent) => {
     const by = STEPS[event.key]
     if (by == null) return
@@ -217,6 +252,8 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
       className={styles.hero}
       aria-roledescription={HOME_COPY.carousel}
       aria-label={HOME_COPY.featured}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       <div className={styles.wash} aria-hidden="true">
         {featured
@@ -268,6 +305,7 @@ export const HomeHero = ({ featured }: HomeHeroProps) => {
           </span>
         </div>
       )}
+      {count > 1 && <Dots count={count} at={at} />}
       <p className="visually-hidden" aria-live={isHeld ? 'polite' : 'off'}>
         {HOME_COPY.announcement({ title: current?.title ?? '', at: at + 1, count })}
       </p>

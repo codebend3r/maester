@@ -21,10 +21,23 @@ type Row = {
   status: string
   diagnostics: string
   created_at: string
+  archived_at: string | null
 }
 
 const COLUMNS =
-  'id, account_id, reporter_email, media_id, title, summary, status, diagnostics, created_at'
+  'id, account_id, reporter_email, media_id, title, summary, status, diagnostics, created_at, archived_at'
+
+/** A report the admin has not deleted, the only kind any list or change sees. */
+const KEPT = 'deleted_at IS NULL'
+
+/** How deleting a report went: only an archived one is deleted. */
+export const BUG_REPORT_DELETIONS = {
+  deleted: 'deleted',
+  current: 'current',
+  missing: 'missing',
+} as const
+
+export type BugReportDeletion = (typeof BUG_REPORT_DELETIONS)[keyof typeof BUG_REPORT_DELETIONS]
 
 const toReport = (row: Row): BugReport => ({
   id: row.id,
@@ -35,6 +48,7 @@ const toReport = (row: Row): BugReport => ({
   title: row.title,
   summary: row.summary,
   mediaId: row.media_id,
+  archivedAt: row.archived_at,
   diagnostics: parseJsonAs({ json: row.diagnostics, guard: isRecord }) ?? {},
 })
 
@@ -53,6 +67,16 @@ type BugReportsRepositorySetStatusProps = {
   at: Date
 }
 
+type BugReportsRepositoryArchiveProps = {
+  id: number
+  isArchived: boolean
+  at: Date
+}
+
+type BugReportsRepositoryArchiveByStatusProps = { status: BugReportStatus; at: Date }
+
+type BugReportsRepositoryDeleteProps = { id: number; at: Date }
+
 /** What the player sent when a video would not play, and where the admin has got to with each. */
 @Injectable()
 export class BugReportsRepository {
@@ -66,7 +90,7 @@ export class BugReportsRepository {
   add({ account, email, diagnostics, at }: BugReportsRepositoryAddProps): BugReport {
     const now = at.toISOString()
     const row = this.db
-      .prepare<[Omit<Row, 'id'> & { updated_at: string }], Row>(
+      .prepare<[Omit<Row, 'id' | 'archived_at'> & { updated_at: string }], Row>(
         `INSERT INTO bug_reports
            (account_id, reporter_email, media_id, title, summary, status, diagnostics, created_at, updated_at)
          VALUES
@@ -88,10 +112,10 @@ export class BugReportsRepository {
     return toReport(row)
   }
 
-  /** Every report, newest first. */
+  /** Every report but the deleted, archived or not, newest first. */
   list(): BugReport[] {
     return this.db
-      .prepare<[], Row>(`SELECT ${COLUMNS} FROM bug_reports ORDER BY id DESC`)
+      .prepare<[], Row>(`SELECT ${COLUMNS} FROM bug_reports WHERE ${KEPT} ORDER BY id DESC`)
       .all()
       .map(toReport)
   }
@@ -110,9 +134,50 @@ export class BugReportsRepository {
   setStatus({ id, status, at }: BugReportsRepositorySetStatusProps): BugReport | null {
     const row = this.db
       .prepare<[string, string, number], Row>(
-        `UPDATE bug_reports SET status = ?, updated_at = ? WHERE id = ? RETURNING ${COLUMNS}`,
+        `UPDATE bug_reports SET status = ?, updated_at = ? WHERE id = ? AND ${KEPT} RETURNING ${COLUMNS}`,
       )
       .get(status, at.toISOString(), id)
     return row === undefined ? null : toReport(row)
+  }
+
+  /** The report archived, or brought back, or null when no report has that id. */
+  archive({ id, isArchived, at }: BugReportsRepositoryArchiveProps): BugReport | null {
+    const now = at.toISOString()
+    const row = this.db
+      .prepare<[string | null, string, number], Row>(
+        `UPDATE bug_reports SET archived_at = ?, updated_at = ? WHERE id = ? AND ${KEPT} RETURNING ${COLUMNS}`,
+      )
+      .get(isArchived ? now : null, now, id)
+    return row === undefined ? null : toReport(row)
+  }
+
+  /** Archives every report on the current list with `status`; the ones it archived, newest first. */
+  archiveByStatus({ status, at }: BugReportsRepositoryArchiveByStatusProps): BugReport[] {
+    const now = at.toISOString()
+    return this.db
+      .prepare<[string, string, string], Row>(
+        `UPDATE bug_reports SET archived_at = ?, updated_at = ?
+          WHERE status = ? AND archived_at IS NULL AND ${KEPT}
+          RETURNING ${COLUMNS}`,
+      )
+      .all(now, now, status)
+      .map(toReport)
+      .toSorted((a, b) => b.id - a.id)
+  }
+
+  /** Deletes an archived report from every list; one on the current list is left as it is. */
+  delete({ id, at }: BugReportsRepositoryDeleteProps): BugReportDeletion {
+    const now = at.toISOString()
+    const deleted = this.db
+      .prepare<[string, string, number]>(
+        `UPDATE bug_reports SET deleted_at = ?, updated_at = ?
+          WHERE id = ? AND archived_at IS NOT NULL AND ${KEPT}`,
+      )
+      .run(now, now, id)
+    if (deleted.changes > 0) return BUG_REPORT_DELETIONS.deleted
+    const kept = this.db
+      .prepare<[number], { id: number }>(`SELECT id FROM bug_reports WHERE id = ? AND ${KEPT}`)
+      .get(id)
+    return kept === undefined ? BUG_REPORT_DELETIONS.missing : BUG_REPORT_DELETIONS.current
   }
 }

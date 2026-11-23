@@ -17,11 +17,12 @@ import {
   requestKeyOf,
   showPath,
   withLibraries,
+  isRecord,
 } from '@raven/core'
 import { Icon, PictureChips, classNames } from '@raven/ui'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
-import { type KeyboardEvent, type ReactNode, useId, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { Dotted } from '@/components/ItemHeader/ItemHeader'
 import { ItemPoster, PosterImage, TmdbPoster } from '@/components/PosterImage/PosterImage'
@@ -292,6 +293,12 @@ const ARROW_STEPS = { [KEYS.arrowDown]: 1, [KEYS.arrowUp]: -1 } as const satisfi
 
 const isArrow = (key: string): key is keyof typeof ARROW_STEPS => key in ARROW_STEPS
 
+/** What a link hands Home in its state to open with the cursor in the search. */
+export const SEARCH_ASK = { isSearchAsked: true } as const
+
+/** Whether a page's state asks for the search, as `SEARCH_ASK` does. */
+const asksForSearch = (state: unknown): boolean => isRecord(state) && !!state.isSearchAsked
+
 type SiteSearchProps = { className?: string }
 
 /**
@@ -309,7 +316,12 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
   const id = useId()
   const listId = useId()
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
+  const input = useRef<HTMLInputElement>(null)
+  // A way in that asks for the search, as a phone's More sheet's Search, puts the cursor in it.
+  useEffect(() => {
+    if (asksForSearch(state)) input.current?.focus()
+  }, [state])
   const scope = scopeOf(pathname)
   const plan = SCOPE_PLANS[scope]
   const search = useAddressSearch({ page: '/', shouldWaitForEnter: true })
@@ -390,6 +402,7 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
         {plan.placeholder}
       </label>
       <SearchField
+        ref={input}
         id={id}
         search={search}
         className={styles.input}

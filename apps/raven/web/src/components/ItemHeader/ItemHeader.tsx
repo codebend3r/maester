@@ -357,7 +357,9 @@ type ItemHeaderProps = {
  * it, the content rating and facts, the scores, how far through it the
  * viewer is, and the page's actions: `children` first (Play, favourite,
  * Watched), then `manage` (the editors and the menu) on a row of their own.
- * On a narrow screen the picture sits above the rest.
+ * On a narrow screen the picture sits above the rest; on a phone, as in the
+ * phone app, a small picture sits beside the title, who made it and the facts,
+ * with the scores and the actions across the page under them.
  */
 export const ItemHeader = ({
   titleId,
@@ -403,39 +405,43 @@ export const ItemHeader = ({
           </div>
         )}
         <div className={styles.body}>
-          <h1 id={titleId} className={styles.title}>
-            <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
-          </h1>
-          {byline && <p className={styles.byline}>{byline}</p>}
-          {(contentRating != null || facts.length > 0) && (
-            // Words that wrap as text does, so long genres take a second line on a phone.
-            <p className={styles.facts}>
-              {contentRating != null && (
-                <>
-                  <span className={`${styles.part} ${styles.ratedPart}`}>
-                    <span className={styles.rated}>
-                      <span className="visually-hidden">{ITEM_HEADER_COPY.rated}</span>
-                      {contentRating}
+          <div className={styles.words}>
+            <h1 id={titleId} className={styles.title}>
+              <TitleArt key={logo ?? 'none'} title={title} logo={logo} />
+            </h1>
+            {byline && <p className={styles.byline}>{byline}</p>}
+            {(contentRating != null || facts.length > 0) && (
+              // Words that wrap as text does, so long genres take a second line on a phone.
+              <p className={styles.facts}>
+                {contentRating != null && (
+                  <>
+                    <span className={`${styles.part} ${styles.ratedPart}`}>
+                      <span className={styles.rated}>
+                        <span className="visually-hidden">{ITEM_HEADER_COPY.rated}</span>
+                        {contentRating}
+                      </span>
                     </span>
-                  </span>
-                  <wbr />
-                </>
-              )}
-              <Dotted
-                parts={facts.map((fact) => (
-                  <FactText key={fact} fact={fact} />
-                ))}
-              />
-            </p>
-          )}
-          <RatingPanel ratings={ratings} />
-          {progress && <Progress progress={progress} />}
-          {(!!children || !!manage) && (
-            <div className={styles.actions}>
-              {!!children && <div className={styles.group}>{children}</div>}
-              {!!manage && <div className={`${styles.group} ${styles.manage}`}>{manage}</div>}
-            </div>
-          )}
+                    <wbr />
+                  </>
+                )}
+                <Dotted
+                  parts={facts.map((fact) => (
+                    <FactText key={fact} fact={fact} />
+                  ))}
+                />
+              </p>
+            )}
+          </div>
+          <div className={styles.more}>
+            <RatingPanel ratings={ratings} />
+            {progress && <Progress progress={progress} />}
+            {(!!children || !!manage) && (
+              <div className={styles.actions}>
+                {!!children && <div className={styles.group}>{children}</div>}
+                {!!manage && <div className={`${styles.group} ${styles.manage}`}>{manage}</div>}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

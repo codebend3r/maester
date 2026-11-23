@@ -1,6 +1,7 @@
 import {
   LIBRARY_VIEWS,
   type LibrarySettings,
+  type LibraryView,
   type MediaItem,
   type PosterEntry,
   type ShowEntry,
@@ -18,6 +19,7 @@ import {
   frameCard,
   libraryVideoCard,
   showCard,
+  showPanelCard,
   videoShapeFor,
 } from '@/queries/cards'
 import { LIBRARY_GRID_COPY } from '@/queries/copy'
@@ -42,6 +44,11 @@ export type GridSection = {
   cards: ShelfCard[]
   /** Whether a titled section starts open, as Coming soon's shelves do; a library's buckets start shut. */
   isOpenFirst?: boolean
+  /**
+   * Whether its cards are drawn as panels, the web's wide show cards: the poster beside its
+   * words, on a wash of its own colours. A TV library's shows in the grid view are.
+   */
+  hasPanels?: boolean
 }
 
 /**
@@ -115,10 +122,14 @@ const fileSections = ({ files, ...cards }: FileSectionsProps): GridSection[] => 
 
 type ShowSectionsProps = Cards & Listing
 
+/** The views the web draws a TV library's shows in as wide show cards: the grid, which the grouped view is for shows. */
+const PANEL_VIEWS: ReadonlySet<LibraryView> = new Set([LIBRARY_VIEWS.grid, LIBRARY_VIEWS.grouped])
+
 /**
  * A TV library: its shows, then each show folder whose files no show was found for, as the
  * web's Not matched bucket lists them. With nothing unmatched the shows are one open run;
- * otherwise they are a bucket of their own, Matched, as on the web.
+ * otherwise they are a bucket of their own, Matched, as on the web. In the grid view the shows
+ * are panels, as the web's wide show cards.
  */
 const showSections = ({
   shows,
@@ -129,12 +140,15 @@ const showSections = ({
 }: ShowSectionsProps): GridSection[] => {
   const order = { sort: settings.sort, now }
   const isBucketed = files.length > 0
+  const hasPanels = PANEL_VIEWS.has(settings.view)
+  const cardOf = hasPanels ? showPanelCard : showCard
   const showRun: GridSection = {
     key: SECTION_KEYS.shows,
     title: isBucketed ? LIBRARY_GRID_COPY.matched : null,
     count: isBucketed ? plural({ n: shows.length, ...LIBRARY_GRID_COPY.shows }) : null,
     shape: CARD_SHAPES.poster,
-    cards: shows.map((entry) => showCard({ entry, order, ...pictures })),
+    hasPanels,
+    cards: shows.map((entry) => cardOf({ entry, order, ...pictures })),
   }
   const shown: GridSection[] = shows.length === 0 ? [] : [showRun]
   const folders = unmatchedShowsOf(files).map((folder) => ({

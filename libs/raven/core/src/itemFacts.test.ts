@@ -20,6 +20,7 @@ import {
   seasonFacts,
   seasonsOf,
   seasonsWatched,
+  showCountFacts,
   rangeLabel,
   splitPictureRest,
   versionFacts,
@@ -33,6 +34,18 @@ describe('runtimeFact', () => {
     expect(runtimeFact({ file: mediaItem({ duration: 3600 }), runtime: 97 })).toBe('1h 0m')
     expect(runtimeFact({ file: mediaItem({ duration: null }), runtime: 97 })).toBe('1h 37m')
     expect(runtimeFact({ file: undefined, runtime: null })).toBeNull()
+  })
+})
+
+describe('showCountFacts', () => {
+  it('counts the seasons where the server did, then every episode the show has', () => {
+    expect(showCountFacts({ seasons: 1, episodes: 6, totalEpisodes: 8 })).toEqual([
+      '1 season',
+      '8 episodes',
+    ])
+    expect(showCountFacts({ seasons: undefined, episodes: 1, totalEpisodes: undefined })).toEqual([
+      '1 episode',
+    ])
   })
 })
 

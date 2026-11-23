@@ -82,6 +82,40 @@
   }
 }
 
+// A phone's words in the arrow's place.
+.headingSeeAll {
+  grid-area: arrow;
+  display: none;
+  color: var(--color-lichen);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 40rem) {
+  .headingArrow {
+    display: none;
+  }
+
+  .headingSeeAll {
+    display: grid;
+  }
+
+  // The phone app's Home opens on its search and Binge: no way back and no title, which stays for a screen reader.
+  .back {
+    display: none;
+  }
+
+  .header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 // The icon's own hover nudge, a there-and-back, would fight the one slide above, so it sits still here.
 .headingLink:hover .headingArrow > svg {
   animation: none;

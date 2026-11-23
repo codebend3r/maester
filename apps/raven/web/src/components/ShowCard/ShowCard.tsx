@@ -6,6 +6,7 @@ import {
   WATCHED_STATES,
   episodeCode,
   showEntryKey,
+  showCountFacts,
   showSortFact,
   showYears,
   watchedStateOf,
@@ -45,10 +46,7 @@ const useShowCard = ({ entry, sort }: UseShowCardProps) => {
     code,
     sorted: sort ? showSortFact({ entry, sort }) : null,
     years: showYears({ year: show.year, endedYear: entry.endedYear }),
-    facts: [
-      entry.seasons == null ? null : COMMON_COPY.seasons(entry.seasons),
-      COMMON_COPY.episodes(entry.totalEpisodes ?? entry.episodes),
-    ].filter((fact): fact is string => fact != null),
+    facts: showCountFacts(entry),
     playLabel: code
       ? SHOW_CARD_COPY.playEpisode({ title: show.title, code })
       : SHOW_CARD_COPY.playShow(show.title),

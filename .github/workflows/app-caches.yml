@@ -44,42 +44,32 @@ env:
   APP_NODE_VERSION: 24.21.0
 
 jobs:
-  build:
+  # One leg per app and platform a pull request builds, each with the setup and the build
+  # target its build job runs; `test_native_ci.py` checks the two lists agree. The Apple
+  # legs run one at a time: three macOS arm64 jobs queued at once left two waiting until
+  # GitHub gave up on finding them a runner, and a cache build is in no hurry.
+  build-apple:
     name: ${{ matrix.platform.name }}
-    runs-on: ${{ matrix.platform.runner }}
+    runs-on: macos-26
     timeout-minutes: 60
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
-        # One leg per app and platform a pull request builds, each with the setup and the
-        # build target its build job runs; `test_native_ci.py` checks the two lists agree.
         platform:
           - name: 📱 iPhone and iPad caches
             id: ios
             project: apps/raven/app
             target: '@raven/app:build:ios'
-            runner: macos-26
           - name: 📺 Apple TV caches
             id: tvos
             project: apps/raven/app
             target: '@raven/app:build:tvos'
-            runner: macos-26
-          - name: 📺 Android TV caches
-            id: android-tv
-            project: apps/raven/app
-            target: '@raven/app:build:android-tv'
-            runner: ubuntu-24.04
           - name: 🎵 Wren iPhone caches
             id: ios
             project: apps/raven/music
             target: '@raven/music:build:ios'
-            runner: macos-26
-          - name: 🎵 Wren Android caches
-            id: android-tv
-            project: apps/raven/music
-            target: '@raven/music:build:android'
-            runner: ubuntu-24.04
-    steps:
+    steps: &build-steps
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
@@ -125,6 +115,24 @@ jobs:
         uses: ./.github/actions/delete-superseded-caches
         with:
           keep: ${{ steps.setup.outputs.supersedes }}
+
+  build-android:
+    name: ${{ matrix.platform.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: 📺 Android TV caches
+            id: android-tv
+            project: apps/raven/app
+            target: '@raven/app:build:android-tv'
+          - name: 🎵 Wren Android caches
+            id: android-tv
+            project: apps/raven/music
+            target: '@raven/music:build:android'
+    steps: *build-steps
 
   android-tv-avd:
     name: 📺 Android TV emulator cache

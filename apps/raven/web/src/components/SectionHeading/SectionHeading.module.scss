@@ -24,3 +24,15 @@
   color: var(--color-lichen);
   font-size: var(--font-size-sm);
 }
+
+// On a phone, the phone app's section heading: smaller, with no rule under it.
+@media (max-width: 40rem) {
+  .head {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .title {
+    font-size: var(--font-size-lg);
+  }
+}

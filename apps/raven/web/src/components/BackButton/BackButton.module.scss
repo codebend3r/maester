@@ -1,11 +1,25 @@
+// The way back and, on a phone, Home beside it, as a page places them; empty, it takes no room.
+.way {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  justify-self: start;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  min-width: 0;
+
+  &:empty {
+    display: none;
+  }
+}
+
 /*
  * A touch more glass than a pill's own, so it holds on a backdrop picture
  * as well as on a plain page. As wide as its label, and no wider than its
- * row, a long name cut short, so it never runs off a phone's edge. A page
- * places it with `grid-area` alone.
+ * row, a long name cut short, so it never runs off a phone's edge.
  */
 .back {
-  justify-self: start;
   max-width: 100%;
   background: var(--color-night-glass);
 }
@@ -14,4 +28,29 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+// Home beside the way back is a phone's alone, as in the phone app.
+.home {
+  display: none;
+}
+
+/*
+ * On a phone, the phone app's Back: its arrow and words in the muted text,
+ * with no pill around them, and Home as its icon beside it.
+ */
+@media (max-width: 40rem) {
+  .way .back {
+    padding-inline: 0 var(--space-1);
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-lichen);
+    font-size: var(--font-size-md);
+    backdrop-filter: none;
+  }
+
+  .home {
+    display: inline-grid;
+    color: var(--color-bark);
+  }
 }

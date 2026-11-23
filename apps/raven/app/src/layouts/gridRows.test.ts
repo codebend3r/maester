@@ -48,7 +48,10 @@ describe('gridColumnsOf', () => {
   type ColumnsOfProps = { room: number; least: number; gap: number }
 
   const columnsOf = ({ room, least, gap }: ColumnsOfProps) =>
-    gridColumnsOf({ room, gap, leastOf: () => least }).columnsOf(CARD_SHAPES.poster)
+    gridColumnsOf({ room, gap, leastOf: () => least }).columnsOf({
+      shape: CARD_SHAPES.poster,
+      hasPanels: false,
+    })
 
   it('fits as many columns as the least width allows, with the gaps between them', () => {
     expect(columnsOf({ room: 358, least: 128, gap: 16 })).toBe(2)
@@ -65,12 +68,24 @@ describe('gridColumnsOf', () => {
     const { columnsOf: columns, widthOf } = gridColumnsOf({
       room: 400,
       gap: 16,
-      leastOf: (shape) => (shape === CARD_SHAPES.poster ? 128 : 240),
+      leastOf: ({ shape }) => (shape === CARD_SHAPES.poster ? 128 : 240),
     })
-    expect(columns(CARD_SHAPES.poster)).toBe(2)
-    expect(widthOf(CARD_SHAPES.poster)).toBe(192)
-    expect(columns(CARD_SHAPES.wide)).toBe(1)
-    expect(widthOf(CARD_SHAPES.wide)).toBe(400)
+    const posters = { shape: CARD_SHAPES.poster, hasPanels: false }
+    const frames = { shape: CARD_SHAPES.wide, hasPanels: false }
+    expect(columns(posters)).toBe(2)
+    expect(widthOf(posters)).toBe(192)
+    expect(columns(frames)).toBe(1)
+    expect(widthOf(frames)).toBe(400)
+  })
+
+  it('lays panels out by their own least width, apart from bare posters', () => {
+    const { columnsOf: columns } = gridColumnsOf({
+      room: 400,
+      gap: 16,
+      leastOf: ({ hasPanels }) => (hasPanels ? 280 : 128),
+    })
+    expect(columns({ shape: CARD_SHAPES.poster, hasPanels: true })).toBe(1)
+    expect(columns({ shape: CARD_SHAPES.poster, hasPanels: false })).toBe(2)
   })
 })
 

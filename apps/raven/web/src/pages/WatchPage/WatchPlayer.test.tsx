@@ -94,6 +94,7 @@ describe('Player escape feedback', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -120,6 +121,7 @@ describe('Player escape feedback', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -155,6 +157,7 @@ describe('Player file link on the media plane', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -192,6 +195,7 @@ describe('Player file link on the media plane', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -223,6 +227,7 @@ describe('Player file link on the media plane', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -254,6 +259,7 @@ describe('WatchPlayer Report this error', () => {
             upNext={[]}
             played={[]}
             shuffledFrom={null}
+            isFromStart={false}
             backTo="/libraries/2"
           />
           <Toaster />
@@ -284,6 +290,7 @@ describe('Player progress', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -313,6 +320,7 @@ describe('Player progress', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -344,6 +352,7 @@ describe('Player history', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -371,6 +380,7 @@ describe('shared player capability module', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -400,6 +410,7 @@ describe('WatchPlayer up next', () => {
                 upNext={upNext}
                 played={[]}
                 shuffledFrom={null}
+                isFromStart={false}
                 backTo="/libraries/2"
               />
             }
@@ -452,6 +463,7 @@ describe('WatchPlayer title art', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -474,6 +486,7 @@ describe('WatchPlayer title art', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -496,6 +509,7 @@ describe('WatchPlayer title art', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -527,6 +541,7 @@ describe('WatchPlayer sessions', () => {
                 upNext={[]}
                 played={[]}
                 shuffledFrom={null}
+                isFromStart={false}
                 backTo="/libraries/2"
               />
             }
@@ -577,6 +592,7 @@ describe('WatchPlayer sessions', () => {
                 upNext={[]}
                 played={[]}
                 shuffledFrom={null}
+                isFromStart={false}
                 backTo="/libraries/2"
               />
             }
@@ -615,6 +631,7 @@ describe('WatchPlayer sessions', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -645,6 +662,7 @@ describe('WatchPlayer markers', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -693,6 +711,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -710,6 +729,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -731,6 +751,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={[mediaItem({ id: 8 }), mediaItem({ id: 9 })]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -766,6 +787,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={[]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -773,6 +795,29 @@ describe('WatchPlayer Open in Raven', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
     expect(open.mock.calls).toEqual([
       [playLinkFor({ origin: window.location.origin, mediaId: 7, at: 600, next: [] })],
+    ])
+  })
+
+  it('opens a title played from the beginning at the start, past its saved position', async () => {
+    const open = opened()
+    setBrowserSupport(() => false)
+    usePlayerPrefs.setState({ opensInRavenPlayer: true })
+    renderWithProviders({
+      ui: (
+        <Player
+          media={mediaItem({ position: 600, duration: 7200 })}
+          session={SINGLE}
+          upNext={[]}
+          played={[]}
+          shuffledFrom={null}
+          isFromStart
+          backTo="/libraries/2"
+        />
+      ),
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Raven' }))
+    expect(open.mock.calls).toEqual([
+      [playLinkFor({ origin: window.location.origin, mediaId: 7, at: 0, next: [] })],
     ])
   })
 
@@ -791,6 +836,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={[mediaItem({ id: 8 })]}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),
@@ -828,6 +874,7 @@ describe('WatchPlayer Open in Raven', () => {
           upNext={upNext}
           played={[]}
           shuffledFrom={null}
+          isFromStart={false}
           backTo="/libraries/2"
         />
       ),

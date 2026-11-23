@@ -179,6 +179,13 @@
  * under a media query, and @raven/ui ships no SCSS to share.
  */
 @media (max-width: 40rem) {
+  // The phone app's size for a library's name.
+  .title {
+    font-size: var(--font-size-xl);
+    line-height: var(--line-tight);
+    letter-spacing: normal;
+  }
+
   .heading {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
@@ -193,15 +200,37 @@
     text-align: left;
   }
 
+  /*
+   * The tabs as the phone app's page toggles: a row of square icon chips, the
+   * open one lit in the leaf where the app leaves it out, so the web keeps
+   * saying where it is; the counts stay for a wider screen.
+   */
   .tabs {
-    grid-auto-columns: minmax(max-content, 1fr);
-    gap: 0;
+    grid-auto-columns: var(--field-size);
+    gap: var(--space-1);
+    border-bottom: 0;
   }
 
   .tab {
-    gap: var(--space-0);
     justify-content: center;
-    padding: var(--space-2) var(--space-1);
+    min-height: var(--field-size);
+    padding: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-moss);
+    color: var(--color-bark);
+
+    &::after {
+      display: none;
+    }
+
+    &[aria-current='page'] {
+      background: var(--color-leaf);
+      color: var(--color-on-leaf);
+    }
+  }
+
+  .tabCount {
+    display: none;
   }
 
   .tabLabel {
@@ -360,4 +389,46 @@
 
 .musicShuffle {
   grid-area: shuffle;
+}
+
+/*
+ * A phone's music toolbar is the phone app's chips: the search as an
+ * underline in the display face over Shuffle, the sort with its choice, the
+ * direction and Play, each but the sort its icon alone, its words still read aloud.
+ */
+@media (max-width: 30rem) {
+  .musicToolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'search search search search'
+      'shuffle sort order play';
+    gap: var(--space-1);
+  }
+
+  .musicToolbar .musicSearch {
+    min-height: var(--field-size);
+    border: 0;
+    border-bottom: 1px solid var(--color-line);
+    border-radius: 0;
+    background: transparent;
+    font-family: var(--font-display);
+    font-size: var(--font-size-xl);
+
+    &:focus-visible {
+      border-bottom-color: var(--color-bark);
+      box-shadow: none;
+    }
+  }
+
+  .musicToolbar :is(.musicOrder, .musicPlay, .musicShuffle) {
+    min-width: var(--field-size);
+    min-height: var(--field-size);
+    gap: 0;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .musicToolbar :is(.musicOrder, .musicShuffle) {
+    background: var(--color-moss);
+  }
 }

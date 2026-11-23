@@ -9,5 +9,6 @@ export const PLAYABLE_ITEM_VIEW_COPY = {
   timeLeft: (left: string) => `${left} left`,
   playTitle: (title: string) => `Play ${title}`,
   resumeFrom: (position: string) => `Resume from ${position}`,
+  fromStart: 'Play from the beginning',
   neighbourLabel: ({ direction, title }: NeighbourLabelProps) => `${direction}: ${title}`,
 } as const

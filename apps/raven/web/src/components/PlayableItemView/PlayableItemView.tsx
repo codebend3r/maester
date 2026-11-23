@@ -252,8 +252,9 @@ type PlayableItemViewProps = {
 
 /**
  * A movie's or an episode's page once the item, the library's files it
- * shows and the version Play starts are known: the header with Play,
- * favourite and Watched, and with the admin lock off the editors and the
+ * shows and the version Play starts are known: the header with Play (or
+ * Resume, with Play from the beginning beside it), Download, favourite and
+ * Watched, and with the admin lock off the editors and the
  * file's menu (its picture plays too), whether this browser cannot play
  * that version, then the summary beside the file's facts, its versions, an
  * episode's neighbours, the people, a movie's reviews and TMDB's credit.
@@ -289,10 +290,12 @@ export const PlayableItemView = ({
   const back = config.back({ details, primary, libraries: known })
   const tagline = config.tagline(details)
   const play = watchLink({ media: primary })
-  const playLabel =
-    primary.position > 0
-      ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(formatDuration(primary.position))
-      : COMMON_COPY.play
+  const fromStart = watchLink({ media: primary, isFromStart: true })
+  const isStarted = primary.position > 0
+  const resumeAt = formatDuration(primary.position)
+  // Resume shows only its spot, "0:19"; its name says what it does.
+  const playLabel = isStarted ? PLAYABLE_ITEM_VIEW_COPY.resumeFrom(resumeAt) : COMMON_COPY.play
+  const playText = isStarted ? resumeAt : COMMON_COPY.play
   const playPicture = { ...play, label: PLAYABLE_ITEM_VIEW_COPY.playTitle(details.title) }
   const still =
     api.itemImageUrl({
@@ -347,10 +350,19 @@ export const PlayableItemView = ({
           icon="play"
           to={play.to}
           state={play.state}
-          title={playLabel}
+          aria-label={playLabel}
+          data-phone-icon-only={!isStarted || undefined}
         >
-          {playLabel}
+          {playText}
         </ButtonLink>
+        {isStarted && (
+          <ButtonLink
+            icon="reset"
+            to={fromStart.to}
+            state={fromStart.state}
+            aria-label={PLAYABLE_ITEM_VIEW_COPY.fromStart}
+          />
+        )}
         <DownloadButton
           target={{ kind: DOWNLOAD_TARGET_KINDS.media, mediaId: primary.id }}
           isDolbyVisionOnly={primary.isDolbyVisionOnly}

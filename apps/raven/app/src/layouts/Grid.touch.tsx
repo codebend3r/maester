@@ -13,6 +13,7 @@ import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
 import { SCROLL_EVERY_MS, ScrollHomeButton, useScrollHome } from '@/layouts/ScrollHome.touch'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard, isCaptionless, touchCaptionHeightOf } from '@/layouts/TouchCard'
+import { PanelFace, type PanelScale, panelHeightOf } from '@/layouts/PanelCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
@@ -27,6 +28,7 @@ import {
   isRowView,
 } from '@/layouts/gridKit'
 import {
+  type CardRun,
   GRID_ROWS,
   type GridRow,
   type GridRowKind,
@@ -58,6 +60,28 @@ const leastWidthOf = ({ shape, screen }: LeastWidthOfProps): number => {
 
 /** A row of the list and tiles views is at least this wide, so a tablet holds two. */
 const LEAST_ROW_WIDTH = 320
+
+/** A panel is at least the web's wide show card's 17.5rem, so an iPad holds three or four and a phone one. */
+const LEAST_PANEL_WIDTH = 280
+
+/** A panel under the thumb, the web's wide show card: a 6rem poster, its padding and its words. */
+const PANEL_SCALE = {
+  poster: 96,
+  padding: SIZES.space3,
+  gap: SIZES.space3,
+  radius: SIZES.radiusLg,
+  posterRadius: SIZES.radius,
+  title: SIZES.textLg,
+  line: SIZES.textXs,
+} as const satisfies PanelScale
+
+type LeastOfProps = { run: CardRun; isRows: boolean; screen: number }
+
+/** The narrowest a run's card stands: a panel's, a row's, or its shape's. */
+const leastOf = ({ run, isRows, screen }: LeastOfProps): number => {
+  if (run.hasPanels) return LEAST_PANEL_WIDTH
+  return isRows ? LEAST_ROW_WIDTH : leastWidthOf({ shape: run.shape, screen })
+}
 
 /** A tile's picture, by its card's shape. */
 const TILE_WIDTHS = {
@@ -157,7 +181,7 @@ const JumpStrip = ({ jump, room, fontScale, onJump }: JumpStripProps) => {
 type GridRowContext = {
   view: LibraryView
   heightOf: (row: GridRow) => number
-  widthOf: (shape: CardShape) => number
+  widthOf: (run: CardRun) => number
   toggle: ReturnType<typeof useGrid>['toggle']
   onOpen: GridProps['onOpen']
 }
@@ -183,9 +207,30 @@ const CardCell = ({ card, width, grid }: CardCellProps) => (
   <TouchCard card={card} onPress={() => grid.onOpen(card)} width={width} />
 )
 
+type PanelCellProps = GridCellProps
+
+/** A show as the web's wide show card, pressed to open it; a long press opens its menu. */
+const PanelCell = ({ card, width, grid }: PanelCellProps) => {
+  const styles = useStyles()
+  const { onLongPress, menu } = useTouchCard({ card })
+  return (
+    <Pressable
+      accessibilityLabel={cardLabelOf({ card })}
+      accessibilityRole="button"
+      onLongPress={onLongPress}
+      onPress={() => grid.onOpen(card)}
+      style={({ pressed }) => [{ width }, pressed && styles.pressed]}
+    >
+      <PanelFace card={card} scale={PANEL_SCALE} width={width} />
+      {menu}
+    </Pressable>
+  )
+}
+
 const GRID_CELLS = {
   [CARD_LAYOUTS.rows]: RowCell,
   [CARD_LAYOUTS.cards]: CardCell,
+  [CARD_LAYOUTS.panels]: PanelCell,
 } as const satisfies Record<CardLayout, ComponentType<GridCellProps>>
 
 type GridRowPartProps<K extends GridRowKind> = { row: GridRowOf<K>; grid: GridRowContext }
@@ -221,11 +266,11 @@ type CardsRowProps = GridRowPartProps<typeof GRID_ROWS.cards>
 /** A run of cards across the grid. */
 const CardsRow = ({ row, grid }: CardsRowProps) => {
   const styles = useStyles()
-  const Cell = GRID_CELLS[cardLayoutOf(grid.view)]
+  const Cell = GRID_CELLS[cardLayoutOf({ view: grid.view, hasPanels: row.hasPanels })]
   return (
     <View style={[styles.cards, { height: grid.heightOf(row) }]}>
       {row.cards.map((card) => (
-        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row.shape)} />
+        <Cell key={card.key} card={card} grid={grid} width={grid.widthOf(row)} />
       ))}
     </View>
   )
@@ -288,10 +333,13 @@ const Grid = ({
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - left - right,
     gap: GAP,
-    leastOf: (shape) => (isRows ? LEAST_ROW_WIDTH : leastWidthOf({ shape, screen: screen.width })),
+    leastOf: (run) => leastOf({ run, isRows, screen: screen.width }),
   })
   const heightOf = (row: GridRow): number => {
     if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
+    if (row.hasPanels) {
+      return panelHeightOf({ scale: PANEL_SCALE, fontScale: screen.fontScale }) + ROW_GAP
+    }
     if (isRows) {
       const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
       const words =
@@ -300,7 +348,7 @@ const Grid = ({
       return Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, words) + SIZES.space2 * 2
     }
     return (
-      pictureHeightOf({ shape: row.shape, width: widthOf(row.shape) }) +
+      pictureHeightOf({ shape: row.shape, width: widthOf(row) }) +
       (row.cards.every(isCaptionless) ? 0 : touchCaptionHeightOf(screen.fontScale)) +
       ROW_GAP
     )

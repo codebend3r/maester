@@ -318,6 +318,7 @@ export const bugReport = (overrides: Partial<BugReport> = {}): BugReport => ({
   title: 'Busboys (2026)',
   summary: "The MKV container isn't supported here.",
   mediaId: 7,
+  archivedAt: null,
   diagnostics: playbackDiagnostics(),
   ...overrides,
 })

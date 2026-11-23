@@ -3,8 +3,9 @@ export const FAVOURITES_COPY = {
   favourites: 'favourites',
   show: 'Show',
   loading: 'Gathering your favourites',
+  // The phone app's words, so every raven says it the same way.
   empty:
-    "No favourites yet. Press the heart on a movie, show, season, album or artist page, or open a video's menu, from the button in its corner or a right click, and choose Favourite.",
+    'Nothing is a favourite yet. Mark a title, an album or an artist with its heart and it waits here.',
   artists: 'Artists',
   artistsLabel: 'Favourite artists',
   kinds: {

@@ -112,6 +112,14 @@ describe('watchLink', () => {
     })
   })
 
+  it('says when the video starts from the beginning, and reads it back', () => {
+    const media = mediaItem({ id: 9, position: 120 })
+    const { state } = watchLink({ media, isFromStart: true })
+    expect(state.isFromStart).toBe(true)
+    expect(readWatchState({ state, id: 9 })?.isFromStart).toBe(true)
+    expect(watchLink({ media }).state).not.toHaveProperty('isFromStart')
+  })
+
   it('keeps only the last fifty videos played', () => {
     const played = Array.from({ length: 60 }, (_, index) => mediaItem({ id: index + 100 }))
     const kept = watchLink({ media: mediaItem({ id: 9 }), played }).state.played ?? []

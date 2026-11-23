@@ -419,3 +419,10 @@
   border-radius: var(--radius-pill);
   background: var(--color-track);
 }
+
+// On a phone the panel runs the page's width, as the phone app's does, its scores at the left.
+@media (max-width: 40rem) {
+  .panel {
+    justify-self: stretch;
+  }
+}

@@ -1,6 +1,7 @@
 import { CARD_SHAPES, type CardShape } from '@/queries/cards'
 import { pictureHeightOf } from '@/layouts/Card'
 import { focusCardWidthOf } from '@/layouts/FocusCard'
+import type { PanelScale } from '@/layouts/PanelCard'
 import { GRID_SIZE_COPY } from '@/layouts/copy'
 import { GRID_SIZES, type GridSize } from '@/stores/appPrefs'
 import { linesHeightOf } from '@/layouts/textHeights'
@@ -100,3 +101,33 @@ export const cardWidthForRows = ({
 
 /** Rows drawn at once: a screen's worth of the smallest posters, with one more coming into view. */
 export const GRID_ROWS_AT_ONCE = 4
+
+/** How panels are laid out on a TV: the narrowest one stands, and how it is drawn. */
+type PanelFit = { least: number; scale: PanelScale }
+
+/** How a grid size draws panels on a TV: the narrowest a panel stands and its poster's width, on a 1920 point screen. */
+const PANEL_FITS = {
+  [GRID_SIZES.small]: { least: 400, poster: 104 },
+  [GRID_SIZES.medium]: { least: 520, poster: 136 },
+  [GRID_SIZES.large]: { least: 680, poster: 176 },
+} as const satisfies Record<GridSize, Pick<PanelFit, 'least'> & Pick<PanelScale, 'poster'>>
+
+/**
+ * How panels, the web's wide show cards, are sized on a TV for a grid size: the narrowest one
+ * stands, so Medium holds three across, and how its poster, padding and words are drawn.
+ */
+export const panelFitOf = (size: GridSize): PanelFit => {
+  const fit = PANEL_FITS[size]
+  return {
+    least: tvSize(fit.least),
+    scale: {
+      poster: tvSize(fit.poster),
+      padding: TV_SIZES.space3,
+      gap: TV_SIZES.space4,
+      radius: TV_SIZES.radiusLg,
+      posterRadius: TV_SIZES.radius,
+      title: TV_SIZES.textLg,
+      line: TV_SIZES.text,
+    },
+  }
+}

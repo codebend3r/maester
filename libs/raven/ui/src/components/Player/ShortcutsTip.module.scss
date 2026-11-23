@@ -74,3 +74,10 @@
     outline-color: var(--color-on-picture);
   }
 }
+
+// A phone or a touch screen has no keyboard to teach, and the phone app has no such tip.
+@media (max-width: 40rem), (hover: none) {
+  .layer {
+    display: none;
+  }
+}

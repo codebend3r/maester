@@ -113,6 +113,22 @@
   line-height: var(--line-heading);
 }
 
+// The title opens the arrival's page, in the title's own look.
+.titleLink {
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+}
+
+// A phone's way of saying which arrival is up; wider screens have Previous, Next and the count.
+.dots {
+  display: none;
+}
+
 /*
  * Room for three lines whether or not the words have come, so the buttons
  * under them hold still as the arrivals change.
@@ -328,5 +344,145 @@
     grid-template-areas:
       'buttons'
       'facts';
+  }
+}
+
+/*
+ * A phone's hero is the phone app's (`HomeHero.touch`): the arrival's backdrop
+ * edge to edge, darkened at the top and the foot, with its words over the
+ * foot inside the gutter, one button (Play, or Details where there is nothing
+ * to play), dots for which is up, and a swipe or a tap on the title to move
+ * or open it. The fan and the Previous and Next buttons stay on wider screens.
+ */
+@media (max-width: 40rem) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: 'slide';
+    gap: 0;
+    min-height: max(60svh, 18.75rem);
+    padding-bottom: var(--space-4);
+    color: var(--color-on-picture);
+  }
+
+  .wash {
+    inset: 0 calc(-1 * var(--gutter));
+    width: auto;
+    height: auto;
+    background: var(--color-stage);
+
+    &::after {
+      content: '';
+      grid-area: wash;
+      background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-stage) 45%, transparent),
+        transparent 20%,
+        transparent 35%,
+        color-mix(in srgb, var(--color-stage) 95%, transparent)
+      );
+    }
+  }
+
+  .backdrop {
+    filter: none;
+    mask-image: none;
+  }
+
+  .shown {
+    opacity: 1;
+  }
+
+  .stack,
+  .controls,
+  .besidePlay {
+    display: none;
+  }
+
+  .slide {
+    grid-template-areas:
+      'eyebrow'
+      'title'
+      'facts'
+      'line'
+      'buttons';
+    gap: var(--space-1);
+  }
+
+  .actions {
+    display: contents;
+  }
+
+  .buttons {
+    position: relative;
+    z-index: 1;
+    padding-top: var(--space-3);
+  }
+
+  .eyebrow {
+    grid-area: eyebrow;
+    color: var(--color-on-picture-soft);
+
+    &::before {
+      display: none;
+    }
+  }
+
+  .title {
+    grid-area: title;
+    font-size: calc(var(--font-size-xl) * 1.3);
+    line-height: var(--line-tight);
+    letter-spacing: normal;
+  }
+
+  .long {
+    font-size: calc(var(--font-size-xl) * 1.1);
+  }
+
+  .longest {
+    font-size: calc(var(--font-size-xl) * 0.9);
+  }
+
+  // The whole slide opens the arrival's page, as the phone app's picture does; Play sits over it.
+  .titleLink::after {
+    position: absolute;
+    inset: 0 calc(-1 * var(--gutter));
+    content: '';
+  }
+
+  .facts {
+    color: var(--color-on-picture-soft);
+  }
+
+  .line {
+    grid-area: line;
+    min-height: 0;
+    color: var(--color-on-picture);
+    font-size: var(--font-size-sm);
+  }
+
+  // Level with the button, at the hero's right.
+  .dots {
+    grid-area: slide;
+    align-self: end;
+    justify-self: end;
+    display: grid;
+    grid-auto-flow: column;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: var(--control-size);
+  }
+
+  .dot {
+    width: var(--space-1);
+    height: var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--color-on-picture-soft);
+    opacity: 0.5;
+  }
+
+  .dotUp {
+    background: var(--color-on-picture);
+    opacity: 1;
   }
 }

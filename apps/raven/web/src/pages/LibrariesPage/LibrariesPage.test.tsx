@@ -766,7 +766,7 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(async () => [library({ id: 2, name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage />, route: '/libraries', behind: ['/'] })
     expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+    expect(screen.getAllByRole('link', { name: 'Home' })).toHaveLength(1)
   })
   describe('folded cards and the order', () => {
     const three = () => [

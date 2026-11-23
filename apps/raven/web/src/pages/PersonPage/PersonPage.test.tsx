@@ -733,7 +733,8 @@ describe('PersonPage', () => {
     renderPerson({ behind: ['/movies/1'] })
     await screen.findByRole('heading', { level: 1, name: 'Keanu Reeves' })
     expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Home' })).toBeNull()
+    // Beside it, a phone's Home button.
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
     cleanup()
     renderPerson()
     await screen.findByRole('heading', { level: 1, name: 'Keanu Reeves' })
