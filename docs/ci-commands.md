@@ -32,4 +32,6 @@ The ✅ Checks job lives in `.github/workflows/pull-request-checks.yml`. The nat
 
 `bun run web:e2e` runs the 🌐 Web end to end job the same way, though its name has no `ci:` prefix: Playwright drives the web app against a fixture server. It needs Chrome and ffmpeg.
 
+`bun run e2e` runs every end to end job above and `web:e2e` one after another (web, the Mac desktop, iPhone, Wren, Apple TV, Android TV), stopping at the first failure. It needs everything each of them needs.
+
 [All commands](commands.md) lists every root script.

@@ -1,6 +1,6 @@
 import type { IconName } from '@raven/ui/iconDrawings'
 import { useRootNavigationState } from 'expo-router'
-import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Pressable,
   StyleSheet,
@@ -12,7 +12,7 @@ import {
 import { BUTTON_TONES } from '@raven/native/headless'
 
 import { useToneStyles } from '@/layouts/formStyles'
-import { useReturnAsks } from '@/layouts/focus'
+import { type IsInFront, useReturnAsks } from '@/layouts/focus'
 import { frontRouteKeyOf } from '@/layouts/frontRoute'
 import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
@@ -163,7 +163,12 @@ export const NowPlayingStrip = ({
   useEffect(() => {
     if (front !== null) takeOpener({ screen: front, card: STRIP_PLACE })
   }, [front])
-  useReturnAsks({ screen: front, card: STRIP_PLACE, view })
+  const latestFront = useRef(front)
+  useEffect(() => {
+    latestFront.current = front
+  })
+  const isInFront = useCallback<IsInFront>(({ screen }) => latestFront.current === screen, [])
+  useReturnAsks({ screen: front, card: STRIP_PLACE, view, isInFront })
   // Music started: the remote goes up to the strip, to pause or skip at once.
   const startCount = useMusicStarts((starts) => starts.started)
   const met = useMusicStarts((starts) => starts.met)

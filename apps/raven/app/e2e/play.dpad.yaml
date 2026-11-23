@@ -48,8 +48,8 @@ tags:
       text: Position, ${output.ahead} of .*
       focused: true
     timeout: 10000
-# Back leaves the player for the page, which offers to resume from the spot it skipped to.
-- pressKey: Back
+# Back, twice with the controls up, leaves the player for the page, which offers to resume from the spot it skipped to.
+- runFlow: steps/leavePlayer.dpad.yaml
 - extendedWaitUntil:
     visible:
       text: Resume from ${output.ahead}

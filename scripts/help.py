@@ -368,6 +368,11 @@ GROUPS: tuple[Group, ...] = (
                 "The 🌐 Web end to end job: Playwright drives the web app against a fixture server.",
                 "Chrome + ffmpeg",
             ),
+            Command(
+                "e2e",
+                "Every end to end job, one after another: web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.",
+                "macOS + Xcode + Android SDK",
+            ),
         ),
     ),
     Group(

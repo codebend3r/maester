@@ -1,5 +1,5 @@
 import { useNavigation, useRoute } from 'expo-router'
-import { type RefObject, useEffect, useRef } from 'react'
+import { type RefObject, useCallback, useEffect, useRef } from 'react'
 import type { LayoutChangeEvent } from 'react-native'
 
 import { requestTVFocus } from '@/layouts/tvFocus'
@@ -99,10 +99,16 @@ export const useScreenFocusScope = (): OpeningFocus => {
   return useOpeningFocus()
 }
 
+type IsInFrontProps = { screen: string }
+
+/** Whether the screen `screen` is still the one in front; stable for as long as its caller lives. */
+export type IsInFront = (props: IsInFrontProps) => boolean
+
 type UseReturnAsksProps = {
   screen: string | null
   card: string
   view: RefObject<unknown>
+  isInFront: IsInFront
 }
 
 /**
@@ -118,11 +124,12 @@ const LAST_ASK_MS = 400
 /**
  * The asks of the card the screen `screen` names as taking the focus back: once as it is
  * returning, again as the transition that brings the screen back ends (`asked`), and a last
- * time `LAST_ASK_MS` later, for tvOS, whose engine can refuse that one too. Each follows the
+ * time `LAST_ASK_MS` later while the screen is still in front, for tvOS, whose engine can
+ * refuse that one too. Each follows the
  * store's word in an effect, so a layout that reads the same word in a layout effect (Home's
  * shelves, which bring the card's shelf into view) acts before it.
  */
-export const useReturnAsks = ({ screen, card, view }: UseReturnAsksProps): void => {
+export const useReturnAsks = ({ screen, card, view, isInFront }: UseReturnAsksProps): void => {
   const isReturning = useScreenFocus(
     (state) =>
       screen !== null && isCardInPhase({ state, screen, card, phase: RESTORE_PHASES.returning }),
@@ -145,9 +152,15 @@ export const useReturnAsks = ({ screen, card, view }: UseReturnAsksProps): void 
     if (screen === null || !isAsked) return
     spendAsk({ screen })
     requestTVFocus(view.current)
-    // Kept past `isAsked` turning false, which spending the ask does at once; cleared only as the view goes.
-    lastAsk.current = setTimeout(() => requestTVFocus(view.current), LAST_ASK_MS)
-  }, [isAsked, screen, view])
+    /*
+     * Kept past `isAsked` turning false, which spending the ask does at once; cleared only as the
+     * view goes. A screen pushed over this one within the wait keeps the focus: asked from a
+     * screen behind it, the card took the remote off Android TV's screen altogether.
+     */
+    lastAsk.current = setTimeout(() => {
+      if (isInFront({ screen })) requestTVFocus(view.current)
+    }, LAST_ASK_MS)
+  }, [isAsked, isInFront, screen, view])
 }
 
 type UseOpenerFocusProps = {
@@ -176,7 +189,9 @@ export const useOpenerFocus = ({
     return () => drawCard({ screen, card: place, isDrawn: false })
   }, [screen, place])
   useScreenTurn({ isToFront: true, onTurn: () => takeOpener({ screen, card: place }) })
-  useReturnAsks({ screen, card: place, view })
+  const navigation = useNavigation()
+  const isInFront = useCallback<IsInFront>(() => navigation.isFocused(), [navigation])
+  useReturnAsks({ screen, card: place, view, isInFront })
   return { remember: () => rememberOpener({ screen, card: place, shelf }) }
 }
 

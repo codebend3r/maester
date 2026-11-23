@@ -10,9 +10,8 @@ set -euo pipefail
 # shellcheck source=scripts/local_ci_app.sh
 source "$(dirname "$0")/local_ci_app.sh"
 
-# CI's simulator, by name and device type; a runtime with no such iPhone takes its newest.
+# CI's simulator, by name; its device type is find_iphone_type's.
 WREN_SIMULATOR=wren-phone
-WREN_DEVICE_TYPE=com.apple.CoreSimulator.SimDeviceType.iPhone-16
 WREN_APP=apps/raven/music/build/ios/Build/Products/Release-iphonesimulator/Wren.app
 
 export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
@@ -28,8 +27,8 @@ install_maestro
 prepare_app
 
 step 'Boot the iPhone simulator'
-device_type="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$SIM_RUNTIME" --arg type "$WREN_DEVICE_TYPE" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier == $type)) + .) | first | .identifier')"
-boot_simulator "$WREN_SIMULATOR" "$device_type"
+find_iphone_type
+boot_simulator "$WREN_SIMULATOR" "$IPHONE_TYPE"
 
 step "Build Wren for the iPhone simulator"
 CURL_HOME="$WORK" bunx nx run @raven/music:build:ios --excludeTaskDependencies

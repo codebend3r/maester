@@ -47,7 +47,7 @@ tags:
       focused: true
     timeout: 10000
 - pressKey: Remote Dpad Right
-- pressKey: Back
+- runFlow: steps/leavePlayer.dpad.yaml
 - extendedWaitUntil:
     visible:
       text: Lantern Bay

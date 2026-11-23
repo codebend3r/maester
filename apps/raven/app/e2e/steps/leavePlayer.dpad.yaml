@@ -1,0 +1,12 @@
+appId: io.github.codebend3r.raven.app
+name: Leave the TV player with the controls showing, by Back twice
+# With the controls up, Back clears them for an unobstructed picture and only a second press
+# leaves the player. The controls going is read off the line: the hidden state's catcher is not
+# drawn while the up next card is offered, as it is over a short episode's last seconds. Where
+# the second press lands is the caller's to wait for.
+---
+- pressKey: Back
+- extendedWaitUntil:
+    notVisible: Position, .*
+    timeout: 10000
+- pressKey: Back
