@@ -118,6 +118,10 @@ export const LIBRARIES_COPY = {
   none: 'No libraries here yet. An admin adds them on the web.',
   showMore: (library: string) => `Show more of ${library}`,
   showLess: (library: string) => `Show less of ${library}`,
+  /** The Pin toggle, the web's: its words for the eye, and one name aloud whatever its state. */
+  pin: 'Pin',
+  pinned: 'Pinned',
+  pinName: (library: string) => `Pin ${library}`,
 } as const
 
 export const SETTINGS_COPY = {
@@ -141,6 +145,40 @@ export const SETTINGS_COPY = {
   subtitlesNote: 'How subtitles look on every video, on every device this account signs in on.',
   subtitleSize: 'Size',
   subtitleColour: 'Colour',
+} as const
+
+/** Settings' Servers section, in the web's words but the https ones, which a device has no page to need. */
+export const SERVERS_COPY = {
+  heading: 'Servers',
+  help: 'Where this app finds its media. The server in use gives every library, picture and stream; your servers and pins follow your account to every device.',
+  home: 'Home',
+  inUse: 'In use',
+  tags: (tags: readonly string[]) => tags.join(' · '),
+  use: 'Use',
+  switchToName: (name: string) => `Use ${name}`,
+  rename: 'Rename',
+  renameName: (name: string) => `Rename ${name}`,
+  newName: 'New name',
+  save: 'Save',
+  cancel: 'Cancel',
+  remove: 'Remove',
+  removeName: (name: string) => `Remove ${name}`,
+  badName: 'A name needs 1 to 80 characters, with no hidden ones.',
+  add: 'Add server',
+  adding: 'Checking',
+  address: 'Server address',
+  addressHint: 'Its address, as https://raven.example.com:8443.',
+  signInToAdd: 'Sign in to keep more servers on your account.',
+  failed: (message: string) => `That did not work: ${message}`,
+  problems: {
+    address:
+      'That is not a server address. Type its http or https address, with its port if it has one.',
+    listed: 'That server is already on your list.',
+    full: 'Your list is full. Remove a server first.',
+    unreachable: 'That server did not answer. Check the address and try again.',
+    tooOld: 'That server is too old to switch to. Update it first.',
+    signedOut: 'Sign in to keep more servers on your account.',
+  },
 } as const
 
 export const SIGN_IN_COPY = {

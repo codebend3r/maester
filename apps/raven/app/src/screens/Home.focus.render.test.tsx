@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { type Hero, type Home as HomeAnswer, isRecord } from '@raven/core'
+import { type FetchLike, type Hero, type Home as HomeAnswer, isRecord } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -11,6 +11,14 @@ import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, itemTarget } from 
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
 import { useReduceMotion } from '@/stores/reduceMotion'
+import {
+  type AccountData,
+  HOME_SERVER_ID,
+  MELEYS,
+  accountDataOf,
+  accountFetchOf,
+  signInTestAccount,
+} from '@/test/accountData'
 import { FILMS, HERO, HOME, NAS, SEVERANCE_PAGE, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
@@ -32,10 +40,17 @@ const mockHome: { answer: Promise<void>; home: HomeAnswer | null; hero: Hero | n
   home: null,
   hero: null,
 }
+/** Meleys' own library, named as home's Films is, which only its server's name tells apart. */
+const MELEYS_FILMS = { ...FILMS, id: 5 }
+
+let mockAccount: AccountData = accountDataOf()
+const mockAccountFetch: FetchLike = (url, init) => accountFetchOf(mockAccount)(url, init)
+
 const mockApi = jest.fn((server: AppServer) => {
   const api = homeApi(server)
   return {
     ...api,
+    listLibraries: async () => (server.id === MELEYS.id ? [MELEYS_FILMS] : api.listLibraries()),
     getHome: async () => {
       await mockHome.answer
       return mockHome.home ?? api.getHome()
@@ -67,6 +82,7 @@ jest.mock('react-native/Libraries/Components/TV/TVEventHandler', () =>
 )
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
+  openFetch: ((url, init) => mockAccountFetch(url, init)) satisfies FetchLike,
   apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => ({}), forget: async () => {} },
@@ -520,5 +536,56 @@ describe("Home's hero on a TV", () => {
     await screen.findByRole('header', { name: 'Films' })
     expect(screen.queryByText('FEATURED IN FILMS')).toBeNull()
     expect(preferred()).toEqual(['Busboys'])
+  })
+})
+
+describe("Home's side menu on a TV, with the account's servers", () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    resetTestScreen()
+    mockHome.answer = Promise.resolve()
+    mockHome.home = null
+    mockHome.hero = null
+    // NAS stands in for home here, as the fake answers its Home.
+    useActiveServer.setState({
+      home: NAS,
+      servers: [NAS, MELEYS],
+      activeId: NAS.id,
+      homeServerId: HOME_SERVER_ID,
+    })
+    mockAccount = accountDataOf({
+      pins: [
+        { serverId: HOME_SERVER_ID, libraryId: FILMS.id, pinnedAt: '1' },
+        { serverId: MELEYS.id, libraryId: MELEYS_FILMS.id, pinnedAt: '2' },
+      ],
+    })
+    signInTestAccount()
+  })
+
+  it('lists the pins of every server, and opens one on another server by switching to it', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'Films' })).toHaveLength(2))
+    const [, onMeleys] = screen.getAllByRole('link', { name: 'Films' })
+    await fireEvent.press(onMeleys)
+    expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+    expect(mockPush).toHaveBeenCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.library, libraryId: MELEYS_FILMS.id, query: '' }),
+    )
+  })
+
+  it('names the server in use at the head of the menu, and switches from its list', async () => {
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    await fireEvent.press(screen.getByRole('link', { name: `Server: ${NAS.name}` }))
+    await fireEvent.press(await screen.findByRole('button', { name: MELEYS.name }))
+    expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+  })
+
+  it('has no server row while the account keeps one server', async () => {
+    useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
+    await renderHome()
+    await screen.findByRole('header', { name: 'Films' })
+    expect(screen.queryByRole('link', { name: `Server: ${NAS.name}` })).toBeNull()
   })
 })

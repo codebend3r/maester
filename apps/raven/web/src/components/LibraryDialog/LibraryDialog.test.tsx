@@ -141,7 +141,6 @@ describe('LibraryDialog', () => {
         paths: ['/media/Movies'],
         settings: {
           saveProgress: true,
-          pinned: true,
           inHero: true,
           sort: 'year-new',
           view: 'grid',
@@ -172,7 +171,6 @@ describe('LibraryDialog', () => {
       paths: ['/media/Clips'],
       settings: {
         saveProgress: false,
-        pinned: true,
         inHero: true,
         sort: 'year-new',
         view: 'grid',
@@ -393,7 +391,6 @@ describe('LibraryDialog', () => {
     expect(
       screen.getByRole('checkbox', { name: 'Save where each video stopped' }),
     ).not.toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Pin to the side menu' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Refresh automatically' })).not.toBeChecked()
   })
 

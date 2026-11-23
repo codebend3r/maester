@@ -24,7 +24,7 @@ import type { AccountKey } from '@/media/viewingAccountKeys'
 import { QUERY_PARAMS } from '@/queryValues'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 
-/** How many of a pinned library's newest releases its shelf on the home page holds. */
+/** How many of a library's newest releases its shelf on the home page holds. */
 const SHELF_SIZE = 50
 
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
@@ -73,7 +73,7 @@ export class HomeController {
       .filter((library) => !library.settings.locked && viewer.seesLibrary(library.id))
   }
 
-  /** Every video in progress with the poster its card shows, then each pinned library's newest releases. */
+  /** Every video in progress with the poster its card shows, then each library's newest releases. */
   @Get()
   home(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): Home {
     const libraries = this.onHome(this.lock.viewer({ request }))
@@ -82,28 +82,26 @@ export class HomeController {
       inProgress: this.media.withPosters(
         this.media.listInProgress({ account }).filter(({ libraryId }) => shown.has(libraryId)),
       ),
-      shelves: libraries
-        .filter((library) => library.settings.pinned)
-        .map((library) =>
-          this.shelf({
-            library,
-            search: '',
-            sort: MEDIA_SORTS.yearNew,
-            limit: SHELF_SIZE,
-            account,
-          }),
-        ),
+      shelves: libraries.map((library) =>
+        this.shelf({
+          library,
+          search: '',
+          sort: MEDIA_SORTS.yearNew,
+          limit: SHELF_SIZE,
+          account,
+        }),
+      ),
     }
   }
 
   /**
-   * A shelf of albums for each pinned music library, the newest release
+   * A shelf of albums for each music library, the newest release
    * first, read apart from the shelves.
    */
   @Get('albums')
   albums(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): AlbumShelf[] {
     return this.onHome(this.lock.viewer({ request }))
-      .filter((library) => library.settings.pinned && isMusicLibrary(library))
+      .filter((library) => isMusicLibrary(library))
       .map((library) => ({
         libraryId: library.id,
         albums: this.music
@@ -131,7 +129,7 @@ export class HomeController {
   }
 
   /**
-   * What `?q=` finds in every library, pinned or not, by title: a row for
+   * What `?q=` finds in every library, by title: a row for
    * each library holding a match, and nothing for a blank search. Locked
    * libraries stay out, whether or not the PIN is entered.
    */

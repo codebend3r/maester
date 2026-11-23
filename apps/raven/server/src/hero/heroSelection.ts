@@ -46,7 +46,7 @@ type HeroSelectionCanPickProps = {
 }
 
 /**
- * What home's hero shows, from the pinned libraries the caller may see that
+ * What home's hero shows, from the libraries the caller may see that
  * are not left out of it, and never from a locked one. The movies and shows the admin picked, in the order
  * they were picked, first; then each library's most recently released title,
  * then each one's second, and so on, to fill what the picks leave. At most
@@ -69,17 +69,14 @@ export class HeroSelection {
   }
 
   /**
-   * The libraries the hero draws on for this caller: pinned, included, and
+   * The libraries the hero draws on for this caller: included, and
    * seen. A locked library is never one, for anyone, unlocked or not, so
    * nothing of it can reach the hero.
    */
-  private pinnedFor(viewer: Viewer): LibraryRecord[] {
+  private heroLibrariesFor(viewer: Viewer): LibraryRecord[] {
     return this.libraries
       .list()
-      .filter(
-        ({ id, settings }) =>
-          settings.pinned && settings.inHero && !settings.locked && viewer.seesLibrary(id),
-      )
+      .filter(({ id, settings }) => settings.inHero && !settings.locked && viewer.seesLibrary(id))
   }
 
   /** The titles among `itemIds` that `library` holds and the hero can lay out, in the order given. */
@@ -125,15 +122,15 @@ export class HeroSelection {
   }
 
   entries({ viewer, account }: HeroSelectionEntriesProps): Hero {
-    const pinned = this.pinnedFor(viewer)
+    const libraries = this.heroLibrariesFor(viewer)
     const picked = this.picks.picks()
     const chosen =
       picked.length === 0
         ? []
         : distinct(
-            pinned.flatMap((library) => this.candidates({ library, itemIds: picked, account })),
+            libraries.flatMap((library) => this.candidates({ library, itemIds: picked, account })),
           ).toSorted((a, b) => picked.indexOf(a.itemId) - picked.indexOf(b.itemId))
-    const lists = pinned.map((library) => this.newestIn({ library, account }))
+    const lists = libraries.map((library) => this.newestIn({ library, account }))
     const depth = Math.max(0, ...lists.map((list) => list.length))
     const rounds = Array.from({ length: depth }, (_, round) =>
       lists.flatMap((list) => list.slice(round, round + 1)),
@@ -141,9 +138,9 @@ export class HeroSelection {
     return this.withLines(distinct([...chosen, ...rounds.flat()]).slice(0, this.limit))
   }
 
-  /** Whether `itemId` is a movie or show held by a pinned library `viewer` may see, so the admin may pick it. */
+  /** Whether `itemId` is a movie or show held by a hero library `viewer` may see, so the admin may pick it. */
   canPick({ itemId, viewer, account }: HeroSelectionCanPickProps): boolean {
-    return this.pinnedFor(viewer).some(
+    return this.heroLibrariesFor(viewer).some(
       (library) => this.candidates({ library, itemIds: [itemId], account }).length > 0,
     )
   }

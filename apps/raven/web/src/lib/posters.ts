@@ -91,9 +91,11 @@ const NARROWEST: Record<PosterSizes, number> = {
  * rounding down between two (checked in Chrome 155), so that is the test.
  */
 const needsOwnWidth = (sizes: PosterSizes): boolean =>
-  api.posterWidths.every(
-    (width) => width === POSTER_OWN_WIDTH || width < NARROWEST[sizes] * window.devicePixelRatio,
-  )
+  api
+    .posterWidths()
+    .every(
+      (width) => width === POSTER_OWN_WIDTH || width < NARROWEST[sizes] * window.devicePixelRatio,
+    )
 
 type PosterSourcesProps = {
   item: Pick<ItemSummary, 'id' | 'posterVersion'>

@@ -2,7 +2,8 @@ type Listener = () => void
 
 /**
  * Tells whoever listens that something happened to the page's account: its sign-in ended
- * (`accessEnds`), or the account signed in changed (`accountSwitches`). One listener's failure
+ * (`accessEnds`), or the account signed in changed (`accountSwitches`), and that the page
+ * switched servers (`ActiveServer.switches`). One listener's failure
  * never keeps the rest from hearing it.
  */
 export type AccountSignal = {

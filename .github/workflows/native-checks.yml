@@ -9,8 +9,8 @@ name: 🧱 Native checks
 # shows here, after the merge, and emails the pusher, as any failed run on main does.
 # The device apps' screen tests (`test:screens`) run here too, and on no pull request.
 #
-# Every job is listed here: no workflow is called and no job is a matrix row. The selection is the
-# pull request's, the same down to its steps; `test_native_ci.py` fails when the two differ. What a
+# Every job is listed here: no workflow is called and no job is a matrix row. A pull request
+# selects nothing and builds every group; the selection here picks the flows a push runs. What a
 # device needs is its job's `APP_*` variables, and the end to end jobs share one list of steps.
 on:
   push:
@@ -59,8 +59,8 @@ jobs:
       desktop_run: ${{ steps.plan.outputs.desktop_run }}
       desktop_sha: ${{ steps.plan.outputs.desktop_sha }}
     steps:
-      # The run's own commit, which the script reads as GITHUB_SHA: a pull request's merge
-      # commit with its base, a push's head. The whole history, so Nx can diff it against the base.
+      # The run's own commit, the push's head, which the script reads as GITHUB_SHA. The whole
+      # history, so Nx can diff it against the base.
       - name: 📥 Checkout
         uses: actions/checkout@v7
         with:

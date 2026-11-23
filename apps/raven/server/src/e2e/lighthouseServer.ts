@@ -14,8 +14,8 @@ import { type FakeMovie, type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
  * raven's, a film library and a series library, each with more titles than Home's shelf of eight
  * shows, and a few titles partway watched, so Home opens on its hero, Continue watching and a full
  * shelf for each, as it does on Vhagar; for Wren's, a music library of more albums than its Home
- * shows, each with a cover as heavy as a real one. The music library is neither pinned nor in the
- * hero, so raven's Home is as it was without it. Every picture is a JPEG as heavy as TMDB's own at that size
+ * shows, each with a cover as heavy as a real one. The music library is not in the hero, so
+ * raven's hero is as it was without it. Every picture is a JPEG as heavy as TMDB's own at that size
  * (`encodePicture`), since the hero's backdrop and the posters are most of what Home loads. The
  * videos are copies of one short clip: Home reads their listing, never their bytes.
  */
@@ -293,7 +293,7 @@ await runFixture({
       {
         name: LIBRARIES.music,
         paths: [join(folders.media, 'music')],
-        settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
+        settings: { kind: LIBRARY_KINDS.music, inHero: false },
       },
     ]
   },

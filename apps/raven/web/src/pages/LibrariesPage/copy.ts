@@ -5,8 +5,11 @@ const count = new Intl.NumberFormat()
 export const LIBRARIES_COPY = {
   libraries: (n: number) => plural({ n, one: 'library', many: 'libraries' }),
   pinnedTitle:
-    'Pinned: this library has its own link in the side menu and a row on Home. Press to unpin it.',
-  pinTitle: 'Pin this library: give it its own link in the side menu and a row on Home.',
+    'Pinned: this library has its own link in the side menu and a row on Home, on every device you sign in on. Press to unpin it.',
+  pinTitle:
+    'Pin this library: give it its own link in the side menu and a row on Home, on every device you sign in on.',
+  pinsFull: (cap: number) =>
+    `You have pinned ${cap} libraries, the most an account keeps. Unpin one first.`,
   pinned: 'Pinned',
   pin: 'Pin',
   pinName: (name: string) => `Pin ${name}`,

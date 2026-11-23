@@ -6,6 +6,7 @@ import { AUTH_ROUTES } from '@raven/core'
 import { downloadsPageFor, isFilePlaying, isOfflinePage, offlineReturnOf } from '@/desktop/paths'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { signInPath } from '@/lib/authRoutes'
+import { switchTo, useHomeServer, useIsAway } from '@/lib/servers'
 import { queryKeys } from '@raven/ui/headless'
 import { AUTH_GATE_COPY } from '@/components/AuthGate/copy'
 import { RavenLoader } from '@/components/RavenLoader/RavenLoader'
@@ -17,21 +18,32 @@ const Loading = () => <RavenLoader isFullscreen shouldShowLabel={false} />
 
 type RetryProps = { title: string; message: string }
 
+/**
+ * A screen to try again from. On another server than the home one, which may be the one that
+ * failed, it also offers the way back home.
+ */
 const Retry = ({ title, message }: RetryProps) => {
   const queryClient = useQueryClient()
   const isRetrying = useIsFetching({ queryKey: queryKeys.auth }) > 0
+  const isAway = useIsAway()
+  const home = useHomeServer()
   return (
     <main className={styles.screen}>
       <section className={styles.panel}>
         <h1 className={styles.title}>{title}</h1>
         <p className={styles.copy}>{message}</p>
-        <Button
-          tone={BUTTON_TONES.primary}
-          disabled={isRetrying}
-          onClick={() => queryClient.refetchQueries({ queryKey: queryKeys.auth })}
-        >
-          {AUTH_GATE_COPY.tryAgain}
-        </Button>
+        <div className={styles.actions}>
+          <Button
+            tone={BUTTON_TONES.primary}
+            disabled={isRetrying}
+            onClick={() => queryClient.refetchQueries({ queryKey: queryKeys.auth })}
+          >
+            {AUTH_GATE_COPY.tryAgain}
+          </Button>
+          {isAway && (
+            <Button onClick={() => switchTo(home)}>{AUTH_GATE_COPY.backHome(home.name)}</Button>
+          )}
+        </div>
       </section>
     </main>
   )

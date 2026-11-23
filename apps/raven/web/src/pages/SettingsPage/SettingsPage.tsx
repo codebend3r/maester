@@ -11,6 +11,7 @@ import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
 import { CaptionSettings } from '@/pages/SettingsPage/CaptionSettings'
 import { RequestsTab } from '@/pages/SettingsPage/RequestsTab'
 import { ScrobblingSection } from '@/pages/SettingsPage/ScrobblingSection'
+import { ServerSection } from '@/pages/SettingsPage/ServerSection'
 import { SoundSettings } from '@/pages/SettingsPage/SoundSettings'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
@@ -103,8 +104,9 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
 }
 
 /**
- * Settings while Raven cannot reach its server: only what the app
- * and this browser keep for themselves.
+ * Settings while the server cannot be reached: what the app and this
+ * browser keep for themselves, and the servers, so another one can be
+ * switched to.
  */
 const OfflineSettings = () => {
   const titleId = useId()
@@ -115,6 +117,7 @@ const OfflineSettings = () => {
           {COMMON_COPY.settings}
         </PageTitle>
       </header>
+      <ServerSection />
       <HostSettings />
       <AdvancedSection />
     </section>
@@ -133,6 +136,7 @@ const ViewerPreferences = () => {
         <BrowserPlayback isDesktop={isDesktop} />
       </section>
       {access.kind === ACCESS_KINDS.approved && <AccountSection account={access.account} />}
+      <ServerSection />
       {(access.kind === ACCESS_KINDS.approved || access.kind === ACCESS_KINDS.disabled) && (
         <ScrobblingSection />
       )}

@@ -302,6 +302,10 @@ describe('isDesktopRequest', () => {
     ],
     [{ type: DESKTOP_REQUESTS.playTitle, mediaId: 7, at: 0, next: [] }],
     [{ type: DESKTOP_REQUESTS.playTitle, mediaId: 7, at: 30.5, next: [8, 9] }],
+    [{ type: DESKTOP_REQUESTS.useServer, serverId: null }],
+    [{ type: DESKTOP_REQUESTS.useServer, serverId: id }],
+    [{ type: DESKTOP_REQUESTS.checkServer, origin: 'https://friend.example:8443' }],
+    [{ type: DESKTOP_REQUESTS.serverLibraries, serverId: id }],
   ])('accepts %j', (value) => {
     expect(isDesktopRequest(value)).toBe(true)
   })
@@ -400,6 +404,14 @@ describe('isDesktopRequest', () => {
       },
     ],
     ['a title with no next', { type: DESKTOP_REQUESTS.playTitle, mediaId: 7, at: 0 }],
+    [
+      'a server named by its origin',
+      { type: DESKTOP_REQUESTS.useServer, serverId: 'https://evil.example' },
+    ],
+    ['a server with no id', { type: DESKTOP_REQUESTS.useServer }],
+    ['a check of a path', { type: DESKTOP_REQUESTS.checkServer, origin: 'https://a.example/api' }],
+    ['a check of a file', { type: DESKTOP_REQUESTS.checkServer, origin: 'file:///etc/hosts' }],
+    ['libraries of no server', { type: DESKTOP_REQUESTS.serverLibraries, serverId: null }],
     ['the PIN main takes no more', { type: 'unlock', pin: '3001' }],
     [
       'an update switch set by a string',
@@ -512,6 +524,9 @@ describe('isDesktopReply', () => {
         space: { free: 442_381_631_488, total: 994_662_584_320, used: 0 },
       },
     ],
+    [{ type: DESKTOP_REPLIES.server, serverId: id }],
+    [{ type: DESKTOP_REPLIES.server, serverId: null }],
+    [{ type: DESKTOP_REPLIES.libraries, libraries: [] }],
   ])('accepts %j', (value) => {
     expect(isDesktopReply(value)).toBe(true)
   })

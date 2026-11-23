@@ -1,12 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type Hero, type Home, type HomeSearch, mediaLabel } from '@raven/core'
+import { type Hero, type Home, type HomeSearch, HOME_SHELF_TYPES, mediaLabel } from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
 import { POSTER_SIZES } from '@/lib/posters'
 import { HomePage } from '@/pages/HomePage/HomePage'
+import { accountDataFor } from '@/lib/accountData'
+import { fakeAccount, readyConfig } from '@/test/authClient'
+import { MELEYS_ID, pin } from '@/test/servers'
 import { itemSummary, library, matchedMovie, mediaItem, showEntry } from '@/test/fixtures'
 import { album } from '@/test/music'
 import { fakeBinge } from '@/test/fakeBinge'
@@ -470,6 +473,59 @@ describe('HomePage', () => {
       )
       await waitFor(() => expect(searchbox()).toHaveValue(''))
       expect(await screen.findByRole('heading', { name: 'Continue watching' })).toBeInTheDocument()
+    })
+  })
+
+  describe("with the account's pins", () => {
+    const accountPins = spyOn(accountDataFor(readyConfig), 'listPins')
+    const accountServers = spyOn(accountDataFor(readyConfig), 'listServers')
+    const SHELVES: Home = {
+      inProgress: [],
+      shelves: [
+        {
+          libraryId: 2,
+          type: HOME_SHELF_TYPES.media,
+          media: [mediaItem({ id: 8, title: 'Heat' })],
+        },
+        {
+          libraryId: 5,
+          type: HOME_SHELF_TYPES.media,
+          media: [mediaItem({ id: 9, title: 'Clip' })],
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      accountServers.mockImplementation(async () => [])
+      spies.home.mockImplementation(async () => SHELVES)
+      spies.libraries.mockImplementation(async () => LIBRARIES)
+    })
+
+    afterEach(() => {
+      accountPins.mockReset()
+      accountServers.mockReset()
+    })
+
+    afterAll(() => {
+      accountPins.mockRestore()
+      accountServers.mockRestore()
+    })
+
+    it('shows the rows of the libraries pinned on this server alone', async () => {
+      accountPins.mockImplementation(async () => [
+        pin({ libraryId: 2 }),
+        pin({ serverId: MELEYS_ID, libraryId: 5 }),
+      ])
+      renderWithProviders({ ui: <HomePage />, account: fakeAccount() })
+      expect(await screen.findByRole('region', { name: 'Films' })).toBeInTheDocument()
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Clips' })).toBeNull())
+    })
+
+    it('shows every library its row while the account pinned none on this server', async () => {
+      accountPins.mockImplementation(async () => [pin({ serverId: MELEYS_ID, libraryId: 5 })])
+      renderWithProviders({ ui: <HomePage />, account: fakeAccount() })
+      expect(await screen.findByRole('region', { name: 'Films' })).toBeInTheDocument()
+      expect(await screen.findByRole('region', { name: 'Clips' })).toBeInTheDocument()
     })
   })
 })

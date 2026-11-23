@@ -15,6 +15,7 @@ import type {
   LibrariesKit,
   LibrariesPageProps,
   LibraryCardAction,
+  LibraryCardPin,
   LibraryCardProps,
 } from '@/layouts/librariesKit'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -79,10 +80,44 @@ const ActionPlate = ({ action }: ActionPlateProps) => {
   )
 }
 
+type PinPlateProps = { pin: LibraryCardPin }
+
+/** Pin as a plate beside a card's name, the web's toggle: filled while the library is pinned, passed by while the account can pin no more. */
+const PinPlate = ({ pin }: PinPlateProps) => {
+  const { settle } = useOpeningFocus()
+  const styles = useStyles()
+  const plateStyles = usePlateStyles()
+  const text = useTheme((theme) => theme.palette.text)
+  return (
+    <Pressable
+      accessibilityLabel={pin.name}
+      accessibilityRole="button"
+      accessibilityState={{ selected: pin.isPinned, disabled: pin.isDisabled }}
+      disabled={pin.isDisabled}
+      focusable={!pin.isDisabled}
+      onFocus={settle}
+      onPress={pin.onPress}
+      style={({ focused }) => [
+        plateStyles.plate,
+        pin.isPinned && styles.pinned,
+        focused && plateStyles.focused,
+        pin.isDisabled && styles.off,
+      ]}
+    >
+      {({ focused }) => (
+        <>
+          <Icon colour={text} isFocused={focused} name={APP_ICONS.pin} size={TV_SIZES.textLg} />
+          <Text style={plateStyles.label}>{pin.text}</Text>
+        </>
+      )}
+    </Pressable>
+  )
+}
+
 /**
  * A library's card on a TV: its name and counts beside its icon on one plate the remote presses
- * to open the library, which takes the focus back on the way out of it, and the chevron beside
- * it; open, how its work stands and a row of its buttons, a band of their own.
+ * to open the library, which takes the focus back on the way out of it, and Pin and the chevron
+ * beside it; open, how its work stands and a row of its buttons, a band of their own.
  */
 const LibraryCard = ({
   place,
@@ -93,6 +128,7 @@ const LibraryCard = ({
   isFirst,
   isOpen,
   toggle,
+  pin,
   onOpen,
   lines,
   actions,
@@ -137,6 +173,7 @@ const LibraryCard = ({
                 </>
               )}
             </Pressable>
+            {pin !== null && <PinPlate pin={pin} />}
             {toggle !== null && (
               <Pressable
                 accessibilityLabel={toggle.name}
@@ -229,5 +266,6 @@ const useStyles = themedStyles((colours) =>
     more: { gap: TV_SIZES.space2 },
     actions: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space2 },
     off: { opacity: OPACITIES.disabled },
+    pinned: { backgroundColor: colours.quiet },
   }),
 )

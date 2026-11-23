@@ -1,24 +1,8 @@
 import type { Type } from '@nestjs/common'
-import { HEADERS, HTTP_METHODS, HTTP_STATUSES } from '@shared/server'
+import { HEADERS, HTTP_METHODS } from '@shared/server'
 import type { FastifyInstance } from 'fastify'
+import { type AllowedOriginCheck, type CorsPolicy, answerPreflight, responseHeaders } from '@/cors'
 import { routeMarks } from '@/routeMarks'
-
-/** The CORS headers the media plane reads and sends, in lower case as Node hands incoming ones over. */
-export const CORS_HEADERS = {
-  origin: 'origin',
-  allowOrigin: 'access-control-allow-origin',
-  allowMethods: 'access-control-allow-methods',
-  allowHeaders: 'access-control-allow-headers',
-  allowCredentials: 'access-control-allow-credentials',
-  allowPrivateNetwork: 'access-control-allow-private-network',
-  exposeHeaders: 'access-control-expose-headers',
-  maxAge: 'access-control-max-age',
-  requestMethod: 'access-control-request-method',
-  requestPrivateNetwork: 'access-control-request-private-network',
-} as const
-
-/** What a yes-or-no CORS header says for yes. */
-export const CORS_FLAGS = { true: 'true' } as const
 
 /** The methods the media plane answers cross-origin: GET and HEAD, and the preflight. */
 const MEDIA_PLANE_METHODS = {
@@ -27,8 +11,15 @@ const MEDIA_PLANE_METHODS = {
   options: HTTP_METHODS.options,
 } as const
 
-/** How `Vary` names the header a CORS answer depends on. */
-const VARIES = { origin: 'Origin' } as const
+/**
+ * What the media plane allows another origin: its methods, the `Range` a
+ * player seeks with, and the headers a player reads off the answer.
+ */
+export const MEDIA_PLANE_CORS = {
+  methods: Object.values(MEDIA_PLANE_METHODS),
+  requestHeaders: [HEADERS.range],
+  exposedHeaders: [HEADERS.contentLength, HEADERS.contentRange, HEADERS.acceptRanges],
+} as const satisfies CorsPolicy
 
 /** The path of every route marked for the media plane. */
 export const mediaPlanePaths = (controllers: readonly Type[]): string[] =>
@@ -50,42 +41,8 @@ export const pathMatcher = (paths: readonly string[]): ((path: string) => boolea
   }
 }
 
-export const responseHeaders = (origin: string): Record<string, string> => ({
-  [CORS_HEADERS.allowOrigin]: origin,
-  [HEADERS.vary]: VARIES.origin,
-  [CORS_HEADERS.exposeHeaders]: [
-    HEADERS.contentLength,
-    HEADERS.contentRange,
-    HEADERS.acceptRanges,
-  ].join(', '),
-})
-
-type PreflightHeadersProps = {
-  origin: string
-  wantsPrivateNetwork: boolean
-}
-
-export const preflightHeaders = ({
-  origin,
-  wantsPrivateNetwork,
-}: PreflightHeadersProps): Record<string, string> => ({
-  [CORS_HEADERS.allowOrigin]: origin,
-  [HEADERS.vary]: VARIES.origin,
-  [CORS_HEADERS.allowMethods]: Object.values(MEDIA_PLANE_METHODS).join(', '),
-  [CORS_HEADERS.allowHeaders]: HEADERS.range,
-  [CORS_HEADERS.maxAge]: '600',
-  ...(wantsPrivateNetwork ? { [CORS_HEADERS.allowPrivateNetwork]: CORS_FLAGS.true } : {}),
-})
-
 const isMediaPlaneMethod = (method: string): boolean =>
   Object.values(MEDIA_PLANE_METHODS).some((allowed) => allowed === method)
-
-const withOrigin = (existing: string | number | string[] | undefined): string => {
-  const current = Array.isArray(existing) ? existing.join(', ') : String(existing ?? '')
-  const names = current.split(',').map((name) => name.trim().toLowerCase())
-  if (names.includes(CORS_HEADERS.origin)) return current
-  return current === '' ? VARIES.origin : `${current}, ${VARIES.origin}`
-}
 
 /** The origin of a `Referer`, or null for a missing or malformed one. */
 const refererOrigin = (referer: string | string[] | undefined): string | null => {
@@ -97,7 +54,7 @@ const refererOrigin = (referer: string | string[] | undefined): string | null =>
 type RegisterMediaPlaneHookProps = {
   fastify: FastifyInstance
   isMediaPlanePath: (path: string) => boolean
-  isAllowedOrigin: (origin: string | undefined) => boolean
+  isAllowedOrigin: AllowedOriginCheck
   /** Told the web origin whose `/api` proxy a media request came through. */
   onProxied: (webOrigin: string) => void
 }
@@ -129,19 +86,17 @@ export const registerMediaPlaneHook = ({
     }
     if (!isAllowedOrigin(origin)) return
     if (request.method === MEDIA_PLANE_METHODS.options) {
-      const wantsPrivateNetwork =
-        request.headers[CORS_HEADERS.requestPrivateNetwork] === CORS_FLAGS.true
-      return reply
-        .headers(preflightHeaders({ origin, wantsPrivateNetwork }))
-        .code(HTTP_STATUSES.noContent)
-        .send()
+      return answerPreflight({ request, reply, origin, policy: MEDIA_PLANE_CORS })
     }
     if (request.method !== MEDIA_PLANE_METHODS.get && request.method !== MEDIA_PLANE_METHODS.head) {
       return
     }
-    reply.headers({
-      ...responseHeaders(origin),
-      [HEADERS.vary]: withOrigin(reply.getHeader(HEADERS.vary)),
-    })
+    reply.headers(
+      responseHeaders({
+        origin,
+        policy: MEDIA_PLANE_CORS,
+        vary: reply.getHeader(HEADERS.vary),
+      }),
+    )
   })
 }

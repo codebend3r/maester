@@ -6,8 +6,9 @@ import { type ComponentType, useState } from 'react'
 
 import { useOwnerId } from '@/account/useOwnerId'
 import { LibrariesPage, LibraryCard, Loading } from '@/layouts'
-import type { LibraryCardProps } from '@/layouts/librariesKit'
+import type { LibraryCardPin, LibraryCardProps } from '@/layouts/librariesKit'
 import type { LoadingProps } from '@/layouts/loadingKit'
+import { usePinToggle } from '@/queries/accountPins'
 import { type Picture, pictureAt } from '@/queries/cards'
 import { librariesSummaryOf, libraryLineOf } from '@/queries/libraryList'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
@@ -25,16 +26,32 @@ type CardRole = (typeof CARD_ROLES)[keyof typeof CARD_ROLES]
 type LibraryEntryProps = {
   api: ApiClient
   library: Library
-  card: Omit<LibraryCardProps, 'toggle' | 'lines' | 'actions'>
+  card: Omit<LibraryCardProps, 'toggle' | 'pin' | 'lines' | 'actions'>
   onToggle: () => void
+}
+
+/** A card's Pin toggle in the web's words, or null where the account cannot pin. */
+const useCardPin = (library: Library): LibraryCardPin | null => {
+  const pin = usePinToggle(library.id)
+  return (
+    pin && {
+      text: pin.isPinned ? LIBRARIES_COPY.pinned : LIBRARIES_COPY.pin,
+      name: LIBRARIES_COPY.pinName(library.name),
+      isPinned: pin.isPinned,
+      isDisabled: pin.isFull,
+      onPress: pin.toggle,
+    }
+  )
 }
 
 /** The owner's card: the chevron opens its buttons and how its work stands, as the web's card does. */
 const OwnerLibraryCard = ({ api, library, card, onToggle }: LibraryEntryProps) => {
   const { actions, lines } = useLibraryCardWork({ api, library })
+  const pin = useCardPin(library)
   return (
     <LibraryCard
       {...card}
+      pin={pin}
       actions={actions}
       lines={lines}
       toggle={{
@@ -47,10 +64,11 @@ const OwnerLibraryCard = ({ api, library, card, onToggle }: LibraryEntryProps) =
   )
 }
 
-/** Anyone else's card: its picture, icon, name and counts, pressed to open the library. */
-const ViewerLibraryCard = ({ card }: LibraryEntryProps) => (
-  <LibraryCard {...card} actions={[]} lines={[]} toggle={null} />
-)
+/** Anyone else's card: its picture, icon, name and counts, pressed to open the library, and Pin. */
+const ViewerLibraryCard = ({ library, card }: LibraryEntryProps) => {
+  const pin = useCardPin(library)
+  return <LibraryCard {...card} actions={[]} lines={[]} pin={pin} toggle={null} />
+}
 
 const LIBRARY_CARDS = {
   [CARD_ROLES.owner]: OwnerLibraryCard,
@@ -150,7 +168,9 @@ const ServerLibraries = ({ session }: ServerLibrariesProps) => {
  * the web's Libraries page lays them out: a card each, stacked full width, with its newest
  * video's picture, its icon, its name and its counts, opening it as the side menu's row does (a
  * music library on its albums). The owner's cards also open, by their chevron, onto the
- * library's scans and the rest of its work. Each server gets a page of its own.
+ * library's scans and the rest of its work. Each card's Pin keeps the library in the account's
+ * pins for this server, which the menus list and Home's shelves follow. Each server gets a page
+ * of its own, which lists that server's libraries only.
  */
 export const Libraries = () => {
   const session = useAppQueries()

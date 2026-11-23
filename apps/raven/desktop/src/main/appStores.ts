@@ -53,7 +53,7 @@ export type AppStores = {
   store: StateStore
   config: ConfigStore
   downloadsStore: DownloadsStore
-  /** The server Raven plays from, fixed for the run. */
+  /** The home server, the one the build plays from: where each launch starts, under its own id. */
   server: ServerEntry
   /** The real folder the downloads are named under, as grants hold real paths. */
   downloadsUserData: string
@@ -62,7 +62,7 @@ export type AppStores = {
 }
 
 /**
- * Reads the three stores at once, then files every download under the one server, its folders
+ * Reads the three stores at once, then files an older Raven's downloads (`settleDownloads`), their folders
  * moved first and saved before the config that says which servers were adopted, so a launch cut
  * short does it all again. An upgraded config is written then, so the server keeps its id.
  */
@@ -127,6 +127,7 @@ export const openAppStores = async ({
     state: loadedDownloads.state,
     serverId: server.id,
     adopted: loadedConfig.adopted,
+    dropped: loadedConfig.dropped,
     userData: downloadsUserData,
     fs: { mkdir: makeDir, rename: ({ from, to }) => rename(from, to), exists },
     warn,

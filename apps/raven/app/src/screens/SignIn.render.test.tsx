@@ -55,7 +55,7 @@ const signInAsViewer = () => signInWith({ email: SESSION.email, password: 'hunte
 describe('SignIn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    useActiveServer.setState({ servers: [], activeId: null })
+    useActiveServer.setState({ servers: [], activeId: RAVEN_SERVER.id })
     useAccountSession.setState({ signIn: mockSignIn })
     mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.ok, session: SESSION })
     getHome.mockResolvedValue(HOME)
@@ -117,7 +117,7 @@ describe('SignIn', () => {
       origin: `http://nas${n}:8080`,
       addedAt: n,
     }))
-    useActiveServer.setState({ servers: full, activeId: null })
+    useActiveServer.setState({ servers: full, activeId: RAVEN_SERVER.id })
     await render(<SignIn />)
     await signInAsViewer()
     expect(await screen.findByText(/as many servers as it can/)).toBeTruthy()

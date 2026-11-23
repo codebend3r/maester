@@ -44,7 +44,7 @@ const LibrariesPage = ({ title, line, notice, onBack, children }: LibrariesPageP
 
 /**
  * A library's card, the web's: its icon in a well beside its name and counts, pressed to open
- * the library, the chevron at its right, and once opened how its work stands and its buttons,
+ * the library, Pin and the chevron at its right, and once opened how its work stands and its buttons,
  * each an icon with its words. Its newest video's picture fades in at its right.
  */
 const LibraryCard = ({
@@ -54,6 +54,7 @@ const LibraryCard = ({
   picture,
   isOpen,
   toggle,
+  pin,
   onOpen,
   lines,
   actions,
@@ -81,6 +82,16 @@ const LibraryCard = ({
               <Text style={styles.line}>{line}</Text>
             </View>
           </Pressable>
+          {pin !== null && (
+            <Chip
+              icon={APP_ICONS.pin}
+              isDisabled={pin.isDisabled}
+              isOn={pin.isPinned}
+              label={pin.name}
+              onPress={pin.onPress}
+              text={pin.text}
+            />
+          )}
           {toggle !== null && (
             <Pressable
               accessibilityLabel={toggle.name}

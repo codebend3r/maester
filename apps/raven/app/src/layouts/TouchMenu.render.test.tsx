@@ -1,16 +1,32 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { FetchLike } from '@raven/core'
+import type * as Native from '@raven/native'
+import type { ApiForProps } from '@raven/native'
+import type * as Headless from '@raven/native/headless'
+import { RAVEN_SERVER } from '@raven/native/headless'
 import { ravenQueriesFor } from '@raven/ui/headless'
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 
+import { SERVER_SWITCHER_COPY } from '@/layouts/copy'
 import { TouchMenu } from '@/layouts/TouchMenu'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTES, ROUTE_TARGETS, hrefOf } from '@/routes'
+import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { useTouchMenu } from '@/stores/touchMenu'
-import { NAS, SERIES, homeApi } from '@/test/homeServer'
+import {
+  type AccountData,
+  HOME_SERVER_ID,
+  MELEYS,
+  accountDataOf,
+  accountFetchOf,
+  signInTestAccount,
+} from '@/test/accountData'
+import { FILMS, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { renderScreen } from '@/test/renderScreen'
+import { useAccountSession } from '@/account/session'
 
 const mockPush = jest.fn()
 const mockReplace = jest.fn()
@@ -22,6 +38,22 @@ jest.mock('expo-router', () => ({
   usePathname: () => mockPathname,
 }))
 
+/** Meleys' own library 1, named as home's is, which only its server's name tells apart. */
+const MELEYS_FILMS = { ...FILMS, id: 5 }
+
+let mockAccount: AccountData = accountDataOf()
+const mockAccountFetch: FetchLike = (url, init) => accountFetchOf(mockAccount)(url, init)
+const mockApiOf = (server: Headless.AppServer) => ({
+  ...homeApi(server),
+  listLibraries: async () => (server.id === MELEYS.id ? [MELEYS_FILMS] : [FILMS, SERIES]),
+})
+
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApiOf(server),
+  openFetch: ((url, init) => mockAccountFetch(url, init)) satisfies FetchLike,
+}))
+
 const api = homeApi()
 const SESSION: AppQueries = {
   server: NAS,
@@ -31,6 +63,12 @@ const SESSION: AppQueries = {
 }
 
 const SHEET = 'Menu'
+
+/** Both servers' pins of a library named as Films, once the second server's libraries have answered too. */
+const findFilmsPinsOfBothServers = async () => {
+  await waitFor(() => expect(screen.getAllByRole('link', { name: FILMS.name })).toHaveLength(2))
+  return screen.getAllByRole('link', { name: FILMS.name })
+}
 
 const openMenu = async () => {
   await renderScreen({ ui: <TouchMenu session={SESSION} /> })
@@ -45,6 +83,14 @@ describe('the side menu of a phone or tablet', () => {
     useTouchMenu.setState({ isOpen: false })
     useReduceMotion.setState({ isReduced: true })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
+    useActiveServer.setState({ servers: [NAS], activeId: NAS.id, homeServerId: null })
+    mockAccount = accountDataOf({
+      pins: [
+        { serverId: NAS.id, libraryId: FILMS.id, pinnedAt: '1' },
+        { serverId: NAS.id, libraryId: SERIES.id, pinnedAt: '2' },
+      ],
+    })
+    signInTestAccount()
   })
 
   it('draws nothing while it is shut', async () => {
@@ -71,6 +117,72 @@ describe('the side menu of a phone or tablet', () => {
       'Settings',
     ])
     expect(screen.queryByRole('button', { name: 'Search every library' })).toBeNull()
+  })
+
+  it('lists only what the account pinned, in the server order', async () => {
+    mockAccount.pins = [{ serverId: NAS.id, libraryId: SERIES.id, pinnedAt: '1' }]
+    await openMenu()
+    expect(await screen.findByRole('link', { name: 'Series' })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: 'Films' })).toBeNull()
+  })
+
+  it('lists no pinned libraries, and no heading, while nobody is signed in', async () => {
+    useAccountSession.setState({ session: null })
+    await openMenu()
+    expect(await screen.findByRole('link', { name: 'Libraries' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: 'Pinned' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Films' })).toBeNull()
+  })
+
+  describe('with several servers', () => {
+    beforeEach(() => {
+      useActiveServer.setState({
+        home: RAVEN_SERVER,
+        servers: [RAVEN_SERVER, MELEYS],
+        activeId: RAVEN_SERVER.id,
+        homeServerId: HOME_SERVER_ID,
+      })
+      mockAccount.pins = [
+        { serverId: HOME_SERVER_ID, libraryId: FILMS.id, pinnedAt: '1' },
+        { serverId: MELEYS.id, libraryId: MELEYS_FILMS.id, pinnedAt: '2' },
+      ]
+    })
+
+    it('lists the pins of every server, each over its server name in small type', async () => {
+      await openMenu()
+      const [onHome, onMeleys] = await findFilmsPinsOfBothServers()
+      expect(within(onHome).getByText(RAVEN_SERVER.name)).toBeTruthy()
+      expect(within(onMeleys).getByText(MELEYS.name)).toBeTruthy()
+    })
+
+    it('switches to the server of a pin on another and opens its library', async () => {
+      await openMenu()
+      const [, onMeleys] = await findFilmsPinsOfBothServers()
+      await fireEvent.press(onMeleys)
+      expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+      expect(mockPush).toHaveBeenCalledWith(
+        hrefOf({ kind: ROUTE_TARGETS.library, libraryId: MELEYS_FILMS.id, query: '' }),
+      )
+    })
+
+    it('switches servers from the head of the menu, the one in use checked', async () => {
+      await openMenu()
+      expect(screen.getByRole('header', { name: SERVER_SWITCHER_COPY.servers })).toBeTruthy()
+      expect(
+        screen.getByRole('button', { name: SERVER_SWITCHER_COPY.inUse(RAVEN_SERVER.name) }),
+      ).toBeTruthy()
+      await fireEvent.press(
+        screen.getByRole('button', { name: SERVER_SWITCHER_COPY.row(MELEYS.name) }),
+      )
+      expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+      expect(useTouchMenu.getState().isOpen).toBe(false)
+    })
+  })
+
+  it('shows no server switcher with one server', async () => {
+    await openMenu()
+    expect(await screen.findByRole('link', { name: 'Films' })).toBeTruthy()
+    expect(screen.queryByRole('header', { name: SERVER_SWITCHER_COPY.servers })).toBeNull()
   })
 
   it('shuts when the scrim is pressed', async () => {

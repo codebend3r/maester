@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Library, LibraryViewChange } from '@raven/core'
+import type { Library } from '@raven/core'
 import { api } from '@/lib/api'
 import { LIBRARY_BACKDROP_SIZES, LibrariesPage } from '@/pages/LibrariesPage/LibrariesPage'
 import { useQuery } from '@tanstack/react-query'
@@ -29,7 +29,6 @@ const ISO = '2026-10-17T09:00:00.000Z'
 describe('LibrariesPage', () => {
   const spies = {
     list: spyOn(api, 'listLibraries'),
-    view: spyOn(api, 'setLibraryView'),
     lock: spyOn(api, 'getLock'),
     health: spyOn(api, 'getMetadataHealth'),
     match: spyOn(api, 'matchLibrary'),
@@ -52,7 +51,6 @@ describe('LibrariesPage', () => {
   afterEach(() => {
     cleanup()
     spies.list.mockReset()
-    spies.view.mockReset()
     spies.lock.mockReset()
     spies.health.mockReset()
     spies.match.mockReset()
@@ -122,61 +120,6 @@ describe('LibrariesPage', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('unpins a pinned library, changing nothing else', async () => {
-    const movies = library({ id: 2, name: 'Movies', paths: ['/media/Movies'] })
-    const sent: Array<{ id: number; change: LibraryViewChange }> = []
-    spies.list.mockImplementation(async () => [movies])
-    spies.view.mockImplementation(async (request) => {
-      sent.push(request)
-      return movies
-    })
-    renderWithProviders({ ui: <LibrariesPage /> })
-    await openAll()
-    const pin = await screen.findByRole('button', { name: 'Pin Movies' })
-    expect(pin).toHaveAttribute('aria-pressed', 'true')
-    await userEvent.click(pin)
-    expect(sent).toEqual([{ id: 2, change: { pinned: false } }])
-  })
-
-  it('pins at once, before the server answers', async () => {
-    const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
-    spies.list.mockImplementation(async () => [clips])
-    spies.view.mockImplementation(() => held<Library>().promise)
-    renderWithProviders({ ui: <LibrariesPage /> })
-    await openAll()
-    const pin = await screen.findByRole('button', { name: 'Pin Clips' })
-    await userEvent.click(pin)
-    await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'true'))
-    expect(pin).toBeEnabled()
-  })
-
-  it('takes the pin back when the server refuses it', async () => {
-    const clips = library({ name: 'Clips', settings: { ...library().settings, pinned: false } })
-    spies.list.mockImplementation(async () => [clips])
-    spies.view.mockImplementation(async () => {
-      throw new Error('The server is away.')
-    })
-    renderWithProviders({ ui: <LibrariesPage /> })
-    await openAll()
-    const pin = await screen.findByRole('button', { name: 'Pin Clips' })
-    await userEvent.click(pin)
-    await waitFor(() => expect(pin).toHaveAttribute('aria-pressed', 'false'))
-  })
-
-  it('reads Pinned on a pinned library and Pin on one that is not, its name the same either way', async () => {
-    spies.list.mockImplementation(async () => [
-      library({ id: 1, name: 'Films' }),
-      library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
-    ])
-    renderWithProviders({ ui: <LibrariesPage /> })
-    await openAll()
-    const pinned = await screen.findByRole('button', { name: 'Pin Films' })
-    const unpinned = screen.getByRole('button', { name: 'Pin Clips' })
-    expect(within(pinned).getByText('Pinned')).toHaveAttribute('aria-hidden', 'true')
-    expect(within(unpinned).getByText('Pin')).toHaveAttribute('aria-hidden', 'true')
-    expect(within(unpinned).queryByText('Pinned')).toBeNull()
-  })
-
   it('says how many libraries there are and how many videos they hold between them', async () => {
     spies.list.mockImplementation(async () => [
       library({ id: 1, name: 'Films', itemCount: 1204 }),
@@ -226,18 +169,6 @@ describe('LibrariesPage', () => {
     spies.list.mockImplementation(() => held<Library[]>().promise)
     renderWithProviders({ ui: <LibrariesPage /> })
     expect(await screen.findByText('Gathering your libraries')).toBeInTheDocument()
-  })
-
-  it('shows a library that is not pinned as unpressed', async () => {
-    spies.list.mockImplementation(async () => [
-      library({ name: 'Clips', settings: { ...library().settings, pinned: false } }),
-    ])
-    renderWithProviders({ ui: <LibrariesPage /> })
-    await openAll()
-    expect(await screen.findByRole('button', { name: 'Pin Clips' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
   })
 
   it('says what type each library is', async () => {
@@ -429,7 +360,6 @@ describe('LibrariesPage', () => {
     await openAll()
     await screen.findByRole('button', { name: 'Full scan Films' })
     const actions = [
-      'Pin Films',
       'Quick scan Films',
       'Full scan Films',
       'Update ratings Films',
@@ -438,7 +368,7 @@ describe('LibrariesPage', () => {
     ]
     actions.forEach((name) => {
       expect(screen.getByRole('button', { name }).getAttribute('title')).toBeTruthy()
-      // Each wears an icon, the Pin's included.
+      // Each wears an icon.
       expect(screen.getByRole('button', { name }).querySelector('svg')).not.toBeNull()
     })
     expect(screen.getByRole('link', { name: 'History Films' }).querySelector('svg')).not.toBeNull()
@@ -686,11 +616,11 @@ describe('LibrariesPage', () => {
     expect(spies.list).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves Add library and the scans and Update ratings out while the admin lock is on, but keeps the pin', async () => {
+  it('leaves Add library and the scans and Update ratings out while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [library({ name: 'Clips' })])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     await openAll()
-    expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Collapse Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add library' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Quick scan/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Full scan/ })).toBeNull()
@@ -703,7 +633,7 @@ describe('LibrariesPage', () => {
     ])
     renderWithProviders({ ui: <LibrariesPage />, adminLock: { state: 'on', available: true } })
     await openAll()
-    expect(await screen.findByRole('button', { name: 'Pin Clips' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Collapse Clips' })).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Folders' })).toBeNull()
     expect(screen.queryByText('/media/vermithor')).toBeNull()
     cleanup()

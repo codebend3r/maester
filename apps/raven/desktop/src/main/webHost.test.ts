@@ -11,7 +11,7 @@ import {
 import { createServer as createNetServer } from 'node:net'
 import { join } from 'node:path'
 import { text } from 'node:stream/consumers'
-import { HTTP_METHODS, WEB_HOST, AUTH_PATHS, WEB_HOST_ERRORS } from '@raven/core'
+import { HTTP_METHODS, WEB_HOST, AUTH_PATHS, ROUTES, WEB_HOST_ERRORS } from '@raven/core'
 import { ERROR_CODES } from '@/main/stateStore'
 import type { Timers } from '@/main/timers'
 import {
@@ -137,10 +137,17 @@ const upstream = async (
 
 const NO_TIMERS: Timers = { set: () => 0, clear: () => {} }
 
-type HostProps = { serverOrigin?: string; authOrigin?: string | null; timers?: Timers }
+type HostProps = {
+  serverOrigin?: string
+  /** The server in use as main reads it for each request, in place of a fixed `serverOrigin`. */
+  originOf?: () => string
+  authOrigin?: string | null
+  timers?: Timers
+}
 
 const host = async ({
   serverOrigin = 'http://127.0.0.1:1',
+  originOf,
   authOrigin = null,
   timers = NO_TIMERS,
 }: HostProps = {}) => {
@@ -149,7 +156,8 @@ const host = async ({
   const notes: string[] = []
   const handler = createWebHostHandler({
     root: ROOT,
-    serverOrigin,
+    serverOrigin: originOf ?? (() => serverOrigin),
+    homeOrigin: serverOrigin,
     authOrigin,
     readFile: async (path) => {
       reads.push(path)
@@ -413,6 +421,29 @@ describe('the web host: /api', () => {
     expect(heard?.headers[HEADERS.cookie]).toBe('raven-auth=abc; raven_unlock=1')
     expect(heard?.headers[HEADERS.accept]).toBe('application/json')
     expect(heard?.headers.host).toBe(new URL(server.origin).host)
+  })
+
+  it('forwards each request to the server in use when it asks, so a switch moves the next one', async () => {
+    const home = await upstream()
+    const friend = await upstream()
+    const using = { origin: home.origin }
+    const { port } = await host({ originOf: () => using.origin })
+    await ask({ port, path: ROUTES.listLibraries.path })
+    using.origin = friend.origin
+    await ask({ port, path: ROUTES.listLibraries.path })
+    expect(home.heard.map(({ url }) => url)).toEqual([ROUTES.listLibraries.path])
+    expect(friend.heard.map(({ url }) => url)).toEqual([ROUTES.listLibraries.path])
+    expect(friend.heard[0]?.headers.host ?? null).toBe(new URL(friend.origin).host)
+  })
+
+  it('asks the home server for the account config whichever server is in use', async () => {
+    const home = await upstream()
+    const friend = await upstream()
+    const { port } = await host({ serverOrigin: home.origin, originOf: () => friend.origin })
+    await ask({ port, path: AUTH_PATHS.config })
+    await ask({ port, path: ROUTES.listLibraries.path })
+    expect(home.heard.map(({ url }) => url)).toEqual([AUTH_PATHS.config])
+    expect(friend.heard.map(({ url }) => url)).toEqual([ROUTES.listLibraries.path])
   })
 
   it('forwards /api itself', async () => {

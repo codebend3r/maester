@@ -35,7 +35,6 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   },
   settings: {
     saveProgress: true,
-    pinned: true,
     inHero: true,
     sort: 'title',
     view: 'grid',

@@ -1,7 +1,8 @@
 import { AUTH_HEADERS, AUTH_SCHEME, SERVER_METHODS } from '@raven/core'
 import { accountIdOfToken } from '@/main/accounts/tokenAccount'
-import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import {
   CALL_NAMES,
   isWrite,
@@ -145,7 +146,8 @@ const rematch = (call: AllowedCall): AllowedCall | null => {
 }
 
 type CreateServerCallsProps = {
-  server: ServerEntry
+  /** The server in use, read as each call starts, so a call goes whole to the server it began on. */
+  server: Pick<ServerInUse, 'current'>
   fetch: ServerFetch
   /** The access token to send to the server: the page's, or null while it is signed out. */
   authorize: () => string | null
@@ -176,11 +178,11 @@ export const createServerCalls = ({
   let writes: ReadonlySet<Promise<void>> = new Set()
 
   /** One request to the server, in one of its slots. */
-  const attempt = async ({ call, token }: RequestProps): Promise<ServerCallResult> => {
+  const attempt = async ({ call, token, origin }: RequestProps): Promise<ServerCallResult> => {
     if (inFlight >= slotsFor(call)) return { ok: false, message: CALL_MESSAGES.busy, isBusy: true }
     inFlight += 1
     try {
-      return await request({ call, token })
+      return await request({ call, token, origin })
     } finally {
       inFlight -= 1
     }
@@ -189,15 +191,16 @@ export const createServerCalls = ({
   type RequestProps = {
     call: AllowedCall
     token: string | null
+    origin: string
   }
 
-  const request = async ({ call, token }: RequestProps): Promise<ServerCallResult> => {
+  const request = async ({ call, token, origin }: RequestProps): Promise<ServerCallResult> => {
     const { method, path, body } = requestFor(call)
     const maxChars = replyCapFor(call)
     try {
       const unlock = await unlockOf()
       const reply = await fetch({
-        url: `${server.origin}${path}`,
+        url: `${origin}${path}`,
         method,
         headers: headersFor({ body, token, unlock }),
         body,
@@ -228,7 +231,7 @@ export const createServerCalls = ({
     const token = authorize()
     const isAs = accountId === null || (token !== null && accountIdOfToken(token) === accountId)
     if (!isAs) return Promise.resolve({ ok: false, message: CALL_MESSAGES.otherAccount })
-    return attempt({ call, token })
+    return attempt({ call, token, origin: server.current().origin })
   }
 
   type TrackedProps = {

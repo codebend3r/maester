@@ -24,3 +24,9 @@
   font-size: var(--font-size-xl);
   line-height: var(--line-tight);
 }
+
+.hint {
+  max-width: 32rem;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+}

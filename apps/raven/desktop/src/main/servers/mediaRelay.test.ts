@@ -95,7 +95,7 @@ describe('open', () => {
   test('a listen that fails is tried again on the next open', async () => {
     const attempts = { count: 0 }
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: async () => {
         attempts.count += 1
         if (attempts.count === 1) throw new Error('no socket')
@@ -115,7 +115,7 @@ describe('open', () => {
 
   test('a secret that is not 32 random bytes in base64url is refused', async () => {
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: async () => ({ port: 4000 }),
       fetchUpstream: () => Promise.reject(new Error('unused')),
       tickets: { ticketFor: () => Promise.resolve({ kind: TICKET_OUTCOMES.unreachable }) },
@@ -475,7 +475,7 @@ describe('a relayed request', () => {
     const held: { release: (outcome: TicketOutcome) => void } = { release: () => undefined }
     const asked = Promise.withResolvers<void>()
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -565,7 +565,7 @@ describe('a relayed request', () => {
   test('a refusal is warned without a secret', async () => {
     const warnings: string[] = []
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -595,7 +595,7 @@ describe('a relayed request', () => {
     const clock = { now: 0 }
     const mintedAt = new Map<string, number>()
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,
@@ -645,7 +645,7 @@ describe('a relayed request', () => {
   test('an upstream that fails is a 502', async () => {
     const warnings: string[] = []
     const relay = createMediaRelay({
-      serverOrigin: SERVER.origin,
+      serverOrigin: () => SERVER.origin,
       listen: listenOnLoopback({
         createServer: loopbackServer,
         warn: () => undefined,

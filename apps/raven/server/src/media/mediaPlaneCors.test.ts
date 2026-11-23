@@ -2,14 +2,12 @@ import { HEADERS } from '@shared/server'
 import Fastify from 'fastify'
 import { describe, expect, it } from 'vitest'
 import { CONTROLLERS } from '@/appModule'
+import { CORS_FLAGS, CORS_HEADERS, preflightHeaders, responseHeaders } from '@/cors'
 import {
-  CORS_FLAGS,
-  CORS_HEADERS,
+  MEDIA_PLANE_CORS,
   mediaPlanePaths,
   pathMatcher,
-  preflightHeaders,
   registerMediaPlaneHook,
-  responseHeaders,
 } from '@/media/mediaPlaneCors'
 
 const ORIGIN = 'https://raven.maester.tv'
@@ -40,7 +38,9 @@ describe('pathMatcher', () => {
 
 describe('preflightHeaders', () => {
   it('allows the origin, GET, HEAD and OPTIONS with a range header, for ten minutes', () => {
-    expect(preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: false })).toEqual({
+    expect(
+      preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: false, policy: MEDIA_PLANE_CORS }),
+    ).toEqual({
       [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',
       [CORS_HEADERS.allowMethods]: 'GET, HEAD, OPTIONS',
@@ -50,7 +50,9 @@ describe('preflightHeaders', () => {
   })
 
   it('adds the private network allowance when it was asked for', () => {
-    expect(preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: true })).toEqual({
+    expect(
+      preflightHeaders({ origin: ORIGIN, wantsPrivateNetwork: true, policy: MEDIA_PLANE_CORS }),
+    ).toEqual({
       [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',
       [CORS_HEADERS.allowMethods]: 'GET, HEAD, OPTIONS',
@@ -63,7 +65,7 @@ describe('preflightHeaders', () => {
 
 describe('responseHeaders', () => {
   it('names the origin and exposes the headers a player reads, with no credentials', () => {
-    const headers = responseHeaders(ORIGIN)
+    const headers = responseHeaders({ origin: ORIGIN, policy: MEDIA_PLANE_CORS })
     expect(headers).toEqual({
       [CORS_HEADERS.allowOrigin]: ORIGIN,
       vary: 'Origin',

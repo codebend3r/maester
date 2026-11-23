@@ -1,5 +1,5 @@
 import { ravenQueriesFor } from '@raven/ui/headless'
-import { api } from '@/lib/api'
+import { api, homeApi } from '@/lib/api'
 
 export const {
   librariesQuery,
@@ -69,7 +69,9 @@ export const {
   metadataHealthQuery,
   playbackSettingsQuery,
   displaySettingsQuery,
-  authConfigQuery,
   accountQuery,
   membersQuery,
 } = ravenQueriesFor(api)
+
+/** The account config is the home server's, whichever server is active: the session is built from it. */
+export const { authConfigQuery } = ravenQueriesFor(homeApi)

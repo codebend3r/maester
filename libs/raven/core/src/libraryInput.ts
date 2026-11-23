@@ -21,7 +21,6 @@ const normalisePath = (path: string): string => {
 /** What to say about each setting sent with a value it does not take. */
 const SETTING_PROBLEMS = {
   saveProgress: 'Save progress must be on or off.',
-  pinned: 'Pinned must be on or off.',
   inHero: 'Include in hero display must be on or off.',
   sort: 'Sort is not one of the choices.',
   view: 'View is not one of the choices.',

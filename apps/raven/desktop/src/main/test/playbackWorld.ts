@@ -7,6 +7,7 @@ import {
 } from '@/main/downloads/downloadState'
 import { createGrants } from '@/main/grants'
 import { EMPTY_STATE, type PlayerState } from '@/main/playerState'
+import { serverInUse } from '@/main/servers/activeServer'
 import type { JsonStore } from '@/main/stateStore'
 
 export const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
@@ -77,6 +78,8 @@ type SetupProps = {
   accountId?: string | null
   /** The last account signed in to the server, as the config keeps it. */
   lastAccountId?: string | null
+  /** The server in use, as main reads it; `SERVER_ID` unless a test switches. */
+  serverIdOf?: () => string
 }
 
 /** A download playback over memory: its store, grants and disk, and what it told and warned. */
@@ -86,6 +89,7 @@ export const setup = ({
   player = EMPTY_STATE,
   accountId = ACCOUNT_A,
   lastAccountId = null,
+  serverIdOf = () => SERVER_ID,
 }: SetupProps = {}) => {
   const signedIn = { accountId, lastAccountId }
   const store = memoryStore<DownloadsState>({ ...EMPTY_DOWNLOADS, entries })
@@ -128,7 +132,7 @@ export const setup = ({
     },
     now: () => clock.now,
     warn: (message) => warnings.push(message),
-    serverId: SERVER_ID,
+    server: serverInUse(() => ({ id: serverIdOf(), origin: 'https://raven.example' })),
     change: (apply) => store.update(apply),
     announce: () => {
       told.lists += 1

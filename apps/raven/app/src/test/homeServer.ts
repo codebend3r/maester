@@ -60,7 +60,6 @@ const libraryFor = ({ id, name, kind }: LibraryForProps) =>
     },
     settings: {
       saveProgress: true,
-      pinned: true,
       inHero: true,
       sort: MEDIA_SORTS.title,
       view: LIBRARY_VIEWS.grid,

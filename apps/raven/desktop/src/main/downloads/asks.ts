@@ -26,6 +26,7 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { DONE, refused } from '@/main/replies'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import {
   EXPAND_MESSAGES,
   EXPAND_REASONS,
@@ -41,8 +42,8 @@ export const ASK_TTL_MS = 600_000
 
 type DownloadAsksDeps = {
   store: DownloadsStore
-  /** The id the server's downloads are filed under. */
-  serverId: string
+  /** The server in use, whose id a new download is filed under. */
+  server: ServerInUse
   calls: Pick<ServerCalls, 'call'>
   userData: string
   space: SpaceFs
@@ -129,7 +130,7 @@ const entryOf = ({
 
 /** The asks a download link raises: expanded, held for the page's answer, then queued or dropped. */
 export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
-  const { store, serverId, now, change } = deps
+  const { store, server, now, change } = deps
   const asks = new Map<string, HeldAsk>()
 
   const dropExpired = (): void => {
@@ -197,7 +198,7 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     type: DESKTOP_REPLIES.downloadAsk,
     ask: {
       askId,
-      serverId,
+      serverId: server.current().id,
       serverName: SERVER_NAME,
       shouldAutoDelete: store.read().autoDeleteDefault,
       status,
@@ -229,11 +230,15 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
   const expandUnder = async ({ askId, target }: ExpandUnderProps): Promise<DesktopReply> => {
     // Main lists the files with the page's account, so a page signed out signs in first.
     if (!deps.isSignedIn()) return holdForAccount({ askId, target })
+    const expandedOn = server.current().id
     const expansion = await expandTarget({
       calls: deps.calls,
       target,
-      skip: (mediaId) => entryByMedia({ state: store.read(), serverId, mediaId }) !== null,
+      skip: (mediaId) =>
+        entryByMedia({ state: store.read(), serverId: expandedOn, mediaId }) !== null,
     })
+    // The page switched servers meanwhile, so what was listed may be of either.
+    if (!server.isInUse(expandedOn)) return refused(DOWNLOAD_MESSAGES.askGone)
     const outcome = await statusOf(expansion)
     if (!outcome.ok) {
       asks.delete(askId)
@@ -263,13 +268,17 @@ export const createDownloadAsks = (deps: DownloadAsksDeps): DownloadAsks => {
     // A locked ask, or one waiting on its account, waits for its retry; the page offers no Download until then.
     if (!expansion.ok) return refused(expansion.message)
     asks.delete(askId)
+    // Held asks go with a switch (`clear`), so this is the server the ask was expanded on.
+    const filedUnder = server.current().id
     // A file queued since the ask, by another ask or another link, is not queued twice.
     const fresh = expansion.files.filter(
-      (file) => entryByMedia({ state: store.read(), serverId, mediaId: file.media.id }) === null,
+      (file) =>
+        entryByMedia({ state: store.read(), serverId: filedUnder, mediaId: file.media.id }) ===
+        null,
     )
     const createdAt = now()
     const entries = fresh.map((file) =>
-      entryOf({ file, downloadId: deps.newId(), serverId, autoDelete, createdAt }),
+      entryOf({ file, downloadId: deps.newId(), serverId: filedUnder, autoDelete, createdAt }),
     )
     // The dialog's checkbox starts from the last choice made, so the choice becomes the default.
     change((state) => setAutoDeleteDefault({ state: queue({ state, entries }), autoDelete }))

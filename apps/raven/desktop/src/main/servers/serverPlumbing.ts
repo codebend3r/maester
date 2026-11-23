@@ -3,9 +3,9 @@ import { createServer } from 'node:http'
 import { net } from 'electron'
 import type { AccountSignal } from '@/main/accounts/accountSignal'
 import type { PageAccount } from '@/main/accounts/pageAccount'
-import type { ServerEntry } from '@/main/desktopConfig'
 import { fetchProbe, fetchRelayed } from '@/main/netFetches'
 import { type AccountTickets, createAccountTickets } from '@/main/servers/accountTickets'
+import type { SwitchingServer } from '@/main/servers/activeServer'
 import { createMediaRelay, listenOnLoopback, type MediaRelay } from '@/main/servers/mediaRelay'
 import { createOriginPicks, type OriginPicks } from '@/main/servers/originPicks'
 import { createServerCalls, fetchThrough, type ServerCalls } from '@/main/servers/serverCalls'
@@ -30,7 +30,11 @@ export type ServerPlumbing = {
 }
 
 type CreateServerPlumbingProps = {
-  server: ServerEntry
+  /**
+   * The server in use, which every part reads as it reaches out; a switch lets go of what the
+   * last one minted, picked or relayed.
+   */
+  server: SwitchingServer
   account: PageAccount
   /** The `Cookie` header with the page's unlock, so main's own calls carry the PIN it entered. */
   unlockOf: () => Promise<string | null>
@@ -43,9 +47,10 @@ type CreateServerPlumbingProps = {
 }
 
 /**
- * Main's reach to the server: its allowlisted calls with the page's Bearer and unlock, the account
- * tickets, the media origin picked and the two loopback relays. A sign out ends what is relayed;
- * a change of account mints its own tickets and probes the origins again.
+ * Main's reach to the server in use: its allowlisted calls with the page's Bearer and unlock, the
+ * account tickets, the media origin picked and the two loopback relays. A sign out ends what is
+ * relayed; a change of account mints its own tickets and probes the origins again; a change of
+ * server does both and ends what is relayed, since a title's media id names it on the last server.
  */
 export const createServerPlumbing = ({
   server,
@@ -79,7 +84,7 @@ export const createServerPlumbing = ({
 
   const relayedSources = (capacity: number): RelayedSources => {
     const relay = createMediaRelay({
-      serverOrigin: server.origin,
+      serverOrigin: () => server.current().origin,
       listen: listenOnLoopback({ createServer: (handler) => createServer(handler), warn }),
       fetchUpstream: fetchRelayed,
       tickets,
@@ -89,13 +94,19 @@ export const createServerPlumbing = ({
       timers,
       warn,
     })
-    // A sign out: the title stops being relayed.
+    // A sign out or another server: the title stops being relayed.
     accessEnds.listen(() => relay.accessEnded())
+    server.switches.listen(() => relay.accessEnded())
     return { relay, sources: createServerSources({ server, calls, tickets, relay, picks, warn }) }
   }
 
   // A ticket is the account's that minted it, so another account mints its own.
   accountSwitches.listen(() => tickets.forget())
+  // Another server's tickets and media origins are its own.
+  server.switches.listen(() => {
+    tickets.forget()
+    picks.forget()
+  })
   // Signed in, the origins are probed at once, so the first title does not wait on the probe.
   accountSwitches.listen(() => {
     if (account.accountId() === null) return

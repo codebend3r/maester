@@ -3,9 +3,9 @@ description: >-
   Places the pinned prebuilt libmpv under resources/win32-x64 on a Windows x64 runner, audits
   the DLL, builds the N-API addon against it with MSVC and runs the headless libmpv tests.
 
-# Shared by the raven-windows-native action (the 🏗️ Build Windows native job, on pull requests
-# and main) and the release build (desktop-release.yml), so a release builds exactly as the
-# checks did. The Windows libmpv is a pinned prebuilt, not a source build. The calling workflow
+# Shared by the raven-windows-native action (the 🏗️ Build Raven Windows native job, on pull
+# requests and main) and the release build (desktop-release.yml), so a release builds exactly as
+# the checks did. The Windows libmpv is a pinned prebuilt, not a source build. The calling workflow
 # sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 runs:
   using: composite
@@ -17,8 +17,7 @@ runs:
         bun-version-file: package.json
 
     - name: 📦 Install
-      shell: bash
-      run: bun install --frozen-lockfile
+      uses: ./.github/actions/bun-install
 
     # MSVC's compiler and lib.exe on PATH, as a Developer Command Prompt has them; the
     # addon builds with Ninja against them.

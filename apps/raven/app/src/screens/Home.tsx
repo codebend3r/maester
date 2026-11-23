@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
-import type { AlbumShelf } from '@raven/core'
+import { type AlbumShelf, pinnedShelvesOf } from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 
 import type { BingeCard } from '@/queries/bingeCards'
@@ -9,7 +9,8 @@ import type { ShelfCard } from '@/queries/cards'
 import { type HeroSlide, heroSlidesOf } from '@/queries/heroSlides'
 import { type ShelfView, homeShelvesOf } from '@/queries/homeShelves'
 import { showArtIdsOf } from '@/queries/showArt'
-import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
+import { usePinnedHere } from '@/queries/accountPins'
+import { openPinned, usePinnedLibraries } from '@/queries/pinnedLibraries'
 import { useShowArts } from '@/queries/useShowArts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
@@ -54,6 +55,7 @@ const HomeShelves = ({ binge, slides, shelves, notice, libraries }: HomeShelvesP
       notice={notice}
       libraries={libraries}
       onOpenLibrary={openLibrary}
+      onOpenPinned={(library) => openPinned({ library, go: (href) => router.push(href) })}
       onSearch={() => router.push(APP_ROUTES.search)}
       onSettings={() => router.push(APP_ROUTES.settings)}
       title={HOME_COPY.title}
@@ -95,6 +97,8 @@ const NO_ALBUMS: readonly AlbumShelf[] = []
 const ServerHome = ({ session }: ServerHomeProps) => {
   const { server, api, queries } = session
   const home = useQuery(queries.homeQuery)
+  const pinnedHere = usePinnedHere()
+  const pinnedLibraries = usePinnedLibraries({ queries })
   const hero = useQuery(queries.heroQuery)
   const albums = useQuery(queries.homeAlbumsQuery)
   const libraries = useQuery(queries.librariesQuery)
@@ -116,21 +120,28 @@ const ServerHome = ({ session }: ServerHomeProps) => {
    * each of its queries lands, and on a TV's Hermes building hundreds of cards each time held
    * the remote's focus back for seconds.
    */
+  const homeData = useMemo(
+    () =>
+      home.data === undefined
+        ? undefined
+        : { ...home.data, shelves: pinnedShelvesOf({ shelves: home.data.shelves, pinnedHere }) },
+    [home.data, pinnedHere],
+  )
   const shelves = useMemo(
     () =>
-      home.data === undefined ||
+      homeData === undefined ||
       libraries.data === undefined ||
       albumShelves === null ||
       pictures === null
         ? []
         : homeShelvesOf({
-            home: home.data,
+            home: homeData,
             libraries: libraries.data,
             albumShelves,
             arts,
             ...pictures,
           }),
-    [home.data, libraries.data, albumShelves, arts, pictures],
+    [homeData, libraries.data, albumShelves, arts, pictures],
   )
   const slides = useMemo(
     () =>
@@ -152,8 +163,6 @@ const ServerHome = ({ session }: ServerHomeProps) => {
     if (failure !== null) return failure.message
     return isBare ? HOME_COPY.bare : null
   })()
-
-  const pinnedLibraries = pinnedLibrariesOf(libraries.data ?? [])
 
   const view: ViewOf<HomeViewProps> = isLoading
     ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading, isHome: true } }

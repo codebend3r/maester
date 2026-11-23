@@ -11,7 +11,7 @@ import {
 } from '@raven/core'
 import { queryKeys } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
-import { api } from '@/lib/api'
+import { api, homeApi } from '@/lib/api'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { fakeAuthClient, readyConfig } from '@/test/authClient'
 import { asDesktop, downloadsMain, sentOfType } from '@/test/desktop'
@@ -66,7 +66,7 @@ describe('AppRoutes inside Raven', () => {
   it('keeps the music mode while the server is out of reach, and goes back once it answers', async () => {
     list.mockImplementation(async () => [musicLibrary()])
     const getAlbum = spyOn(api, 'getAlbum').mockResolvedValue(albumDetails())
-    const getAuthConfig = spyOn(api, 'getAuthConfig').mockRejectedValue(
+    const getAuthConfig = spyOn(homeApi, 'getAuthConfig').mockRejectedValue(
       new ApiError({ status: 502, message: 'Bad Gateway', isServerUnreachable: true }),
     )
     try {

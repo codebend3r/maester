@@ -225,10 +225,8 @@ runs:
           echo "EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN=http://127.0.0.1:8490"
         } >> "$GITHUB_ENV"
 
-    # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
     - name: 📦 Install
-      shell: bash
-      run: bun install --frozen-lockfile
+      uses: ./.github/actions/bun-install
 
     # Gradle installs the NDK React Native's `libs.versions.toml` names by itself, from a
     # download it checks only when it unpacks it, so a short read ("Archive is not a ZIP

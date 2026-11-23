@@ -59,7 +59,7 @@ GROUPS: tuple[Group, ...] = (
         (
             Command(
                 "verify",
-                "Every check at once: spelling, TypeScript only, one command per script, dead "
+                "Every check at once: spelling, one command per script, dead "
                 "code and CSS, lint, format, typecheck, unit and screen tests, and every build.",
             ),
             Command("verify:uncached", "verify, ignoring Nx's cache, after a toolchain change."),
@@ -105,11 +105,9 @@ GROUPS: tuple[Group, ...] = (
         "yellow",
         (
             Command("spellcheck", "Spellchecks the repo with typos."),
-            Command("typescript-only", "Fails on any .js, .jsx, .mjs or .cjs file."),
             Command(
                 "one-command-per-script", "Fails on a package.json script chained with &&, || or ;."
             ),
-            Command("comment-style", "Fails on stacked // comment lines in TypeScript or SCSS."),
             Command("dead-code", "Finds unused exports, files and dependencies with knip."),
             Command("dead-css", "Finds SCSS module classes no component reads."),
             Command(
@@ -283,7 +281,7 @@ GROUPS: tuple[Group, ...] = (
             Command("ci:docker", "The ✅ Checks job inside an Ubuntu 24.04 container.", "Docker"),
             Command(
                 "ci:app:ios",
-                "The 🏗️ Build iPhone job and its end to end job: every ci:app:ios step below, in order.",
+                "The 🏗️ Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.",
                 "macOS + Xcode",
             ),
             Command(
@@ -311,7 +309,9 @@ GROUPS: tuple[Group, ...] = (
                 "macOS + Xcode",
             ),
             Command(
-                "ci:app:tvos", "The 🏗️ Build Apple TV job and its end to end job.", "macOS + Xcode"
+                "ci:app:tvos",
+                "The 🏗️ Build Raven Apple TV job and its end to end job.",
+                "macOS + Xcode",
             ),
             Command(
                 "ci:app:tvos:build",
@@ -320,7 +320,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:android-tv",
-                "The 🏗️ Build Android TV job and its end to end job: every ci:app:android-tv step below, in order.",
+                "The 🏗️ Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order.",
                 "Android SDK",
             ),
             Command(
@@ -400,24 +400,22 @@ GROUPS: tuple[Group, ...] = (
                 "ci:app:fixture:wait", "Waits up to three minutes for the fixture server to answer."
             ),
             Command(
-                "ci:affected",
-                "The projects a change affects, as Nx sees them; the web apps' workflows pass --base and --head.",
-            ),
-            Command(
-                "ci:raven:web",
-                "One or more targets on raven's web app alone, as its job in the PR checks runs them: ci:raven:web lighthouse.",
-            ),
-            Command(
-                "ci:wren:web",
-                "One or more targets on Wren's web app alone, as its job in the PR checks runs them: ci:wren:web lighthouse.",
-            ),
-            Command(
                 "ci:wren", "The 🎵 Build Wren iPhone job and its end to end job.", "macOS + Xcode"
             ),
             Command("ci:desktop:e2e", "The 🎬 E2E Raven Mac desktop job.", "macOS"),
             Command(
                 "web:e2e",
                 "The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
+                "raven:web:lighthouse",
+                "The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
+                "wren:web:lighthouse",
+                "The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.",
                 "Chrome + ffmpeg",
             ),
             Command(

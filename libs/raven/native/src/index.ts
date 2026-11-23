@@ -10,7 +10,13 @@ export {
 export { DISK_TRANSFERS, deviceDiskFor } from '@/downloads/deviceDisk'
 export { secretStore } from '@/servers/deviceSecretStore'
 export { isOnCellular, watchNetwork } from '@/servers/networkChanges'
-export { type ApiForProps, apiFor, cookieJar, openEventsFor } from '@/servers/serverClient'
+export {
+  type ApiForProps,
+  apiFor,
+  cookieJar,
+  openEventsFor,
+  openFetch,
+} from '@/servers/serverClient'
 export { useServerUnlock } from '@/servers/serverUnlock'
 export { Icon } from '@/icons/Icon'
 export { useNativeAudioHost } from '@/music/useNativeAudioHost'

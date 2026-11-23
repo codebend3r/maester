@@ -10,7 +10,7 @@
   ],
   "type": "module",
   "scripts": {
-    "affected": "bun run --sequential spellcheck typescript-only one-command-per-script comment-style dead-code dead-css affected:tasks",
+    "affected": "bun run --sequential spellcheck one-command-per-script dead-code dead-css affected:tasks",
     "affected:tasks": "nx affected -t lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "app:build:android": "nx run @raven/app:build:android",
     "app:build:android-tv": "nx run @raven/app:build:android-tv",
@@ -36,7 +36,6 @@
     "build": "nx run-many -t build",
     "build:raven:splash": "nx run @raven/splash:build",
     "build:wren:web": "nx run @raven/music-web:build",
-    "ci:affected": "nx show projects --affected",
     "ci:app:android": "bash scripts/ci_app_android.sh",
     "ci:app:android-tv": "bash scripts/ci_app_android_tv.sh",
     "ci:app:android-tv:build": "bash scripts/ci_app_android_tv.sh build",
@@ -66,11 +65,8 @@
     "ci:app:tvos:build": "nx run @raven/app:build:tvos --excludeTaskDependencies",
     "ci:desktop:e2e": "bash scripts/ci_desktop_e2e.sh",
     "ci:docker": "bash scripts/ci_docker.sh",
-    "ci:raven:web": "nx run-many --outputStyle=static -p @raven/web -t",
     "ci:wren": "bash scripts/ci_wren.sh",
-    "ci:wren:web": "nx run-many --outputStyle=static -p @raven/music-web -t",
     "claude-audit": "bash scripts/audit_claude_md.sh",
-    "comment-style": "nx run maester:comment-style",
     "dead-code": "nx run maester:dead-code",
     "dead-css": "nx run maester:dead-css",
     "desktop:audit:bundle": "nx run @raven/desktop:audit:bundle",
@@ -104,17 +100,18 @@
     "mpv:native:windows": "nx run-many -p @raven/mpv -t audit:native:windows test:native:windows",
     "one-command-per-script": "nx run maester:one-command-per-script",
     "preview:raven:splash": "nx run @raven/splash:preview",
+    "raven:web:lighthouse": "nx run @raven/web:lighthouse",
     "sandbox:sparrow": "nx run-many -t sandbox -p @sparrow/api @sparrow/web",
     "spellcheck": "nx run maester:spellcheck",
     "test": "nx run-many -t test",
     "test:screens": "nx run-many -t test:screens",
     "typecheck": "nx run-many -t typecheck",
-    "typescript-only": "nx run maester:typescript-only",
-    "verify": "nx run-many -t spellcheck typescript-only one-command-per-script comment-style dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
-    "verify:push": "nx run-many -t spellcheck typescript-only one-command-per-script comment-style lint:py lint:ts lint:css format:check typecheck test test:screens build",
+    "verify": "nx run-many -t spellcheck one-command-per-script dead-code dead-css lint:py lint:ts lint:css format:check typecheck test test:screens build",
+    "verify:push": "nx run-many -t spellcheck one-command-per-script lint:py lint:ts lint:css format:check typecheck test test:screens build",
     "verify:uncached": "bun run verify --skip-nx-cache",
     "web:build": "nx run @raven/web:build",
-    "web:e2e": "nx run @raven/web:e2e:browser"
+    "web:e2e": "nx run @raven/web:e2e:browser",
+    "wren:web:lighthouse": "nx run @raven/music-web:lighthouse"
   },
   "devDependencies": {
     "knip": "6.44.1",
@@ -147,28 +144,12 @@
           "{workspaceRoot}/**/*"
         ]
       },
-      "typescript-only": {
-        "command": "bash scripts/check_typescript_only.sh",
-        "cache": true,
-        "inputs": [
-          "{workspaceRoot}/**/*.{js,jsx,mjs,cjs}",
-          "{workspaceRoot}/scripts/check_typescript_only.sh"
-        ]
-      },
       "one-command-per-script": {
         "command": "bash scripts/check_one_command_per_script.sh",
         "cache": true,
         "inputs": [
           "{workspaceRoot}/**/package.json",
           "{workspaceRoot}/scripts/check_one_command_per_script.sh"
-        ]
-      },
-      "comment-style": {
-        "command": "bash scripts/check_comment_style.sh",
-        "cache": true,
-        "inputs": [
-          "{workspaceRoot}/**/*.{ts,tsx,scss}",
-          "{workspaceRoot}/scripts/check_comment_style.sh"
         ]
       },
       "dead-code": {

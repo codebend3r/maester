@@ -76,10 +76,27 @@ const fakeTokens = () => {
   return { onAccessTokenChange, change, listeners }
 }
 
-type SetUpProps = { tokens?: ReturnType<typeof fakeTokens>; isWatching?: () => boolean }
+/** A switch of server a test makes by hand, as the server switcher would. */
+const fakeServers = () => {
+  const listeners = new Set<() => void>()
+  const onServerChange = (listener: () => void) => {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+  const change = () => act(() => listeners.forEach((listener) => listener()))
+  return { onServerChange, change, listeners }
+}
+
+type SetUpProps = {
+  tokens?: ReturnType<typeof fakeTokens>
+  servers?: ReturnType<typeof fakeServers>
+  isWatching?: () => boolean
+}
 
 /** The hook mounted over a cache holding `HELD`, with every stream it opens kept. */
-const setUp = ({ tokens, isWatching }: SetUpProps = {}) => {
+const setUp = ({ tokens, servers, isWatching }: SetUpProps = {}) => {
   const { api } = recordingApi({ body: null })
   const opened: Array<ReturnType<typeof fakeSource>> = []
   const notified: Notification[] = []
@@ -91,6 +108,7 @@ const setUp = ({ tokens, isWatching }: SetUpProps = {}) => {
       return fake.source
     },
     onAccessTokenChange: tokens?.onAccessTokenChange,
+    onServerChange: servers?.onServerChange,
     onNotification: (notification) => notified.push(notification),
     isWatching,
   })
@@ -303,7 +321,7 @@ describe('useServerEvents', () => {
       tokens.change('refreshed')
       expect(opened.map(({ state }) => state.closed)).toEqual([true, false])
       expect(stale()).toEqual([])
-      opened[1]?.emit({ type: SERVER_STREAM_EVENTS.open })
+      opened[1]!.emit({ type: SERVER_STREAM_EVENTS.open })
       await waitFor(() => expect(stale()).toHaveLength(HELD.length - 1))
     })
 
@@ -322,6 +340,26 @@ describe('useServerEvents', () => {
       expect(tokens.listeners.size).toBe(1)
       hook.unmount()
       expect(tokens.listeners.size).toBe(0)
+    })
+  })
+
+  describe('on a host that switches servers', () => {
+    it('opens the stream again at each switch, reading nothing again for it', async () => {
+      const servers = fakeServers()
+      const { opened, stale } = setUp({ servers })
+      servers.change()
+      expect(opened.map(({ state }) => state.closed)).toEqual([true, false])
+      opened[1]!.emit({ type: SERVER_STREAM_EVENTS.open })
+      await Promise.resolve()
+      expect(stale()).toEqual([])
+    })
+
+    it('stops listening for switches when it unmounts', () => {
+      const servers = fakeServers()
+      const { hook } = setUp({ servers })
+      expect(servers.listeners.size).toBe(1)
+      hook.unmount()
+      expect(servers.listeners.size).toBe(0)
     })
   })
 })

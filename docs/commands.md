@@ -8,17 +8,17 @@ Every script in the root `package.json`, grouped. Run any of them from the repo 
 
 What to run before a push; the pre-push hook runs the same checks.
 
-| Command           | What it does                                                                                                                                                | Needs |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| `verify`          | Every check at once: spelling, TypeScript only, one command per script, dead code and CSS, lint, format, typecheck, unit and screen tests, and every build. |       |
-| `verify:uncached` | verify, ignoring Nx's cache, after a toolchain change.                                                                                                      |       |
-| `verify:push`     | What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.                                                                          |       |
-| `affected`        | The repo-wide checks, then lint, format, typecheck, tests and builds only for the projects your branch changed.                                             |       |
-| `affected:tasks`  | The per-project half of affected, without the repo-wide checks.                                                                                             |       |
-| `build`           | Builds every project.                                                                                                                                       |       |
-| `test`            | Every project's unit tests.                                                                                                                                 |       |
-| `test:screens`    | The device app's render tests under jest-expo.                                                                                                              |       |
-| `typecheck`       | Typechecks every TypeScript project.                                                                                                                        |       |
+| Command           | What it does                                                                                                                               | Needs |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| `verify`          | Every check at once: spelling, one command per script, dead code and CSS, lint, format, typecheck, unit and screen tests, and every build. |       |
+| `verify:uncached` | verify, ignoring Nx's cache, after a toolchain change.                                                                                     |       |
+| `verify:push`     | What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.                                                         |       |
+| `affected`        | The repo-wide checks, then lint, format, typecheck, tests and builds only for the projects your branch changed.                            |       |
+| `affected:tasks`  | The per-project half of affected, without the repo-wide checks.                                                                            |       |
+| `build`           | Builds every project.                                                                                                                      |       |
+| `test`            | Every project's unit tests.                                                                                                                |       |
+| `test:screens`    | The device app's render tests under jest-expo.                                                                                             |       |
+| `typecheck`       | Typechecks every TypeScript project.                                                                                                       |       |
 
 ## Lint and format
 
@@ -42,9 +42,7 @@ Workspace-wide checks for rules no linter covers.
 | Command                  | What it does                                                                                           | Needs       |
 | ------------------------ | ------------------------------------------------------------------------------------------------------ | ----------- |
 | `spellcheck`             | Spellchecks the repo with typos.                                                                       |             |
-| `typescript-only`        | Fails on any .js, .jsx, .mjs or .cjs file.                                                             |             |
 | `one-command-per-script` | Fails on a package.json script chained with &&, \|\| or ;.                                             |             |
-| `comment-style`          | Fails on stacked // comment lines in TypeScript or SCSS.                                               |             |
 | `dead-code`              | Finds unused exports, files and dependencies with knip.                                                |             |
 | `dead-css`               | Finds SCSS module classes no component reads.                                                          |             |
 | `claude-audit`           | Has Claude Code read your unpushed commits against the CLAUDE.md files for the rules no linter checks. | Claude Code |
@@ -119,43 +117,42 @@ The Electron app on macOS and Windows, with libmpv.
 
 Each runs one CI job from pull-request-checks.yml on this machine.
 
-| Command                           | What it does                                                                                                  | Needs                       |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `ci:docker`                       | The ✅ Checks job inside an Ubuntu 24.04 container.                                                           | Docker                      |
-| `ci:app:ios`                      | The 🏗️ Build iPhone job and its end to end job: every ci:app:ios step below, in order.                        | macOS + Xcode               |
-| `ci:app:ios:tools`                | Its tools: Homebrew's, Maestro and the iOS simulator runtime.                                                 | macOS + Xcode               |
-| `ci:app:ios:simulator`            | Boots the raven-phone iPhone simulator, making it when there is none.                                         | macOS + Xcode               |
-| `ci:app:ios:build`                | The fixture's Release build for the iPhone simulator.                                                         | macOS + Xcode               |
-| `ci:app:ios:pods`                 | Checks the build's pod install finished.                                                                      | macOS + Xcode               |
-| `ci:app:ios:install`              | Installs the build on the iPhone simulator.                                                                   | macOS + Xcode               |
-| `ci:app:ios:e2e`                  | The touch Maestro flows on the iPhone simulator.                                                              | macOS + Xcode               |
-| `ci:app:tvos`                     | The 🏗️ Build Apple TV job and its end to end job.                                                             | macOS + Xcode               |
-| `ci:app:tvos:build`               | The Apple TV job's Release build for the simulator, with a brief log.                                         | macOS + Xcode               |
-| `ci:app:android-tv`               | The 🏗️ Build Android TV job and its end to end job: every ci:app:android-tv step below, in order.             | Android SDK                 |
-| `ci:app:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                          | Android SDK                 |
-| `ci:app:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                                                   | Android SDK                 |
-| `ci:app:android-tv:build`         | The fixture's Release APK for the emulator.                                                                   | Android SDK                 |
-| `ci:app:android-tv:emulator:wait` | Waits for the emulator to boot and turns its animations off.                                                  | Android SDK                 |
-| `ci:app:android-tv:install`       | Installs the APK on the emulator.                                                                             | Android SDK                 |
-| `ci:app:android-tv:e2e`           | The remote's Maestro flows on the emulator.                                                                   | Android SDK                 |
-| `ci:app:android`                  | The Android phone end to end job: every ci:app:android step below, in order.                                  | Android SDK                 |
-| `ci:app:android:tools`            | Its tools: Android Studio, the SDK, the phone system image and Maestro.                                       | Android SDK                 |
-| `ci:app:android:emulator`         | Starts the raven_phone emulator, making it when there is none.                                                | Android SDK                 |
-| `ci:app:android:build`            | The fixture's Release APK for the phone emulator.                                                             | Android SDK                 |
-| `ci:app:android:emulator:wait`    | Waits for the phone emulator to boot and turns its animations off.                                            | Android SDK                 |
-| `ci:app:android:install`          | Installs the APK on the phone emulator.                                                                       | Android SDK                 |
-| `ci:app:android:e2e`              | The touch Maestro flows on the phone emulator.                                                                | Android SDK                 |
-| `ci:app:install`                  | The device app jobs' bun install.                                                                             |                             |
-| `ci:app:libraries`                | Builds the libraries the fixture server and the device app read.                                              |                             |
-| `ci:app:fixture`                  | The device app jobs' fixture server on :8490, in the foreground.                                              | ffmpeg                      |
-| `ci:app:fixture:wait`             | Waits up to three minutes for the fixture server to answer.                                                   |                             |
-| `ci:affected`                     | The projects a change affects, as Nx sees them; the web apps' workflows pass --base and --head.               |                             |
-| `ci:raven:web`                    | One or more targets on raven's web app alone, as its job in the PR checks runs them: ci:raven:web lighthouse. |                             |
-| `ci:wren:web`                     | One or more targets on Wren's web app alone, as its job in the PR checks runs them: ci:wren:web lighthouse.   |                             |
-| `ci:wren`                         | The 🎵 Build Wren iPhone job and its end to end job.                                                          | macOS + Xcode               |
-| `ci:desktop:e2e`                  | The 🎬 E2E Raven Mac desktop job.                                                                             | macOS                       |
-| `web:e2e`                         | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                             | Chrome + ffmpeg             |
-| `e2e`                             | Every end to end job, one after another: web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.         | macOS + Xcode + Android SDK |
+| Command                           | What it does                                                                                            | Needs                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `ci:docker`                       | The ✅ Checks job inside an Ubuntu 24.04 container.                                                     | Docker                      |
+| `ci:app:ios`                      | The 🏗️ Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.            | macOS + Xcode               |
+| `ci:app:ios:tools`                | Its tools: Homebrew's, Maestro and the iOS simulator runtime.                                           | macOS + Xcode               |
+| `ci:app:ios:simulator`            | Boots the raven-phone iPhone simulator, making it when there is none.                                   | macOS + Xcode               |
+| `ci:app:ios:build`                | The fixture's Release build for the iPhone simulator.                                                   | macOS + Xcode               |
+| `ci:app:ios:pods`                 | Checks the build's pod install finished.                                                                | macOS + Xcode               |
+| `ci:app:ios:install`              | Installs the build on the iPhone simulator.                                                             | macOS + Xcode               |
+| `ci:app:ios:e2e`                  | The touch Maestro flows on the iPhone simulator.                                                        | macOS + Xcode               |
+| `ci:app:tvos`                     | The 🏗️ Build Raven Apple TV job and its end to end job.                                                 | macOS + Xcode               |
+| `ci:app:tvos:build`               | The Apple TV job's Release build for the simulator, with a brief log.                                   | macOS + Xcode               |
+| `ci:app:android-tv`               | The 🏗️ Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order. | Android SDK                 |
+| `ci:app:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                    | Android SDK                 |
+| `ci:app:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                                             | Android SDK                 |
+| `ci:app:android-tv:build`         | The fixture's Release APK for the emulator.                                                             | Android SDK                 |
+| `ci:app:android-tv:emulator:wait` | Waits for the emulator to boot and turns its animations off.                                            | Android SDK                 |
+| `ci:app:android-tv:install`       | Installs the APK on the emulator.                                                                       | Android SDK                 |
+| `ci:app:android-tv:e2e`           | The remote's Maestro flows on the emulator.                                                             | Android SDK                 |
+| `ci:app:android`                  | The Android phone end to end job: every ci:app:android step below, in order.                            | Android SDK                 |
+| `ci:app:android:tools`            | Its tools: Android Studio, the SDK, the phone system image and Maestro.                                 | Android SDK                 |
+| `ci:app:android:emulator`         | Starts the raven_phone emulator, making it when there is none.                                          | Android SDK                 |
+| `ci:app:android:build`            | The fixture's Release APK for the phone emulator.                                                       | Android SDK                 |
+| `ci:app:android:emulator:wait`    | Waits for the phone emulator to boot and turns its animations off.                                      | Android SDK                 |
+| `ci:app:android:install`          | Installs the APK on the phone emulator.                                                                 | Android SDK                 |
+| `ci:app:android:e2e`              | The touch Maestro flows on the phone emulator.                                                          | Android SDK                 |
+| `ci:app:install`                  | The device app jobs' bun install.                                                                       |                             |
+| `ci:app:libraries`                | Builds the libraries the fixture server and the device app read.                                        |                             |
+| `ci:app:fixture`                  | The device app jobs' fixture server on :8490, in the foreground.                                        | ffmpeg                      |
+| `ci:app:fixture:wait`             | Waits up to three minutes for the fixture server to answer.                                             |                             |
+| `ci:wren`                         | The 🎵 Build Wren iPhone job and its end to end job.                                                    | macOS + Xcode               |
+| `ci:desktop:e2e`                  | The 🎬 E2E Raven Mac desktop job.                                                                       | macOS                       |
+| `web:e2e`                         | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                       | Chrome + ffmpeg             |
+| `raven:web:lighthouse`            | The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.                         | Chrome + ffmpeg             |
+| `wren:web:lighthouse`             | The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.                          | Chrome + ffmpeg             |
+| `e2e`                             | Every end to end job, one after another: web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.   | macOS + Xcode + Android SDK |
 
 ## Help
 

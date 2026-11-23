@@ -8,7 +8,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
 import { DesktopHost } from '@/desktop/DesktopHost'
 import { OFFLINE_RETRY_MS } from '@/desktop/serverReach'
-import { api } from '@/lib/api'
+import { homeApi } from '@/lib/api'
 import { useServerReach } from '@/stores/serverReach'
 import { Where, where } from '@/test/authPage'
 import { asDesktop } from '@/test/desktop'
@@ -96,7 +96,7 @@ describe('following whether the server can be reached', () => {
   })
 
   it('sends a page that needs the server to Downloads, and back to it once the server answers', async () => {
-    const getAuthConfig = spyOn(api, 'getAuthConfig').mockRejectedValue(UNREACHABLE)
+    const getAuthConfig = spyOn(homeApi, 'getAuthConfig').mockRejectedValue(UNREACHABLE)
     const { client } = renderHost({
       route: '/libraries/3?sort=year',
       ui: (

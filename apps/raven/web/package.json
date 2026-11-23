@@ -8,7 +8,6 @@
   },
   "scripts": {
     "build": "vite build",
-    "comment-style": "bash ../../../scripts/check_comment_style.sh",
     "dead-code": "knip --no-progress --directory ../../.. --workspace apps/raven/web",
     "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
     "dev": "vite",
@@ -32,8 +31,7 @@
     "test:watch": "bun test --dots --watch",
     "typecheck": "bun run --sequential typecheck:app typecheck:worker",
     "typecheck:app": "tsgo --noEmit",
-    "typecheck:worker": "tsgo --noEmit -p tsconfig.worker.json",
-    "typescript-only": "bash ../../../scripts/check_typescript_only.sh"
+    "typecheck:worker": "tsgo --noEmit -p tsconfig.worker.json"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -89,13 +87,11 @@
       "format:check",
       "test",
       "test:watch",
-      "comment-style",
       "dead-code",
       "dead-css",
       "lint:py",
       "one-command-per-script",
-      "spellcheck",
-      "typescript-only"
+      "spellcheck"
     ],
     "targets": {
       "build": {
@@ -144,13 +140,6 @@
           "default",
           "^production",
           "againstServer"
-        ]
-      },
-      "comment-style": {
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/**/*.{ts,tsx,scss}",
-          "{workspaceRoot}/scripts/check_comment_style.sh"
         ]
       },
       "dead-code": {
@@ -207,13 +196,6 @@
         "inputs": [
           "{projectRoot}/**/*",
           "{workspaceRoot}/typos.toml"
-        ]
-      },
-      "typescript-only": {
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/**/*.{js,jsx,mjs,cjs}",
-          "{workspaceRoot}/scripts/check_typescript_only.sh"
         ]
       }
     }

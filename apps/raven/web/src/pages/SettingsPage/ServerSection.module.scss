@@ -1,0 +1,138 @@
+.servers {
+  display: grid;
+  gap: var(--space-1);
+  max-width: var(--measure-form-wide);
+}
+
+// A server's facts beside what can be done with it, a rename's field under both.
+.server {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'facts actions'
+    'more more';
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+
+  > form,
+  > p {
+    grid-area: more;
+  }
+}
+
+.active {
+  border-color: var(--color-line-strong);
+  background: var(--color-canopy-hi);
+}
+
+.facts {
+  grid-area: facts;
+  display: grid;
+  gap: var(--space-0);
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.origin {
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.tag {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-moss);
+  color: var(--color-bark);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-1);
+}
+
+// The new name beside Save and Cancel, why it will not do under them.
+.rename {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'input actions'
+    'note note';
+  gap: var(--space-1) var(--space-2);
+
+  > input {
+    grid-area: input;
+  }
+
+  > p {
+    grid-area: note;
+  }
+}
+
+.input {
+  background-color: var(--color-deep);
+}
+
+// The address field and Add beside it, what it takes under them.
+.add {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 36rem;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.addRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+@media (max-width: 40rem) {
+  .server {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'facts'
+      'actions'
+      'more';
+  }
+
+  .rename {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'input'
+      'actions'
+      'note';
+  }
+
+  .addRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

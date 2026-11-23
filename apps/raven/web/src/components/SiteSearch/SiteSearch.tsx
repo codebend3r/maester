@@ -162,8 +162,8 @@ const upcomingSuggestionsOf = (found: UpcomingSearch | undefined): Suggestion[] 
   (found?.titles ?? []).slice(0, MAX_SUGGESTIONS).map(upcomingSuggestion)
 
 /**
- * What the box searches: every library, or, on Coming soon's pages, the
- * movies and shows still to come that no library holds.
+ * What the box searches: every library, or, on Coming soon's pages, every
+ * movie and show on TMDB that no library holds.
  */
 const SEARCH_SCOPES = { libraries: 'libraries', upcoming: 'upcoming' } as const
 
@@ -303,7 +303,7 @@ type SiteSearchProps = { className?: string }
 
 /**
  * The search at the top of every page: through every library, or on Coming
- * soon's pages through what is still to come and no library holds, each
+ * soon's pages through every movie and show no library holds, each
  * suggestion opening its Coming soon page. Once three
  * letters are typed and the typing pauses, a list under the box offers the
  * first titles found, each opening its page, and a last row that opens home

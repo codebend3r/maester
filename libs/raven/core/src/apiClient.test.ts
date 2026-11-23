@@ -13,6 +13,9 @@ import {
   CDN_BACKDROP_WIDTHS,
   CDN_POSTER_WIDTHS,
   DEFAULT_SAGA_BACKDROP,
+  ENCODER_KINDS,
+  HEALTH_STATUSES,
+  METADATA_SERVICE_STATES,
   POSTER_OWN_WIDTH,
   AUTH_CONFIG_STATES,
   AUTH_HEADERS,
@@ -25,6 +28,7 @@ import {
   type ItemMetadataState,
   type MetadataHealth,
   type PersonDetails,
+  type ServerHealth,
 } from '@/contract'
 import { type Call, clientReturning, respond } from '@/test/apiClientFakes'
 import {
@@ -651,6 +655,31 @@ describe('the metadata calls', () => {
     await expect(client.getMetadataHealth()).resolves.toEqual(metadata)
   })
 
+  it("reads the server's whole health answer, its id with it", async () => {
+    const health: ServerHealth = {
+      status: HEALTH_STATUSES.ok,
+      ffmpeg: '7.1',
+      tonemap: true,
+      encoder: ENCODER_KINDS.software,
+      thumbnailsPending: 0,
+      metadata: {
+        tmdb: METADATA_SERVICE_STATES.ok,
+        omdb: METADATA_SERVICE_STATES.off,
+        mdblist: METADATA_SERVICE_STATES.off,
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: METADATA_SERVICE_STATES.off,
+        aiRemaining: 0,
+        aiPending: 0,
+      },
+      serverId: '0b5f8f0e-6c55-4b8e-9d0a-1f6f3c8e2a11',
+    }
+    const { client, calls } = clientReturning(respond({ body: health }))
+    await expect(client.getServerHealth()).resolves.toEqual(health)
+    expect(calls[0]?.url ?? null).toBe('http://nas:8484/api/health')
+  })
+
   it('refuses a health check it does not understand', async () => {
     const metadata = { tmdb: 'ok', omdb: 'off', pending: 3, error: null, lastOk: null }
     const { client } = clientReturning(respond({ body: { status: 'ok', metadata } }))
@@ -734,7 +763,7 @@ describe('the metadata calls', () => {
 
     it('lists a poster at each of its finer widths, the widest at its own URL', () => {
       const path = '/api/pictures/items/2/poster/abc'
-      expect(client.posterWidths).toEqual(CDN_POSTER_WIDTHS)
+      expect(client.posterWidths()).toEqual(CDN_POSTER_WIDTHS)
       expect(client.posterSrcSet({ id: 2, version: 'abc' })).toBe(
         CDN_POSTER_WIDTHS.map(
           (width) => `${at(width === POSTER_OWN_WIDTH ? { path } : { path, width })} ${width}w`,
@@ -750,6 +779,42 @@ describe('the metadata calls', () => {
         ).join(', '),
       )
       expect(client.backdropSrcSet({ id: 3, version: null })).toBeNull()
+    })
+  })
+
+  describe('following the server a getter names', () => {
+    const server = { origin: '' }
+    const calls: string[] = []
+    const client = createApiClient({
+      baseUrl: () => server.origin,
+      fetch: async (url) => {
+        calls.push(url)
+        return respond({ body: [] })
+      },
+      pictureCdn: '/.netlify/images',
+    })
+
+    it("calls and addresses the page's own /api, through the CDN, while the getter names none", async () => {
+      server.origin = ''
+      await client.listLibraries()
+      expect(calls.at(-1)).toBe('/api/libraries')
+      expect(client.eventsUrl()).toBe('/api/events')
+      expect(client.itemImageUrl({ id: 2, kind: 'poster', version: 'abc' })).toStartWith(
+        '/.netlify/images?',
+      )
+      expect(client.posterWidths()).toEqual(CDN_POSTER_WIDTHS)
+    })
+
+    it('calls another server at its origin once the getter names it, its pictures straight from it', async () => {
+      server.origin = 'https://meleys.example:8443/'
+      await client.listLibraries()
+      expect(calls.at(-1)).toBe('https://meleys.example:8443/api/libraries')
+      expect(client.eventsUrl()).toBe('https://meleys.example:8443/api/events')
+      expect(client.itemImageUrl({ id: 2, kind: 'poster', version: 'abc' })).toBe(
+        'https://meleys.example:8443/api/pictures/items/2/poster/abc',
+      )
+      expect(client.posterWidths()).not.toEqual(CDN_POSTER_WIDTHS)
+      expect(client.backdropSrcSet({ id: 3, version: 'def' })).toBeNull()
     })
   })
 })

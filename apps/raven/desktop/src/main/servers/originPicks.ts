@@ -10,9 +10,10 @@ import {
   readMediaOrigins,
   toQueryString,
 } from '@raven/core'
-import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import { quietly } from '@/main/log/quietly'
 import { parseJson } from '@/main/parseJson'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import type { ServerCalls } from '@/main/servers/serverCalls'
 import { HTTP_STATUSES } from '@shared/http'
@@ -114,7 +115,8 @@ export type OriginPicks = {
 }
 
 type CreateOriginPicksProps = {
-  server: ServerEntry
+  /** The server in use, whose own address stands in when no origin answers. */
+  server: Pick<ServerInUse, 'current'>
   calls: Pick<ServerCalls, 'call'>
   probe: ProbeFetch
   /** Times the probes in monotonic milliseconds, so a wall clock that jumps never skews one. */
@@ -208,7 +210,7 @@ export const createOriginPicks = ({
 
   const placeOf: OriginPicks['placeOf'] = async () => {
     const { origin, remote } = await pickOf()
-    return { url: origin?.url ?? server.origin, origin, remote }
+    return { url: origin?.url ?? server.current().origin, origin, remote }
   }
 
   return {

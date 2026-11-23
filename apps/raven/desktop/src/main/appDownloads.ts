@@ -9,6 +9,7 @@ import { createDownloadService, type DownloadService } from '@/main/downloads/do
 import { createMediaAccess } from '@/main/downloads/mediaAccess'
 import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { Grants } from '@/main/grants'
+import type { SwitchingServer } from '@/main/servers/activeServer'
 import { fetchDownload } from '@/main/netFetches'
 import { makeDir, openPart, removeTree, sizeOf } from '@/main/nodeFs'
 import type { ServerPlumbing } from '@/main/servers/serverPlumbing'
@@ -17,6 +18,8 @@ import type { Timers } from '@/main/timers'
 type OpenAppDownloadsProps = {
   stores: AppStores
   plumbing: ServerPlumbing
+  /** The server in use: new downloads are filed under its id, and its are the ones fetched. */
+  active: SwitchingServer
   grants: Grants
   accountIdOf: () => string | null
   accessEnds: AccountSignal
@@ -35,6 +38,7 @@ type OpenAppDownloadsProps = {
 export const openAppDownloads = ({
   stores,
   plumbing,
+  active,
   grants,
   accountIdOf,
   accessEnds,
@@ -46,7 +50,7 @@ export const openAppDownloads = ({
   const downloads = createDownloadService({
     store: stores.downloadsStore,
     config: stores.config,
-    server: stores.server,
+    server: active,
     calls: plumbing.calls,
     userData: stores.downloadsUserData,
     space: { mkdir: makeDir, statfs: (path) => statfs(path) },
@@ -87,5 +91,7 @@ export const openAppDownloads = ({
   accessEnds.listen(() => downloads.accessEnded())
   // Another account signed in, or none: what the last one watched stays with it.
   accountSwitches.listen(() => downloads.accountSwitched())
+  // Another server: its downloads go on, and the last one's wait for it.
+  active.switches.listen(() => downloads.serverSwitched())
   return downloads
 }

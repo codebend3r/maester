@@ -1,3 +1,4 @@
+import json
 import re
 import subprocess
 import tomllib
@@ -11,12 +12,13 @@ WORKFLOWS = ROOT / ".github/workflows"
 ACTIONS = ROOT / ".github/actions"
 PULL_REQUEST = "pull-request-checks.yml"
 MAIN = "native-checks.yml"
-# Each web app's job in the pull request workflow: its selection output, the root script that runs
-# a target on it alone, and its folder.
-WEB_APP_JOBS = {
-    "raven-web": ("raven", "ci:raven:web", "apps/raven/web"),
-    "wren-web": ("wren", "ci:wren:web", "apps/raven/music-web"),
+# Each runner OS's one install in the pull request workflow, and its runner.
+INSTALL_JOBS = {
+    "install": "ubuntu-24.04",
+    "install-macos": "macos-26",
+    "install-windows": "windows-2025",
 }
+INSTALL_ACTION = "./.github/actions/bun-install"
 
 SELECT_SCRIPT = "python3 scripts/select_native_checks.py"
 GROUPS = ("app", "music", "desktop")
@@ -51,12 +53,12 @@ E2E_JOBS = {
     **{f"e2e-{device}": group for device, (_, group, has_flows) in DEVICES.items() if has_flows},
     "desktop-e2e": "desktop",
 }
-# The native jobs a pull request lists: the selection, the builds and the tests. Main lists the
-# selection alone.
-NATIVE_JOBS = ["select", *BUILD_JOBS, *FOLLOW_ON_JOBS, "desktop-test"]
-# Each native job that is more than a build of a device, and the action that holds its steps.
+# The native jobs a pull request lists: the builds and the tests. It selects nothing; main lists
+# the selection alone.
+NATIVE_JOBS = [*BUILD_JOBS, *FOLLOW_ON_JOBS, "desktop-test"]
+# Each pull request native job that is more than a build of a device, and the action that holds
+# its steps.
 JOB_ACTIONS = {
-    "select": "raven-native-select",
     "windows-native": "raven-windows-native",
     "windows-app": "raven-windows-app",
     "desktop-native": "raven-mac-native",
@@ -75,6 +77,22 @@ END_TO_END_TARGETS = ("app:e2e", "@raven/music:e2e")
 PROJECTS = {"apps/raven/app": "@raven/app", "apps/raven/music": "@raven/music"}
 PLAN_SCRIPT = ROOT / "scripts/plan_native_builds.sh"
 FIND_SCRIPT = ROOT / "scripts/find_pr_builds.sh"
+# Every row of the pull request's one matrix, by the name its job carries.
+STANDARD_CHECK_NAMES = {
+    "🏗️ Build every project",
+    "🖌️ Gale",
+    "🧹 Dead code",
+    "🧼 Dead CSS",
+    "🎨 Oxfmt",
+    "🔦 Lighthouse Raven web",
+    "🔦 Lighthouse Wren web",
+    "🧩 One command per script",
+    "🟦 Oxlint",
+    "🐍 Python lint",
+    "🔤 Spellcheck",
+    "🧪 Unit tests",
+    "🧩 Type-check",
+}
 CANCEL_STEP = {
     "name": "🛑 Cancel the run",
     "if": "failure() && github.event_name == 'pull_request'",
@@ -93,6 +111,11 @@ def load_action(name: str) -> dict:
     return yaml.load((ACTIONS / name / "action.yml").read_text(), Loader=yaml.BaseLoader)
 
 
+def standard_checks() -> list[dict]:
+    """The rows of the pull request's `standard-checks` matrix."""
+    return load_workflow(PULL_REQUEST)["jobs"]["standard-checks"]["strategy"]["matrix"]["check"]
+
+
 def action_step(job: dict, action: str) -> dict:
     return next(step for step in job["steps"] if step.get("uses") == f"./.github/actions/{action}")
 
@@ -103,51 +126,86 @@ def test_pull_requests_list_the_native_jobs_and_wait_for_them():
     # Every native job is this workflow's own: none is a workflow called, which GitHub would list
     # as a group of jobs under the caller's name.
     assert set(jobs) == {
-        "checks",
-        "build",
-        "web-apps",
-        *WEB_APP_JOBS,
+        *INSTALL_JOBS,
+        "standard-checks",
         *NATIVE_JOBS,
         "checks-complete",
         "supabase",
         "smoke",
     }
     assert all("uses" not in jobs[job_name] for job_name in NATIVE_JOBS)
-    # The selection diffs the head commit against the base, and the builds are named for the head.
+    # The builds are named for the head commit, and nothing diffs against the base.
     assert workflow["env"]["NATIVE_BUILD_SHA"] == "${{ github.event.pull_request.head.sha }}"
-    assert workflow["env"]["NATIVE_SELECT_BASE"] == "${{ github.event.pull_request.base.sha }}"
-    # Every build starts at once: the native jobs wait for what the workspace's build waits for.
-    assert jobs["select"]["needs"] == jobs["build"]["needs"] == "checks"
-    assert all(
-        "e2e" not in check["target"] for check in jobs["checks"]["strategy"]["matrix"]["check"]
-    )
+    assert "NATIVE_SELECT_BASE" not in workflow["env"]
+    assert all("e2e" not in check["target"] for check in standard_checks())
     complete = jobs["checks-complete"]
     assert complete["name"] == "✅ Checks"
-    assert set(complete["needs"]) == {"checks", "build", "web-apps", *WEB_APP_JOBS, *NATIVE_JOBS}
+    assert set(complete["needs"]) == {*INSTALL_JOBS, "standard-checks", *NATIVE_JOBS}
     gate = complete["steps"][-1]
-    # The selection runs on every PR, so its skipped result means the checks failed, never a
-    # pass; a build it did not select is skipped and passes, and one that failed does not.
-    assert 'test "$SELECT_RESULT" = success' in gate["run"]
-    assert 'test "$WEB_APPS_RESULT" = success' in gate["run"]
-    assert gate["env"]["ALL_RESULTS"] == "${{ join(needs.*.result, ' ') }}"
-    assert '*" failure "* | *" cancelled "*) exit 1' in gate["run"]
+    assert gate["env"] == {"ALL_RESULTS": "${{ join(needs.*.result, ' ') }}"}
 
 
 def gate_of(results: str) -> int:
     gate = load_workflow(PULL_REQUEST)["jobs"]["checks-complete"]["steps"][-1]["run"]
-    passed = {"CHECKS_RESULT", "BUILD_RESULT", "SELECT_RESULT", "WEB_APPS_RESULT"}
     return subprocess.run(
         ["bash", "-e", "-c", gate],
-        env={"PATH": "/usr/bin:/bin", **dict.fromkeys(passed, "success"), "ALL_RESULTS": results},
+        env={"PATH": "/usr/bin:/bin", "ALL_RESULTS": results},
         capture_output=True,
         check=False,
     ).returncode
 
 
-def test_the_gate_passes_a_skipped_native_job_and_fails_a_failed_or_cancelled_one():
-    assert gate_of("success success skipped skipped") == 0
-    assert gate_of("success failure skipped") != 0
-    assert gate_of("success skipped cancelled") != 0
+def test_the_gate_passes_only_when_every_job_passed():
+    # Every job runs on every pull request, so a skipped one means a job it waits for failed.
+    assert gate_of("success success success") == 0
+    assert gate_of("success skipped") != 0
+    assert gate_of("success failure") != 0
+    assert gate_of("success cancelled") != 0
+
+
+def test_a_pull_request_selects_nothing_and_runs_every_check_on_every_project():
+    text = (WORKFLOWS / PULL_REQUEST).read_text()
+    assert "affected" not in text
+    assert "--exclude=" not in text
+    assert "raven-native-select" not in text
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
+    assert all("if" not in jobs[job_name] for job_name in NATIVE_JOBS)
+
+
+def test_each_runner_os_installs_once_and_every_job_restores_that_install():
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
+    for job_name, runner in INSTALL_JOBS.items():
+        assert jobs[job_name]["runs-on"] == runner
+        assert any(step.get("uses") == INSTALL_ACTION for step in jobs[job_name]["steps"])
+    # Nothing but the shared action installs, and off Windows it installs only on a cache miss.
+    paths = [WORKFLOWS / PULL_REQUEST, *ACTIONS.glob("*/action.yml")]
+    installing = [
+        path.relative_to(ROOT)
+        for path in paths
+        if "bun install --frozen-lockfile" in path.read_text()
+    ]
+    assert installing == [Path(".github/actions/bun-install/action.yml")]
+    restore, downloads, install = load_action("bun-install")["runs"]["steps"]
+    assert "runner.os" in restore["with"]["key"]
+    assert "node_modules" in restore["with"]["path"]
+    # The cache's tar breaks the junctions Bun links a Windows install with, so a Windows job
+    # restores Bun's downloads, which hold no links, and always installs from them.
+    assert restore["if"] == "runner.os != 'Windows'"
+    assert downloads["if"] == "runner.os == 'Windows'"
+    assert "runner.os" in downloads["with"]["key"]
+    assert "node_modules" not in downloads["with"]["path"]
+    assert install["if"] == "runner.os == 'Windows' || steps.restore.outputs.cache-hit != 'true'"
+    # Each job waits for the install of the OS it runs on, itself or through the standard checks.
+    assert jobs["standard-checks"]["needs"] == "install"
+    assert jobs["supabase"]["needs"] == "install"
+    for job_name in BUILD_JOBS:
+        job = jobs[job_name]
+        needs = job["needs"] if isinstance(job["needs"], list) else [job["needs"]]
+        assert "standard-checks" in needs
+        expected = {"macos-26": "install-macos", "windows-2025": "install-windows"}.get(
+            job["runs-on"]
+        )
+        assert expected is None or expected in needs, job_name
 
 
 def test_a_pull_request_holds_no_end_to_end_job_not_even_a_skipped_one():
@@ -157,13 +215,6 @@ def test_a_pull_request_holds_no_end_to_end_job_not_even_a_skipped_one():
     jobs = load_workflow(PULL_REQUEST)["jobs"]
     assert not any("E2E" in job.get("name", "") for job in jobs.values())
     assert "env.APP_FLOWS" not in (ACTIONS / "raven-app-build/action.yml").read_text()
-
-
-def test_main_lists_the_pull_request_s_selection_unchanged():
-    pull_request = load_workflow(PULL_REQUEST)["jobs"]["select"]
-    main = load_workflow(MAIN)["jobs"]["select"]
-    # A pull request's selection waits for its checks; main has none to wait for.
-    assert pull_request == {**main, "needs": "checks"}
 
 
 def test_supabase_reserves_its_ports_before_any_network_activity():
@@ -203,8 +254,7 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
     assert "needs" not in screens
     assert "if" not in screens
     assert any("-t test:screens" in step.get("run", "") for step in screens["steps"])
-    pull_request = load_workflow(PULL_REQUEST)["jobs"]["checks"]["strategy"]["matrix"]["check"]
-    assert all(check["target"] != "test:screens" for check in pull_request)
+    assert all(check["target"] != "test:screens" for check in standard_checks())
     # The selection looks its last green run up under this workflow's file name.
     assert f"workflows/{MAIN}/runs" in (ROOT / "scripts/select_native_checks.py").read_text()
 
@@ -279,7 +329,7 @@ def plan_of(env: dict[str, str]) -> dict[str, str]:
     return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
 
-def test_a_pull_request_builds_what_it_selected():
+def test_a_selected_group_with_no_build_found_is_planned_as_one_to_build():
     plan = plan_of({"SELECTED_app": "true", "SELECTED_desktop": "false"})
     assert (plan["app_selected"], plan["app_build"]) == ("true", "true")
     assert (plan["app_run"], plan["app_sha"]) == ("20", "main")
@@ -314,7 +364,7 @@ def test_the_lookup_never_fails_the_run_and_reads_the_pull_request_s_checks(even
     script = FIND_SCRIPT.read_text()
     assert "set -e" not in script
     assert "pull-request-checks.yml/runs" in script
-    # Not a push: nothing is found, with no call made, so a pull request builds what it selected.
+    # Not a push: nothing is found, with no call made.
     result = subprocess.run(
         ["bash", str(FIND_SCRIPT)],
         env={"PATH": "/usr/bin:/bin", "EVENT": event, "REPO": "o/r", "SHA": "main"},
@@ -323,13 +373,6 @@ def test_the_lookup_never_fails_the_run_and_reads_the_pull_request_s_checks(even
         check=True,
     )
     assert result.stdout == ""
-
-
-@pytest.mark.parametrize(("job_name", "group"), sorted(BUILD_JOBS.items()))
-def test_build_jobs_run_when_the_plan_says_to_build_their_group(job_name: str, group: str):
-    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
-    assert job["needs"] == "select"
-    assert job["if"] == f"needs.select.outputs.{group}_build == 'true'"
 
 
 @pytest.mark.parametrize(("job_name", "group"), sorted(E2E_JOBS.items()))
@@ -386,7 +429,9 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
     name, group, has_flows = facts
     jobs = load_workflow(PULL_REQUEST)["jobs"]
     build = jobs[f"build-{device}"]
-    assert build["name"] == f"{BUILD_EMOJI[group]} Build {name}"
+    # Each build names its app: raven's device app or Wren.
+    app_name = name if group == "music" else f"Raven {name}"
+    assert build["name"] == f"{BUILD_EMOJI[group]} Build {app_name}"
     # Every device builds by the same steps; only its job's `APP_*` variables differ.
     assert build["steps"] == jobs["build-iphone"]["steps"]
     assert build["steps"][0]["with"] == {"ref": NATIVE_SHA}
@@ -407,7 +452,7 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
 @pytest.mark.parametrize(("device", "name"), sorted(E2E_NAMES.items()))
 def test_each_device_s_flows_run_on_its_own_build_in_a_job_named_for_it(device: str, name: str):
     jobs = load_workflow(MAIN)["jobs"]
-    job, build = jobs[f"e2e-{device}"], load_workflow(PULL_REQUEST)["jobs"][f"build-{device}"]
+    job, build = (jobs[f"e2e-{device}"], load_workflow(PULL_REQUEST)["jobs"][f"build-{device}"])
     assert job["name"] == name
     # A device's two jobs agree on the build that passes between them.
     assert all(job["env"][setting] == build["env"][setting] for setting in HANDOFF_SETTINGS)
@@ -461,17 +506,21 @@ def test_the_mac_s_build_jobs_build_the_named_commit_and_pass_the_handoff(
 def test_the_mac_s_tests_run_with_its_build_and_its_suite_waits_for_main():
     test = load_workflow(PULL_REQUEST)["jobs"]["desktop-test"]
     e2e = load_workflow(MAIN)["jobs"]["desktop-e2e"]
-    assert (test["name"], e2e["name"]) == ("🧪 Test Mac player", "🎬 E2E Raven Mac desktop")
-    # The tests run wherever this run built the native pieces, and only there.
-    assert test["needs"] == ["select", "desktop-native"]
+    assert (test["name"], e2e["name"]) == ("🧪 Test Raven Mac player", "🎬 E2E Raven Mac desktop")
+    # The tests run on the native pieces this run built.
+    assert test["needs"] == "desktop-native"
     assert "if" not in test
-    # Both read the handoff from whichever run holds it.
-    for job, target in ((test, "test:native"), (e2e, "e2e")):
-        assert action_step(job, "raven-mac-playback")["with"] == {
-            "target": target,
-            "build-run-id": "${{ needs.select.outputs.desktop_run }}",
-            "build-sha": "${{ needs.select.outputs.desktop_sha }}",
-        }
+    assert action_step(test, "raven-mac-playback")["with"] == {
+        "target": "test:native",
+        "build-run-id": "${{ github.run_id }}",
+        "build-sha": NATIVE_SHA,
+    }
+    # Main's suite reads the handoff from whichever run holds it.
+    assert action_step(e2e, "raven-mac-playback")["with"] == {
+        "target": "e2e",
+        "build-run-id": "${{ needs.select.outputs.desktop_run }}",
+        "build-sha": "${{ needs.select.outputs.desktop_sha }}",
+    }
     steps = load_action("raven-mac-playback")["runs"]["steps"]
     download = next(step for step in steps if step.get("uses") == "actions/download-artifact@v8")
     assert download["with"] == {
@@ -590,60 +639,21 @@ def test_main_finds_a_group_only_with_every_build_its_flows_read():
     assert found == expected
 
 
-WEB_APP_CHECK_NAMES = {
-    "💬 Comment style",
-    "🖌️ CSS lint",
-    "🧹 Dead code",
-    "🧼 Dead CSS",
-    "🎨 Format",
-    "🧩 One command per script",
-    "🐍 Python lint",
-    "🔤 Spellcheck",
-    "🧪 Tests",
-    "🧩 Type-check",
-    "🟦 TypeScript lint",
-    "🟦 TypeScript only",
-    "🏗️ Build",
-    "🔦 Lighthouse",
-}
-
-
-@pytest.mark.parametrize("job_name", WEB_APP_JOBS)
-def test_each_web_app_runs_every_check_on_itself_alone(job_name: str):
-    output, script, folder = WEB_APP_JOBS[job_name]
-    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
-    assert {check["name"] for check in job["strategy"]["matrix"]["check"]} == WEB_APP_CHECK_NAMES
-    assert job["env"]["WEB_APP_SCRIPT"] == script
-    assert job["env"]["WEB_APP_DIR"] == folder
-    assert any(step.get("run") == 'bun run "$WEB_APP_SCRIPT" "$TARGET"' for step in job["steps"])
-    assert job["if"] == f"needs.web-apps.outputs.{output} == 'true'"
-
-
-@pytest.mark.parametrize("job_name", WEB_APP_JOBS)
-def test_each_web_app_s_job_stands_apart(job_name: str):
-    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
-    # It waits for its selection alone, never for the workspace's checks or the other app.
-    assert job["needs"] == "web-apps"
-    assert job["strategy"]["fail-fast"] == "false"
-    assert all("gh run cancel" not in step.get("run", "") for step in job["steps"])
-
-
-def test_the_web_apps_selection_runs_both_when_the_workflow_changes():
-    select = next(
-        step
-        for step in load_workflow(PULL_REQUEST)["jobs"]["web-apps"]["steps"]
-        if step.get("id") == "select"
-    )
-    assert f".github/workflows/{PULL_REQUEST}" in select["run"]
-    assert """affected='["@raven/web","@raven/music-web"]'""" in select["run"]
-
-
-def test_the_workspace_s_checks_leave_the_web_apps_to_their_jobs():
-    jobs = load_workflow(PULL_REQUEST)["jobs"]
-    check = next(
-        step for step in jobs["checks"]["steps"] if step.get("name") == "${{ matrix.check.name }}"
-    )
-    assert check["env"]["WEB_APPS"] == "@raven/web,@raven/music-web"
-    assert check["run"].count('--exclude="$WEB_APPS"') == 2
-    build = next(step for step in jobs["build"]["steps"] if step.get("name") == "🏗️ Build")
-    assert build["run"] == "bun run build --exclude=@raven/web,@raven/music-web"
+def test_the_standard_checks_run_every_check_at_once_and_cancel_on_a_failure():
+    job = load_workflow(PULL_REQUEST)["jobs"]["standard-checks"]
+    checks = standard_checks()
+    assert {check["name"] for check in checks} == STANDARD_CHECK_NAMES
+    assert "max-parallel" not in job["strategy"]
+    assert job["strategy"]["fail-fast"] == "true"
+    assert job["steps"][-1] == CANCEL_STEP
+    # Lighthouse runs on one web app a runner, through the root script that names its cached Nx
+    # target; every other check runs on every project.
+    scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
+    assert {scripts[check["script"]] for check in checks if "script" in check} == {
+        "nx run @raven/web:lighthouse",
+        "nx run @raven/music-web:lighthouse",
+    }
+    assert all(check["target"] == "lighthouse" for check in checks if "script" in check)
+    for project in ("apps/raven/web", "apps/raven/music-web"):
+        targets = json.loads((ROOT / project / "package.json").read_text())["nx"]["targets"]
+        assert targets["lighthouse"]["cache"] is True

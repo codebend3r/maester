@@ -15,7 +15,7 @@ import {
 export const HOME_SHELF_TYPES = { shows: 'shows', media: 'media' } as const
 
 /**
- * A library's row on the home page: a pinned library's newest arrivals,
+ * A library's row on the home page: a library's newest arrivals,
  * newest first, or what a search found in it, by title. A TV shows library
  * gives its shows; any other library gives its videos.
  */
@@ -36,7 +36,7 @@ export const isAlbumShelf = object({ libraryId: isNumber, albums: isAlbumList })
 export type AlbumShelf = Infer<typeof isAlbumShelf>
 
 /**
- * `GET /api/home/albums`: a shelf of albums for each pinned music library, as
+ * `GET /api/home/albums`: a shelf of albums for each music library, as
  * the side menu orders them. Read apart from the shelves, which keep each
  * music library's files for the clients that do not draw albums.
  */
@@ -64,7 +64,7 @@ export const isPosterEntries = listOf(isPosterEntry)
  */
 export const isFavouriteTitles = listOf(isItemSummary)
 
-/** `GET /api/home`: every video in progress, then each pinned library's shelf, as the side menu orders them. */
+/** `GET /api/home`: every video in progress, then each library's shelf, as the side menu orders them. */
 export const isHome = object({
   /** Videos with a saved spot, the most recently watched first. */
   inProgress: isPosterEntries,
@@ -105,7 +105,7 @@ export type HeroEntry = Infer<typeof isHeroEntry>
 
 /**
  * `GET /api/home/hero`: the titles home's hero takes turns with. The ones the
- * admin picked when any are picked, else each pinned library's newest
+ * admin picked when any are picked, else each included library's newest
  * released title, a round at a time; never more than the server's
  * `HERO_COUNT`.
  */

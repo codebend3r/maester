@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type * as Native from '@raven/native'
-import { AUTH_OUTCOMES, type AuthOutcome } from '@raven/native/headless'
+import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 
 import { useAccountSession } from '@/account/session'
@@ -47,7 +47,7 @@ describe('SignIn on a TV', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetTestScreen()
-    useActiveServer.setState({ servers: [], activeId: null })
+    useActiveServer.setState({ servers: [], activeId: RAVEN_SERVER.id })
     useAccountSession.setState({ signIn: mockSignIn })
     mockSignIn.mockResolvedValue({
       kind: AUTH_OUTCOMES.ok,

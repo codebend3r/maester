@@ -36,7 +36,11 @@ bun run affected   # the same for the projects changed since main; spellcheck st
 
 [Commands](docs/commands.md) lists every root `package.json` script with what it does; `bun run help` prints the same list.
 
-Every pull request runs each check on every project in its own parallel matrix job, then builds and health checks both production images (`.github/workflows/pull-request-checks.yml`). The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps.
+Every pull request installs the dependencies once per runner OS, runs every check on every project at once in the standard checks matrix, then builds every native app, and health checks both production images beside them (`.github/workflows/pull-request-checks.yml`).
+
+![The pull request checks: one install per runner OS, the standard checks matrix, then the native builds, all gated by Checks](docs/images/pr-checks-workflow.png)
+
+The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps.
 
 The git hooks are lefthook's (`lefthook.yml`):
 

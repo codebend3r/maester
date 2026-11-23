@@ -6,19 +6,22 @@ import { BUTTON_TONES, Button, Icon, type IconName, classNames, useKeyShortcut }
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
-import { isAnyOf, libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { isAnyOf, pinnedPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import { BrowseFan } from '@/components/AppShell/BrowseFan'
 import { FollowServer } from '@/components/AppShell/FollowServer'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
 import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
+import { ServerSwitcher } from '@/components/ServerSwitcher/ServerSwitcher'
 import { Logo } from '@/components/Logo/Logo'
 import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
+import { type PinnedLibrary, followPin, usePinnedLibraries } from '@/lib/pins'
 import { librariesQuery } from '@/lib/queries'
+import { useServers } from '@/lib/servers'
 import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
@@ -39,34 +42,87 @@ type NavItemProps = {
   label: string
   isIconsOnly: boolean
   note?: string
+  /** A line in very small type under the name: a pinned library's server, when there are several. */
+  detail?: string
+  /** Heard before the link opens its page, as a pin on another server switches to it. */
+  onClick?: () => void
 }
 
 /**
  * A row of the side menu, marked as current when the location matches any
  * of its patterns. Down to its icon, it keeps its name for screen readers
  * and shows it as a tooltip at once. A note adds its word to the name both ways:
- * `Tutorials (locked)`.
+ * `Tutorials (locked)`; a detail shows under the name, and in the tooltip after it.
  */
-const NavItem = ({ to, patterns, icon, label, isIconsOnly, note }: NavItemProps) => {
+const NavItem = ({
+  to,
+  patterns,
+  icon,
+  label,
+  isIconsOnly,
+  note,
+  detail,
+  onClick,
+}: NavItemProps) => {
   const isCurrent = useIsCurrent(patterns)
   const suffix = note ? APP_SHELL_COPY.noteSuffix(note) : ''
+  const detailSuffix = detail ? APP_SHELL_COPY.noteSuffix(detail) : ''
   return (
-    <NavTip text={`${label}${suffix}`} isOn={isIconsOnly}>
+    <NavTip text={`${label}${suffix}${detailSuffix}`} isOn={isIconsOnly}>
       {(handlers) => (
         <Link
           to={to}
           className={styles.navLink}
           aria-current={isCurrent ? 'page' : undefined}
+          onClick={onClick}
           {...handlers}
         >
           {icon}
-          <span className={isIconsOnly ? 'visually-hidden' : styles.label}>
+          <span
+            className={classNames([
+              isIconsOnly ? 'visually-hidden' : styles.label,
+              !!detail && styles.stacked,
+            ])}
+          >
             {label}
             {!!note && <span className="visually-hidden">{suffix}</span>}
+            {!!detail && (
+              <span className={styles.detail}>
+                <span className="visually-hidden">{APP_SHELL_COPY.on}</span>
+                {detail}
+              </span>
+            )}
           </span>
         </Link>
       )}
     </NavTip>
+  )
+}
+
+type PinnedNavItemProps = {
+  pinned: PinnedLibrary
+  isIconsOnly: boolean
+  /** Whether the account keeps more than one server, so each pin names its own. */
+  hasServers: boolean
+}
+
+/**
+ * A pinned library's row: its type's icon, a lock on a locked one, and its server's name under
+ * it while the account keeps several. One on another server switches to it as it opens.
+ */
+const PinnedNavItem = ({ pinned, isIconsOnly, hasServers }: PinnedNavItemProps) => {
+  const { library, server } = pinned
+  return (
+    <NavItem
+      to={libraryPath(library.id)}
+      patterns={pinnedPages(pinned)}
+      icon={<LibraryIcon settings={library.settings} />}
+      label={library.name}
+      isIconsOnly={isIconsOnly}
+      note={library.settings.locked ? APP_SHELL_COPY.locked : undefined}
+      detail={hasServers ? server.name : undefined}
+      onClick={() => followPin(pinned)}
+    />
   )
 }
 
@@ -231,10 +287,13 @@ const PINNED_MARKS = {
  * holds still as the page scrolls: the logo, Home, then a nine-dot button
  * that fans out Continue watching, Binge, Coming soon (what TMDB says is on
  * its way), Favourites and, while a music library exists, Music (the music
- * mode at `/music`), then under a Pinned heading the pinned libraries, each
- * with its type's icon
- * (with a lock on it for a locked one, whatever its type), an open one
- * marked instead of Libraries. Libraries and Settings sit at its foot, under
+ * mode at `/music`), then under a Pinned heading the account's pinned libraries
+ * on every server it keeps, each with its type's icon
+ * (with a lock on it for a locked one, whatever its type) and, while the
+ * account keeps more than one server, that server's name in very small type,
+ * an open one marked instead of Libraries; one on another server switches to
+ * it. At its foot, while there are several servers, the server in use, which
+ * switches between them; then Libraries and Settings, under
  * a rule and a Manage button that folds them away, open menu or icons alone,
  * then Shortcuts, which never folds, over raven's version and the toggle. The menu collapses to its icons with B or
  * the toggle and stays that way across visits; on a medium screen it is
@@ -262,16 +321,13 @@ export const AppShell = () => {
   const hasDownloads = useDownloadsHostOrNone() !== null
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
-  // Kept from before the server went out of reach, they would open pages that need it.
-  const pinned = isOffline
-    ? []
-    : (libraries.data ?? []).filter((library) => library.settings.pinned)
+  const pinned = usePinnedLibraries()
+  const servers = useServers()
+  const hasServers = servers.length > 1
   const hasMusic = !isOffline && musicLibrariesOf(libraries.data ?? []).length > 0
   const browsePlaces = hasMusic ? [...BROWSE_PLACES, NAV_PLACES.music] : BROWSE_PLACES
   const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
-  const isPinnedOpen = pinned.some((library) =>
-    isAnyOf({ patterns: libraryPages(library.id), pathname }),
-  )
+  const isPinnedOpen = pinned.some((entry) => isAnyOf({ patterns: pinnedPages(entry), pathname }))
 
   useKeyShortcut({ key: SIDE_MENU_KEY, onPress: isMediumScreen ? ignore : toggle })
   useScrollReset()
@@ -299,15 +355,12 @@ export const AppShell = () => {
             <>
               <PinnedMark />
               <ul className={styles.pinned} aria-label={APP_SHELL_COPY.pinned}>
-                {pinned.map((library) => (
-                  <li key={library.id} className={styles.pinnedItem}>
-                    <NavItem
-                      to={libraryPath(library.id)}
-                      patterns={libraryPages(library.id)}
-                      icon={<LibraryIcon settings={library.settings} />}
-                      label={library.name}
+                {pinned.map((entry) => (
+                  <li key={entry.key} className={styles.pinnedItem}>
+                    <PinnedNavItem
+                      pinned={entry}
                       isIconsOnly={isIconsOnly}
-                      note={library.settings.locked ? APP_SHELL_COPY.locked : undefined}
+                      hasServers={hasServers}
                     />
                   </li>
                 ))}
@@ -316,6 +369,7 @@ export const AppShell = () => {
           )}
         </div>
         <div className={styles.dock}>
+          {hasServers && <ServerSwitcher servers={servers} isIconsOnly={isIconsOnly} />}
           <ManageGroup isIconsOnly={isIconsOnly}>
             {!isOffline && (
               <>
@@ -374,7 +428,7 @@ export const AppShell = () => {
           <ShellOutlet pageKey={key} />
         </div>
       </main>
-      <TabBar hasMusic={hasMusic} pinned={pinned} />
+      <TabBar hasMusic={hasMusic} pinned={pinned} servers={hasServers ? servers : []} />
     </div>
   )
 }

@@ -87,7 +87,7 @@ export const setupSync = ({
   const asked: (string | null)[] = []
   const sync = createSync({
     store,
-    serverId: SERVER_ID,
+    server: { isInUse: (serverId) => serverId === SERVER_ID },
     calls: {
       call: async ({ call, accountId: askedAs = null }) => {
         log.push(call)

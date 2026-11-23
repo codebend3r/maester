@@ -1,12 +1,18 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { EVENTS_RETRY_MS, SERVER_STREAM_EVENTS } from '@raven/ui/headless'
+import { EVENTS_RETRY_MS, SERVER_STREAM_EVENTS, useActiveServer } from '@raven/ui/headless'
 import { useServerEvents } from '@/lib/useServerEvents'
 import { useAuthSession } from '@/stores/authSession'
 import { SIGNED_IN } from '@/test/authClient'
 import { FakeEventSource } from '@/test/eventSource'
+import { MELEYS_ID, MELEYS_ORIGIN } from '@/test/servers'
+import { AUTH_SCHEME, ROUTES } from '@raven/core'
+import { HEADERS } from '@shared/http'
+
+/** A stream the page opened through fetch: where, and the Bearer it sent. */
+type AskedStream = { url: string; authorization: string | null }
 
 const render = () => {
   const client = new QueryClient()
@@ -125,5 +131,46 @@ describe('useServerEvents', () => {
     act(() => useAuthSession.setState({ session: SIGNED_IN }))
     expect(FakeEventSource.opened).toHaveLength(2)
     expect(stream(1).closed).toBe(false)
+  })
+
+  describe('on another server than the home one', () => {
+    const asked: AskedStream[] = []
+    const fetchSpy = spyOn(window, 'fetch')
+
+    beforeEach(() => {
+      asked.length = 0
+      fetchSpy.mockImplementation(
+        Object.assign(
+          async (input: RequestInfo | URL, init?: RequestInit) => {
+            asked.push({
+              url: String(input),
+              authorization: new Headers(init?.headers ?? {}).get(HEADERS.authorization),
+            })
+            return new Response(new ReadableStream())
+          },
+          { preconnect: () => undefined },
+        ),
+      )
+    })
+
+    afterEach(() => fetchSpy.mockReset())
+
+    afterAll(() => fetchSpy.mockRestore())
+
+    it("reads that server's stream through fetch with the Bearer, and the home one's again on the way back", () => {
+      render()
+      expect(FakeEventSource.opened).toHaveLength(1)
+      act(() => useActiveServer.getState().choose({ serverId: MELEYS_ID, origin: MELEYS_ORIGIN }))
+      expect(stream(0).closed).toBe(true)
+      expect(asked).toEqual([
+        {
+          url: `${MELEYS_ORIGIN}${ROUTES.events.path}`,
+          authorization: `${AUTH_SCHEME} ${SIGNED_IN.accessToken}`,
+        },
+      ])
+      act(() => useActiveServer.getState().choose(null))
+      expect(FakeEventSource.opened).toHaveLength(2)
+      expect(stream(1).url).toBe(ROUTES.events.path)
+    })
   })
 })

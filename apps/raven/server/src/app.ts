@@ -10,6 +10,8 @@ import type { ServerConfig } from '@/config'
 import type { AiFetch } from '@/metadata/aiClient'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
 import type { ReachabilityFetch } from '@/remoteAccess/reachability'
+import { registerApiCorsHook } from '@/apiCors'
+import type { AllowedOriginCheck } from '@/cors'
 import { isAllowedWebOrigin } from '@/media/mediaPlaneConfig'
 import { mediaPlanePaths, pathMatcher, registerMediaPlaneHook } from '@/media/mediaPlaneCors'
 import { proxiedMediaWarner } from '@/media/mediaPlaneFallback'
@@ -87,17 +89,20 @@ export const createApp = async ({
     })
   }
   const mediaPlaneLogger = new Logger(proxiedMediaWarner.name)
+  const isMediaPlanePath = pathMatcher(mediaPlanePaths(CONTROLLERS))
+  const isAllowedOrigin: AllowedOriginCheck = (origin) =>
+    isAllowedWebOrigin({ origin, allowed: config.mediaPlane.webOrigins })
+  registerApiCorsHook({ fastify, isMediaPlanePath, isAllowedOrigin })
   registerMediaPlaneHook({
     fastify,
-    isMediaPlanePath: pathMatcher(mediaPlanePaths(CONTROLLERS)),
-    isAllowedOrigin: (origin) =>
-      isAllowedWebOrigin({ origin, allowed: config.mediaPlane.webOrigins }),
+    isMediaPlanePath,
+    isAllowedOrigin,
     onProxied: proxiedMediaWarner({
       hasMediaOrigins: config.mediaPlane.origins.length > 0,
       warn: (message) => mediaPlaneLogger.warn(message),
     }),
   })
-  // After the media plane's hook, so a refused media request still carries its CORS headers.
+  // After the CORS hooks, so a refused request still carries its CORS headers.
   limitRavenRequests({
     fastify,
     controllers: CONTROLLERS,
@@ -106,8 +111,8 @@ export const createApp = async ({
   })
   /*
    * In Docker the server hands out the built web app too, so it and the API
-   * share one port. Only the media plane routes answer CORS, for the web
-   * origins in RAVEN_WEB_ORIGINS. In development Vite serves the app and
+   * share one port. Only `/api` answers CORS, for the web origins in
+   * RAVEN_WEB_ORIGINS. In development Vite serves the app and
    * proxies /api here.
    */
   await serveWebApp({ app, webDir: config.webDir, serverPrefixes: ['/api/'] })

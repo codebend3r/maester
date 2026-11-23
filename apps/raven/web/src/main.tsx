@@ -7,16 +7,18 @@ import '@fontsource/young-serif'
 import '@fontsource-variable/instrument-sans/wdth.css'
 // Shared primitives load before host components that override them.
 import '@raven/ui/styles.css'
-import { startMediaOrigin } from '@raven/ui'
+import { followActiveServer } from '@raven/ui'
 import { configureStorage } from '@raven/ui/headless'
 import { AppRoutes } from '@/AppRoutes'
 import { API_ORIGIN } from '@/lib/apiOrigin'
 import { api } from '@/lib/api'
 import { applyStylesheets } from '@/lib/applyStylesheets'
+import { clearServerState } from '@/lib/clearAccountState'
 import { CardLinks } from '@/components/CardLink/CardLink'
 import { startBrowserDownloads } from '@/browserDownloads/start'
 import { startDesktop } from '@/desktop/startDesktop'
 import { startServiceWorker } from '@/lib/serviceWorker'
+import { KeepActiveServer } from '@/lib/keepActiveServer'
 import { KeepLibraryListings } from '@/lib/keepLibraryListings'
 import { queryClient } from '@/lib/queryClient'
 import { keepAuthConfigSaved, restoreAuthConfig } from '@/lib/savedAuthConfig'
@@ -25,7 +27,7 @@ import { StartAuthSession } from '@/lib/startAuthSession'
 import { followTheme } from '@/stores/theme'
 
 followTheme()
-startMediaOrigin({ apiOrigin: API_ORIGIN })
+followActiveServer({ queryClient, apiOrigin: API_ORIGIN, onSwitch: clearServerState })
 restoreAuthConfig({ storage: window.localStorage, queryClient })
 keepAuthConfigSaved({ storage: window.localStorage, queryClient })
 startDesktop({ bridge: window.ravenDesktop, root: document.documentElement, target: window })
@@ -51,6 +53,7 @@ if (rootElement) {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <StartAuthSession>
+            <KeepActiveServer />
             <PrefetchPlaybackSettings>
               <KeepLibraryListings>
                 <CardLinks>

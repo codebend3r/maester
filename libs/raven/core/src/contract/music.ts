@@ -1,3 +1,4 @@
+import { isUuid } from '@/contract/ids'
 import { isMatchState } from '@/contract/items'
 import {
   type Infer,
@@ -6,7 +7,6 @@ import {
   isString,
   isStringArray,
   listOf,
-  matching,
   nullable,
   object,
   oneOf,
@@ -222,7 +222,7 @@ export const isArtistBackgroundChoice = object({ key: nullable(isString) })
 export type ArtistBackgroundChoice = Infer<typeof isArtistBackgroundChoice>
 
 /** A MusicBrainz release id: a UUID. */
-export const isMbid = matching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+export const isMbid = isUuid
 
 /** One of MusicBrainz's releases, offered by Fix match for an album. */
 export const isAlbumMatchCandidate = object({

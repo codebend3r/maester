@@ -24,3 +24,8 @@ jest.mock('react-native/Libraries/Components/View/ViewNativeComponent', () => {
     Commands: { ...commands, setDestinations: () => undefined },
   }
 })
+
+// No screen test reaches the network: a call no test answers fails as it would on a device offline.
+globalThis.fetch = async () => {
+  throw new TypeError('Network request failed')
+}

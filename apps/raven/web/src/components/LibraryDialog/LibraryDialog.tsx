@@ -365,13 +365,6 @@ export const LibraryDialog = ({ library, onClose }: LibraryDialogProps) => {
               hint={LIBRARY_DIALOG_COPY.saveProgressHint}
             />
             <SettingToggle
-              id={`${ids.settings}-pinned`}
-              label={LIBRARY_DIALOG_COPY.pin}
-              checked={settings.pinned}
-              onChange={(pinned) => setSettings((current) => ({ ...current, pinned }))}
-              hint={LIBRARY_DIALOG_COPY.pinHint}
-            />
-            <SettingToggle
               id={`${ids.settings}-refresh`}
               label={LIBRARY_DIALOG_COPY.autoRefresh}
               checked={settings.autoRefresh}

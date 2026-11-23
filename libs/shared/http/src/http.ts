@@ -20,6 +20,7 @@ export const HEADERS = {
   keepAlive: 'keep-alive',
   link: 'link',
   location: 'location',
+  prefer: 'prefer',
   proxyAuthenticate: 'proxy-authenticate',
   proxyAuthorization: 'proxy-authorization',
   range: 'range',
@@ -59,6 +60,7 @@ export const HTTP_METHODS = {
   options: 'OPTIONS',
   post: 'POST',
   put: 'PUT',
+  patch: 'PATCH',
   delete: 'DELETE',
 } as const
 
@@ -66,6 +68,7 @@ export type HttpMethod = (typeof HTTP_METHODS)[keyof typeof HTTP_METHODS]
 
 export const HTTP_STATUSES = {
   ok: 200,
+  created: 201,
   noContent: 204,
   partialContent: 206,
   found: 302,

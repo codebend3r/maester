@@ -8,12 +8,7 @@ import {
   type DownloadStatus,
   type DownloadView,
 } from '@raven/core'
-import {
-  type ConfigStore,
-  SERVER_NAME,
-  type ServerEntry,
-  setLastAccount,
-} from '@/main/desktopConfig'
+import { type ConfigStore, SERVER_NAME, setLastAccount } from '@/main/desktopConfig'
 import { createDownloadAsks, type DownloadAsks } from '@/main/downloads/asks'
 import { factsBefore } from '@/main/downloads/artwork'
 import { createAutoDelete, isDueForDeletion } from '@/main/downloads/autoDelete'
@@ -31,7 +26,6 @@ import {
   bytesOf,
   entryById,
   isRelocked,
-  type DownloadEntry,
   oweOtherAccounts,
   setAutoDelete,
   setAutoDeleteDefault,
@@ -55,6 +49,7 @@ import { downloadsDirFor, readSpace, type SpaceFs } from '@/main/downloads/space
 import { createSync, settleWithin } from '@/main/downloads/sync'
 import { errorText } from '@/main/log/errorText'
 import { DONE, refused } from '@/main/replies'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import type { Timers } from '@/main/timers'
 
@@ -67,8 +62,11 @@ export const SYNC_DELETE_WAIT_MS = 2000
 export type DownloadServiceDeps = {
   store: DownloadsStore
   config: ConfigStore
-  /** The server Raven plays from, fixed for the run: the downloads filed under its id are its. */
-  server: ServerEntry
+  /**
+   * The server in use: the downloads filed under its id are the ones fetched, synced, matched to
+   * its titles and filled with pictures; every server's play from Downloads, with or without it.
+   */
+  server: ServerInUse
   calls: Pick<ServerCalls, 'call'>
   userData: string
   space: SpaceFs
@@ -140,6 +138,11 @@ export type DownloadService = Pick<DownloadAsks, 'ask' | 'retryAsk' | 'confirm' 
     onResume: () => void
     /** The page's sign-in ended in main: the downloads fetched with an account ticket fail. */
     accessEnded: () => void
+    /**
+     * The page switched servers: the last one's asks go, its files stop where they are, and what
+     * the new one is owed, and its pictures, are sent and asked for.
+     */
+    serverSwitched: () => void
     /**
      * The account signed in changed: what the downloads hold for any other account
      * waits in `owed` for that account, and what the one signed in now is owed goes out. An
@@ -221,40 +224,33 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const { server } = deps
 
-  /** Whether a download is of the server Raven plays from, not one an older Raven kept besides. */
-  const isOwn = (entry: DownloadEntry): boolean => entry.serverId === server.id
-
   const views = (): DownloadView[] =>
-    sortDownloads(store.read().entries).map((entry) => {
-      // A server an older Raven kept besides has no name: its folder would name a media id.
-      const serverName = isOwn(entry) ? SERVER_NAME : ''
-      return {
-        downloadId: entry.downloadId,
-        serverId: entry.serverId,
-        label: entry.label,
-        group: entry.group,
-        serverName,
-        size: entry.size,
-        status: viewStatusOf(entry.status),
-        shouldAutoDelete: entry.autoDelete,
-        watched: playback.watchedOf(entry),
-        deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
-        isLocked: isRelocked(entry),
-        artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
-        pictures: {
-          art: entry.pictures?.art?.id ?? null,
-          logo: entry.pictures?.logo?.id ?? null,
-        },
-        library: entry.library ?? null,
-        facts: entry.facts ?? factsBefore(entry),
-        createdAt: entry.createdAt,
-        /*
-         * The music engine plays the current server's downloads alone, so another server's
-         * tracks have nothing to queue them by.
-         */
-        track: isOwn(entry) ? (entry.track ?? null) : null,
-      }
-    })
+    sortDownloads(store.read().entries).map((entry) => ({
+      downloadId: entry.downloadId,
+      serverId: entry.serverId,
+      label: entry.label,
+      group: entry.group,
+      serverName: SERVER_NAME,
+      size: entry.size,
+      status: viewStatusOf(entry.status),
+      shouldAutoDelete: entry.autoDelete,
+      watched: playback.watchedOf(entry),
+      deletesAt: deleteClock.deletesAt({ downloadId: entry.downloadId }),
+      isLocked: isRelocked(entry),
+      artwork: entry.artwork ?? { kind: DOWNLOAD_ARTWORK_KINDS.none },
+      pictures: {
+        art: entry.pictures?.art?.id ?? null,
+        logo: entry.pictures?.logo?.id ?? null,
+      },
+      library: entry.library ?? null,
+      facts: entry.facts ?? factsBefore(entry),
+      createdAt: entry.createdAt,
+      /*
+       * The music engine plays the server in use's downloads alone, so another server's
+       * tracks have nothing to queue them by.
+       */
+      track: server.isInUse(entry.serverId) ? (entry.track ?? null) : null,
+    }))
 
   const list = (): DownloadsList => ({
     type: DESKTOP_EVENTS.downloads,
@@ -291,7 +287,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     timers: deps.timers,
     warn: deps.warn,
     retryMs: deps.syncRetryMs,
-    serverId: server.id,
+    server,
     accountIdOf: deps.accountIdOf,
   })
 
@@ -326,7 +322,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     stat: deps.stat,
     now: deps.now,
     warn: deps.warn,
-    serverId: server.id,
+    server,
     change,
     announce,
     /*
@@ -345,7 +341,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const queue = createDownloadQueue({
     // The queue's changes go through `change` too, so its progress reaches the page.
     store: { ...store, update: change },
-    serverId: server.id,
+    server,
     access: deps.access,
     fetch: deps.fetch,
     calls: deps.calls,
@@ -380,7 +376,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
 
   const asks = createDownloadAsks({
     store,
-    serverId: server.id,
+    server,
     calls: deps.calls,
     userData: deps.userData,
     space: deps.space,
@@ -513,9 +509,20 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
   const accountSwitched: DownloadService['accountSwitched'] = () => {
     const accountId = deps.accountIdOf()
     keepLastAccount(accountId)
-    change((state) => oweOtherAccounts({ state, serverId: server.id, accountId }))
+    change((state) => oweOtherAccounts({ state, serverId: server.current().id, accountId }))
     runSync(sync.runAll())
     keepPictures(pictures.fill())
+  }
+
+  const serverSwitched: DownloadService['serverSwitched'] = () => {
+    asks.clear()
+    queue.serverSwitched().catch((error: unknown) => {
+      deps.warn(`Raven could not move its downloads to the server: ${loggable(errorText(error))}`)
+    })
+    runSync(sync.runAll())
+    keepPictures(pictures.fill())
+    // A track of the new server can queue now, and the last one's cannot.
+    announce()
   }
 
   const dispose = (): void => {
@@ -602,6 +609,7 @@ export const createDownloadService = (deps: DownloadServiceDeps): DownloadServic
     onSuspend: queue.onSuspend,
     onResume: queue.onResume,
     accessEnded: queue.accessEnded,
+    serverSwitched,
     accountSwitched,
     dispose,
   }

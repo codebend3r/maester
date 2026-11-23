@@ -8,7 +8,7 @@ description: >-
 
 The goal is a machine ready to run every command in the root `package.json`, not just `bun run verify`. Read its current `scripts` and the project scripts they invoke before setup; do not assume this skill's command list stays exhaustive. Install all required tool tiers by default for a full `/get-started` request, unless the user explicitly scopes it down. Inventory each root script against its tools, generated artifacts, services, credentials and platform requirements. Report blockers rather than claiming readiness from `verify` alone.
 
-`bun run verify` is the baseline gate. It runs spellcheck, typescript-only, one-command-per-script, dead-code, dead-css, lint (Python, TypeScript, SCSS), format check, typecheck, unit and screen tests, and generic builds. It does not prove native builds, packaging, simulator flows, Docker or authenticated tools work.
+`bun run verify` is the baseline gate. It runs spellcheck, one-command-per-script, dead-code, dead-css, lint (Python, TypeScript, SCSS), format check, typecheck, unit and screen tests, and generic builds. It does not prove native builds, packaging, simulator flows, Docker or authenticated tools work.
 
 A fresh clone that fails `verify` almost always has an environment problem, not a code problem. Fix the machine; don't edit source, configs or tests to make a check pass, and never skip the hooks.
 
@@ -101,7 +101,7 @@ Use an iPhone that the runtime supports (`xcrun simctl list -j runtimes` shows e
 
 The device app's build, prebuild and e2e targets are cached by Nx (their inputs include `APP_VARIANT` and the Xcode version). Add `--skip-nx-cache` to force a real run.
 
-### The 🏗️ Build Mac native job, locally
+### The 🏗️ Build Raven Mac native job, locally
 
 `bun run mpv:native` selects `${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}` and runs the audit and real native tests through Nx. Its task dependencies first build or restore pinned libmpv/MoltenVK/FFmpeg, then run the uncached addon build, which refreshes the current HEAD's source bundle and provenance before either check starts. No manual shell export or separate build command is needed for this root command with Xcode at its default path. For a different Xcode installation, supply `DEVELOPER_DIR`. CI also uses `.github/actions/raven-desktop-native/action.yml`; read it and `libs/raven/mpv/README.md` for the current toolchain.
 

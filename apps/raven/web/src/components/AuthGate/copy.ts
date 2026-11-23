@@ -1,5 +1,6 @@
 export const AUTH_GATE_COPY = {
   tryAgain: 'Try again',
+  backHome: (name: string) => `Back to ${name}`,
   failedTitle: 'Account access is temporarily unavailable',
   failedMessage: 'raven could not check your account. Your session is kept.',
   unavailableTitle: 'raven is temporarily unavailable',

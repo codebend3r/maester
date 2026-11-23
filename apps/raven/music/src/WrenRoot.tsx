@@ -3,7 +3,6 @@ import {
   IGNORED,
   IS_SIGN_IN_BYPASSED,
   accountIdOf,
-  pinRavenServer,
   tokenRenewalFor,
   useStoresLoaded,
 } from '@raven/native/headless'
@@ -68,7 +67,6 @@ const loadStores = async (): Promise<void> => {
     configureRecentSearches({ storage: AsyncStorage }),
     configureDownloads({ storage: AsyncStorage, disk: deviceDisk, ...downloadSources }),
   ])
-  pinRavenServer({ servers: useActiveServer })
   // The account read back may not be the downloads' owner, whatever order the stores loaded in.
   await keepDownloadsFor({ accountId: accountIdOf(useWrenAccount.getState()) })
 }

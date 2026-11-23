@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useEffect } from 'react'
+import { useActiveServer } from '@raven/ui/headless'
 import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { listedLibraryOf } from '@/lib/libraryListing'
 import { listingStore } from '@/lib/listingStore'
@@ -7,8 +8,8 @@ import { librariesQuery } from '@/lib/queries'
 import { keepHome } from '@/lib/savedHome'
 import { OPEN_SCOPE, keepListings } from '@/lib/savedListings'
 
-/** Whose listings these are, or null while no one is served. */
-const scopeOf = (access: AccessState): string | null => {
+/** Whose listings these are on the home server, or null while no one is served. */
+const accountScopeOf = (access: AccessState): string | null => {
   switch (access.kind) {
     case ACCESS_KINDS.approved:
       return access.account.id
@@ -75,17 +76,21 @@ type KeepLibraryListingsProps = { children: ReactNode }
  * saved, reads the rest in the background one library at a time while the
  * browser is idle, and keeps the cache saved for the next visit. It waits
  * for an approved account when accounts are on, as the server answers no
- * one else, and keeps each account's listings apart. Home's shelves, hero and
+ * one else, and keeps each account's listings, and each server's, apart. Home's shelves, hero and
  * albums are kept the same way, so a return visit draws home at once.
  */
 export const KeepLibraryListings = ({ children }: KeepLibraryListingsProps) => {
-  const scope = scopeOf(useAccessState())
+  const accountScope = accountScopeOf(useAccessState())
+  const serverId = useActiveServer((state) => state.active?.serverId ?? null)
+  // Another server's listings are kept apart from the home one's, whose scope stays as it was.
+  const scope =
+    accountScope === null || serverId === null ? accountScope : `${serverId}:${accountScope}`
   return (
     <>
       {scope !== null && (
         <>
-          <Keep scope={scope} />
-          <KeepHome scope={scope} />
+          <Keep key={scope} scope={scope} />
+          <KeepHome key={scope} scope={scope} />
         </>
       )}
       {children}

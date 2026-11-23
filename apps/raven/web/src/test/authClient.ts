@@ -4,9 +4,13 @@ import { AUTH_CONFIG_STATES, AUTH_COOKIE, MEMBER_STATUSES } from '@raven/core'
 import type { AuthClient } from '@/lib/authClient'
 import type { SessionSummary } from '@/stores/authSession'
 
+/** The home server's id, as its account config names it in these tests. */
+export const HOME_ID = '7a0c2d4e-1f3b-4c5d-8e9f-0a1b2c3d4e5f'
+
 /** What the server says about accounts when they are on, pointing at the local stack. */
 export const readyConfig: ReadyAuthConfig = {
   state: AUTH_CONFIG_STATES.ready,
+  serverId: HOME_ID,
   supabaseUrl: 'http://127.0.0.1:54321',
   publishableKey: 'sb_publishable_test',
   webUrl: 'http://localhost:8484',

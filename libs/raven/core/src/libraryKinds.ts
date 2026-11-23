@@ -246,7 +246,6 @@ export const groupingsFor = (kind: LibraryKind): readonly MediaGroupBy[] =>
 /** What a new library starts with, and what a library made before settings existed has. */
 export const DEFAULT_LIBRARY_SETTINGS: LibrarySettings = {
   saveProgress: true,
-  pinned: true,
   inHero: true,
   sort: MEDIA_SORTS.yearNew,
   view: LIBRARY_VIEWS.grid,

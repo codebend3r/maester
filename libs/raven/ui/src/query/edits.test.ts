@@ -304,10 +304,10 @@ describe('librarySettingsEdits', () => {
     const other = library({ id: 3 })
     client.setQueryData(queryKeys.library(2), library())
     client.setQueryData(queryKeys.libraries, [library(), other])
-    apply({ client, edits: librarySettingsEdits({ libraryId: 2, change: { pinned: false } }) })
-    expect(client.getQueryData<Library>(queryKeys.library(2))!.settings.pinned).toBe(false)
+    apply({ client, edits: librarySettingsEdits({ libraryId: 2, change: { inHero: false } }) })
+    expect(client.getQueryData<Library>(queryKeys.library(2))!.settings.inHero).toBe(false)
     const [changed, untouched] = client.getQueryData<Library[]>(queryKeys.libraries) ?? []
-    expect(changed!.settings.pinned).toBe(false)
+    expect(changed!.settings.inHero).toBe(false)
     expect(untouched).toBe(other)
   })
 })

@@ -19,6 +19,7 @@ import {
 } from '@/layouts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { AdminSettings } from '@/screens/AdminSettings'
+import { ServerSettings } from '@/screens/ServerSettings'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { SETTINGS_COPY } from '@/screens/copy'
 import { THEME_PICKER } from '@/theme/themeOptions'
@@ -60,7 +61,7 @@ const OwnerSettings = ({ session }: OwnerSettingsProps) => {
 }
 
 /**
- * `/settings`: the signed-in account, its theme and how it plays, kept on the device, how its
+ * `/settings`: the signed-in account, its servers, its theme and how it plays, kept on the device, how its
  * subtitles look, kept on the server for every device it signs in on, and for the owner the
  * server's own settings, as the web's Admin page has them. Signing out sends the viewer back
  * to sign-in.
@@ -90,6 +91,7 @@ export const Settings = () => {
           text={SETTINGS_COPY.signOut}
         />
       </SettingsSection>
+      <ServerSettings />
       <SettingsSection note={SETTINGS_COPY.themeNote} title={THEME_PICKER.label}>
         <SettingsChoice
           label={THEME_PICKER.label}

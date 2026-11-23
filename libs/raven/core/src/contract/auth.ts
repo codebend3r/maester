@@ -1,12 +1,14 @@
 import { AUTH_SCHEMES, HEADERS, HTTP_METHODS } from '@shared/http'
+import { isServerId } from '@/contract/accountServers'
+import { isUuid } from '@/contract/ids'
 import {
   type Infer,
   isBoolean,
   isString,
   listOf,
-  matching,
   object,
   oneOf,
+  optional,
   union,
   literal,
 } from '@/schema'
@@ -62,14 +64,19 @@ export const AUTH_ROUTES = {
   pending: '/pending',
 } as const
 
-export const isAccountId = matching(
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-)
+export const isAccountId = isUuid
+
+/** The server's own id beside its auth state; left out by a server older than multi-server support. */
+const serverIdField = { serverId: optional(isServerId) }
 
 export const isAuthConfig = union(
-  object({ state: oneOf([AUTH_CONFIG_STATES.off, AUTH_CONFIG_STATES.unavailable]) }),
+  object({
+    state: oneOf([AUTH_CONFIG_STATES.off, AUTH_CONFIG_STATES.unavailable]),
+    ...serverIdField,
+  }),
   object({
     state: literal(AUTH_CONFIG_STATES.ready),
+    ...serverIdField,
     supabaseUrl: isString,
     publishableKey: isString,
     webUrl: isString,

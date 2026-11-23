@@ -108,7 +108,7 @@ const setup = ({
   const fake = fakeFetch({ answer })
   const warnings: string[] = []
   const calls = createServerCalls({
-    server: SERVER,
+    server: { current: () => SERVER },
     fetch: fake.fetch,
     authorize,
     unlockOf,
@@ -409,7 +409,7 @@ describe('createServerCalls.call', () => {
   it('answers unreachable when the fetch throws at once', async () => {
     const warnings: string[] = []
     const calls = createServerCalls({
-      server: SERVER,
+      server: { current: () => SERVER },
       fetch: () => {
         throw new Error('no network')
       },
@@ -447,7 +447,7 @@ describe('createServerCalls.call', () => {
     /** Server calls over `fetchThrough`, so the cap is the one the real stream read keeps. */
     const streaming = ({ text }: StreamingProps) =>
       createServerCalls({
-        server: SERVER,
+        server: { current: () => SERVER },
         fetch: fetchThrough(() => Promise.resolve(new Response(text))),
         authorize: () => null,
         unlockOf: async () => null,

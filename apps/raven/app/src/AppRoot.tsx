@@ -5,7 +5,6 @@ import {
   IS_SIGN_IN_BYPASSED,
   accountIdOf,
   forgetOnAccountChange,
-  pinRavenServer,
   tokenRenewalFor,
   useStoresLoaded,
 } from '@raven/native/headless'
@@ -31,7 +30,7 @@ import { NowPlayingBar, useIsBarShown } from '@/music/NowPlayingBar'
 import { deviceNavKind } from '@/platform/devicePlatform'
 import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
-import { useActiveServer } from '@/stores/activeServer'
+import { accountServers, useActiveServer } from '@/stores/activeServer'
 import { configureAppPrefs } from '@/stores/appPrefs'
 import { configureDownloads, useDownloads } from '@/stores/downloads'
 import { configureLibraryViews } from '@/stores/libraryViews'
@@ -63,7 +62,6 @@ const loadStores = async (): Promise<void> => {
     useActiveServer.persist.rehydrate(),
     useAccountSession.persist.rehydrate(),
   ])
-  pinRavenServer({ servers: useActiveServer })
   /*
    * The account read back may not be the downloads' owner; downloads kept before they had
    * owners are claimed by it here. What a relaunch stopped then starts again once the servers
@@ -72,6 +70,20 @@ const loadStores = async (): Promise<void> => {
   const downloads = useDownloads.getState()
   await downloads.keepFor({ accountId: accountIdOf(useAccountSession.getState()) }).catch(IGNORED)
   downloads.resume().catch(IGNORED)
+}
+
+/**
+ * Reads the account's servers into the list once the stores are read and again whenever the
+ * account changes, so the switcher, the pins and Settings show its servers, and the app goes
+ * home when the one in use is no longer the account's. A read that fails keeps the list kept
+ * on the device, so a server's downloads still play away from the network. Hands back the way
+ * to stop.
+ */
+const followAccountServers = (): (() => void) => {
+  accountServers.sync().catch(IGNORED)
+  return useAccountSession.subscribe((state, previous) => {
+    if (accountIdOf(state) !== accountIdOf(previous)) accountServers.sync().catch(IGNORED)
+  })
 }
 
 /**
@@ -216,6 +228,7 @@ export const AppRoot = () => {
   useEffect(() => {
     if (isLoaded) hideAsync().catch(IGNORED)
   }, [isLoaded])
+  useEffect(() => (isLoaded ? followAccountServers() : undefined), [isLoaded])
 
   return isLoaded && <AppRoutes />
 }

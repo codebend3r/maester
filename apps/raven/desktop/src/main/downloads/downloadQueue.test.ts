@@ -130,6 +130,8 @@ type SetupProps = {
   access?: MediaAccess['accessFor']
   disk?: Record<string, number>
   tracks?: MediaTracks
+  /** The server in use, as main reads it; `SERVER_ID` unless a test switches. */
+  serverIdOf?: () => string
 }
 
 const setup = ({
@@ -138,6 +140,7 @@ const setup = ({
   access = async () => FAR_TICKET,
   disk = {},
   tracks = tracksWith([]),
+  serverIdOf = () => SERVER_ID,
 }: SetupProps = {}) => {
   const store = memoryStore({ ...EMPTY_DOWNLOADS, entries })
   const { timers, pending } = fakeTimers()
@@ -155,7 +158,7 @@ const setup = ({
   const wakes = { settled: 0 }
   const queue = createDownloadQueue({
     store,
-    serverId: SERVER_ID,
+    server: { isInUse: (serverId) => serverId === serverIdOf() },
     access: media.access,
     fetch: network.fetch,
     calls,
@@ -532,7 +535,7 @@ describe('an outage', () => {
     })
     const media = createMediaAccess({
       picks: createOriginPicks({
-        server: SERVER,
+        server: { current: () => SERVER },
         calls,
         probe: wholePing,
         probeClock: () => 0,
@@ -825,7 +828,7 @@ describe('an account ticket', () => {
     const count = 40
     const media = createMediaAccess({
       picks: createOriginPicks({
-        server: SERVER,
+        server: { current: () => SERVER },
         calls: fakeCalls({}).calls,
         probe: wholePing,
         probeClock: () => 0,
@@ -1356,6 +1359,40 @@ describe('remove', () => {
     ])
     await ticks(10)
     expect(world.network.fileRequests()).toHaveLength(2)
+  })
+})
+
+describe('downloads of several servers', () => {
+  const OTHER_ID = GONE_SERVER_ID
+
+  it("fetches the server in use's files alone, and leaves another server's queued", async () => {
+    const world = setup({ entries: [entryFor(1, { serverId: OTHER_ID }), entryFor(2)] })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+    await ticks(10)
+    expect(world.network.fileRequests().map(({ url }) => url)).toEqual([fileUrl(2)])
+    expect(world.statusOf(1)).toEqual({ kind: DOWNLOAD_STATUS_KINDS.queued })
+    expect(world.failed).toEqual([])
+  })
+
+  it("stops the last server's file where it is on a switch and starts the new one's", async () => {
+    const using = { id: SERVER_ID }
+    const world = setup({
+      entries: [entryFor(1), entryFor(2, { serverId: OTHER_ID })],
+      serverIdOf: () => using.id,
+    })
+    world.queue.kick()
+    await until(() => world.network.fileRequests().length === 1)
+    using.id = OTHER_ID
+    await world.queue.serverSwitched()
+    await until(() => world.network.fileRequests().length === 2)
+    const [first, second] = world.network.fileRequests()
+    expect(first?.signal.aborted ?? null).toBe(true)
+    expect(second?.url ?? null).toBe(fileUrl(2))
+    // Still downloading, not failed: it goes on from its bytes once its server is in use again.
+    expect(world.statusOf(1)?.kind ?? null).toBe(DOWNLOAD_STATUS_KINDS.downloading)
+    expect(world.failed).toEqual([])
+    expect(world.media.forgets.count).toBeGreaterThan(0)
   })
 })
 

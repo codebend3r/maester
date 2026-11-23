@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import {
   DEFAULT_DISPLAY_SETTINGS,
@@ -14,8 +14,10 @@ import {
   isAccountId,
   isPlaybackSettings,
   isRecord,
+  isServerId,
   isString,
   object,
+  type ServerId,
 } from '@raven/core'
 import { DatabaseService } from '@/db/database'
 import { parseJsonAs } from '@/db/json'
@@ -29,6 +31,7 @@ export const SETTINGS_KEYS = {
   viewing: 'viewing',
   scrobble: 'scrobble',
   remoteAccess: 'remoteAccess',
+  server: 'server',
 } as const
 
 /** The owner who took over the viewing recorded before accounts, and when. */
@@ -163,6 +166,19 @@ export class SettingsRepository {
     const secret = randomBytes(32).toString('base64url')
     this.write({ key, value: { secret } })
     return secret
+  }
+
+  /**
+   * This server's own id: a uuid made the first time it is asked for and kept
+   * from then on, so every account's server list and pins name the server,
+   * whichever origin reached it, across restarts and redeploys.
+   */
+  serverId(): ServerId {
+    const stored = this.read({ key: SETTINGS_KEYS.server })?.id ?? null
+    if (isServerId(stored)) return stored
+    const id = randomUUID()
+    this.write({ key: SETTINGS_KEYS.server, value: { id } })
+    return id
   }
 
   /** When this server first ran with accounts ready, or null if it never has. */

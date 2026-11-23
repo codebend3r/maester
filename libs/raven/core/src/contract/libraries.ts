@@ -194,8 +194,6 @@ export const isWatchedPercent = wholeNumberIn({ min: 1, max: 100 })
 export const isLibrarySettings = object({
   /** Remember where each video stopped and resume there. Off keeps saved spots without using them. */
   saveProgress: isBoolean,
-  /** Give the library its own link in the side menu. */
-  pinned: isBoolean,
   /** Let home's hero show its titles, the newest releases and the admin's picks alike. */
   inHero: isBoolean,
   /** The order its videos are listed in. */
@@ -226,15 +224,14 @@ export type LibrarySettings = Infer<typeof isLibrarySettings>
 export const isLibrarySettingsChange = exactPartial(isLibrarySettings.shape)
 
 /**
- * How a library is laid out, and its pin: the settings any viewer may
- * change, with the admin lock on or off. Everything else of a library, its
+ * How a library is laid out: the settings any viewer may change, with the
+ * admin lock on or off. Everything else of a library, its
  * name and folders included, is an admin's `LibraryInput`.
  */
 export const isLibraryViewChange = exactPartial({
   sort: isLibrarySettings.shape.sort,
   view: isLibrarySettings.shape.view,
   groupBy: isLibrarySettings.shape.groupBy,
-  pinned: isLibrarySettings.shape.pinned,
 })
 
 export type LibraryViewChange = Infer<typeof isLibraryViewChange>

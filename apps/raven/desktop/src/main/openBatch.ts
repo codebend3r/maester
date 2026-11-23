@@ -79,6 +79,8 @@ export const eventForOpen = (reply: DesktopReply): DesktopEvent | null => {
     case DESKTOP_REPLIES.updates:
     case DESKTOP_REPLIES.downloads:
     case DESKTOP_REPLIES.space:
+    case DESKTOP_REPLIES.server:
+    case DESKTOP_REPLIES.libraries:
       return null
     default: {
       const unreachable: never = reply

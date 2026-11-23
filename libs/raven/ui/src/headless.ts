@@ -42,6 +42,10 @@ export {
 } from '@/stores/playerPrefs'
 export type { AudiobookSpeed, MusicQuality } from '@/stores/playerPrefs'
 export { configureStorage } from '@/stores/configureStorage'
+export { activeServerId, onActiveServerChange, useActiveServer } from '@/stores/activeServer'
+export type { ActiveServer } from '@/stores/activeServer'
+export { serverClientsFor } from '@/lib/serverClients'
+export { accountServersQuery, libraryPinsQuery, serverLibrariesQuery } from '@/query/accountQueries'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'
@@ -79,6 +83,7 @@ export {
   afterNotification,
   afterPins,
   afterPlaylists,
+  afterServersChanged,
   afterReconnect,
   afterRematch,
   afterRescan,
@@ -89,6 +94,8 @@ export {
 } from '@/query/invalidate'
 export { edit, editAll, useOptimisticMutation } from '@/query/optimistic'
 export type { Edit } from '@/query/optimistic'
+export { usePinToggle } from '@/query/usePinToggle'
+export type { PinToggle } from '@/query/usePinToggle'
 export {
   albumFavouriteEdits,
   artistFavouriteEdits,

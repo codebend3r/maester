@@ -9,7 +9,8 @@
 # request's run and head commit, when one was found).
 #
 # A selected group that was found is not built again: its builds come from the pull request's run
-# under its head commit. Any other selected group is built here and read from this run.
+# under its head commit. Any other selected group is planned as one to build, read from this run;
+# main builds nothing, so its end to end job fails on that, saying so.
 set -euo pipefail
 
 for group in app music desktop; do

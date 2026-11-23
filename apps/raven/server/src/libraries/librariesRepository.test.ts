@@ -115,7 +115,7 @@ describe('libraries', () => {
       input: {
         name: 'Films',
         paths: ['/media/Films', '/media/Classics'],
-        settings: { pinned: true },
+        settings: { inHero: true },
       },
     })
     expect(libraries.get(id)?.layouts).toEqual([

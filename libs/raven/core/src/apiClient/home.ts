@@ -26,7 +26,7 @@ type UpcomingShelfQuery = {
 
 /** The home page: what is in progress, each library's shelf, the hero, and the favourites across every library. */
 export const homeCalls = ({ ask }: Transport) => ({
-  /** Every video in progress, then each pinned library's newest arrivals; libraries still locked stay out. */
+  /** Every video in progress, then each library's newest arrivals; libraries still locked stay out. */
   getHome: (): Promise<Home> => ask({ route: ROUTES.getHome }),
 
   /** What `query` finds in every library, a row for each holding a match; libraries still locked stay out. */
@@ -36,7 +36,7 @@ export const homeCalls = ({ ask }: Transport) => ({
   /** The titles home's hero takes turns with, each with the line it reads; libraries still locked stay out. */
   getHero: (): Promise<Hero> => ask({ route: ROUTES.getHero }),
 
-  /** A shelf of albums for each pinned music library, the one added last first; libraries still locked stay out. */
+  /** A shelf of albums for each music library, the one added last first; libraries still locked stay out. */
   getHomeAlbums: (): Promise<AlbumShelf[]> => ask({ route: ROUTES.getHomeAlbums }),
 
   /** The movies and shows the admin picked for the hero, and how many it holds at most. */

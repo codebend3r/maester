@@ -34,6 +34,7 @@ import {
   resumeFor,
   watchedShare,
 } from '@/main/playerState'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import { loggable } from '@/main/servers/serverCalls'
 import type { StateStore } from '@/main/stateStore'
 import { MAX_QUEUE } from '@/shared/hostNames'
@@ -43,8 +44,8 @@ type OnNotedProps = { downloadId: string }
 export type DownloadPlaybackDeps = {
   /** Read here; every change goes through `change`, so the page hears it. */
   store: DownloadsStore
-  /** The id the server's downloads are filed under; another's owe it nothing. */
-  serverId: string
+  /** The server in use: its downloads are matched to its titles; another's wait for it again. */
+  server: ServerInUse
   userData: string
   /** A download plays through a grant: the page holds its id, never its path. */
   grants: Grants
@@ -268,24 +269,21 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     return file ?? firstGranted(rest)
   }
 
-  /** The account signed in, for a download of the server; a server an older Raven kept is owed nothing. */
-  const signedInFor = (entry: DownloadEntry): string | null =>
-    entry.serverId === deps.serverId ? deps.accountIdOf() : null
-
   /**
    * The account a sitting belongs to: the one signed in, or while none is, the last that was,
    * so a play before the page sends its session waits for that account rather than going to
-   * whoever signs in next. Null only before any account has signed in.
+   * whoever signs in next. Null only before any account has signed in. A download from another
+   * server than the one in use is tagged the same way: its play stays filed under its own server,
+   * which sync sends only while it is in use, and goes only to this account.
    */
-  const sittingAccountOf = (entry: DownloadEntry): string | null =>
-    entry.serverId === deps.serverId ? (deps.accountIdOf() ?? deps.lastAccountIdOf()) : null
+  const sittingAccountOf = (): string | null => deps.accountIdOf() ?? deps.lastAccountIdOf()
 
   type SitProps = { fileId: string; entry: DownloadEntry }
 
   const sit = ({ fileId, entry }: SitProps): void => {
     files.set(fileId, {
       downloadId: entry.downloadId,
-      sitting: { isFresh: true, accountId: sittingAccountOf(entry) },
+      sitting: { isFresh: true, accountId: sittingAccountOf() },
     })
   }
 
@@ -319,7 +317,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   const openTitle: DownloadPlayback['openTitle'] = async ({ mediaId }) => {
-    const entry = entryByMedia({ state: store.read(), serverId: deps.serverId, mediaId })
+    const entry = entryByMedia({ state: store.read(), serverId: deps.server.current().id, mediaId })
     if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return null
     const fileId = await grantVideo(entry)
     if (fileId === null) {
@@ -331,7 +329,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   }
 
   const trackPathOf: DownloadPlayback['trackPathOf'] = async ({ mediaId }) => {
-    const entry = entryByMedia({ state: store.read(), serverId: deps.serverId, mediaId })
+    const entry = entryByMedia({ state: store.read(), serverId: deps.server.current().id, mediaId })
     if (entry === null || entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return null
     const facts = await readFileFacts({ stat: deps.stat, path: mediaPathOf(entry) })
     if (facts === null) deps.warn(`Raven could not open the file of ${loggable(entry.label)}`)
@@ -357,7 +355,7 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
   const fromLabelOf: DownloadPlayback['fromLabelOf'] = ({ path }) => {
     const [serverId = ''] = relative(downloadsDirFor({ userData: deps.userData }), path).split(sep)
     if (!isOpaqueId(serverId)) return null
-    return serverId === deps.serverId
+    return deps.server.isInUse(serverId)
       ? DOWNLOAD_MESSAGES.downloadedFrom
       : DOWNLOAD_MESSAGES.downloadedElsewhere
   }
@@ -396,8 +394,8 @@ export const createDownloadPlayback = (deps: DownloadPlaybackDeps): DownloadPlay
     const isPlay = sitting?.isFresh ?? false
     const at = deps.now()
     const { serverId } = entry
-    const signedIn = signedInFor(entry)
-    const accountId = sitting === null ? sittingAccountOf(entry) : sitting.accountId
+    const signedIn = deps.accountIdOf()
+    const accountId = sitting === null ? sittingAccountOf() : sitting.accountId
     files.set(fileId, { downloadId, sitting: { isFresh: false, accountId } })
     deps.change((state) => {
       const local = forgetServerPosition({ state, downloadId })

@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES, AUTH_ROUTES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
-import { api } from '@/lib/api'
+import { api, homeApi } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
 import { AUTH_ERRORS } from '@/lib/authErrors'
 import { AUTH_QUERY } from '@/lib/authRoutes'
@@ -51,7 +51,7 @@ const returnTo = (path: string) =>
 
 describe('SignInPage', () => {
   const getMe = spyOn(api, 'getMe')
-  const getAuthConfig = spyOn(api, 'getAuthConfig')
+  const getAuthConfig = spyOn(homeApi, 'getAuthConfig')
 
   afterEach(() => {
     getMe.mockReset()

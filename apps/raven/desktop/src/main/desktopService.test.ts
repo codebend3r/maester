@@ -13,6 +13,7 @@ import { createGrants, type Grants } from '@/main/grants'
 import { createStateStore, type StateFs } from '@/main/stateStore'
 import { EMPTY_STATE } from '@/main/playerState'
 import { createDesktopService, MESSAGES } from '@/main/desktopService'
+import { DIRECTORY_MESSAGES } from '@/main/servers/serverDirectory'
 import type { DownloadService } from '@/main/downloads/downloadService'
 import type { ConfigStore, DesktopConfig } from '@/main/desktopConfig'
 import type { ServerTitles } from '@/main/servers/serverTitles'
@@ -156,6 +157,7 @@ const fakeDownloads = ({ grants, savedPosition, serverPosition }: FakeDownloadsP
     onResume: () => undefined,
     accessEnded: () => undefined,
     accountSwitched: () => undefined,
+    serverSwitched: () => undefined,
     dispose: () => undefined,
     pause: async (input) => {
       note('pause', input)
@@ -203,6 +205,10 @@ const TITLE_REPLY = {
   resumeAt: 30,
   next: [8],
 } as const satisfies DesktopReply
+
+/** Another of the account's servers, and an address that does not answer. */
+const OTHER_SERVER = '00000000-0000-4000-8000-0000000000cc'
+const UNREACHABLE = 'https://down.example'
 
 const NAVIGATE_REPLY = {
   type: DESKTOP_REPLIES.navigate,
@@ -314,7 +320,10 @@ const setup = ({
   const batches: (readonly string[])[] = []
   const sessions: (PageSession | null)[] = []
   const played: Parameters<ServerTitles['play']>[0][] = []
-  const server = { opened, batches, sessions, played }
+  const used: (string | null)[] = []
+  const checked: string[] = []
+  const listed: string[] = []
+  const server = { opened, batches, sessions, played, used, checked, listed }
   const updateQueue = [...updateAnswers]
   const releasePages: string[] = []
   const releases = { checks: 0, opened: releasePages }
@@ -350,6 +359,20 @@ const setup = ({
       play: async (input) => {
         server.played.push(input)
         return TITLE_REPLY
+      },
+    },
+    servers: {
+      use: async (serverId) => {
+        server.used.push(serverId)
+        return { type: DESKTOP_REPLIES.done }
+      },
+      check: async (origin) => {
+        server.checked.push(origin)
+        return origin === UNREACHABLE ? { ok: false } : { ok: true, serverId: OTHER_SERVER }
+      },
+      librariesOf: async (serverId) => {
+        server.listed.push(serverId)
+        return serverId === OTHER_SERVER ? [] : null
       },
     },
     links: {
@@ -1158,5 +1181,58 @@ describe('downloads', () => {
       await ask({ service, request: { type: 'openDownload', downloadId: '../downloads' } }),
     ).toEqual({ type: 'refused', message: MESSAGES.unknownRequest })
     expect(reached).toEqual([])
+  })
+})
+
+describe('servers', () => {
+  type Service = ReturnType<typeof setup>['service']
+  type AskProps = { service: Service; request: unknown }
+  const ask = ({ service, request }: AskProps) => service.handle(request)
+
+  it('hands the server the page uses to main by its id, and home as null', async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.useServer, serverId: OTHER_SERVER } }),
+    ).toEqual({ type: DESKTOP_REPLIES.done })
+    await ask({ service, request: { type: DESKTOP_REQUESTS.useServer, serverId: null } })
+    expect(server.used).toEqual([OTHER_SERVER, null])
+  })
+
+  it('refuses a server named by an address, and hands main nothing', async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.useServer, serverId: 'https://evil.example' },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: MESSAGES.unknownRequest })
+    expect(server.used).toEqual([])
+  })
+
+  it("answers a server's health with its id, and one that does not answer with a refusal", async () => {
+    const { service, server } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.checkServer, origin: 'https://friend.example' },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.server, serverId: OTHER_SERVER })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.checkServer, origin: UNREACHABLE } }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: DIRECTORY_MESSAGES.unreachable })
+    expect(server.checked).toEqual(['https://friend.example', UNREACHABLE])
+  })
+
+  it("answers another server's libraries, and a refusal when main has none to give", async () => {
+    const { service } = setup({ files: {} })
+    expect(
+      await ask({
+        service,
+        request: { type: DESKTOP_REQUESTS.serverLibraries, serverId: OTHER_SERVER },
+      }),
+    ).toEqual({ type: DESKTOP_REPLIES.libraries, libraries: [] })
+    expect(
+      await ask({ service, request: { type: DESKTOP_REQUESTS.serverLibraries, serverId: SERVER } }),
+    ).toEqual({ type: DESKTOP_REPLIES.refused, message: DIRECTORY_MESSAGES.unreachable })
   })
 })

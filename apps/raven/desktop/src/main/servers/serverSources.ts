@@ -18,7 +18,7 @@ import {
   type TitleRefusal,
 } from '@raven/core'
 import { BOUNDED_OUTCOMES, within } from '@/main/bounded'
-import { SERVER_NAME, type ServerEntry } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import { parseJson } from '@/main/parseJson'
 import {
   type AccountRefusalReader,
@@ -33,6 +33,7 @@ import {
   TICKET_OUTCOMES,
   type TicketOutcome,
 } from '@/main/servers/accountTickets'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { accountRefusalOf, type AccountRefusal } from '@/main/servers/authRefusals'
 import { type MediaRelay, RELAYED_MEDIA_KINDS, type RelayedMedia } from '@/main/servers/mediaRelay'
@@ -44,7 +45,7 @@ import { HTTP_STATUSES } from '@shared/http'
 
 export const SOURCE_MESSAGES = {
   badTitle: 'Raven cannot open that title.',
-  otherServer: 'Raven plays titles from its own server only.',
+  otherServer: 'This title is on another of your servers. Switch to that server to play it.',
   lost: `Raven lost its connection to ${SERVER_NAME}. Where you stopped last is saved there.`,
   relocked: `${SERVER_NAME} locked this library again.`,
   gone: `This title is not on ${SERVER_NAME} any more.`,
@@ -133,7 +134,8 @@ const accountRefusalIn = (result: ServerCallResult): AccountRefusal | null =>
   result.ok ? accountRefusalOf(result) : null
 
 type CreateServerSourcesProps = {
-  server: ServerEntry
+  /** The server in use: a title of any other is refused. */
+  server: ServerInUse
   calls: Pick<ServerCalls, 'call'>
   tickets: Pick<AccountTickets, 'ticketFor'>
   relay: Pick<MediaRelay, 'open' | 'refusalOf' | 'close'>
@@ -337,8 +339,8 @@ export const createServerSources = ({
     if (!isOpaqueId(serverId) || !isMediaId(mediaId)) {
       return { ok: false, message: SOURCE_MESSAGES.badTitle }
     }
-    // A title of a server an older Raven kept besides is reached no more.
-    if (serverId !== server.id) return { ok: false, message: SOURCE_MESSAGES.otherServer }
+    // A title of another server than the one in use is not reached.
+    if (!server.isInUse(serverId)) return { ok: false, message: SOURCE_MESSAGES.otherServer }
     // Read while the first ticket is minted: a video wants its sidecars either way.
     return resolveRelayed({
       mediaId,

@@ -8,6 +8,7 @@ import {
   type MatchSubject,
   type MediaItem,
   type MetadataHealth,
+  type ServerHealth,
 } from '@/contract'
 
 /** The query a search's subject adds: the file, or the show, it is scored against. */
@@ -77,4 +78,7 @@ export const matchingCalls = ({ ask }: Transport) => ({
   /** How matching is doing, and whether TMDB is configured at all. */
   getMetadataHealth: async (): Promise<MetadataHealth> =>
     (await ask({ route: ROUTES.getServerHealth })).metadata,
+
+  /** The server's open health answer, its own id among it (left out by an older server). */
+  getServerHealth: (): Promise<ServerHealth> => ask({ route: ROUTES.getServerHealth }),
 })

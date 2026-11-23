@@ -96,7 +96,7 @@ export const isUpcomingPage = object({
 
 export type UpcomingPage = Infer<typeof isUpcomingPage>
 
-/** Where the server searches TMDB for upcoming movies and shows that no library holds. */
+/** Where the server searches all of TMDB for movies and shows that no library holds. */
 export const UPCOMING_SEARCH_PATH = `${UPCOMING_PATH}/search` as const
 
 /** The search's query parameter: the words to look for. */
@@ -106,8 +106,8 @@ export const UPCOMING_SEARCH_PARAM = 'q'
 export const UPCOMING_SEARCH_SIZE = 20
 
 /**
- * What an upcoming search found: movies and shows TMDB says come out today
- * or later, with a poster, that no library holds, the most popular first.
+ * What an upcoming search found: movies and shows on TMDB with a poster that
+ * no library holds, out already or still to come, the most popular first.
  */
 export const isUpcomingSearch = object({
   titles: listOf(isUpcomingTitle),

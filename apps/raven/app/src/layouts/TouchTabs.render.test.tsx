@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import type { FetchLike } from '@raven/core'
+import type * as Native from '@raven/native'
+import type { ApiForProps } from '@raven/native'
+import type * as Headless from '@raven/native/headless'
+import { RAVEN_SERVER } from '@raven/native/headless'
 import { ravenQueriesFor } from '@raven/ui/headless'
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 
+import { SERVER_SWITCHER_COPY } from '@/layouts/copy'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchTabs } from '@/layouts/TouchTabs'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
@@ -10,9 +16,18 @@ import type * as DevicePlatform from '@/platform/devicePlatform'
 import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { APP_ROUTES, ROUTE_TARGETS, hrefOf, searchHrefOf } from '@/routes'
+import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useReduceMotion } from '@/stores/reduceMotion'
-import { NAS, SERIES, homeApi } from '@/test/homeServer'
+import {
+  type AccountData,
+  HOME_SERVER_ID,
+  MELEYS,
+  accountDataOf,
+  accountFetchOf,
+  signInTestAccount,
+} from '@/test/accountData'
+import { FILMS, NAS, SERIES, homeApi } from '@/test/homeServer'
 import { renderScreen } from '@/test/renderScreen'
 
 const mockPush = jest.fn()
@@ -24,6 +39,27 @@ const mockNavKind = jest.fn<() => NavKind>(() => NAV_KINDS.tabs)
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace, dismissTo: mockDismissTo }),
   usePathname: () => mockPathname(),
+}))
+/** Meleys' own library, named as home's Films is, which only its server's name tells apart. */
+const MELEYS_FILMS = { ...FILMS, id: 5 }
+
+/** Both servers' pins of a library named as Films, once the second server's libraries have answered too. */
+const findFilmsPinsOfBothServers = async () => {
+  await waitFor(() => expect(screen.getAllByRole('link', { name: FILMS.name })).toHaveLength(2))
+  return screen.getAllByRole('link', { name: FILMS.name })
+}
+
+let mockAccount: AccountData = accountDataOf()
+const mockAccountFetch: FetchLike = (url, init) => accountFetchOf(mockAccount)(url, init)
+const mockApiOf = (server: Headless.AppServer) => ({
+  ...homeApi(server),
+  listLibraries: async () => (server.id === MELEYS.id ? [MELEYS_FILMS] : [FILMS, SERIES]),
+})
+
+jest.mock('@raven/native', () => ({
+  ...jest.requireActual<typeof Native>('@raven/native'),
+  apiFor: ({ server }: ApiForProps) => mockApiOf(server),
+  openFetch: ((url, init) => mockAccountFetch(url, init)) satisfies FetchLike,
 }))
 jest.mock('@/platform/devicePlatform', () => ({
   ...jest.requireActual<typeof DevicePlatform>('@/platform/devicePlatform'),
@@ -112,6 +148,14 @@ describe('the More sheet', () => {
     mockNavKind.mockReturnValue(NAV_KINDS.tabs)
     useReduceMotion.setState({ isReduced: true })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
+    useActiveServer.setState({ servers: [NAS], activeId: NAS.id, homeServerId: null })
+    mockAccount = accountDataOf({
+      pins: [
+        { serverId: NAS.id, libraryId: FILMS.id, pinnedAt: '1' },
+        { serverId: NAS.id, libraryId: SERIES.id, pinnedAt: '2' },
+      ],
+    })
+    signInTestAccount()
   })
 
   it('draws nothing until More is pressed', async () => {
@@ -149,6 +193,45 @@ describe('the More sheet', () => {
       hrefOf({ kind: ROUTE_TARGETS.library, libraryId: SERIES.id, query: '' }),
     )
     expect(screen.queryByRole('header', { name: TOUCH_TABS_COPY.more })).toBeNull()
+  })
+
+  it('lists the pins of every server with their server names, and switches to open one on another', async () => {
+    useActiveServer.setState({
+      home: RAVEN_SERVER,
+      servers: [RAVEN_SERVER, MELEYS],
+      activeId: RAVEN_SERVER.id,
+      homeServerId: HOME_SERVER_ID,
+    })
+    mockAccount.pins = [
+      { serverId: HOME_SERVER_ID, libraryId: FILMS.id, pinnedAt: '1' },
+      { serverId: MELEYS.id, libraryId: MELEYS_FILMS.id, pinnedAt: '2' },
+    ]
+    await openMore()
+    const [onHome, onMeleys] = await findFilmsPinsOfBothServers()
+    expect(within(onHome).getByText(RAVEN_SERVER.name)).toBeTruthy()
+    expect(within(onMeleys).getByText(MELEYS.name)).toBeTruthy()
+    await fireEvent.press(onMeleys)
+    expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+    expect(mockPush).toHaveBeenCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.library, libraryId: MELEYS_FILMS.id, query: '' }),
+    )
+  })
+
+  it('switches servers from the sheet while there are several, and opens Home', async () => {
+    useActiveServer.setState({
+      home: RAVEN_SERVER,
+      servers: [RAVEN_SERVER, MELEYS],
+      activeId: RAVEN_SERVER.id,
+      homeServerId: HOME_SERVER_ID,
+    })
+    mockPathname.mockReturnValue('/library/1')
+    await openMore()
+    expect(screen.getByRole('header', { name: SERVER_SWITCHER_COPY.servers })).toBeTruthy()
+    await fireEvent.press(
+      screen.getByRole('button', { name: SERVER_SWITCHER_COPY.row(MELEYS.name) }),
+    )
+    expect(useActiveServer.getState().activeId).toBe(MELEYS.id)
+    expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
   it('opens Search and Settings in place of the page anywhere but Home', async () => {
