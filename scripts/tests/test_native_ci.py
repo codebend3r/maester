@@ -11,6 +11,13 @@ WORKFLOWS = ROOT / ".github/workflows"
 ACTIONS = ROOT / ".github/actions"
 PULL_REQUEST = "pull-request-checks.yml"
 MAIN = "native-checks.yml"
+# Each web app's job in the pull request workflow: its selection output, the root script that runs
+# a target on it alone, and its folder.
+WEB_APP_JOBS = {
+    "raven-web": ("raven", "ci:raven:web", "apps/raven/web"),
+    "wren-web": ("wren", "ci:wren:web", "apps/raven/music-web"),
+}
+
 SELECT_SCRIPT = "python3 scripts/select_native_checks.py"
 GROUPS = ("app", "music", "desktop")
 # Each device's job id suffix, the name its jobs carry, its group, and whether it has flows.
@@ -88,8 +95,9 @@ def test_pull_requests_list_the_native_jobs_and_wait_for_them():
     # as a group of jobs under the caller's name.
     assert set(jobs) == {
         "checks",
-        "lighthouse",
         "build",
+        "web-apps",
+        *WEB_APP_JOBS,
         *NATIVE_JOBS,
         "checks-complete",
         "supabase",
@@ -106,25 +114,19 @@ def test_pull_requests_list_the_native_jobs_and_wait_for_them():
     )
     complete = jobs["checks-complete"]
     assert complete["name"] == "✅ Checks"
-    assert set(complete["needs"]) == {"checks", "lighthouse", "build", *NATIVE_JOBS}
+    assert set(complete["needs"]) == {"checks", "build", "web-apps", *WEB_APP_JOBS, *NATIVE_JOBS}
     gate = complete["steps"][-1]
-    # Lighthouse runs beside the matrix, so the build and the native apps never wait for it,
-    # and the gate does.
-    assert "needs" not in jobs["lighthouse"]
-    assert all(
-        check["target"] != "lighthouse" for check in jobs["checks"]["strategy"]["matrix"]["check"]
-    )
-    assert 'test "$LIGHTHOUSE_RESULT" = success' in gate["run"]
     # The selection runs on every PR, so its skipped result means the checks failed, never a
     # pass; a build it did not select is skipped and passes, and one that failed does not.
     assert 'test "$SELECT_RESULT" = success' in gate["run"]
+    assert 'test "$WEB_APPS_RESULT" = success' in gate["run"]
     assert gate["env"]["ALL_RESULTS"] == "${{ join(needs.*.result, ' ') }}"
     assert '*" failure "* | *" cancelled "*) exit 1' in gate["run"]
 
 
 def gate_of(results: str) -> int:
     gate = load_workflow(PULL_REQUEST)["jobs"]["checks-complete"]["steps"][-1]["run"]
-    passed = {"CHECKS_RESULT", "LIGHTHOUSE_RESULT", "BUILD_RESULT", "SELECT_RESULT"}
+    passed = {"CHECKS_RESULT", "BUILD_RESULT", "SELECT_RESULT", "WEB_APPS_RESULT"}
     return subprocess.run(
         ["bash", "-e", "-c", gate],
         env={"PATH": "/usr/bin:/bin", **dict.fromkeys(passed, "success"), "ALL_RESULTS": results},
@@ -575,3 +577,62 @@ def test_main_finds_a_group_only_with_every_build_its_flows_read():
         )
     }
     assert found == expected
+
+
+WEB_APP_CHECK_NAMES = {
+    "💬 Comment style",
+    "🖌️ CSS lint",
+    "🧹 Dead code",
+    "🧼 Dead CSS",
+    "🎨 Format",
+    "🧩 One command per script",
+    "🐍 Python lint",
+    "🔤 Spellcheck",
+    "🧪 Tests",
+    "🧩 Type-check",
+    "🟦 TypeScript lint",
+    "🟦 TypeScript only",
+    "🏗️ Build",
+    "🔦 Lighthouse",
+}
+
+
+@pytest.mark.parametrize("job_name", WEB_APP_JOBS)
+def test_each_web_app_runs_every_check_on_itself_alone(job_name: str):
+    output, script, folder = WEB_APP_JOBS[job_name]
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
+    assert {check["name"] for check in job["strategy"]["matrix"]["check"]} == WEB_APP_CHECK_NAMES
+    assert job["env"]["WEB_APP_SCRIPT"] == script
+    assert job["env"]["WEB_APP_DIR"] == folder
+    assert any(step.get("run") == 'bun run "$WEB_APP_SCRIPT" "$TARGET"' for step in job["steps"])
+    assert job["if"] == f"needs.web-apps.outputs.{output} == 'true'"
+
+
+@pytest.mark.parametrize("job_name", WEB_APP_JOBS)
+def test_each_web_app_s_job_stands_apart(job_name: str):
+    job = load_workflow(PULL_REQUEST)["jobs"][job_name]
+    # It waits for its selection alone, never for the workspace's checks or the other app.
+    assert job["needs"] == "web-apps"
+    assert job["strategy"]["fail-fast"] == "false"
+    assert all("gh run cancel" not in step.get("run", "") for step in job["steps"])
+
+
+def test_the_web_apps_selection_runs_both_when_the_workflow_changes():
+    select = next(
+        step
+        for step in load_workflow(PULL_REQUEST)["jobs"]["web-apps"]["steps"]
+        if step.get("id") == "select"
+    )
+    assert f".github/workflows/{PULL_REQUEST}" in select["run"]
+    assert """affected='["@raven/web","@raven/music-web"]'""" in select["run"]
+
+
+def test_the_workspace_s_checks_leave_the_web_apps_to_their_jobs():
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
+    check = next(
+        step for step in jobs["checks"]["steps"] if step.get("name") == "${{ matrix.check.name }}"
+    )
+    assert check["env"]["WEB_APPS"] == "@raven/web,@raven/music-web"
+    assert check["run"].count('--exclude="$WEB_APPS"') == 2
+    build = next(step for step in jobs["build"]["steps"] if step.get("name") == "🏗️ Build")
+    assert build["run"] == "bun run build --exclude=@raven/web,@raven/music-web"

@@ -231,6 +231,11 @@ GROUPS: tuple[Group, ...] = (
                 "The Maestro flows on the Android TV emulator, driven by the remote.",
                 "emulator",
             ),
+            Command(
+                "app:e2e:android",
+                "The touch Maestro flows on the Android phone emulator ANDROID_SERIAL names.",
+                "emulator",
+            ),
         ),
     ),
     Group(
@@ -346,6 +351,41 @@ GROUPS: tuple[Group, ...] = (
                 "The remote's Maestro flows on the emulator.",
                 "Android SDK",
             ),
+            Command(
+                "ci:app:android",
+                "The Android phone end to end job: every ci:app:android step below, in order.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:tools",
+                "Its tools: Android Studio, the SDK, the phone system image and Maestro.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:emulator",
+                "Starts the raven_phone emulator, making it when there is none.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:build",
+                "The fixture's Release APK for the phone emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:emulator:wait",
+                "Waits for the phone emulator to boot and turns its animations off.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:install",
+                "Installs the APK on the phone emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:app:android:e2e",
+                "The touch Maestro flows on the phone emulator.",
+                "Android SDK",
+            ),
             Command("ci:app:install", "The device app jobs' bun install."),
             Command(
                 "ci:app:libraries",
@@ -358,6 +398,18 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:fixture:wait", "Waits up to three minutes for the fixture server to answer."
+            ),
+            Command(
+                "ci:affected",
+                "The projects a change affects, as Nx sees them; the web apps' workflows pass --base and --head.",
+            ),
+            Command(
+                "ci:raven:web",
+                "One or more targets on raven's web app alone, as its job in the PR checks runs them: ci:raven:web lighthouse.",
+            ),
+            Command(
+                "ci:wren:web",
+                "One or more targets on Wren's web app alone, as its job in the PR checks runs them: ci:wren:web lighthouse.",
             ),
             Command(
                 "ci:wren", "The 🏗️ Build Wren iPhone job and its end to end job.", "macOS + Xcode"

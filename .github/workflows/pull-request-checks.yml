@@ -49,7 +49,7 @@ jobs:
       # The cancel step below ends the whole run on the first failure, in any job.
       fail-fast: true
       # Nx Cloud bills the peak number of jobs connected at once beyond the 10 included, so
-      # the matrix leaves room for the Supabase and Lighthouse jobs that run beside it.
+      # the matrix leaves room for the Supabase job and the two web apps' jobs beside it.
       max-parallel: 5
       matrix:
         check:
@@ -127,15 +127,18 @@ jobs:
 
       # `static` keeps every test's output; Nx's CI default collapses passing tasks. A change
       # to this workflow touches only the root project, so it runs the check on everything.
+      # raven's and Wren's web apps are left to their own jobs (raven-web, wren-web), which run
+      # every one of these checks on them.
       - name: ${{ matrix.check.name }}
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           TARGET: ${{ matrix.check.target }}
+          WEB_APPS: '@raven/web,@raven/music-web'
         run: |
           if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
-            bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t "$TARGET"
+            bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t "$TARGET" --exclude="$WEB_APPS"
           else
-            bunx nx run-many --outputStyle=static -t "$TARGET"
+            bunx nx run-many --outputStyle=static -t "$TARGET" --exclude="$WEB_APPS"
           fi
 
       # A failure anywhere ends the whole run, so no other job keeps burning minutes.
@@ -152,21 +155,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh run cancel ${{ github.run_id }} --repo ${{ github.repository }}
 
-  # raven's web build in Google Chrome on simulated mobile and desktop, served over HTTP/2
-  # with Brotli as Netlify serves it: the sign-in page, and Home against the server's
-  # Lighthouse fixture, which encodes its pictures and clip with ffmpeg. Fails below the
-  # floors in its lighthouserc.json. It runs where `@raven/web` is affected, and there Nx
-  # restores a pass when its inputs, which name the server's sources as the browser
-  # suite's do, are unchanged. A server-only change does not run it. A job of its own, not
-  # a row of the matrix: it takes minutes where the checks take seconds, so the build and
-  # the native apps, which wait for the matrix, start without it. ✅ Checks still waits.
-  lighthouse:
-    name: 🔦 Lighthouse
+  # raven's and Wren's web apps, each a matrix job of its own beside the workspace's checks: the
+  # same twelve checks, the build and Lighthouse, on that app alone (`bun run ci:raven:web`,
+  # `bun run ci:wren:web`). Neither waits for any other job, and neither cancels the run when one
+  # of its checks fails. Each runs when Nx counts its app affected (the app, anything it builds on,
+  # or the shared config), and always when this workflow changes.
+  web-apps:
+    name: 🔎 Select affected web apps
     runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-      contents: read
-    timeout-minutes: 30
+    timeout-minutes: 10
+    outputs:
+      raven: ${{ steps.select.outputs.raven }}
+      wren: ${{ steps.select.outputs.wren }}
     steps:
       # The whole history, so Nx can find what the PR changed against the base.
       - name: 📥 Checkout
@@ -179,8 +179,96 @@ jobs:
         with:
           bun-version-file: package.json
 
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      - name: 🔎 Select
+        id: select
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
+            affected="$(bun run --silent ci:affected --json --base="$BASE" --head=HEAD)"
+          else
+            affected='["@raven/web","@raven/music-web"]'
+          fi
+          raven="$(jq -c 'index("@raven/web") != null' <<< "$affected")"
+          wren="$(jq -c 'index("@raven/music-web") != null' <<< "$affected")"
+          echo "raven web: $raven, Wren web: $wren"
+          echo "raven=$raven" >> "$GITHUB_OUTPUT"
+          echo "wren=$wren" >> "$GITHUB_OUTPUT"
+
+  raven-web:
+    name: 🦅 Raven web ${{ matrix.check.name }}
+    needs: web-apps
+    if: needs.web-apps.outputs.raven == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      # One check failing leaves the app's others running, so each says where it stands.
+      fail-fast: false
+      # Nx Cloud bills the peak number of jobs connected at once beyond the 10 included.
+      max-parallel: 3
+      matrix:
+        check: &web-app-checks
+          - name: 💬 Comment style
+            target: comment-style
+          - name: 🖌️ CSS lint
+            target: lint:css
+          - name: 🧹 Dead code
+            target: dead-code
+          - name: 🧼 Dead CSS
+            target: dead-css
+          - name: 🎨 Format
+            target: format:check
+          - name: 🧩 One command per script
+            target: one-command-per-script
+          - name: 🐍 Python lint
+            target: lint:py
+            uv: true
+          - name: 🔤 Spellcheck
+            target: spellcheck
+            uv: true
+          - name: 🧪 Tests
+            target: test
+          - name: 🧩 Type-check
+            target: typecheck
+          - name: 🟦 TypeScript lint
+            target: lint:ts
+          - name: 🟦 TypeScript only
+            target: typescript-only
+          - name: 🏗️ Build
+            target: build
+          # The build in Google Chrome on simulated mobile and desktop, served as Netlify serves
+          # it: the sign-in page, and Home against the server's Lighthouse fixture, which encodes
+          # its pictures, clips and tracks with ffmpeg. Fails below the floors in the app's
+          # lighthouserc.json.
+          - name: 🔦 Lighthouse
+            target: lighthouse
+            ffmpeg: true
+    env:
+      UV_FROZEN: '1'
+      WEB_APP_SCRIPT: ci:raven:web
+      WEB_APP_DIR: apps/raven/web
+    steps: &web-app-steps
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🐍 Set up uv
+        if: matrix.check.uv == true
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: '**/uv.lock'
+
       # scripts/install_ffmpeg.sh holds the pin, shared with the local image (ci.Dockerfile).
       - name: 🎞️ Install test system tools
+        if: matrix.check.ffmpeg == true
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -190,29 +278,38 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
-      # A change to this workflow touches only the root project, so it runs on everything.
-      - name: 🔦 Lighthouse
+      - name: ${{ matrix.check.name }}
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if git diff --quiet "$BASE" HEAD -- .github/workflows/pull-request-checks.yml; then
-            bunx nx affected --outputStyle=static --base="$BASE" --head=HEAD -t lighthouse
-          else
-            bunx nx run-many --outputStyle=static -t lighthouse
-          fi
+          TARGET: ${{ matrix.check.target }}
+        run: bun run "$WEB_APP_SCRIPT" "$TARGET"
 
       # Lighthouse CI keeps the report of every run.
-      - name: 📤 Upload the reports
-        if: failure()
+      - name: 📤 Upload the Lighthouse reports
+        if: failure() && matrix.check.target == 'lighthouse'
         uses: actions/upload-artifact@v7
         with:
-          name: lighthouse-reports-${{ github.sha }}
-          path: apps/raven/web/.lighthouseci
+          name: ${{ env.WEB_APP_SCRIPT == 'ci:raven:web' && 'raven' || 'wren' }}-web-lighthouse-reports-${{ github.sha }}
+          path: ${{ env.WEB_APP_DIR }}/.lighthouseci
           # Lighthouse CI writes to `.lighthouseci`, which the action skips as a hidden folder by default.
           include-hidden-files: true
           if-no-files-found: ignore
 
-      - *native-cancel
+  wren-web:
+    name: 🐦 Wren web ${{ matrix.check.name }}
+    needs: web-apps
+    if: needs.web-apps.outputs.wren == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        check: *web-app-checks
+    env:
+      UV_FROZEN: '1'
+      WEB_APP_SCRIPT: ci:wren:web
+      WEB_APP_DIR: apps/raven/music-web
+    steps: *web-app-steps
 
   # Keep the existing order: every matrix check finishes, then every project builds.
   build:
@@ -236,8 +333,9 @@ jobs:
       - name: 📦 Install
         run: bun install --frozen-lockfile
 
+      # The web apps build in their own jobs (raven-web, wren-web).
       - name: 🏗️ Build
-        run: bun run build
+        run: bun run build --exclude=@raven/web,@raven/music-web
 
       - *native-cancel
 
@@ -520,16 +618,18 @@ jobs:
       - *native-cancel
 
   # The "Protect main" ruleset requires this stable check name. It passes only when every
-  # matrix check, Lighthouse, the build and the selection passed, and no native job failed or
+  # matrix check, the build and both selections passed, and no web app or native job failed or
   # was cancelled: a native job the PR does not affect is skipped, which is a pass, and one
   # skipped because the checks or the selection failed is caught by those two.
   checks-complete:
     name: ✅ Checks
     needs:
       - checks
-      - lighthouse
       - build
       - select
+      - web-apps
+      - raven-web
+      - wren-web
       - windows-native
       - windows-app
       - build-iphone
@@ -548,20 +648,20 @@ jobs:
       - name: ✅ Every check passed
         env:
           CHECKS_RESULT: ${{ needs.checks.result }}
-          LIGHTHOUSE_RESULT: ${{ needs.lighthouse.result }}
           BUILD_RESULT: ${{ needs.build.result }}
           SELECT_RESULT: ${{ needs.select.result }}
+          WEB_APPS_RESULT: ${{ needs.web-apps.result }}
           ALL_RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Checks: $CHECKS_RESULT"
-          echo "Lighthouse: $LIGHTHOUSE_RESULT"
           echo "Build: $BUILD_RESULT"
           echo "Select: $SELECT_RESULT"
+          echo "Web apps: $WEB_APPS_RESULT"
           echo "Every job: $ALL_RESULTS"
           test "$CHECKS_RESULT" = success
-          test "$LIGHTHOUSE_RESULT" = success
           test "$BUILD_RESULT" = success
           test "$SELECT_RESULT" = success
+          test "$WEB_APPS_RESULT" = success
           case " $ALL_RESULTS " in *" failure "* | *" cancelled "*) exit 1 ;; esac
 
   supabase:

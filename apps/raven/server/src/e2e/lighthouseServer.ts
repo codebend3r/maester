@@ -6,20 +6,23 @@ import { HEADERS } from '@shared/server'
 import { type FixtureFolders, runFixture } from '@/e2e/fixtureRun'
 import { RAVEN_CONTENT_TYPES } from '@/http'
 import type { MetadataFetch } from '@/metadata/tmdbClient'
-import { encodeClip, encodeImage, encodePicture } from '@/test/clips'
+import { encodeClip, encodeImage, encodePicture, encodeTrack } from '@/test/clips'
 import { type FakeMovie, type FakeShow, fakeTmdb } from '@/test/fakeTmdb'
 
 /**
- * The library the web's Lighthouse run scores Home against (`apps/raven/web/lighthouse`): a film
- * library and a series library, each with more titles than Home's shelf of eight shows, and a few
- * titles partway watched, so Home opens on its hero, Continue watching and a full shelf for each,
- * as it does on Vhagar. Every picture is a JPEG as heavy as TMDB's own at that size
+ * The libraries the web apps' Lighthouse runs score Home against (`@tooling/web/lighthouse`): for
+ * raven's, a film library and a series library, each with more titles than Home's shelf of eight
+ * shows, and a few titles partway watched, so Home opens on its hero, Continue watching and a full
+ * shelf for each, as it does on Vhagar; for Wren's, a music library of more albums than its Home
+ * shows, each with a cover as heavy as a real one. The music library is neither pinned nor in the
+ * hero, so raven's Home is as it was without it. Every picture is a JPEG as heavy as TMDB's own at that size
  * (`encodePicture`), since the hero's backdrop and the posters are most of what Home loads. The
  * videos are copies of one short clip: Home reads their listing, never their bytes.
  */
 const LIBRARIES = {
   films: 'Films',
   series: 'Series',
+  music: 'Music',
 } as const
 
 const FILM_TITLES = [
@@ -51,6 +54,28 @@ const SHOW_TITLES = [
 ] as const
 
 const EPISODES_PER_SHOW = 3
+
+const ALBUM_TITLES = [
+  'Morning Chorus',
+  'Tidewater',
+  'Low Country',
+  'Brass and Bone',
+  'Northbound',
+  'The Long Evening',
+  'Paper Lanterns',
+  'Cold Harbour',
+  'Field Notes',
+  'Slow Weather',
+  'Glass Houses',
+  'Afterglow',
+] as const
+
+const ARTISTS = ['The Fixture Birds', 'Hollow Pines', 'Marsh Light', 'June Ferry'] as const
+
+const TRACK_TITLES = ['First Light', 'Halfway Home', 'Open Sky'] as const
+
+/** Short, since Home reads the albums' listing and covers, never the tracks' sound. */
+const TRACK_SECONDS = 2
 
 /** How many films and episodes Home's Continue watching opens with. */
 const IN_PROGRESS = { films: 3, episodes: 2 } as const
@@ -93,6 +118,11 @@ const PICTURES = {
     file: 'backdrop.jpg',
     type: RAVEN_CONTENT_TYPES.jpeg,
     encode: ({ path, colours }: EncodeProps) => encodePicture({ path, size: '1280x720', colours }),
+  },
+  cover: {
+    file: 'cover.jpg',
+    type: RAVEN_CONTENT_TYPES.jpeg,
+    encode: ({ path, colours }: EncodeProps) => encodePicture({ path, size: '600x600', colours }),
   },
   logo: {
     file: 'logo.png',
@@ -164,6 +194,36 @@ const metadataFetchOver =
     return new Response(bytes, { headers: { [HEADERS.contentType]: PICTURES[kind].type } })
   }
 
+/** Every album's three tracks, each embedding its palette's cover, as a ripped album does. */
+const writeMusic = async ({ root, media }: FixtureFolders): Promise<void> => {
+  const covers = PALETTES.map((_, palette) => join(root, 'covers', `${palette}.jpg`))
+  await Promise.all(
+    PALETTES.map((colours, palette) =>
+      PICTURES.cover.encode({ path: covers[palette] ?? '', colours }),
+    ),
+  )
+  await Promise.all(
+    ALBUM_TITLES.flatMap((album, index) => {
+      const artist = ARTISTS[index % ARTISTS.length] ?? ARTISTS[0]
+      return TRACK_TITLES.map((title, track) =>
+        encodeTrack({
+          path: join(media, 'music', artist, album, `0${track + 1} ${title}.flac`),
+          seconds: TRACK_SECONDS,
+          cover: covers[index % covers.length] ?? null,
+          tags: {
+            album,
+            album_artist: artist,
+            artist,
+            title,
+            track: String(track + 1),
+            date: String(yearOf(index)),
+          },
+        }),
+      )
+    }),
+  )
+}
+
 /** One clip, encoded once and copied to every film's and episode's file. */
 const writeMedia = async ({ root, media }: FixtureFolders): Promise<void> => {
   const clip = join(root, 'clip.mp4')
@@ -218,7 +278,7 @@ await runFixture({
   webDir: null,
   metadataFetchFor: ({ root }) => metadataFetchOver(root),
   prepare: async (folders) => {
-    await Promise.all([encodePictures(folders.root), writeMedia(folders)])
+    await Promise.all([encodePictures(folders.root), writeMedia(folders), writeMusic(folders)])
     return [
       {
         name: LIBRARIES.films,
@@ -229,6 +289,11 @@ await runFixture({
         name: LIBRARIES.series,
         paths: [join(folders.media, 'series')],
         settings: { kind: LIBRARY_KINDS.shows },
+      },
+      {
+        name: LIBRARIES.music,
+        paths: [join(folders.media, 'music')],
+        settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
       },
     ]
   },

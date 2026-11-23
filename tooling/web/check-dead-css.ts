@@ -1,4 +1,4 @@
-import { dirname, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { compile } from 'sass'
 import ts from 'typescript'
 
@@ -7,7 +7,9 @@ import ts from 'typescript'
  * it, and every class a component reads exists in the module, so a dead
  * selector or a misspelt class name fails the check. Runs as the root
  * project's `dead-css` target over every project with a gale.json, so in
- * `verify`, `affected` and the PR checks. A computed key (`styles[tone]`) is
+ * `verify`, `affected` and the PR checks, and as a web app's own `dead-css`
+ * over the project folder it is handed, which that app's PR job runs.
+ * A computed key (`styles[tone]`) is
  * checked through its type, which has to be a union of string literals: the
  * shape CLAUDE.md's constants rule produces.
  */
@@ -18,7 +20,7 @@ type Problem = { file: string; line?: number; message: string }
 type Found = { uses: Use[]; problems: Problem[] }
 type Position = Pick<Use, 'file' | 'line'>
 
-const root = process.cwd()
+const root = join(import.meta.dirname, '..', '..')
 
 const describe = ({ file, line }: Pick<Problem, 'file' | 'line'>): string =>
   line === undefined ? relative(root, file) : `${relative(root, file)}:${line}`
@@ -227,11 +229,14 @@ const checkProject = (project: string) => {
   }
 }
 
-const projects = [
-  ...new Bun.Glob('{apps,libs}/*/*/gale.json').scanSync({ cwd: root, absolute: true }),
-]
-  .map(dirname)
-  .toSorted()
+// A project folder handed on the command line is checked alone, else every styled project.
+const handed = process.argv.slice(2).map((folder) => resolve(folder))
+const projects =
+  handed.length > 0
+    ? handed
+    : [...new Bun.Glob('{apps,libs}/*/*/gale.json').scanSync({ cwd: root, absolute: true })]
+        .map(dirname)
+        .toSorted()
 
 const results = projects.map(checkProject)
 const problems = results.flatMap((result) => result.problems)

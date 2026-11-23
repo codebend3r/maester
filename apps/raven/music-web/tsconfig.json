@@ -5,5 +5,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../../tooling/web"]
+  "include": ["src", "lighthouse", "vite.config.ts", "../../../tooling/web"]
 }
