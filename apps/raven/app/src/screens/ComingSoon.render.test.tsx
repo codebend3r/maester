@@ -147,7 +147,7 @@ describe("An upcoming title's page on a phone or tablet", () => {
   it('describes the title and asks for it, then says where the request stands', async () => {
     await renderScreen({ ui: <ComingSoonTitle /> })
     expect(await screen.findByText(DETAILS.summary ?? '')).toBeTruthy()
-    expect(screen.getByText('3 of 5 requests left today')).toBeTruthy()
+    expect(await screen.findByText('3 of 5 requests left today')).toBeTruthy()
 
     await fireEvent.press(
       await screen.findByRole('button', { name: COMING_SOON_COPY.request.request }),
