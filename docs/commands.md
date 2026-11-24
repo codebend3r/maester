@@ -152,9 +152,9 @@ Each runs one CI job from pull-request-checks.yml on this machine.
 | `ci:affected`                     | The projects a change affects, as Nx sees them; the web apps' workflows pass --base and --head.               |                             |
 | `ci:raven:web`                    | One or more targets on raven's web app alone, as its job in the PR checks runs them: ci:raven:web lighthouse. |                             |
 | `ci:wren:web`                     | One or more targets on Wren's web app alone, as its job in the PR checks runs them: ci:wren:web lighthouse.   |                             |
-| `ci:wren`                         | The 🏗️ Build Wren iPhone job and its end to end job.                                                          | macOS + Xcode               |
-| `ci:desktop:e2e`                  | The 🎬 E2E Mac job.                                                                                           | macOS                       |
-| `web:e2e`                         | The 🌐 Web end to end job: Playwright drives the web app against a fixture server.                            | Chrome + ffmpeg             |
+| `ci:wren`                         | The 🎵 Build Wren iPhone job and its end to end job.                                                          | macOS + Xcode               |
+| `ci:desktop:e2e`                  | The 🎬 E2E Raven Mac desktop job.                                                                             | macOS                       |
+| `web:e2e`                         | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                             | Chrome + ffmpeg             |
 | `e2e`                             | Every end to end job, one after another: web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.         | macOS + Xcode + Android SDK |
 
 ## Help

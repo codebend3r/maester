@@ -522,7 +522,7 @@ jobs:
   # Wren, raven's music app, built by the device app's steps, since it builds on the same React
   # Native and pods.
   build-wren-iphone:
-    name: 🏗️ Build Wren iPhone
+    name: 🎵 Build Wren iPhone
     needs: select
     if: needs.select.outputs.music_build == 'true'
     runs-on: macos-26
@@ -538,7 +538,7 @@ jobs:
     steps: *build-steps
 
   build-wren-android:
-    name: 🏗️ Build Wren Android
+    name: 🎵 Build Wren Android
     needs: select
     if: needs.select.outputs.music_build == 'true'
     runs-on: ubuntu-24.04

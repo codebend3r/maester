@@ -15,15 +15,15 @@ Read on 2026-11-21 from the suites themselves. A new end to end test, or a new a
 
 | App | Suite | Driven by | Runs in CI, on main once a pull request merges |
 | --- | --- | --- | --- |
-| Web | `apps/raven/web/e2e` | Playwright in Google Chrome, against `@raven/server`'s fixture | 🌐 Web end to end |
-| Raven macOS | `apps/raven/desktop/e2e` | Playwright driving Electron, against a stand-in server | 🎬 E2E Mac |
+| Web | `apps/raven/web/e2e` | Playwright in Google Chrome, against `@raven/server`'s fixture | 🌐 E2E Raven web |
+| Raven macOS | `apps/raven/desktop/e2e` | Playwright driving Electron, against a stand-in server | 🎬 E2E Raven Mac desktop |
 | Raven Windows | None | | Built and smoke-tested only |
-| iPhone | `apps/raven/app/e2e`, the flows not tagged `dpad` | Maestro on an iPhone simulator | 🎬 E2E iPhone |
+| iPhone | `apps/raven/app/e2e`, the flows not tagged `dpad` | Maestro on an iPhone simulator | 🎬 E2E Raven iPhone |
 | iPad | None | | The iPhone flows never run on an iPad simulator |
 | Android phone | None | | Built only |
-| Android TV | `apps/raven/app/e2e`, the flows not tagged `touch` | Maestro on an Android TV emulator, with the remote's keys | 🎬 E2E Android TV |
-| Apple TV | `apps/raven/app/tvos-e2e` | XCUITest pressing the Siri Remote | 🎬 E2E Apple TV |
-| Wren iPhone | `apps/raven/music/e2e` | Maestro on an iPhone simulator | 🎬 E2E Wren iPhone |
+| Android TV | `apps/raven/app/e2e`, the flows not tagged `touch` | Maestro on an Android TV emulator, with the remote's keys | 🎬 E2E Raven Android TV |
+| Apple TV | `apps/raven/app/tvos-e2e` | XCUITest pressing the Siri Remote | 🎬 E2E Raven Apple TV |
+| Wren iPhone | `apps/raven/music/e2e` | Maestro on an iPhone simulator | 🎵 E2E Wren iPhone |
 | Wren Android | None | | Built only |
 
 ## Coverage
