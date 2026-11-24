@@ -10,7 +10,7 @@ import {
   AUTH_ROUTES,
 } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
-import { api } from '@/lib/api'
+import { api, homeApi } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
 import { HOME_PATH, signInPath } from '@/lib/authRoutes'
 import { queryKeys } from '@raven/ui/headless'
@@ -50,7 +50,7 @@ const renderPending = ({
 
 describe('PendingPage', () => {
   const getMe = spyOn(api, 'getMe')
-  const getAuthConfig = spyOn(api, 'getAuthConfig')
+  const getAuthConfig = spyOn(homeApi, 'getAuthConfig')
 
   const answers = (...accounts: Account[]) =>
     accounts.forEach((account) => getMe.mockResolvedValueOnce(account))

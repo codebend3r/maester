@@ -59,7 +59,6 @@ const libraryFor = ({ id, name, kind }: LibraryForProps): Library => ({
   },
   settings: {
     saveProgress: false,
-    pinned: true,
     inHero: false,
     sort: MEDIA_SORTS.title,
     view: LIBRARY_VIEWS.grid,

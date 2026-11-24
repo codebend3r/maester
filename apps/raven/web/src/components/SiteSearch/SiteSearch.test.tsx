@@ -72,7 +72,7 @@ describe('SiteSearch', () => {
     spies.upcoming.mockReset()
   })
 
-  it('searches only what is coming soon on Coming soon, and Enter opens the first title', async () => {
+  it('searches every movie and show on Coming soon, and Enter opens the first title', async () => {
     spies.upcoming.mockImplementation(async () => ({
       titles: [
         {
@@ -85,8 +85,8 @@ describe('SiteSearch', () => {
       ],
     }))
     open('/coming-soon')
-    const box = screen.getByRole('combobox', { name: 'Search all upcoming' })
-    expect(box).toHaveAttribute('placeholder', 'Search all upcoming')
+    const box = screen.getByRole('combobox', { name: 'Search all movies and shows' })
+    expect(box).toHaveAttribute('placeholder', 'Search all movies and shows')
     await userEvent.type(box, 'gladiator')
     const list = await screen.findByRole('listbox', { name: 'Suggestions' })
     expect(await within(list).findByText('Gladiator III')).toBeInTheDocument()

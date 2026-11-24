@@ -94,7 +94,7 @@
   min-width: 0;
 }
 
-// Its icon over its name, about 84px tall, marked like a current tab.
+// Its icon over its name, about 84px tall, marked like a current tab; a server's is a button.
 .tile {
   display: grid;
   place-content: center;
@@ -112,11 +112,23 @@
   text-align: center;
   text-decoration: none;
 
+  &:is(button) {
+    border: 0;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  &:disabled {
+    color: var(--color-lichen);
+    cursor: default;
+  }
+
   &:focus-visible {
     outline: var(--focus-ring);
   }
 
-  &[aria-current='page'] {
+  &[aria-current='page'],
+  &[aria-current='true'] {
     --icon-tint: 0.4;
 
     background: var(--color-moss);
@@ -125,8 +137,16 @@
 }
 
 .label {
+  display: grid;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+// A pinned library's server, under its name.
+.detail {
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+  font-weight: 400;
 }
 
 @media (prefers-reduced-motion: no-preference) {

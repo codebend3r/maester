@@ -49,6 +49,12 @@ describe('account contract boundaries', () => {
     expect(isAuthConfig({ state: AUTH_CONFIG_STATES.ready })).toBe(false)
   })
 
+  it("carries the server's id in every state, and lets an older server leave it out", () => {
+    const serverId = '30000000-0000-4000-8000-000000000001'
+    expect(isAuthConfig({ state: AUTH_CONFIG_STATES.off, serverId })).toBe(true)
+    expect(isAuthConfig({ state: AUTH_CONFIG_STATES.off, serverId: 'not-a-uuid' })).toBe(false)
+  })
+
   it('validates machine-readable refusals without accepting unknown reasons', () => {
     expect(isAuthRefusal({ reason: AUTH_REFUSALS.pending, message: 'Awaiting approval.' })).toBe(
       true,

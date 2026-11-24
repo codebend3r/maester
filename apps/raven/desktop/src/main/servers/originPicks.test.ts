@@ -38,7 +38,7 @@ const run = ({ replies, answers }: RunProps) => {
   const warnings: string[] = []
   const clock = { now: 0 }
   const picks = createOriginPicks({
-    server: SERVER,
+    server: { current: () => SERVER },
     calls,
     probe: network.probe,
     probeClock: network.clock,
@@ -283,7 +283,7 @@ describe('createOriginPicks', () => {
     const network = pingNetwork({})
     const warnings: string[] = []
     const picks = createOriginPicks({
-      server: SERVER,
+      server: { current: () => SERVER },
       calls: {
         call: async () => {
           throw new Error('boom http://10.0.0.1')
@@ -304,7 +304,7 @@ describe('createOriginPicks', () => {
 
   it('a warn that throws never fails a pick', async () => {
     const picks = createOriginPicks({
-      server: SERVER,
+      server: { current: () => SERVER },
       calls: fakeCalls({}).calls,
       probe: pingNetwork({}).probe,
       probeClock: () => 0,

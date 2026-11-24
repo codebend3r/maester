@@ -21,6 +21,7 @@ import {
   type Track,
 } from '@raven/core'
 import type { MediaPlane } from '@/components/Player/useMediaPlane'
+import type { ActiveServer } from '@/stores/activeServer'
 
 /** A media plane that names no origin, so the video plays through the web host's own address. */
 export const mediaPlane = (overrides: Partial<MediaPlane> = {}): MediaPlane => ({
@@ -88,7 +89,6 @@ export const library = (overrides: Partial<Library> = {}): Library => ({
   },
   settings: {
     saveProgress: true,
-    pinned: true,
     inHero: true,
     sort: MEDIA_SORTS.title,
     view: LIBRARY_VIEWS.grid,
@@ -209,3 +209,9 @@ export const playlistDetails = (overrides: Partial<PlaylistDetails> = {}): Playl
   tracks: [track(), track({ id: 102, title: 'Paranoid Android', number: 2 })],
   ...overrides,
 })
+
+/** One of the account's extra servers, as the active server store holds it. */
+export const MELEYS = {
+  serverId: '0b5f8f0e-6c55-4b8e-9d0a-1f6f3c8e2a11',
+  origin: 'https://meleys.example:8443',
+} as const satisfies ActiveServer

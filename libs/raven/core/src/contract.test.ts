@@ -11,6 +11,9 @@ import {
   isBugReportStatusChange,
   isPlaybackDiagnostics,
   DEFAULT_SAGA_BACKDROP,
+  ENCODER_KINDS,
+  HEALTH_STATUSES,
+  METADATA_SERVICE_STATES,
   HLS_COPY_AUDIO,
   HLS_IDLE_MS,
   HLS_KEPT_SEGMENTS,
@@ -152,7 +155,6 @@ describe('isLibrary', () => {
         library({
           settings: {
             saveProgress: false,
-            pinned: true,
             inHero: false,
             sort: 'random',
             view: 'tiles',
@@ -209,7 +211,7 @@ describe('isLibrary', () => {
   })
 
   it('rejects a library with a setting that is not a boolean', () => {
-    expect(isLibrary({ ...library(), settings: { ...library().settings, pinned: 'yes' } })).toBe(
+    expect(isLibrary({ ...library(), settings: { ...library().settings, inHero: 'yes' } })).toBe(
       false,
     )
   })
@@ -734,6 +736,32 @@ describe('isServerHealth', () => {
     }
     expect(isServerHealth(health)).toBe(true)
     expect(isServerHealth({ ...health, encoder: 'nvenc' })).toBe(false)
+  })
+
+  it("takes the server's id, and an older server's answer without one", () => {
+    const health = {
+      status: HEALTH_STATUSES.ok,
+      ffmpeg: null,
+      tonemap: false,
+      encoder: ENCODER_KINDS.software,
+      thumbnailsPending: 0,
+      metadata: {
+        tmdb: METADATA_SERVICE_STATES.off,
+        omdb: METADATA_SERVICE_STATES.off,
+        mdblist: METADATA_SERVICE_STATES.off,
+        pending: 0,
+        error: null,
+        lastOk: null,
+        ai: METADATA_SERVICE_STATES.off,
+        aiRemaining: 0,
+        aiPending: 0,
+      },
+    }
+    expect(isServerHealth({ ...health, serverId: '30000000-0000-4000-8000-000000000001' })).toBe(
+      true,
+    )
+    expect(isServerHealth(health)).toBe(true)
+    expect(isServerHealth({ ...health, serverId: 'vhagar' })).toBe(false)
   })
 })
 

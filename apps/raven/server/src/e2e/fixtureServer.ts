@@ -20,7 +20,7 @@ import { fakeTmdb } from '@/test/fakeTmdb'
  * device plays through the server's HLS remux; the second episode is an MP4 with an English
  * and a Spanish sidecar and a chapter naming its intro, which it plays as it is. Both are matched against a fake TMDB, which knows no
  * MusicBrainz release, so the album keeps its tags and no request leaves the Mac. The music
- * library is neither pinned nor in the hero, so the device app's Home is as it was without it.
+ * library is not in the hero, so the device app's hero is as it was without it.
  * It listens on a fixed port (`runFixture`). The web's browser suite starts it on a port of its
  * own with the built web app's folder, which it then serves beside its API, as raven's image does.
  * Coming soon reads the same fake TMDB's `/discover`, and its requests go to a fake Radarr and
@@ -148,7 +148,7 @@ await runFixture({
       {
         name: FIXTURE_SERVER.album.library,
         paths: [music],
-        settings: { kind: LIBRARY_KINDS.music, pinned: false, inHero: false },
+        settings: { kind: LIBRARY_KINDS.music, inHero: false },
       },
     ]
   },

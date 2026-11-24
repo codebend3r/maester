@@ -57,11 +57,11 @@ describe('validateLibraryInput', () => {
     const result = validateLibraryInput({
       name: 'Clips',
       paths: ['/media/clips'],
-      settings: { saveProgress: 'no', pinned: 1 },
+      settings: { saveProgress: 'no', inHero: 1 },
     })
     expect(result).toEqual({
       ok: false,
-      errors: ['Save progress must be on or off.', 'Pinned must be on or off.'],
+      errors: ['Save progress must be on or off.', 'Include in hero display must be on or off.'],
     })
   })
 

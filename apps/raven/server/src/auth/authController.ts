@@ -39,6 +39,7 @@ import { PRIVACIES } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
 import { parseBody } from '@/parseBody'
 import { StrictlyLimited } from '@/rateLimits/rateTiers'
+import { SettingsRepository } from '@/settings/settingsRepository'
 
 const pageNumber = (value: unknown): number | null => (isString(value) ? wholeNumber(value) : null)
 
@@ -52,13 +53,14 @@ export class AuthController {
     @Inject(MembershipLookups) private readonly lookups: MembershipLookups,
     @Inject(AccountTickets) private readonly tickets: AccountTickets,
     @Inject(MediaIndex) private readonly media: MediaIndex,
+    @Inject(SettingsRepository) private readonly settings: SettingsRepository,
   ) {}
 
   @OpenToAnyone()
   @Header(HEADERS.cacheControl, CACHE_POLICIES.noStore)
   @Get(AUTH_PATHS.config)
   authConfig(): AuthConfig {
-    return this.auth
+    return { ...this.auth, serverId: this.settings.serverId() }
   }
 
   @RequireAccount(ACCOUNT_REQUIREMENTS.session)

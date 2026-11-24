@@ -1,4 +1,4 @@
-import { HTTP_METHODS, isSeconds, isTrackIndex } from '@/contract'
+import { HTTP_METHODS, isLibrary, isSeconds, isServerId, isTrackIndex } from '@/contract'
 import { watchPageOf } from '@/itemLinks'
 import { isMediaId } from '@/contract/ids'
 import { isDownloadAsk, isDownloadView, isSpaceView } from '@/desktop/downloads'
@@ -6,6 +6,7 @@ import { isOpaqueId } from '@/desktop/opaqueId'
 import { isDownloadTarget, PLAY_LINK_MAX_NEXT } from '@/playLink'
 import { isOutputSettings, isPlayerSource } from '@/player'
 import { fromQueryString, toQueryString } from '@/query'
+import { isServerOrigin } from '@/serverOrigin'
 import {
   type Infer,
   isBoolean,
@@ -232,9 +233,17 @@ export const DESKTOP_REQUESTS = {
   accountToken: 'accountToken',
   askDownload: 'askDownload',
   playTitle: 'playTitle',
+  useServer: 'useServer',
+  checkServer: 'checkServer',
+  serverLibraries: 'serverLibraries',
 } as const
 
-/** What the page asks main for. No variant carries a file path or names a server: main has one. */
+/**
+ * What the page asks main for. No variant carries a file path. A server is named by its id alone
+ * (`useServer`, `serverLibraries`): main looks its origin up on the account's own list, so the page
+ * never points main at a host. `checkServer` is the one that carries an origin, for the open
+ * `/api/health` of a server the viewer is adding, read with no account at all.
+ */
 export const isDesktopRequest = tagged({
   tag: 'type',
   variants: {
@@ -302,6 +311,11 @@ export const isDesktopRequest = tagged({
       at: isSeconds,
       next: isUpNext,
     },
+    // The server the page uses now: null for the home one, else one of the account's by its id.
+    [DESKTOP_REQUESTS.useServer]: { serverId: nullable(isServerId) },
+    [DESKTOP_REQUESTS.checkServer]: { origin: isServerOrigin },
+    // Another of the account's servers' libraries, for the pins kept on it.
+    [DESKTOP_REQUESTS.serverLibraries]: { serverId: isServerId },
   },
 })
 
@@ -337,6 +351,8 @@ export const DESKTOP_REPLIES = {
   downloadAsk: 'downloadAsk',
   downloads: 'downloads',
   space: 'space',
+  server: 'server',
+  libraries: 'libraries',
 } as const
 
 export const isDesktopReply = tagged({
@@ -370,6 +386,9 @@ export const isDesktopReply = tagged({
       shouldAutoDeleteByDefault: isBoolean,
     },
     [DESKTOP_REPLIES.space]: { space: isSpaceView },
+    // What a server's open health said of it: its id, or null for a server too old to have one.
+    [DESKTOP_REPLIES.server]: { serverId: nullable(isServerId) },
+    [DESKTOP_REPLIES.libraries]: { libraries: listOf(isLibrary) },
   },
 })
 
@@ -426,6 +445,9 @@ export const DESKTOP_REPLIES_FOR = {
   [R.accountToken]: [A.done],
   [R.askDownload]: [A.downloadAsk],
   [R.playTitle]: [A.title, A.titleRefused],
+  [R.useServer]: [A.done],
+  [R.checkServer]: [A.server],
+  [R.serverLibraries]: [A.libraries],
 } as const satisfies Record<DesktopRequestType, readonly DesktopReplyType[]>
 
 /** A reply of one of `types`, or a refusal. */

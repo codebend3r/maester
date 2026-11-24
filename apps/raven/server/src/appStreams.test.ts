@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { NestFastifyApplication } from '@nestjs/platform-fastify'
 import {
   type ApiClient,
+  LIBRARY_VIEWS,
   MEDIA_PURPOSE_PARAM,
   type MediaItem,
   PLAYBACK_MODES,
@@ -168,10 +169,10 @@ describe('who is streaming', () => {
       [[], []],
     ])
     expect(await viewer().getLibrary(shown?.id ?? -1)).toMatchObject({ paths: [], layouts: [] })
-    const pinned = await viewer().setLibraryView({
+    const viewed = await viewer().setLibraryView({
       id: shown?.id ?? -1,
-      change: { pinned: true },
+      change: { view: LIBRARY_VIEWS.grid },
     })
-    expect(pinned).toMatchObject({ paths: [], layouts: [] })
+    expect(viewed).toMatchObject({ paths: [], layouts: [] })
   })
 })

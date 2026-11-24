@@ -76,6 +76,7 @@ import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
 import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
 import { tracksFromMpv } from '@/main/player/tracksFromMpv'
 import { createAccountTickets } from '@/main/servers/accountTickets'
+import { serverInUse } from '@/main/servers/activeServer'
 import {
   createMediaRelay,
   listenOnLoopback,
@@ -1778,7 +1779,7 @@ const accountPartsFor = async ({
   const account = createPageAccount({ onSwitched: () => undefined, onEnded: () => undefined })
   const unlock = jar.find(({ name }) => name === SERVER_COOKIES.unlock) ?? null
   const calls = createServerCalls({
-    server: entry,
+    server: { current: () => entry },
     fetch: fetchThrough(fetch),
     authorize: () => account.accessToken(),
     unlockOf: async () => (unlock === null ? null : `${SERVER_COOKIES.unlock}=${unlock.value}`),
@@ -1795,7 +1796,7 @@ const accountPartsFor = async ({
   const heard: string[] = []
   const listeners: Server[] = []
   const relay = createMediaRelay({
-    serverOrigin: entry.origin,
+    serverOrigin: () => entry.origin,
     listen: listenOnLoopback({
       createServer: (handler) => {
         const listener = createServer((request, response) => {
@@ -1817,7 +1818,7 @@ const accountPartsFor = async ({
     warn,
   })
   const sources = createServerSources({
-    server: entry,
+    server: serverInUse(() => entry),
     calls,
     tickets,
     relay,

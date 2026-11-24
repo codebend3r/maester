@@ -444,7 +444,7 @@ describe('Advanced on SettingsPage', () => {
     })
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Playback', 'Scrobbling', 'Advanced'])
+    ).toEqual(['Playback', 'Servers', 'Scrobbling', 'Advanced'])
     expect(slider()).toBeEnabled()
   })
 })
@@ -480,7 +480,7 @@ describe('accounts on SettingsPage', () => {
 
   it('shows neither Account nor Users while accounts are off', () => {
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(headings()).toEqual(['Playback', 'Scrobbling', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Servers', 'Scrobbling', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
     expect(spies.members).not.toHaveBeenCalled()
   })
@@ -490,28 +490,28 @@ describe('accounts on SettingsPage', () => {
       ui: <SettingsPage />,
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
     })
-    expect(headings()).toEqual(['Playback', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Servers', 'Advanced'])
     expect(spies.me).not.toHaveBeenCalled()
   })
 
   it('shows neither to an account that is not approved', async () => {
     renderSignedIn(fakeAccount({ status: MEMBER_STATUSES.pending, isOwner: true }))
     await waitFor(() => expect(spies.me).toHaveBeenCalled())
-    expect(headings()).toEqual(['Playback', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Servers', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Scrobbling', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Account', 'Servers', 'Scrobbling', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('keeps admin settings and Users off the personal settings page for the owner too', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
     await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Scrobbling', 'Advanced'])
+    expect(headings()).toEqual(['Playback', 'Account', 'Servers', 'Scrobbling', 'Advanced'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
@@ -574,14 +574,14 @@ describe('SettingsPage inside Raven', () => {
     expect(screen.getByRole('region', { name: 'Updates' })).toBeInTheDocument()
   })
 
-  it("keeps only the app's sections and this browser's while its server is out of reach", () => {
+  it("keeps the servers, the app's sections and this browser's while its server is out of reach", () => {
     asDesktop(downloadsMain())
     useServerReach.setState({ isOffline: true })
     renderWithProviders({ ui: <SettingsPage />, playback: null, display: null, authConfig: null })
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
     expect(
       screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Downloads', 'This computer', 'Updates', 'Advanced'])
+    ).toEqual(['Servers', 'Downloads', 'This computer', 'Updates', 'Advanced'])
     expect(spies.get).not.toHaveBeenCalled()
   })
 })

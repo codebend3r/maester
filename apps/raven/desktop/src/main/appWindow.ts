@@ -59,7 +59,8 @@ export const showWindowButtons = ({
 }
 
 type StartWebHostProps = {
-  serverOrigin: string
+  serverOrigin: () => string
+  homeOrigin: string
   timers: Timers
   appLog: Pick<AppLog, 'log' | 'warn'>
 }
@@ -72,6 +73,7 @@ type StartWebHostProps = {
  */
 export const startWebHost = async ({
   serverOrigin,
+  homeOrigin,
   timers,
   appLog: { log, warn },
 }: StartWebHostProps): Promise<void> => {
@@ -84,6 +86,7 @@ export const startWebHost = async ({
       resourcesPath: process.resourcesPath,
     }),
     serverOrigin,
+    homeOrigin,
     authOrigin,
     readFile: (path) => readFile(path),
     timers,
@@ -102,7 +105,7 @@ export const startWebHost = async ({
     dialog.showErrorBox('Raven could not open', webHostFailureText(error))
     throw error
   }
-  log.info(`${WEB_HOST_READY} at ${PAGE_ORIGIN}, /api goes to ${serverOrigin}`)
+  log.info(`${WEB_HOST_READY} at ${PAGE_ORIGIN}, /api goes to ${serverOrigin()}`)
 }
 
 type ServeFilesProps = { grants: Grants }

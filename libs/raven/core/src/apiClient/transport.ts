@@ -9,7 +9,7 @@ import {
   type MediaOrigin,
 } from '@/contract'
 import { isUnreachableAnswer } from '@/desktop/webHost'
-import { fillPath, pathWithQuery, toQueryString } from '@/query'
+import { fillPath, pathWithQuery } from '@/query'
 import { type PathParamName, type PathParams, type RouteMethod } from '@/routes'
 import { type Guard, isRecord, isString, isStringArray } from '@/schema'
 import { CONTENT_TYPES, HEADERS, HTTP_STATUSES } from '@shared/http'
@@ -72,15 +72,16 @@ export const isLockedError = (error: unknown): error is ApiError =>
 
 type ErrorMessageProps = { body: unknown; fallback: string }
 
-/** Nest's error body carries `message` as a string or, for validation, a list. */
-const errorMessage = ({ body, fallback }: ErrorMessageProps): string => {
+/** Nest's error body carries `message` as a string or, for validation, a list; PostgREST's as a string. */
+export const errorMessage = ({ body, fallback }: ErrorMessageProps): string => {
   if (!isRecord(body)) return fallback
   if (isString(body.message)) return body.message
   if (isStringArray(body.message)) return body.message.join(' ')
   return fallback
 }
 
-const readJson = async (response: FetchResponse): Promise<unknown> => {
+/** A response's JSON body, or null when it has none or it does not parse. */
+export const readJson = async (response: FetchResponse): Promise<unknown> => {
   try {
     return await response.json()
   } catch {
@@ -103,8 +104,14 @@ const REQUEST_FAILED = 'Request failed'
 
 const NOT_UNDERSTOOD = 'The server sent a response this client does not understand.'
 
+/**
+ * Where the server's API is: an origin, '' for the page's own, or a getter read on every call,
+ * for a client whose server can change while it is in use (the web's active server).
+ */
+export type BaseUrl = string | (() => string)
+
 type CreateTransportProps = {
-  baseUrl: string
+  baseUrl: BaseUrl
   fetch: FetchLike
   accessToken: () => string | null
 }
@@ -115,8 +122,11 @@ type CreateTransportProps = {
  * the guard a response must pass before a caller sees it.
  */
 export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransportProps) => {
-  const root = baseUrl.replace(/(?<!\/)\/+$/, '')
-  const url = (path: string): string => `${root}${path}`
+  const rootOf = (): string =>
+    (typeof baseUrl === 'function' ? baseUrl() : baseUrl).replace(/(?<!\/)\/+$/, '')
+  const url = (path: string): string => `${rootOf()}${path}`
+  /** Whether the API is the page's own `/api`, under no origin, rather than another server's. */
+  const isOwnSite = (): boolean => rootOf() === ''
 
   type MediaUrlProps = {
     path: string
@@ -126,10 +136,8 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
 
   /** A media path on the origin `access` names, with its ticket; on this server's own without. */
   const mediaUrl = ({ path, query, access }: MediaUrlProps): string => {
-    const queryString = toQueryString(
-      access === null ? query : { ...query, [MEDIA_TICKET_PARAM]: access.ticket },
-    )
-    return `${access === null ? root : access.origin.url}${path}${queryString === '' ? '' : `?${queryString}`}`
+    const ticketed = access === null ? query : { ...query, [MEDIA_TICKET_PARAM]: access.ticket }
+    return `${access === null ? rootOf() : access.origin.url}${pathWithQuery({ path, query: ticketed })}`
   }
 
   /**
@@ -249,5 +257,5 @@ export const createTransport = ({ baseUrl, fetch, accessToken }: CreateTransport
     await sendRoute(props)
   }
 
-  return { url, mediaUrl, sendForText, askMedia, ask, tell }
+  return { url, isOwnSite, mediaUrl, sendForText, askMedia, ask, tell }
 }

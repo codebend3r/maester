@@ -1,3 +1,4 @@
+import { isServerId } from '@/contract/accountServers'
 import { isNotification } from '@/contract/notifications'
 import { isEncoderKind } from '@/contract/settings'
 import {
@@ -9,6 +10,7 @@ import {
   nullable,
   object,
   oneOf,
+  optional,
   union,
   literal,
 } from '@/schema'
@@ -55,6 +57,8 @@ export const isServerHealth = object({
   thumbnailsPending: isNumber,
   /** Whether TMDB is configured and answering, and how many files wait to be matched. */
   metadata: isMetadataHealth,
+  /** The server's own id, made once and kept; left out by a server older than multi-server support. */
+  serverId: optional(isServerId),
 })
 
 export type ServerHealth = Infer<typeof isServerHealth>

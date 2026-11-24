@@ -178,7 +178,7 @@ export class LibrariesController {
     const settings = parseBody({
       guard: isLibraryViewChange,
       body,
-      message: 'Send only sort, view, groupBy or pinned, each a value it takes.',
+      message: 'Send only sort, view or groupBy, each a value it takes.',
     })
     return this.saveSettings({ library, settings, request })
   }

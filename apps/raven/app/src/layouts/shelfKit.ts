@@ -8,10 +8,22 @@ import type { ShelfView } from '@/queries/homeShelves'
 import type { RouteTarget } from '@/routes'
 
 /**
- * A pinned library as the side menu lists it, with the icon it wears there on the web, and
- * whether it is locked behind the PIN, which the web marks with a lock and so does the menu.
+ * A pinned library as the side menu lists it, on whichever server holds it: with the icon it
+ * wears there on the web, whether it is locked behind the PIN, which the web marks with a lock
+ * and so does the menu, and its server, which a press on one elsewhere switches to.
  */
-export type MenuLibrary = { id: number; name: string; icon: LibraryIconName; isLocked: boolean }
+export type MenuLibrary = {
+  /** Unique across servers, as two servers may each have a library 3. */
+  key: string
+  id: number
+  name: string
+  icon: LibraryIconName
+  isLocked: boolean
+  /** The id its server is listed under. */
+  serverId: string
+  /** Its server's name, in very small type under its own, while the account keeps several servers. */
+  serverName: string | null
+}
 
 type MenuRowLabelOfProps = { label: string; isLocked: boolean }
 
@@ -27,10 +39,12 @@ export type ShelvesProps = {
   onSearch: () => void
   /** Opens Settings. */
   onSettings: () => void
-  /** The pinned libraries, in the order the web's side menu lists them. */
+  /** The pinned libraries on every server, in the order the web's side menu lists them. */
   libraries: readonly MenuLibrary[]
-  /** Opens a library from the side menu. */
+  /** Opens a library from a shelf, on the server in use. */
   onOpenLibrary: (libraryId: number) => void
+  /** Opens a pinned library from the side menu, switching to its server first. */
+  onOpenPinned: (library: MenuLibrary) => void
   children: ReactNode
 }
 

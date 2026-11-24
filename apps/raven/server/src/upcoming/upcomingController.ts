@@ -37,8 +37,8 @@ const TMDB_TO_DO = 'see what is coming soon'
 /** What the 503 says a title's own page needs TMDB for. */
 const TMDB_TO_DESCRIBE = 'describe a title that is coming soon'
 
-/** What the 503 says a search of what is coming soon needs TMDB for. */
-const TMDB_TO_SEARCH = 'search what is coming soon'
+/** What the 503 says Coming soon's search needs TMDB for. */
+const TMDB_TO_SEARCH = 'search for movies and shows'
 
 /** What a 400 says of a `q` that is no single string. */
 const BAD_QUERY = 'q must be the words to search for'
@@ -57,8 +57,8 @@ export class UpcomingController {
   ) {}
 
   /**
-   * Upcoming movies and shows `?q=` finds on TMDB that no library holds, the
-   * most popular first. Held to the PIN lock as the shelves are, since what
+   * The movies and shows `?q=` finds on TMDB that no library holds, out
+   * already or still to come, the most popular first. Held to the PIN lock, since what
    * it leaves out says what the libraries hold.
    */
   @Get(UPCOMING_SEARCH_PATH)

@@ -15,7 +15,7 @@ import {
   PICTURE_PATHS,
   titleItemIdOf,
 } from '@raven/core'
-import type { ServerEntry } from '@/main/desktopConfig'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import {
   type DownloadEntry,
   type EntryPictures,
@@ -77,8 +77,8 @@ export type DownloadPicturesDeps = {
   calls: Pick<ServerCalls, 'call'>
   /** A bare fetch with no cookie: a picture's address names its version, which is its only key. */
   fetch: StreamFetch
-  /** The server Raven plays from: the downloads filed under its id are the ones it is asked about. */
-  server: ServerEntry
+  /** The server in use: the downloads filed under its id are the ones it is asked about. */
+  server: ServerInUse
   /** Whether the page is signed in, so main has an account to ask with. */
   isSignedIn: () => boolean
   fs: PictureFs
@@ -326,13 +326,14 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
   /** Fetches one picture whole and writes it; a failure is logged and left for the next pass. */
   const save = async ({ want, path }: SaveProps): Promise<Saved> => {
     if (path === null) return { picture: null, isSettled: true }
-    if (want.serverId !== deps.server.id) return NOT_SAVED
+    if (!deps.server.isInUse(want.serverId)) return NOT_SAVED
+    const server = deps.server.current()
     const late = new AbortController()
     const timer = deps.timers.set({ run: () => late.abort(), ms: DOWNLOAD_STALL_MS })
     const signal = AbortSignal.any([stop.signal, late.signal])
     try {
       const response = await deps.fetch({
-        url: `${deps.server.origin}${path}`,
+        url: `${server.origin}${path}`,
         headers: {},
         signal,
       })
@@ -410,14 +411,18 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
 
   /** The entries main can ask the server about now: its server is held and the page is signed in. */
   const askable = (): DownloadEntry[] =>
-    store.read().entries.filter(({ serverId }) => serverId === deps.server.id && deps.isSignedIn())
+    store
+      .read()
+      .entries.filter(({ serverId }) => deps.server.isInUse(serverId) && deps.isSignedIn())
 
   const fillAll = async (): Promise<void> => {
     if (stop.signal.aborted) return
     const libraries = new Map<number, Promise<Answer<Library>>>()
     const isReached = await eachInTurn({
       items: askable().filter(({ library }) => library === undefined),
-      step: (entry) => fileLibrary({ entry, libraries }),
+      // A switch of server ends the pass: what is left is asked of its own server once it is in use.
+      step: async (entry) =>
+        deps.server.isInUse(entry.serverId) && fileLibrary({ entry, libraries }),
     })
     if (!isReached) return
     // A title with no item, or a playlist with no cover, has no picture to wait for.
@@ -426,7 +431,10 @@ export const createDownloadPictures = (deps: DownloadPicturesDeps): DownloadPict
       .entries.filter((entry) => entry.pictures === undefined && keyOf(entry) === null)
       .map(({ downloadId }) => downloadId)
     store.update((state) => setPictures({ state, downloadIds: bare, pictures: NO_PICTURES }))
-    await eachInTurn({ items: wantsOf(askable()), step: fillWant })
+    await eachInTurn({
+      items: wantsOf(askable()),
+      step: async (want) => deps.server.isInUse(want.serverId) && fillWant(want),
+    })
   }
 
   /** The names in a folder; none when it does not exist or cannot be read. */

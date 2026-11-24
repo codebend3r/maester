@@ -317,8 +317,8 @@ const passedHeaders = (upstream: Upstream): Record<string, string> =>
   )
 
 type CreateMediaRelayProps = {
-  /** The server's own address, which every load falls back to. */
-  serverOrigin: string
+  /** The server in use's own address, which every load falls back to. */
+  serverOrigin: () => string
   listen: RelayListen
   fetchUpstream: UpstreamFetch
   tickets: Pick<AccountTickets, 'ticketFor'>
@@ -739,7 +739,7 @@ export const createMediaRelay = ({
       const sidecars = sidecarTrackIds.filter(isSidecarTrackId)
       const prefix = `/${secret}/`
       // The server's own address is the fallback, so a media origin that goes away mid-title is passed over.
-      const origins = [...new Set([origin, serverOrigin])]
+      const origins = [...new Set([origin, serverOrigin()])]
       const loadBase: LoadBase = {
         loadId,
         origins,

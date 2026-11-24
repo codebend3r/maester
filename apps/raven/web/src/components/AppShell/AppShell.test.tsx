@@ -4,16 +4,19 @@ import {
   ADMIN_LOCK_STATES,
   type AdminLock,
   DESKTOP_PATHS,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
   DOWNLOAD_STATUS_KINDS,
   isLibraryKind,
   KINDS,
+  type LibraryPin,
   PAGE_PATHS,
 } from '@raven/core'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
-import { api } from '@/lib/api'
+import { api, apiAt } from '@/lib/api'
 import { LESS_MOTION } from '@/lib/motion'
 import { ravenVersion } from '@/lib/version'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
@@ -22,10 +25,13 @@ import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import { useSideMenu } from '@/stores/sideMenu'
-import { fakeAccount } from '@/test/authClient'
+import { fakeAccount, readyConfig } from '@/test/authClient'
+import { accountDataFor } from '@/lib/accountData'
+import { MELEYS_ID, MELEYS_ORIGIN, meleysRow, pin } from '@/test/servers'
+import { useActiveServer } from '@raven/ui/headless'
 import { asBrowserDownloads, fakeEngine } from '@/test/browserDownloads'
 import { FakeEventSource } from '@/test/eventSource'
-import { asDesktop, DL_2, downloadsMain, viewOf } from '@/test/desktop'
+import { asDesktop, DL_2, downloadsMain, fakeClient, viewOf } from '@/test/desktop'
 import { library } from '@/test/fixtures'
 import { musicLibrary } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -35,10 +41,13 @@ import { APP_PATHS } from '@/lib/appPaths'
 type RenderShellProps = {
   route: string
   adminLock?: AdminLock
-  account?: Account
+  /** Who is signed in: the owner unless named, and no one, with accounts off, for null. */
+  account?: Account | null
 }
 
-const renderShell = ({ route, adminLock, account }: RenderShellProps) =>
+const OWNER = fakeAccount({ isOwner: true })
+
+const renderShell = ({ route, adminLock, account = OWNER }: RenderShellProps) =>
   renderWithProviders({
     ui: (
       <Routes>
@@ -90,7 +99,17 @@ const openBrowse = async (): Promise<HTMLElement> => {
 }
 
 describe('AppShell', () => {
-  const spies = { list: spyOn(api, 'listLibraries'), media: spyOn(window, 'matchMedia') }
+  const list = spyOn(api, 'listLibraries')
+  // The account pinned every library its home server lists, as each test's list says.
+  const pinEveryListed = async (): Promise<LibraryPin[]> =>
+    ((await list.getMockImplementation()?.()) ?? []).map((listed) => pin({ libraryId: listed.id }))
+  const spies = {
+    list,
+    media: spyOn(window, 'matchMedia'),
+    pins: spyOn(accountDataFor(readyConfig), 'listPins').mockImplementation(pinEveryListed),
+    servers: spyOn(accountDataFor(readyConfig), 'listServers').mockImplementation(async () => []),
+    meleys: spyOn(apiAt(MELEYS_ORIGIN), 'listLibraries'),
+  }
 
   // Manage opens folded; the tests that read its links start with it open.
   beforeEach(() => {
@@ -106,6 +125,9 @@ describe('AppShell', () => {
 
   afterAll(() => {
     spies.media.mockRestore()
+    spies.pins.mockRestore()
+    spies.servers.mockRestore()
+    spies.meleys.mockRestore()
   })
 
   it('offers the music mode in the menu and the tabs once a music library exists', async () => {
@@ -201,7 +223,11 @@ describe('AppShell', () => {
 
   it('leaves Streams and Bug reports out of the menus and the tab bar while the admin lock is on', async () => {
     spies.list.mockImplementation(async () => [])
-    renderShell({ route: '/', adminLock: { state: ADMIN_LOCK_STATES.on, available: true } })
+    renderShell({
+      route: APP_PATHS.home,
+      adminLock: { state: ADMIN_LOCK_STATES.on, available: true },
+      account: null,
+    })
     expect(await within(nav()).findByRole('link', { name: 'Settings' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Streams' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Bug reports' })).toBeNull()
@@ -219,21 +245,6 @@ describe('AppShell', () => {
     scroll.mockRestore()
   })
 
-  it('lists the pinned libraries and leaves the rest out', async () => {
-    spies.list.mockImplementation(async () => [
-      library({ id: 1, name: 'Anime' }),
-      library({ id: 2, name: 'Clips', settings: { ...library().settings, pinned: false } }),
-      library({ id: 3, name: 'Movies' }),
-    ])
-    renderShell({ route: '/' })
-    const pinned = await within(nav()).findByRole('list', { name: 'Pinned' })
-    const links = within(pinned).getAllByRole('link')
-    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
-      ['Anime', '/libraries/1'],
-      ['Movies', '/libraries/3'],
-    ])
-  })
-
   it("marks a pinned library's own link, not Libraries, while it is open", async () => {
     spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
     renderShell({ route: '/libraries/3' })
@@ -241,19 +252,6 @@ describe('AppShell', () => {
     expect(movies).toHaveAttribute('aria-current', 'page')
     expect(within(nav()).getByRole('link', { name: 'Libraries' })).not.toHaveAttribute(
       'aria-current',
-    )
-  })
-
-  it('keeps Libraries marked while a library that is not pinned is open', async () => {
-    spies.list.mockImplementation(async () => [
-      library({ id: 3, name: 'Movies' }),
-      library({ id: 4, name: 'Clips', settings: { ...library().settings, pinned: false } }),
-    ])
-    renderShell({ route: '/libraries/4' })
-    await within(nav()).findByRole('link', { name: 'Movies' })
-    expect(within(nav()).getByRole('link', { name: 'Libraries' })).toHaveAttribute(
-      'aria-current',
-      'page',
     )
   })
 
@@ -575,6 +573,101 @@ describe('AppShell', () => {
     expect(within(logo()).getByText('Raven')).toHaveClass('visually-hidden')
   })
 
+  describe("with the account's second server", () => {
+    const withMeleys = () => {
+      spies.servers.mockImplementation(async () => [meleysRow()])
+      spies.list.mockImplementation(async () => [
+        library({ id: 3, name: 'Movies' }),
+        library({ id: 4, name: 'Shows' }),
+      ])
+      spies.meleys.mockImplementation(async () => [
+        library({ id: 3, name: 'Movies' }),
+        library({ id: 8, name: 'Concerts' }),
+      ])
+      spies.pins.mockImplementation(async () => [
+        pin({ libraryId: 3 }),
+        pin({ serverId: MELEYS_ID, libraryId: 8 }),
+        pin({ serverId: MELEYS_ID, libraryId: 3 }),
+        // Deleted on Meleys since it was pinned: it is left out.
+        pin({ serverId: MELEYS_ID, libraryId: 99 }),
+      ])
+    }
+
+    afterEach(() => {
+      spies.servers.mockImplementation(async () => [])
+      spies.meleys.mockReset()
+      spies.pins.mockImplementation(pinEveryListed)
+    })
+
+    it("lists the pins on every server, each server's in its order, with its server's name", async () => {
+      withMeleys()
+      renderShell({ route: APP_PATHS.home })
+      await within(nav()).findByRole('link', { name: /Concerts/ })
+      const pinned = within(nav()).getByRole('list', { name: 'Pinned' })
+      const host = window.location.host
+      expect(
+        within(pinned)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual([`Movieson ${host}`, 'Movieson Meleys', 'Concertson Meleys'])
+    })
+
+    it('switches to a pin on another server as it opens it', async () => {
+      withMeleys()
+      renderShell({ route: APP_PATHS.home })
+      await userEvent.click(await within(nav()).findByRole('link', { name: 'Concerts on Meleys' }))
+      expect(useActiveServer.getState().active).toEqual({
+        serverId: MELEYS_ID,
+        origin: MELEYS_ORIGIN,
+      })
+      expect(screen.getByText('library')).toBeInTheDocument()
+    })
+
+    it('marks the server in use in the switcher, and switches home from another', async () => {
+      withMeleys()
+      useActiveServer.getState().choose({ serverId: MELEYS_ID, origin: MELEYS_ORIGIN })
+      renderShell({ route: APP_PATHS.libraries })
+      await userEvent.click(await within(nav()).findByRole('button', { name: 'Server: Meleys' }))
+      const menu = screen.getByRole('menu', { name: 'Servers' })
+      expect(within(menu).getByRole('menuitemradio', { name: 'Meleys' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      )
+      await userEvent.click(within(menu).getByRole('menuitemradio', { name: window.location.host }))
+      expect(useActiveServer.getState().active).toBeNull()
+      expect(screen.getByText('home')).toBeInTheDocument()
+    })
+
+    it("inside Raven, reads another server's pins through main and offers the switch", async () => {
+      withMeleys()
+      const concerts = [library({ id: 8, name: 'Concerts' })]
+      const client = fakeClient({
+        request: async (request) =>
+          request.type === DESKTOP_REQUESTS.serverLibraries
+            ? { type: DESKTOP_REPLIES.libraries, libraries: concerts }
+            : { type: DESKTOP_REPLIES.done },
+      })
+      asDesktop(client)
+      renderShell({ route: APP_PATHS.home })
+      expect(
+        await within(nav()).findByRole('link', { name: 'Concerts on Meleys' }),
+      ).toBeInTheDocument()
+      expect(within(nav()).getByRole('button', { name: 'Server: raven' })).toBeInTheDocument()
+      expect(spies.meleys).not.toHaveBeenCalled()
+      expect(client.request).toHaveBeenCalledWith({
+        type: DESKTOP_REQUESTS.serverLibraries,
+        serverId: MELEYS_ID,
+      })
+    })
+
+    it('names no server under a pin, and offers no switch, with one server', async () => {
+      spies.list.mockImplementation(async () => [library({ id: 3, name: 'Movies' })])
+      renderShell({ route: APP_PATHS.home })
+      expect(await within(nav()).findByRole('link', { name: 'Movies' })).toBeInTheDocument()
+      expect(within(nav()).queryByRole('button', { name: /^Server:/ })).toBeNull()
+    })
+  })
+
   it('has no Pinned heading with nothing pinned', () => {
     spies.list.mockImplementation(async () => [])
     renderShell({ route: '/' })
@@ -655,7 +748,7 @@ describe('AppShell', () => {
 
   it('has no account button while accounts are off', () => {
     spies.list.mockImplementation(async () => [])
-    renderShell({ route: '/libraries' })
+    renderShell({ route: APP_PATHS.libraries, account: null })
     expect(screen.queryByRole('button', { name: 'Account' })).toBeNull()
   })
 

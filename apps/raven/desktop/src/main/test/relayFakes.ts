@@ -102,7 +102,7 @@ export const setupRelay = ({
     warn: () => undefined,
   })
   const relay = createMediaRelay({
-    serverOrigin: SERVER.origin,
+    serverOrigin: () => SERVER.origin,
     listen,
     fetchUpstream,
     tickets: {

@@ -4,6 +4,7 @@ import type { ServerHealth } from '@raven/core'
 import { OpenToAnyone } from '@/auth/accountGuard'
 import { FfmpegService } from '@/ffmpeg/ffmpegService'
 import { MetadataService } from '@/metadata/metadataService'
+import { SettingsRepository } from '@/settings/settingsRepository'
 import { ThumbnailService } from '@/thumbnails/thumbnailService'
 
 @Controller('api/health')
@@ -12,6 +13,7 @@ export class HealthController {
     @Inject(FfmpegService) private readonly ffmpeg: FfmpegService,
     @Inject(ThumbnailService) private readonly thumbnails: ThumbnailService,
     @Inject(MetadataService) private readonly metadata: MetadataService,
+    @Inject(SettingsRepository) private readonly settings: SettingsRepository,
   ) {}
 
   @OpenToAnyone()
@@ -29,6 +31,7 @@ export class HealthController {
       encoder: encoder.kind,
       thumbnailsPending: this.thumbnails.pending(),
       metadata: this.metadata.health(),
+      serverId: this.settings.serverId(),
     }
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🏗️ Build Android TV job and its end to end job, which CI runs on two runners, on
+# Runs the 🏗️ Build Raven Android TV job and its end to end job, which CI runs on two runners, on
 # this Mac: the libraries, the fixture server, the Android TV emulator, the Release APK through
 # ccache, the install and the Maestro flows the remote drives. The emulator is arm64 here, where
 # CI's is x86_64 on KVM, and the flows run on the AVD raven_tv alone (local_ci_android.sh).

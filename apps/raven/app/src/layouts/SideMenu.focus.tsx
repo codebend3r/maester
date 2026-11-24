@@ -1,12 +1,13 @@
 import type { IconName } from '@raven/ui/iconDrawings'
 import { useRouter } from 'expo-router'
 import { type ComponentRef, type Ref, useRef } from 'react'
-import { Pressable, ScrollView, StyleSheet } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
-import { FAVOURITES_ENTRY, LIBRARIES_ENTRY } from '@/layouts/copy'
+import { FAVOURITES_ENTRY, LIBRARIES_ENTRY, SERVER_SWITCHER_COPY } from '@/layouts/copy'
 import { useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
 import { Icon } from '@raven/native'
+import { hasSeveralServers } from '@raven/native/headless'
 import { PickerList, usePickerList } from '@/layouts/Picker.focus'
 import {
   MENU_FOOT,
@@ -21,6 +22,7 @@ import { BINGE_COPY } from '@/queries/bingeCards'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
 import { COMING_SOON_COPY } from '@/queries/comingSoonCopy'
 import { APP_ROUTES } from '@/routes'
+import { useActiveServer } from '@/stores/activeServer'
 import { useAppPrefs } from '@/stores/appPrefs'
 import { isMenuOpen, useSideMenu } from '@/stores/sideMenu'
 import { THEME_PICKER } from '@/theme/themeOptions'
@@ -64,6 +66,8 @@ type MenuRowProps = {
   ref?: Ref<ComponentRef<typeof Pressable>>
   /** A library locked behind the PIN, which wears a lock after its name, as the web's does. */
   isLocked?: boolean
+  /** A line in very small type under the label: a pinned library's server, while there are several. */
+  note?: string | null
 }
 
 /**
@@ -71,7 +75,7 @@ type MenuRowProps = {
  * focus. Folded, the row is its icon alone, and its label is what it is called aloud; open, a long
  * label takes a second line, and the row the remote is on shows its label whole.
  */
-const MenuRow = ({ label, icon, onPress, ref, isLocked = false }: MenuRowProps) => {
+const MenuRow = ({ label, icon, onPress, ref, isLocked = false, note = null }: MenuRowProps) => {
   const { settle } = useOpeningFocus()
   const isOpen = useSideMenu(isMenuOpen)
   const enter = useSideMenu((menu) => menu.enter)
@@ -95,9 +99,16 @@ const MenuRow = ({ label, icon, onPress, ref, isLocked = false }: MenuRowProps) 
         <>
           <Icon colour={text} isFocused={focused} name={icon} size={MENU_ICON} />
           {isOpen && (
-            <Text numberOfLines={focused ? undefined : LABEL_LINES} style={styles.label}>
-              {label}
-            </Text>
+            <View style={styles.words}>
+              <Text numberOfLines={focused ? undefined : LABEL_LINES} style={styles.label}>
+                {label}
+              </Text>
+              {note !== null && (
+                <Text numberOfLines={1} style={styles.note}>
+                  {note}
+                </Text>
+              )}
+            </View>
           )}
           {isOpen && isLocked && <Icon colour={text} name={APP_ICONS.lock} size={TV_SIZES.text} />}
         </>
@@ -150,17 +161,43 @@ const ThemeChoice = () => {
   )
 }
 
-type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenLibrary' | 'libraries'>
+/**
+ * The server in use, as the web's switcher at the head of its side menu: the row names it and
+ * opens the TV's picker list over the screen, focus on that server. Picking another switches to
+ * it, and Home, which this menu stands on, opens for it. Shown only while the account keeps
+ * several servers.
+ */
+const ServerChoice = () => {
+  const servers = useActiveServer((state) => state.servers)
+  const activeId = useActiveServer((state) => state.activeId)
+  const activate = useActiveServer((state) => state.activate)
+  const { open, label, list } = usePickerList({
+    label: SERVER_SWITCHER_COPY.server,
+    options: servers.map(({ id, name }) => ({ key: id, label: name })),
+    value: activeId,
+    onChoose: activate,
+  })
+  return (
+    hasSeveralServers({ servers }) && (
+      <>
+        <MenuRow icon={APP_ICONS.globe} label={label} onPress={open} />
+        <PickerList {...list} />
+      </>
+    )
+  )
+}
+
+type SideMenuProps = Pick<ShelvesProps, 'onSearch' | 'onSettings' | 'onOpenPinned' | 'libraries'>
 
 /**
- * The side menu, as the web's: the search, Continue watching, Binge, Coming soon, Favourites and every library, then the
- * pinned libraries under their heading, each with its icon, and at the foot Settings, the theme and the toggle
+ * The side menu, as the web's: the server in use while there are several, the search, Continue watching, Binge, Coming soon, Favourites and every library, then the
+ * pinned libraries of every server under their heading, each with its icon and, while there are several, its server's name, and at the foot Settings, the theme and the toggle
  * that pins the menu open, kept on this device. It is folded to its icons until the remote moves into it, when it opens over
  * the page, labels and all, and folds again as the remote leaves; pinned, it stays open beside
  * the page. It is the left column of Home on a TV, the remote's way to every library, drawn over
  * the page: the page keeps `useSideMenuRoom` for it.
  */
-export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: SideMenuProps) => {
+export const SideMenu = ({ libraries, onSearch, onSettings, onOpenPinned }: SideMenuProps) => {
   const isOpen = useSideMenu(isMenuOpen)
   const isPinned = useSideMenu((menu) => menu.isPinned)
   const toggle = useSideMenu((menu) => menu.toggle)
@@ -171,6 +208,7 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
       contentContainerStyle={styles.content}
       style={[styles.menu, !isOpen && styles.folded]}
     >
+      <ServerChoice />
       <MenuRow icon={APP_ICONS.search} label={SEARCH_EVERY_LIBRARY.text} onPress={onSearch} />
       <OpenerRow
         icon={APP_ICONS.continue}
@@ -209,11 +247,12 @@ export const SideMenu = ({ libraries, onSearch, onSettings, onOpenLibrary }: Sid
       )}
       {libraries.map((library: MenuLibrary) => (
         <MenuRow
-          key={library.id}
+          key={library.key}
           icon={library.icon}
           isLocked={library.isLocked}
           label={library.name}
-          onPress={() => onOpenLibrary(library.id)}
+          note={library.serverName}
+          onPress={() => onOpenPinned(library)}
         />
       ))}
       <OpenerRow
@@ -269,6 +308,8 @@ const useStyles = themedStyles((colours) =>
       paddingVertical: TV_SIZES.space1,
     },
     focused: { borderColor: colours.text, backgroundColor: colours.quiet },
-    label: { flexShrink: 1, color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    words: { flexShrink: 1 },
+    label: { color: colours.text, fontSize: TV_SIZES.textLg, fontWeight: '600' },
+    note: { color: colours.muted, fontSize: TV_SIZES.textXs },
   }),
 )

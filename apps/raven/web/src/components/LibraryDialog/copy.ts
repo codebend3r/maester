@@ -32,8 +32,6 @@ export const LIBRARY_DIALOG_COPY = {
   saveProgress: 'Save where each video stopped',
   saveProgressHint:
     'Leave a video and come back to pick up where you stopped. Turning this off keeps saved spots for later.',
-  pin: 'Pin to the side menu',
-  pinHint: 'Pinned libraries get their own link in the side menu.',
   autoRefresh: 'Refresh automatically',
   autoRefreshHint:
     'Watch the folders and take in videos as they are added, removed, renamed or replaced, and, for a share mounted from another machine, which never reports the changes made there, check it for new videos every few minutes. A video replaced under its own name waits for a rescan.',

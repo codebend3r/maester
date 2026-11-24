@@ -128,7 +128,6 @@ export const library = (overrides: LibraryProps): Library => ({
   },
   settings: {
     saveProgress: true,
-    pinned: true,
     inHero: true,
     sort: 'title',
     view: 'grid',

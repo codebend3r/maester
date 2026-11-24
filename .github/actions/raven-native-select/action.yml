@@ -4,23 +4,24 @@ description: >-
   each one: whether the commit selected it, whether to build it in this run, and which run and
   commit hold its builds. The caller checks out the commit with its whole history first.
 
-# Shared by the 🔎 Select affected native checks job of pull-request-checks.yml and of
-# native-checks.yml, whose native jobs read this plan and nothing else. A pull request diffs
-# against the base it names; a push to main against its last green run; a push with no green
-# ancestor selects every group. A change to a shared file, a workflow or a script
+# The 🔎 Select affected native checks job of native-checks.yml, whose native jobs read this plan
+# and nothing else; a pull request selects nothing and builds every group. A push to main diffs
+# against its last green run, a base, when one is given, against that base, and a push with no
+# green ancestor selects every group. A change to a shared file, a workflow or a script
 # selects every group too.
 #
 # On a push to main it looks for the pull request the pushed commit merged, that pull request's
 # head commit and its passing checks run, whose artifacts are named for the head commit. A group
 # is found only when every build main's flows read is among them and has not expired; a group not
-# found is built in this run. A lookup that fails finds nothing, so it never fails the run, and a
-# pull request, which is no push, finds nothing and builds everything it selected.
+# found is planned as one to build, which main, building nothing, fails its end to end job on. A
+# lookup that fails finds nothing, so it never fails the run, and a run that is no push finds
+# nothing.
 inputs:
   sha:
     description: The commit this run builds, which its own artifacts are named for.
     required: true
   base:
-    description: A pull request's base commit, which the selection diffs against. Empty, a push to main diffs against its last green run and a manual run selects every group.
+    description: A base commit for the selection to diff against. Empty, a push to main diffs against its last green run and a manual run selects every group.
     required: false
     default: ''
 
@@ -73,10 +74,9 @@ runs:
         bun-version-file: package.json
 
     - name: 📦 Install
-      shell: bash
-      run: bun install --frozen-lockfile
+      uses: ./.github/actions/bun-install
 
-    # The token is for the lookup of main's last green run; a pull request's base skips it.
+    # The token is for the lookup of main's last green run; a base given skips it.
     - name: 🔎 Select the affected groups
       id: select
       shell: bash
@@ -86,7 +86,7 @@ runs:
         NX_DAEMON: 'false'
       run: python3 scripts/select_native_checks.py
 
-    # The script finds something on a push alone: a pull request builds everything it selected.
+    # The script finds something on a push alone.
     - name: 🔎 Find the merged pull request's builds
       id: find
       shell: bash
@@ -98,7 +98,7 @@ runs:
       run: bash scripts/find_pr_builds.sh >> "$GITHUB_OUTPUT"
 
     # A group found is not built again, and its builds are read from the pull request's run
-    # under its head commit; any other selected group is built here and read from this run.
+    # under its head commit; any other selected group is planned as one to build, from this run.
     - name: 🗺️ Plan each group
       id: plan
       shell: bash

@@ -88,6 +88,9 @@ type QueryKeysMatchSearchProps = {
 
 type QueryKeysItemImagesInProps = { id: number; libraryId: number }
 
+/** The prefix of every key the account's own database rows are cached under. */
+const ACCOUNT_DATA_KEY = 'account-data'
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.
@@ -100,6 +103,16 @@ export const queryKeys = {
   account: (userId: string | null) => ['auth', 'account', userId],
   /** Every account on this raven, as the owner who asked for them sees it. */
   members: (userId: string | null) => ['auth', 'members', userId],
+  /** The account's own rows in its Supabase database, which stay as they are when the app changes server. */
+  accountData: [ACCOUNT_DATA_KEY],
+  /** The account's extra servers, beside the home one. */
+  accountServers: (userId: string | null) => [ACCOUNT_DATA_KEY, 'servers', userId],
+  /** The prefix the account's pins share, whoever is signed in. */
+  accountPins: [ACCOUNT_DATA_KEY, 'pins'],
+  /** The libraries the account pinned, on every server. */
+  libraryPins: (userId: string | null) => [ACCOUNT_DATA_KEY, 'pins', userId],
+  /** Another server's libraries, read for the pins the account keeps on it. */
+  serverLibraries: (serverId: string) => [ACCOUNT_DATA_KEY, 'server-libraries', serverId],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({ libraryId, search, sort, seed }: QueryKeysMediaProps) => [

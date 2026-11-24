@@ -47,7 +47,6 @@ type LibraryRow = {
   item_count: number
   unmatched_count: number
   save_progress: number
-  pinned: number
   in_hero: number
   sort: string
   view_mode: string
@@ -96,7 +95,6 @@ const IS_4K = '(m.width >= 3200 OR m.height >= 1800)'
 const toSettings = (row: LibraryRow): LibrarySettings => {
   const stored = {
     saveProgress: row.save_progress === 1,
-    pinned: row.pinned === 1,
     inHero: row.in_hero === 1,
     sort: row.sort,
     view: row.view_mode,
@@ -125,7 +123,6 @@ const toSettings = (row: LibraryRow): LibrarySettings => {
  */
 const settingParams = (settings: LibrarySettings) => ({
   save_progress: Number(settings.saveProgress),
-  pinned: Number(settings.pinned),
   in_hero: Number(settings.inHero),
   sort: settings.sort,
   view_mode: settings.view,

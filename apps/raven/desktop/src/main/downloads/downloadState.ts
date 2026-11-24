@@ -587,29 +587,34 @@ type IsSameListProps<T> = { left: readonly T[]; right: readonly T[] }
 const isSameList = <T>({ left, right }: IsSameListProps<T>): boolean =>
   left.length === right.length && left.every((item, index) => item === right[index])
 
-type KeepOneServerProps = WithState<{
+type AdoptServersProps = WithState<{
   serverId: string
   adopted: readonly string[]
+  dropped: readonly string[]
   moved: ReadonlySet<string>
 }>
 
 /**
- * Files every download under the one server Raven plays from. The downloads in `moved`,
- * an adopted server's whose folders now sit under the server's id, become the server's, and what
- * an adopted server was owed, or its downloads that did not move still owe, is the server's too.
- * A download of any other server is no longer reached: a ready one stays to play, owing that
- * server nothing, and the rest go, as does what that server was owed. Nothing to change, as at
- * every launch after the first, hands back the same state.
+ * Files an older Raven's downloads at the first launch after its upgrade. The downloads in
+ * `moved`, an adopted server's whose folders now sit under the home server's id, become the home
+ * server's, and what an adopted server was owed, or its downloads that did not move still owe, is
+ * the home server's too. A `dropped` server's (one an older Raven kept that no account can name,
+ * its id being Raven's own) is no longer reached: a ready one stays to play, owing nothing, and the
+ * rest go, as does what it was owed. Every other server's downloads are the account's servers' and
+ * stay as they are. Nothing to change, as at every launch after the first, hands back the same state.
  */
-export const keepOneServer = ({
+export const adoptServers = ({
   state,
   serverId,
   adopted,
+  dropped,
   moved,
-}: KeepOneServerProps): DownloadsState => {
+}: AdoptServersProps): DownloadsState => {
+  const isUnreached = (entry: DownloadEntry): boolean =>
+    dropped.includes(entry.serverId) || adopted.includes(entry.serverId)
   const entries = state.entries.flatMap((entry): DownloadEntry[] => {
-    if (entry.serverId === serverId) return [entry]
     if (moved.has(entry.downloadId)) return [{ ...entry, serverId }]
+    if (!isUnreached(entry)) return [entry]
     if (entry.status.kind !== DOWNLOAD_STATUS_KINDS.ready) return []
     return [hasPending(entry) ? { ...entry, pending: NO_PENDING } : entry]
   })
@@ -618,18 +623,16 @@ export const keepOneServer = ({
    * folder that could not move) still owes what was watched of it, now to the server.
    */
   const unmoved = state.entries
-    .filter(
-      (entry) =>
-        entry.serverId !== serverId &&
-        adopted.includes(entry.serverId) &&
-        !moved.has(entry.downloadId),
-    )
+    .filter((entry) => adopted.includes(entry.serverId) && !moved.has(entry.downloadId))
     .map((entry) => ({ ...entry, serverId }))
   const carried = state.owed
-    .filter((item) => item.serverId === serverId || adopted.includes(item.serverId))
+    .filter((item) => !dropped.includes(item.serverId))
     .reduce<Owed[]>(
       (kept, item) =>
-        oweIn({ owed: kept, item: item.serverId === serverId ? item : { ...item, serverId } }),
+        oweIn({
+          owed: kept,
+          item: adopted.includes(item.serverId) ? { ...item, serverId } : item,
+        }),
       [],
     )
   const owed = owe({ state: { ...state, owed: carried }, entries: unmoved })

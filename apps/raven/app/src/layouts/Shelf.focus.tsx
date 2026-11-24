@@ -111,7 +111,7 @@ const Shelves = ({
   onSearch,
   onSettings,
   libraries,
-  onOpenLibrary,
+  onOpenPinned,
   children,
 }: ShelvesProps) => {
   // Home's hold on its screen's focus; the menu's rows and the shelves' cards spend the opening focus themselves.
@@ -129,7 +129,7 @@ const Shelves = ({
     <View style={[styles.screen, { paddingLeft: menuRoom }]}>
       <SideMenu
         libraries={libraries}
-        onOpenLibrary={onOpenLibrary}
+        onOpenPinned={onOpenPinned}
         onSearch={onSearch}
         onSettings={onSettings}
       />

@@ -215,7 +215,6 @@ describe('AudioHost', () => {
       ]),
     )
     await waitFor(() => expect(audioElements()[0]?.playbackRate ?? null).toBe(1))
-    usePlayerPrefs.getState().setAudiobookSpeed(1)
   })
 
   it('starts an audiobook where it was left and saves its spot; music saves none', async () => {

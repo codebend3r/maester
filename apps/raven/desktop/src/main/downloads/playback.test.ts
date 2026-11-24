@@ -1,4 +1,4 @@
-import { type DesktopReply, isOpaqueId, DOWNLOAD_STATUS_KINDS } from '@raven/core'
+import { DESKTOP_REPLIES, type DesktopReply, isOpaqueId, DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { DOWNLOAD_MESSAGES } from '@/main/downloads/downloadMessages'
 import {
@@ -185,6 +185,30 @@ describe('openTitle', () => {
     })
   })
 
+  it("plays another server's download of a title only while that server is in use", async () => {
+    const using = { id: SERVER_ID }
+    const theirs = entryFor({ serverId: OTHER_SERVER_ID })
+    const world = setup({
+      entries: [theirs],
+      videos: { [videoOf(11, OTHER_SERVER_ID)]: FILE },
+      serverIdOf: () => using.id,
+    })
+    // Media 11 on the server in use is another title, which this download is not.
+    expect(await world.playback.openTitle({ mediaId: 11 })).toBeNull()
+    using.id = OTHER_SERVER_ID
+    const fileId = await world.playback.openTitle({ mediaId: 11 })
+    expect(fileId === null ? null : (world.grants.fileOf(fileId)?.path ?? null)).toBe(
+      videoOf(11, OTHER_SERVER_ID),
+    )
+  })
+
+  it("plays every server's downloads from Downloads, with no server at all", async () => {
+    const theirs = entryFor({ serverId: OTHER_SERVER_ID })
+    const world = setup({ entries: [theirs], videos: { [videoOf(11, OTHER_SERVER_ID)]: FILE } })
+    const reply = await world.playback.open({ downloadId: ID })
+    expect(reply.type).toBe(DESKTOP_REPLIES.play)
+  })
+
   it('opens nothing for a title with no download, or one not ready', async () => {
     const world = setup({
       entries: [entryFor({}), episodeOf(2, { status: { kind: DOWNLOAD_STATUS_KINDS.queued } })],
@@ -348,6 +372,34 @@ describe('notePosition', () => {
       at: NOW,
       accountId: ACCOUNT_A,
     })
+  })
+
+  it("tags a play of another server's download, made while home is in use, with the account signed in", async () => {
+    const world = setup({
+      entries: [entryFor({ serverId: OTHER_SERVER_ID })],
+      videos: { [videoOf(11, OTHER_SERVER_ID)]: FILE },
+      accountId: ACCOUNT_A,
+    })
+    const fileId = await opened(world)
+    world.playback.notePosition({ fileId, position: 100, duration: 3000 })
+    expect(entryOf(world)?.pending ?? null).toEqual({
+      play: true,
+      position: 100,
+      furthest: 100,
+      at: NOW,
+      accountId: ACCOUNT_A,
+    })
+    // Another account signing in finds it owed to its own account, still filed under its server.
+    world.signedIn.accountId = ACCOUNT_B
+    world.playback.notePosition({ fileId, position: 200, duration: 3000 })
+    expect(entryOf(world)?.pending ?? null).toEqual(NO_PENDING)
+    expect(world.store.read().owed).toEqual([
+      {
+        serverId: OTHER_SERVER_ID,
+        mediaId: 11,
+        pending: { play: true, position: 200, furthest: 200, at: NOW, accountId: ACCOUNT_A },
+      },
+    ])
   })
 
   it('queues nothing for the server from a play while signed out of it, though the play still counts here', async () => {

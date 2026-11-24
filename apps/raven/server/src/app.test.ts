@@ -349,10 +349,9 @@ describe('the media server', () => {
         })
       const positionOf = async (id: number): Promise<number> => (await api().getMedia(id)).position
 
-      it("starts a library with progress saved, pinned, watched at 95%, of no particular type and wearing its type's icon", async () => {
+      it("starts a library with progress saved, watched at 95%, of no particular type and wearing its type's icon", async () => {
         expect((await api().getLibrary(library.id)).settings).toEqual({
           saveProgress: true,
-          pinned: true,
           inHero: true,
           sort: 'year-new',
           view: 'grid',
@@ -430,11 +429,10 @@ describe('the media server', () => {
       })
 
       it('changes one setting, keeps the rest, and does not rescan', async () => {
-        const updated = await putLibrary({ pinned: false })
+        const updated = await putLibrary({ inHero: false })
         expect(updated.settings).toEqual({
           saveProgress: true,
-          pinned: false,
-          inHero: true,
+          inHero: false,
           sort: 'title',
           view: 'grid',
           groupBy: 'resolution',
@@ -447,7 +445,7 @@ describe('the media server', () => {
           icon: null,
         })
         expect(updated.scan.state).toBe('idle')
-        expect((await putLibrary({ pinned: true })).settings.pinned).toBe(true)
+        expect((await putLibrary({ inHero: true })).settings.inHero).toBe(true)
       })
 
       it('with progress saving off, hides saved spots, saves nothing, and keeps them for later', async () => {
@@ -569,7 +567,7 @@ describe('the media server', () => {
       const shelfOf = async (libraryId: number) =>
         (await api().getHome()).shelves.find((shelf) => shelf.libraryId === libraryId)
 
-      it("shows what is in progress, then a pinned library's newest releases", async () => {
+      it("shows what is in progress, then each library's newest releases", async () => {
         const [movie] = await listMedia(library.id)
         const id = movie?.id ?? -1
         await api().saveProgress({ id, position: 3, audio: null })
@@ -591,44 +589,20 @@ describe('the media server', () => {
         expect((await api().getHome()).inProgress).toEqual([])
       })
 
-      it('searches every library, pinned or not, by title, leaving out those with no match', async () => {
-        const input = { name: 'Everything', paths: paths() }
-        await api().updateLibrary({
-          id: library.id,
-          input: { ...input, settings: { pinned: false } },
-        })
-        try {
-          expect(await api().searchHome('buck')).toEqual([
-            {
-              libraryId: library.id,
-              type: 'media',
-              media: await api().listMedia({ libraryId: library.id, search: 'buck' }),
-            },
-          ])
-          expect(await api().searchHome('nothing by this name')).toEqual([])
-          expect(await api().searchHome('  ')).toEqual([])
-        } finally {
-          await api().updateLibrary({
-            id: library.id,
-            input: { ...input, settings: { pinned: true } },
-          })
-        }
+      it('searches every library by title, leaving out those with no match', async () => {
+        expect(await api().searchHome('buck')).toEqual([
+          {
+            libraryId: library.id,
+            type: 'media',
+            media: await api().listMedia({ libraryId: library.id, search: 'buck' }),
+          },
+        ])
+        expect(await api().searchHome('nothing by this name')).toEqual([])
+        expect(await api().searchHome('  ')).toEqual([])
       })
 
-      it('leaves out a library that is not pinned', async () => {
-        const input = { name: 'Everything', paths: paths() }
-        await api().updateLibrary({
-          id: library.id,
-          input: { ...input, settings: { pinned: false } },
-        })
-        try {
-          expect(await shelfOf(library.id)).toBeUndefined()
-        } finally {
-          await api().updateLibrary({
-            id: library.id,
-            input: { ...input, settings: { pinned: true } },
-          })
-        }
+      it("gives every library the caller sees a shelf, since pins are each account's own", async () => {
+        expect(await shelfOf(library.id)).toBeDefined()
       })
     })
 

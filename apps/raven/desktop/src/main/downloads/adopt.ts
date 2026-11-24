@@ -1,7 +1,7 @@
 import {
   type DownloadEntry,
   type DownloadsState,
-  keepOneServer,
+  adoptServers,
 } from '@/main/downloads/downloadState'
 import { entryDirFor, serverDirFor } from '@/main/downloads/space'
 import { errorText } from '@/main/log/errorText'
@@ -42,13 +42,15 @@ type SettleDownloadsProps = {
   state: DownloadsState
   serverId: string
   adopted: readonly string[]
+  /** The servers an older Raven kept that were not the home one, which no account can name. */
+  dropped: readonly string[]
   userData: string
   fs: AdoptFs
   warn: (message: string) => void
 }
 
 /**
- * At launch, before the downloads start: every download filed under the one server. An adopted
+ * At launch, before the downloads start: an older Raven's downloads filed (`adoptServers`). An adopted
  * server's folders move under the server's id first, one at a time; a folder that is already
  * there (a launch that ended before it saved) or was never made counts as moved, and one that
  * cannot move stays where it is, playable, what it owed owed by the server. Never rejects.
@@ -57,6 +59,7 @@ export const settleDownloads = async ({
   state,
   serverId,
   adopted,
+  dropped,
   userData,
   fs,
   warn,
@@ -83,5 +86,5 @@ export const settleDownloads = async ({
     const done = await soFar
     return (await moveOne(entry)) ? new Set([...done, entry.downloadId]) : done
   }, Promise.resolve(new Set()))
-  return keepOneServer({ state, serverId, adopted, moved })
+  return adoptServers({ state, serverId, adopted, dropped, moved })
 }

@@ -27,7 +27,7 @@ const setup = ({ download = null, ticket = TICKET }: SetupProps = {}) => {
   const opened: { mediaId: number }[] = []
   const minted: { mediaId: number; isFresh: boolean }[] = []
   const titles = createServerTitles({
-    serverId: SERVER.id,
+    server: { current: () => SERVER },
     downloads: {
       openTitle: async (input) => {
         opened.push(input)

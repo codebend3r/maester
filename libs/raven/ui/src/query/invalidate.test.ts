@@ -55,6 +55,8 @@ const HELD = {
   media: queryKeys.mediaItem(7),
   lock: queryKeys.lock,
   browse: queryKeys.browse(null),
+  pins: queryKeys.libraryPins('account-1'),
+  servers: queryKeys.accountServers('account-1'),
 } as const
 
 const STILL = { type: SAGA_BACKDROP_TYPES.still, itemId: 40 } as const
@@ -132,7 +134,7 @@ const CHANGES: ReadonlyArray<{
     change: (queryClient) => afterWatching({ queryClient, libraryId: 2 }),
     stale: [...THE_LIBRARY, ...ITEMS, HELD.favourites, HELD.home],
   },
-  { name: 'afterPins', change: afterPins, stale: [...EVERY_LIBRARY, HELD.home] },
+  { name: 'afterPins', change: afterPins, stale: [HELD.pins] },
   { name: 'afterRescan', change: afterRescan, stale: EVERY_LIBRARY },
   {
     name: 'afterRematch',

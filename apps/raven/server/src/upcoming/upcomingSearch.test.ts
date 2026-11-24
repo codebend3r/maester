@@ -1,7 +1,6 @@
 import { ITEM_TYPES, type MatchItemType, UPCOMING_SEARCH_SIZE, requestKeyOf } from '@raven/core'
 import { describe, expect, it } from 'vitest'
 import type { DiscoveredTitle } from '@/metadata/tmdbShapes'
-import { manualClock } from '@/test/clock'
 import { UpcomingSearch } from '@/upcoming/upcomingSearch'
 
 type TitleProps = {
@@ -33,8 +32,6 @@ type SetUpProps = {
 
 const setUp = ({ answers, held = [] }: SetUpProps) => {
   const asked: string[] = []
-  const { clock, advance } = manualClock()
-  advance(Date.parse('2026-11-15T15:00:00Z'))
   const search = new UpcomingSearch(
     {
       searchDated: async ({ type, query }) => {
@@ -42,14 +39,13 @@ const setUp = ({ answers, held = [] }: SetUpProps) => {
         return answers[type]
       },
     },
-    clock,
     { heldOf: (asks) => new Set(asks.map(requestKeyOf).filter((key) => held.includes(key))) },
   )
   return { search, asked }
 }
 
 describe('UpcomingSearch', () => {
-  it('keeps movies and shows out today or later with a poster, the most popular first', async () => {
+  it('keeps movies and shows with a poster, out already or still to come, the most popular first', async () => {
     const { search, asked } = setUp({
       answers: {
         [ITEM_TYPES.movie]: [
@@ -61,8 +57,12 @@ describe('UpcomingSearch', () => {
       },
     })
     const { titles } = await search.search('gladiator')
-    expect(titles.map(({ type, tmdbId }) => `${type}:${tmdbId}`)).toEqual(['show:4', 'movie:2'])
-    expect(titles[0]).toEqual({
+    expect(titles.map(({ type, tmdbId }) => `${type}:${tmdbId}`)).toEqual([
+      'movie:1',
+      'show:4',
+      'movie:2',
+    ])
+    expect(titles[1]).toEqual({
       type: ITEM_TYPES.show,
       tmdbId: '4',
       title: 'Title 4',

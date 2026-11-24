@@ -1,0 +1,45 @@
+name: 📦 Install
+description: >-
+  Restores every workspace's node_modules for this runner's OS from the cache keyed by the
+  lockfile, and runs `bun install` only when no entry matches, saving what it installed for the
+  next job. On Windows it restores Bun's downloads instead and always installs. The caller sets
+  up Bun first.
+
+# node_modules holds each OS's own binaries (oxlint, esbuild, rollup, better-sqlite3, Nx), so the
+# key names the OS and the architecture, and a Linux install never lands on macOS or Windows.
+# pull-request-checks.yml installs once per OS in a job of its own, and every other job there
+# restores that one. A workflow with no install job installs in its first job to miss, and the
+# rest restore it. A cache hit skips lefthook's postinstall, which CI never needs.
+#
+# Windows is the exception: Bun links each package's dependencies with junctions, which the
+# cache's tar restores as links Node cannot follow (`EPERM: operation not permitted, stat` on
+# the first `require`). So a Windows job keeps Bun's downloaded packages, which hold no links,
+# and installs from them every time.
+runs:
+  using: composite
+  steps:
+    - name: 📦 Restore node_modules
+      id: restore
+      if: runner.os != 'Windows'
+      uses: actions/cache@v6
+      with:
+        key: bun-node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'patches/**') }}
+        path: |
+          node_modules
+          apps/*/*/node_modules
+          libs/*/*/node_modules
+          tooling/*/node_modules
+          scripts/node_modules
+
+    - name: 📦 Restore Bun's downloads
+      if: runner.os == 'Windows'
+      uses: actions/cache@v6
+      with:
+        key: bun-downloads-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock', 'patches/**') }}
+        path: ~/.bun/install/cache
+
+    # Fails instead of rewriting bun.lock when package.json and the lockfile disagree.
+    - name: 📦 Install
+      if: runner.os == 'Windows' || steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: bun install --frozen-lockfile

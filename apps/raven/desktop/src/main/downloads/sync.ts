@@ -11,6 +11,7 @@ import {
 } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import type { Timers } from '@/main/timers'
@@ -23,8 +24,11 @@ export const SYNC_RETRY_MS = 300_000
 
 export type SyncDeps = {
   store: DownloadsStore
-  /** The id the server's downloads are filed under: what any other server is owed is never sent. */
-  serverId: string
+  /**
+   * The server in use: what another server is owed waits until that one is in use, and what a
+   * server an older Raven kept is owed is never sent.
+   */
+  server: Pick<ServerInUse, 'isInUse'>
   calls: Pick<ServerCalls, 'call'>
   timers: Timers
   warn: (message: string) => void
@@ -139,7 +143,7 @@ type Sendable = { serverId: string; pending: Pending }
 
 export const createSync = ({
   store,
-  serverId,
+  server,
   calls,
   timers,
   warn,
@@ -169,7 +173,7 @@ export const createSync = ({
    * Raven kept is owed never goes.
    */
   const isSendable = ({ serverId: owedTo, pending }: Sendable): boolean =>
-    owedTo === serverId && (pending.accountId === null || pending.accountId === accountIdOf())
+    server.isInUse(owedTo) && (pending.accountId === null || pending.accountId === accountIdOf())
 
   type DeliverProps = { due: Due; call: AllowedCall }
 

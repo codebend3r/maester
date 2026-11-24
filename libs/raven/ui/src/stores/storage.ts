@@ -2,6 +2,7 @@ import type { StateStorage } from 'zustand/middleware'
 
 /** The localStorage keys the shared stores keep their state under. */
 export const STORE_KEYS = {
+  activeServer: 'raven-active-server',
   toasts: 'raven-toasts',
 } as const
 

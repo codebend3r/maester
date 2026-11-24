@@ -1,7 +1,7 @@
 import { afterEach } from 'bun:test'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
-import { configureStorage, usePlayerPrefs } from '@raven/ui/headless'
+import { configureStorage, useActiveServer, usePlayerPrefs } from '@raven/ui/headless'
 import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useToasts } from '@raven/ui'
 import { queryClient } from '@/lib/queryClient'
@@ -32,6 +32,7 @@ await configureStorage({ storage: window.localStorage })
 const initialAuthSession = useAuthSession.getInitialState()
 const initialBrowserDownloads = useBrowserDownloads.getInitialState()
 const initialPrefs = usePlayerPrefs.getInitialState()
+const initialActiveServer = useActiveServer.getInitialState()
 const initialPageBackdrop = usePageBackdrop.getInitialState()
 const initialSideMenu = useSideMenu.getInitialState()
 const initialTheme = useTheme.getInitialState()
@@ -60,6 +61,7 @@ afterEach(() => {
   useAuthSession.setState(initialAuthSession, true)
   useBrowserDownloads.setState(initialBrowserDownloads, true)
   usePlayerPrefs.setState(initialPrefs, true)
+  useActiveServer.setState(initialActiveServer, true)
   usePageBackdrop.setState(initialPageBackdrop, true)
   useSideMenu.setState(initialSideMenu, true)
   useTheme.setState(initialTheme, true)

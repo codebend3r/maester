@@ -112,11 +112,20 @@ export const afterHeroPicked = (queryClient: QueryClient): Promise<unknown> =>
     filters: [{ queryKey: queryKeys.heroPicks }, { queryKey: queryKeys.hero }],
   })
 
-/** Libraries were pinned or unpinned: every library, and home, whose shelves follow the pins. */
+/** Libraries were pinned or unpinned: the account's pins, which the side menu and home's shelves follow. */
 export const afterPins = (queryClient: QueryClient): Promise<unknown> =>
+  refetch({ queryClient, filters: [{ queryKey: queryKeys.accountPins }] })
+
+type AfterServersChangedProps = { queryClient: QueryClient; userId: string | null }
+
+/** The account's list of servers changed: the list, and its pins, which a removed server takes with it. */
+export const afterServersChanged = ({
+  queryClient,
+  userId,
+}: AfterServersChangedProps): Promise<unknown> =>
   refetch({
     queryClient,
-    filters: [{ queryKey: queryKeys.libraries }, { queryKey: queryKeys.home }],
+    filters: [{ queryKey: queryKeys.accountServers(userId) }, { queryKey: queryKeys.accountPins }],
   })
 
 /** The libraries were put in a new order: every library, and home, whose shelves follow it. */

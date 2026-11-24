@@ -130,7 +130,7 @@ describe('a music library', () => {
     const library = await api().createLibrary({
       name: 'Music',
       paths: [at()],
-      settings: { kind: LIBRARY_KINDS.music, pinned: true },
+      settings: { kind: LIBRARY_KINDS.music },
     })
     state.library = library.id
     await app().get(ScannerService).whenIdle(library.id)
@@ -212,7 +212,7 @@ describe('a music library', () => {
     expect(artist.albums.find(({ id }) => id === first?.id)?.modifiedAt).toBe(first?.modifiedAt)
   })
 
-  it("gives Home one shelf of the pinned music library's albums, newest releases first", async () => {
+  it("gives Home one shelf of the music library's albums, newest releases first", async () => {
     const [shelf, ...rest] = await api().getHomeAlbums()
     const released = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.release })
     expect(rest).toEqual([])

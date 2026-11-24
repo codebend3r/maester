@@ -308,6 +308,18 @@
   overflow-wrap: anywhere;
 }
 
+// A pinned library's name over its server's.
+.stacked {
+  display: grid;
+}
+
+.detail {
+  color: var(--color-lichen);
+  font-size: var(--font-size-2xs);
+  font-weight: 400;
+  line-height: var(--line-tight);
+}
+
 /*
  * Down to its icons, by the toggle or on a medium screen: each row keeps its
  * name for screen readers and as a tooltip, and the mark stands alone.

@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AUTH_CONFIG_STATES, ApiError, MEMBER_STATUSES, AUTH_ROUTES } from '@raven/core'
 import { AppRoutes } from '@/AppRoutes'
-import { api } from '@/lib/api'
+import { api, homeApi } from '@/lib/api'
 import { type AuthClient } from '@/lib/authClient'
 import { AUTH_ERRORS, PASSWORD_COPY } from '@/lib/authErrors'
 import { checkEmailPath } from '@/lib/authRoutes'
@@ -62,7 +62,7 @@ const fillIn = async ({ user, confirm = 'correct-horse' }: FillInProps) => {
 
 describe('SignUpPage', () => {
   const getMe = spyOn(api, 'getMe')
-  const getAuthConfig = spyOn(api, 'getAuthConfig')
+  const getAuthConfig = spyOn(homeApi, 'getAuthConfig')
 
   afterEach(() => {
     getMe.mockReset()

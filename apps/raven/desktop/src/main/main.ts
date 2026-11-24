@@ -58,7 +58,7 @@ import { createHelpActions } from '@/main/help'
 import { errorText } from '@/main/log/errorText'
 import { logsDirFor } from '@/main/log/opens'
 import { menuTemplate } from '@/main/menu'
-import { fetchReleases } from '@/main/netFetches'
+import { fetchAccountReads, fetchReleases } from '@/main/netFetches'
 import { removeTree } from '@/main/nodeFs'
 import { createOpenBatch, eventForOpen, linksFromArgv } from '@/main/openBatch'
 import { ENGINE_STATUSES } from '@/main/player/engine'
@@ -78,6 +78,8 @@ import { createQuitMark } from '@/main/quitMark'
 import { createLinkOpener } from '@/main/servers/linkOpener'
 import { clearFormerPartitions, PARTITIONS_DIR } from '@/main/servers/formerSessions'
 import { createPageUnlock } from '@/main/servers/pageUnlock'
+import { createActiveServer } from '@/main/servers/activeServer'
+import { createServerDirectory } from '@/main/servers/serverDirectory'
 import { createServerPlumbing } from '@/main/servers/serverPlumbing'
 import { createServerTitles } from '@/main/servers/serverTitles'
 import {
@@ -371,7 +373,7 @@ const startApp = (): void => {
         warn,
       }),
     ])
-    const { store, config, downloadsStore, server } = stores
+    const { store, config, downloadsStore, server: home } = stores
     formerSessions.removing.catch((error: unknown) => {
       warn(`Raven could not clear its old server sessions: ${errorText(error)}`)
     })
@@ -392,8 +394,32 @@ const startApp = (): void => {
       },
       onEnded: () => accessEnds.notify(),
     })
+    /*
+     * Each launch starts at home; the page names the server it uses as it loads, and main takes
+     * only one of the account's own (`serverDirectory.ts`).
+     */
+    const directory = createServerDirectory({
+      home,
+      fetch: fetchAccountReads,
+      accessToken: () => account.accessToken(),
+      warn,
+    })
+    accountSwitches.listen(() => directory.forget())
+    const active = createActiveServer({
+      home,
+      directory,
+      isSignedIn: () => account.accountId() !== null,
+      accountSwitches,
+      accessEnds,
+      timers,
+    })
+    active.switches.listen(() => {
+      log.info(
+        active.isInUse(home.id) ? 'using the home server' : 'using another of the account servers',
+      )
+    })
     const plumbing = createServerPlumbing({
-      server,
+      server: active,
       account,
       // The page enters the library PIN, so main's own calls carry the unlock cookie it holds.
       unlockOf: createPageUnlock({ cookies: () => session.defaultSession.cookies, warn }),
@@ -405,6 +431,7 @@ const startApp = (): void => {
     const downloads = openAppDownloads({
       stores,
       plumbing,
+      active,
       grants,
       accountIdOf: () => account.accountId(),
       accessEnds,
@@ -509,14 +536,21 @@ const startApp = (): void => {
         resizer.move({ window, to })
       },
       links: createLinkOpener({
-        isServerOrigin: (origin) => namesServer({ server: fixedServer, origin }),
+        // A link names the home server's titles, so it opens only while that one is in use.
+        isServerOrigin: (origin) =>
+          active.isInUse(home.id) && namesServer({ server: fixedServer, origin }),
         downloads,
         warn,
       }),
       updates,
       downloads,
       account,
-      titles: createServerTitles({ serverId: server.id, downloads, tickets: plumbing.tickets }),
+      titles: createServerTitles({ server: active, downloads, tickets: plumbing.tickets }),
+      servers: {
+        use: active.use,
+        check: directory.check,
+        librariesOf: directory.librariesOf,
+      },
     })
 
     // mpv stops before the stores flush and before Electron tears the window down.
@@ -578,7 +612,12 @@ const startApp = (): void => {
      */
     powerMonitor.on('suspend', () => downloads.onSuspend())
     powerMonitor.on('resume', () => downloads.onResume())
-    await startWebHost({ serverOrigin: fixedServer.origin, timers, appLog })
+    await startWebHost({
+      serverOrigin: () => active.current().origin,
+      homeOrigin: home.origin,
+      timers,
+      appLog,
+    })
     serveFiles({ grants })
     servePictures({ pictures: { fileOf: downloads.pictureOf } })
     secureContents({ warn })

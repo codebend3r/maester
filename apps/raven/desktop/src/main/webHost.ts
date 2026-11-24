@@ -11,6 +11,7 @@ import { request as requestHttps } from 'node:https'
 import { basename, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
 import {
+  AUTH_PATHS,
   extensionOf,
   FILE_SCHEME,
   PICTURE_SCHEME,
@@ -35,6 +36,12 @@ export const WEB_HOST_READY = 'web host ready'
 export const ALLOWED_METHODS = [HTTP_METHODS.get, HTTP_METHODS.head].join(', ')
 
 const API_PATH = '/api'
+
+/**
+ * What `/api` asks of the home server whichever server is in use: the account config the page's
+ * sign-in and the account's server list are read from.
+ */
+const HOME_PATHS: ReadonlySet<string> = new Set([AUTH_PATHS.config])
 const ASSETS_PATH = '/assets/'
 const INDEX = 'index.html'
 
@@ -222,7 +229,10 @@ const passed = (headers: IncomingHttpHeaders): OutgoingHttpHeaders => {
 
 type CreateWebHostHandlerProps = {
   root: string
-  serverOrigin: string
+  /** The server in use, read for each request, so `/api` follows the page's switch. */
+  serverOrigin: () => string
+  /** The server the build plays from, which answers `HOME_PATHS` whichever is in use. */
+  homeOrigin: string
   /** The test hook's Supabase Auth origin, which the policy lets the page call; null for none. */
   authOrigin: string | null
   readFile: (path: string) => Promise<Uint8Array>
@@ -239,6 +249,7 @@ type CreateWebHostHandlerProps = {
 export const createWebHostHandler = ({
   root,
   serverOrigin,
+  homeOrigin,
   authOrigin,
   readFile,
   timers,
@@ -247,7 +258,6 @@ export const createWebHostHandler = ({
 }: CreateWebHostHandlerProps): Handler => {
   const base = resolve(root)
   const indexPath = join(base, INDEX)
-  const destination = new URL(serverOrigin)
   // Told once each time it changes, since the page asks again and again while it is down.
   const reach = { isReachable: true }
 
@@ -347,6 +357,7 @@ export const createWebHostHandler = ({
   }
 
   const forward = ({ request, response, url }: ForwardProps): void => {
+    const destination = new URL(HOME_PATHS.has(url.pathname) ? homeOrigin : serverOrigin())
     const send = destination.protocol === URL_PROTOCOLS.https ? requestHttps : requestHttp
     const outgoing = send({
       protocol: destination.protocol,

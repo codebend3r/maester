@@ -14,7 +14,7 @@ bun run ci:app:android
 
 It is `scripts/ci_app_android.sh`. Run it yourself in the background (it takes up to 30 minutes cold) and report its steps as they print. Before starting, tell the user what will appear on screen (below).
 
-CI has no Android phone end to end job yet: `🏗️ Build Android phone` builds the APK on a pull request and nothing runs flows on it. This job is local only.
+CI has no Android phone end to end job yet: `🏗️ Build Raven Android phone` builds the APK on a pull request and nothing runs flows on it. This job is local only.
 
 ## Always the emulator
 

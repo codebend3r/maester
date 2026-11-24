@@ -14,6 +14,7 @@ import type { ServerTarget } from '@/main/player/loadTarget'
 import { PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import { TICKET_OUTCOMES, type TicketOutcome } from '@/main/servers/accountTickets'
+import { serverInUse } from '@/main/servers/activeServer'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { type MediaRelay, RELAYED_MEDIA_KINDS } from '@/main/servers/mediaRelay'
 import type { ServerCallResult } from '@/main/servers/serverCalls'
@@ -143,7 +144,7 @@ const setup = ({
   const order: string[] = []
   const relayed = fakeRelay({ refusal, isOpenFailing })
   const sources = createServerSources({
-    server: SERVER,
+    server: serverInUse(() => SERVER),
     calls,
     tickets: {
       ticketFor: async (input) => {
@@ -305,7 +306,7 @@ describe('resolve', () => {
     const warnings: string[] = []
     const { relay } = fakeRelay({})
     const sources = createServerSources({
-      server: SERVER,
+      server: serverInUse(() => SERVER),
       calls: { call: () => Promise.reject(new Error('gone')) },
       tickets: { ticketFor: async () => ({ kind: TICKET_OUTCOMES.ticket, ticket: 't' }) },
       relay,

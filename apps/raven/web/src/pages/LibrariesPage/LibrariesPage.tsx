@@ -30,7 +30,6 @@ import {
 import { api } from '@/lib/api'
 import {
   afterHeroLibraries,
-  afterPins,
   librarySettingsEdits,
   mutationKeys,
   useOptimisticMutation,
@@ -48,6 +47,7 @@ import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
 import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
 import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
+import { PinButton, usePinning } from '@/pages/LibrariesPage/PinButton'
 import styles from '@/pages/LibrariesPage/LibrariesPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
 import { COMMON_COPY } from '@/lib/copy'
@@ -59,42 +59,6 @@ const summaryOf = (libraries: readonly Library[]): string =>
     LIBRARIES_COPY.libraries(libraries.length),
     COMMON_COPY.videos(libraries.reduce((sum, library) => sum + library.itemCount, 0)),
   ].join(COMMON_COPY.separator)
-
-type PinButtonProps = { library: Library }
-
-/**
- * Pin as a toggle: outlined while off, filled while on, when it reads
- * Pinned. A toggle keeps one name whatever its state, which `aria-pressed`
- * carries, so the word on screen is for the eye and the name stays
- * "Pin" and the library's.
- */
-const PinButton = ({ library }: PinButtonProps) => {
-  const queryClient = useQueryClient()
-  /*
-   * Only the pin is sent; the server keeps the rest of the library as it is.
-   * It shows at once, here and in the side menu; home's shelves follow it.
-   */
-  const pin = useOptimisticMutation({
-    mutationKey: mutationKeys.pin,
-    mutationFn: (pinned: boolean) => api.setLibraryView({ id: library.id, change: { pinned } }),
-    edits: (pinned) => librarySettingsEdits({ libraryId: library.id, change: { pinned } }),
-    settle: () => afterPins(queryClient),
-  })
-  const { pinned } = library.settings
-
-  return (
-    <Button
-      icon="pin"
-      className={styles.pin}
-      aria-pressed={pinned}
-      title={pinned ? LIBRARIES_COPY.pinnedTitle : LIBRARIES_COPY.pinTitle}
-      onClick={() => pin.mutate(!pinned)}
-    >
-      <span aria-hidden="true">{pinned ? LIBRARIES_COPY.pinned : LIBRARIES_COPY.pin}</span>
-      <span className="visually-hidden">{LIBRARIES_COPY.pinName(library.name)}</span>
-    </Button>
-  )
-}
 
 type HeroCheckboxProps = { library: Library }
 
@@ -160,6 +124,7 @@ type LibraryRowProps = {
 const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   const detailsId = useId()
   const actions = useLibraryActions(library)
+  const pinning = usePinning()
   const picture = isShut ? null : library.backdrop
   const lockNote = isShut ? LIBRARIES_COPY.locked : LIBRARIES_COPY.unlocked
   // The server sends no folders to a browser with the admin lock on; this holds a list cached from before to the same.
@@ -230,7 +195,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
                 library={library}
                 isShut={isShut}
                 actions={actions}
-                lead={<PinButton library={library} />}
+                lead={pinning !== null && <PinButton library={library} pinning={pinning} />}
               />
             </div>
           </div>

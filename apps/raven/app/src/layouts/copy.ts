@@ -23,6 +23,15 @@ export const FAVOURITES_ENTRY = { label: 'Favourites' } as const
 /** The side menus' way to every library on the server, pinned or not, and that screen's title. */
 export const LIBRARIES_ENTRY = { label: 'Libraries' } as const
 
+/** The menus' server switcher, in the web's words: shown while the account keeps several servers. */
+export const SERVER_SWITCHER_COPY = {
+  servers: 'Servers',
+  server: 'Server',
+  /** A server's row aloud, the one in use saying so. */
+  row: (name: string) => `Use ${name}`,
+  inUse: (name: string) => `${name}, in use`,
+} as const
+
 /** What the checkbox under a secret field says. */
 export const FIELD_COPY = { showPassword: 'Show password' } as const
 

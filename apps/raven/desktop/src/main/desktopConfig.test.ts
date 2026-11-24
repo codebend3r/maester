@@ -171,6 +171,7 @@ describe('the default server and an older install', () => {
         lastAccountId: 'ada',
       },
       adopted: [],
+      dropped: [],
       isChanged: true,
     })
   })
@@ -192,6 +193,7 @@ describe('the default server and an older install', () => {
         updates: UPDATES,
       },
       adopted: [idFor({ n: 3 })],
+      dropped: [idFor({ n: 1 })],
       isChanged: true,
     })
   })
@@ -225,6 +227,7 @@ describe('the default server and an older install', () => {
     expect(upgradeConfig({ stored, server: other, newId })).toEqual({
       config: { ...configFor({ id: NEW_ID, origin: ORIGIN }), updates: UPDATES },
       adopted: [],
+      dropped: [idFor({ n: 1 }), idFor({ n: 2 })],
       isChanged: true,
     })
   })
@@ -249,6 +252,7 @@ describe('upgradeConfig', () => {
         lastAccountId: null,
       },
       adopted: [],
+      dropped: [],
       isChanged: true,
     })
   })
@@ -268,6 +272,7 @@ describe('upgradeConfig', () => {
         lastAccountId: null,
       },
       adopted: [idFor({ n: 3 })],
+      dropped: [idFor({ n: 1 })],
       isChanged: true,
     })
   })
@@ -277,6 +282,7 @@ describe('upgradeConfig', () => {
     expect(upgradeConfig({ stored, server: SERVER, newId })).toEqual({
       config: { ...configFor({ id: NEW_ID, origin: ORIGIN }), updates: UPDATES },
       adopted: [],
+      dropped: [idFor({ n: 1 })],
       isChanged: true,
     })
   })
@@ -303,6 +309,7 @@ describe('upgradeConfig', () => {
     expect(upgradeConfig({ stored, server: SERVER, newId })).toEqual({
       config: configFor({ id: idFor({ n: 1 }), origin: ORIGIN }),
       adopted: [],
+      dropped: [],
       isChanged: true,
     })
   })
@@ -328,6 +335,7 @@ describe('upgradeConfig', () => {
     expect(upgradeConfig({ stored, server: SERVER, newId })).toEqual({
       config: { ...configFor({ id: idFor({ n: 1 }), origin: ORIGIN }), lastAccountId: 'ada' },
       adopted: [],
+      dropped: [],
       isChanged: true,
     })
   })
@@ -384,13 +392,19 @@ describe('loadConfig', () => {
     expect(await load({ fs })).toEqual({
       config: { ...configFor({ id: idFor({ n: 1 }), origin: ORIGIN }), updates: UPDATES },
       adopted: [idFor({ n: 2 })],
+      dropped: [],
       isChanged: true,
     })
   })
 
   it('reads a version 5 file as it is', async () => {
     const { fs } = fakeFs({ initial: { [FILE]: JSON.stringify(CONFIG) } })
-    expect(await load({ fs })).toEqual({ config: CONFIG, adopted: [], isChanged: false })
+    expect(await load({ fs })).toEqual({
+      config: CONFIG,
+      adopted: [],
+      dropped: [],
+      isChanged: false,
+    })
   })
 
   it('starts with the server under a new id when there is no file', async () => {
@@ -398,6 +412,7 @@ describe('loadConfig', () => {
     expect(await load({ fs })).toEqual({
       config: configFor({ id: NEW_ID, origin: ORIGIN }),
       adopted: [],
+      dropped: [],
       isChanged: true,
     })
   })

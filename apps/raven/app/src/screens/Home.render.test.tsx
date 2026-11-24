@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUTH_HEADERS, SERVER_COOKIES, THEMES, isRecord, isString, themeOf } from '@raven/core'
+import {
+  AUTH_HEADERS,
+  type FetchLike,
+  SERVER_COOKIES,
+  THEMES,
+  isRecord,
+  isString,
+  themeOf,
+} from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import { bumpCookieVersion } from '@raven/native/headless'
@@ -19,7 +27,14 @@ import { useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_APP_PREFS, useAppPrefs } from '@/stores/appPrefs'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { SIZES } from '@/theme/appTheme'
-import { NAS, OTHER, homeApi } from '@/test/homeServer'
+import { useAccountSession } from '@/account/session'
+import {
+  type AccountData,
+  accountDataOf,
+  accountFetchOf,
+  signInTestAccount,
+} from '@/test/accountData'
+import { FILMS, NAS, OTHER, SERIES, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
 
@@ -42,6 +57,9 @@ const mockWindowWidth = jest.fn(() => PHONE_WIDTH)
 
 const mockNavKind = jest.fn<() => NavKind>(() => NAV_KINDS.tabs)
 
+let mockAccount: AccountData = accountDataOf()
+const mockAccountFetch: FetchLike = (url, init) => accountFetchOf(mockAccount)(url, init)
+
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }))
 jest.mock('@/platform/devicePlatform', () => ({
   ...jest.requireActual<typeof DevicePlatform>('@/platform/devicePlatform'),
@@ -53,6 +71,7 @@ jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
 }))
 jest.mock('@raven/native', () => ({
   ...jest.requireActual<typeof Native>('@raven/native'),
+  openFetch: ((url, init) => mockAccountFetch(url, init)) satisfies FetchLike,
   apiFor: ({ server }: ApiForProps) => mockApi(server),
   openEventsFor: () => () => ({ addEventListener: () => {}, close: () => {} }),
   cookieJar: { read: async () => mockCookies(), forget: async () => {} },
@@ -75,13 +94,28 @@ describe('Home on a phone or tablet', () => {
     mockWindowWidth.mockReturnValue(PHONE_WIDTH)
     mockNavKind.mockReturnValue(NAV_KINDS.tabs)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
+    mockAccount = accountDataOf()
+    useAccountSession.setState({ session: null })
   })
 
-  it('shows Continue watching, then a shelf for each pinned library, under its name', async () => {
+  it('shows Continue watching, then a shelf for each library while the account pinned none here', async () => {
     await renderHome()
     expect(await screen.findByRole('header', { name: 'Continue watching' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Films' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Series' })).toBeTruthy()
+  })
+
+  it("follows the account's pins on the server in use, leaving out the others' shelves", async () => {
+    mockAccount.pins = [
+      { serverId: NAS.id, libraryId: SERIES.id, pinnedAt: '1' },
+      // A pin on another server chooses nothing here.
+      { serverId: OTHER.id, libraryId: FILMS.id, pinnedAt: '2' },
+    ]
+    signInTestAccount()
+    await renderHome()
+    expect(await screen.findByRole('header', { name: 'Series' })).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('header', { name: 'Films' })).toBeNull())
+    expect(screen.getByRole('header', { name: 'Continue watching' })).toBeTruthy()
   })
 
   it('names every card by its title', async () => {

@@ -71,6 +71,7 @@ import {
   track,
 } from '@/main/test/serverFakes'
 import { mediaItemFor } from '@/shared/test/mediaItem'
+import { serverInUse } from '@/main/servers/activeServer'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const OTHER_SERVER_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
@@ -297,7 +298,7 @@ const setup = ({
   const service = createDownloadService({
     store,
     config,
-    server: SERVER,
+    server: serverInUse(() => SERVER),
     calls,
     userData: USER_DATA,
     space: {

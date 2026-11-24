@@ -1,6 +1,5 @@
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import {
   Animated,
@@ -13,6 +12,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { ServerRows } from '@/layouts/ServerRows.touch'
 import { PINNED_HEADING, SETTINGS_ENTRY } from '@/layouts/shelfKit'
 import { footSheetPanelOf } from '@/layouts/footSheet'
 import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
@@ -20,9 +20,9 @@ import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TOUCH_NAV_COPY, isDroppedBy } from '@/layouts/touchMenuKit'
 import { MORE_COLUMNS, TOUCH_TABS_COPY } from '@/layouts/touchTabsKit'
 import { useMenuGo } from '@/layouts/useMenuGo'
-import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
+import { openPinned, usePinnedLibraries } from '@/queries/pinnedLibraries'
 import type { AppQueries } from '@/queries/useAppQueries'
-import { APP_ROUTES, type Href, ROUTE_TARGETS, hrefOf, searchHrefOf } from '@/routes'
+import { APP_ROUTES, type Href, searchHrefOf } from '@/routes'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -31,10 +31,17 @@ import { APP_ICONS } from '@/theme/icons'
 /** The drag handle's size at the sheet's top. */
 const HANDLE = { width: 36, height: 4 } as const
 
-type MoreTileProps = { icon: IconName; label: string; width: number; onPress: () => void }
+type MoreTileProps = {
+  icon: IconName
+  label: string
+  width: number
+  onPress: () => void
+  /** A line in very small type under the name: a pinned library's server, while there are several. */
+  note?: string | null
+}
 
 /** One tile of the More sheet: its icon over its name. */
-const MoreTile = ({ icon, label, width, onPress }: MoreTileProps) => {
+const MoreTile = ({ icon, label, width, onPress, note = null }: MoreTileProps) => {
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   return (
@@ -48,6 +55,11 @@ const MoreTile = ({ icon, label, width, onPress }: MoreTileProps) => {
       <Text numberOfLines={2} style={styles.tileLabel}>
         {label}
       </Text>
+      {note !== null && (
+        <Text numberOfLines={1} style={styles.tileNote}>
+          {note}
+        </Text>
+      )}
     </Pressable>
   )
 }
@@ -62,7 +74,8 @@ type TouchMoreSheetProps = {
 
 /**
  * The More sheet, up from the bar over a dimmed scrim that shuts it when pressed: a handle,
- * its heading, Search, Binge, Coming soon, Downloads and Settings, then the pinned libraries. A swipe down, an entry or the
+ * its heading, Search, Binge, Coming soon, Downloads and Settings, then the pinned libraries of every
+ * server, each with its server's name while there are several, and the servers to switch between. A swipe down, an entry or the
  * accessibility escape shuts it too. It is drawn only while up or sliding.
  */
 export const TouchMoreSheet = ({
@@ -74,13 +87,12 @@ export const TouchMoreSheet = ({
   const window = useWindowDimensions()
   const insets = useSafeAreaInsets()
   const isReduced = useReduceMotion((motion) => motion.isReduced)
-  const libraries = useQuery(queries.librariesQuery)
   const go = useMenuGo()
   const [progress] = useState(() => new Animated.Value(0))
   const [isDrawn, setDrawn] = useState(false)
   const scrimStyles = useStyles({ isOverPicture: true })
   const styles = useStyles()
-  const pinned = pinnedLibrariesOf(libraries.data ?? [])
+  const pinned = usePinnedLibraries({ queries })
 
   // Opening draws the sheet in this render, so the slide has it to move.
   if (isOpen && !isDrawn) setDrawn(true)
@@ -198,20 +210,18 @@ export const TouchMoreSheet = ({
                 <View style={styles.tiles}>
                   {pinned.map((library) => (
                     <MoreTile
-                      key={library.id}
+                      key={library.key}
                       icon={library.icon}
                       label={library.name}
+                      note={library.serverName}
                       width={tileWidth}
-                      onPress={() =>
-                        choose(
-                          hrefOf({ kind: ROUTE_TARGETS.library, libraryId: library.id, query: '' }),
-                        )
-                      }
+                      onPress={() => openPinned({ library, go: choose })}
                     />
                   ))}
                 </View>
               </>
             )}
+            <ServerRows onChosen={() => choose({ pathname: APP_ROUTES.home, params: {} })} />
           </ScrollView>
         </Animated.View>
       </View>
@@ -256,6 +266,7 @@ const useStyles = themedStyles((colours) =>
       fontWeight: '600',
       textAlign: 'center',
     },
+    tileNote: { color: colours.muted, fontSize: SIZES.textXs, textAlign: 'center' },
     heading: {
       color: colours.muted,
       fontSize: SIZES.textSm,

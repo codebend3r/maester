@@ -51,7 +51,12 @@ export type { TrackPlan } from '@/music/audioItem'
 export { TRACK_STREAM_KINDS, type TrackStream } from '@raven/core'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { nativePlayerOf } from '@/music/nativePlayer'
-export { createActiveServerStore } from '@/servers/activeServerStore'
+export { type AddProblem, RENAME_OUTCOMES, accountServersFor } from '@/servers/accountServers'
+export {
+  activePinServerIdOf,
+  createActiveServerStore,
+  hasSeveralServers,
+} from '@/servers/activeServerStore'
 export { allowlistedFetch } from '@/servers/allowlist'
 export type { ServerCookies } from '@/servers/cookieJar'
 export { APP_STATE_EVENTS, isForegroundState } from '@/servers/eventSource'
@@ -66,11 +71,10 @@ export {
 } from '@/servers/mediaAccess'
 export { probeFetchOf } from '@/servers/mediaProbe'
 export { lastPerServer } from '@/servers/perServer'
-export { pinRavenServer } from '@/servers/pinRavenServer'
 export { IS_SIGN_IN_BYPASSED, RAVEN_SERVER } from '@/servers/ravenServer'
 export { cookieHeadersFor } from '@/servers/serverHeaders'
 export { serverHeadersFor } from '@/servers/serverHeadersHook'
-export { ADD_OUTCOMES, type AppServer } from '@/servers/serverList'
+export { ADD_OUTCOMES, type AppServer, pinServerIdOf } from '@/servers/serverList'
 export { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 export { unlockNow } from '@/stores/cookieSnapshots'
 export { loadPersisted } from '@/stores/persistedStore'

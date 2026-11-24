@@ -108,7 +108,10 @@ describe('account endpoints', () => {
   it('publishes only safe auth config without a session', async () => {
     const response = await app.inject({ url: AUTH_PATHS.config })
     expect(response.statusCode).toBe(200)
-    expect(response.json()).toEqual(AUTH_TEST_CONFIG)
+    expect(response.json()).toEqual({
+      ...AUTH_TEST_CONFIG,
+      serverId: app.get(SettingsRepository).serverId(),
+    })
     expect(response.headers[HEADERS.cacheControl]).toBe(CACHE_POLICIES.noStore)
     expect(fixture.fetcher).not.toHaveBeenCalled()
   })
@@ -527,7 +530,7 @@ describe('a server that enforced accounts', () => {
     const gone = await start({ dataDir, auth: { state: AUTH_CONFIG_STATES.off } })
     try {
       const { config, health, me, libraries } = await answers({ server: gone })
-      expect(config).toEqual({
+      expect(config).toMatchObject({
         status: 200,
         body: { state: AUTH_CONFIG_STATES.unavailable },
       })
@@ -549,7 +552,7 @@ describe('a server that enforced accounts', () => {
     })
     try {
       const { config, health, libraries } = await answers({ server: optedOut })
-      expect(config).toEqual({ status: 200, body: { state: AUTH_CONFIG_STATES.off } })
+      expect(config).toMatchObject({ status: 200, body: { state: AUTH_CONFIG_STATES.off } })
       expect(health.status).toBe(200)
       expect(libraries.status).toBe(200)
       expect(optedOut.get(SettingsRepository).accountsEnforcedAt()).toBeNull()
@@ -560,7 +563,7 @@ describe('a server that enforced accounts', () => {
     const forgotten = await start({ dataDir, auth: { state: AUTH_CONFIG_STATES.off } })
     try {
       const { config, libraries } = await answers({ server: forgotten })
-      expect(config.body).toEqual({ state: AUTH_CONFIG_STATES.off })
+      expect(config.body).toMatchObject({ state: AUTH_CONFIG_STATES.off })
       expect(libraries.status).toBe(200)
     } finally {
       await forgotten.close()
@@ -591,7 +594,7 @@ describe('a server that enforced accounts', () => {
     })
     try {
       const { config, health, me } = await answers({ server: conflict })
-      expect(config.body).toEqual({ state: AUTH_CONFIG_STATES.unavailable })
+      expect(config.body).toMatchObject({ state: AUTH_CONFIG_STATES.unavailable })
       expect(health.status).toBe(200)
       expect(me.status).toBe(503)
       expect(conflict.get(SettingsRepository).accountsEnforcedAt()).toBeNull()

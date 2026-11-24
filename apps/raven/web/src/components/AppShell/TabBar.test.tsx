@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { ADMIN_LOCK_STATES, type AdminLock, DESKTOP_PATHS, type Library } from '@raven/core'
+import {
+  ADMIN_LOCK_STATES,
+  type AdminLock,
+  DESKTOP_PATHS,
+  type Library,
+  libraryPath,
+} from '@raven/core'
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
@@ -7,12 +13,19 @@ import { TabBar } from '@/components/AppShell/TabBar'
 import { useServerReach } from '@/stores/serverReach'
 import { asDesktop, downloadsMain } from '@/test/desktop'
 import { library } from '@/test/fixtures'
+import { MELEYS_ID, MELEYS_ORIGIN, homeEntry, meleysEntry, pinnedOf } from '@/test/servers'
+import type { PinnedLibrary } from '@/lib/pins'
+import type { ServerEntry } from '@/lib/servers'
+import { useActiveServer } from '@raven/ui/headless'
 import { renderWithProviders } from '@/test/render'
 
 type RenderBarProps = {
   route?: string
   hasMusic?: boolean
   pinned?: readonly Library[]
+  /** Pins on the account's other servers, after the home ones. */
+  pinnedElsewhere?: readonly PinnedLibrary[]
+  servers?: readonly ServerEntry[]
   adminLock?: AdminLock
 }
 
@@ -22,12 +35,23 @@ const renderBar = ({
   route = '/',
   hasMusic = false,
   pinned = NO_PINNED,
+  pinnedElsewhere = [],
+  servers = [],
   adminLock,
 }: RenderBarProps = {}) =>
   renderWithProviders({
     ui: (
       <Routes>
-        <Route path="*" element={<TabBar hasMusic={hasMusic} pinned={pinned} />} />
+        <Route
+          path="*"
+          element={
+            <TabBar
+              hasMusic={hasMusic}
+              pinned={[...pinned.map((entry) => pinnedOf({ library: entry })), ...pinnedElsewhere]}
+              servers={servers}
+            />
+          }
+        />
       </Routes>
     ),
     route,
@@ -146,6 +170,42 @@ describe('TabBar', () => {
         .getAllByRole('heading', { level: 3 })
         .map((h) => h.textContent),
     ).toEqual(['Pinned', 'Manage'])
+  })
+
+  it("names each pin's server under it while there are several, and switches to another's", async () => {
+    renderBar({
+      pinned: [library({ id: 2, name: 'Films' })],
+      pinnedElsewhere: [
+        pinnedOf({
+          library: library({ id: 2, name: 'Films' }),
+          server: meleysEntry(),
+          isOnActiveServer: false,
+        }),
+      ],
+      servers: [homeEntry(), meleysEntry()],
+    })
+    await userEvent.click(more())
+    const pinned = within(sheet()).getByRole('list', { name: 'Pinned' })
+    expect(linksOf(pinned)).toEqual([
+      [`Filmson ${window.location.host}`, libraryPath(2)],
+      ['Filmson Meleys', libraryPath(2)],
+    ])
+    await userEvent.click(within(pinned).getByRole('link', { name: 'Films on Meleys' }))
+    expect(useActiveServer.getState().active?.serverId ?? null).toBe(MELEYS_ID)
+  })
+
+  it('lists the servers under Servers, the one in use marked, and switches to another', async () => {
+    renderBar({ route: libraryPath(2), servers: [homeEntry(), meleysEntry()] })
+    await userEvent.click(more())
+    const servers = within(sheet()).getByRole('list', { name: 'Servers' })
+    const home = within(servers).getByRole('button', { name: window.location.host })
+    expect(home).toHaveAttribute('aria-current', 'true')
+    await userEvent.click(within(servers).getByRole('button', { name: 'Meleys' }))
+    expect(useActiveServer.getState().active).toEqual({
+      serverId: MELEYS_ID,
+      origin: MELEYS_ORIGIN,
+    })
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('leaves Binge out of the sheet while it has its own slot', async () => {

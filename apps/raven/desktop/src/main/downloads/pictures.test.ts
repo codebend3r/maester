@@ -26,6 +26,7 @@ import {
 } from '@/main/test/serverFakes'
 import { mediaItemFor } from '@/shared/test/mediaItem'
 import { HEADERS } from '@shared/http'
+import { serverInUse } from '@/main/servers/activeServer'
 
 const SERVER_ID = '6f1c1c0e-3b0a-4f4e-8a55-0d2f3c5b7e11'
 const SERVER = { id: SERVER_ID, origin: 'https://raven.example', name: 'Vhagar' }
@@ -166,7 +167,7 @@ const setup = ({
         body: picture.bytes === undefined ? null : whole([picture.bytes]),
       }
     },
-    server: SERVER,
+    server: serverInUse(() => SERVER),
     isSignedIn: () => account.isSignedIn,
     fs: {
       mkdir: drive.fs.mkdir,

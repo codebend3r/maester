@@ -159,9 +159,24 @@ export const useAuthSession = create<AuthSessionState>()(
   }),
 )
 
+/** The signed-in session's access token, the Bearer every call carries; null while no one is. */
+export const currentAccessToken = (): string | null =>
+  useAuthSession.getState().session?.accessToken ?? null
+
 /** Calls `listener` with the session's access token each time it changes, null on sign out; returns the unsubscribe. */
 export const onAccessTokenChange = (listener: (token: string | null) => void): (() => void) =>
   useAuthSession.subscribe((state, previous) => {
     const token = state.session?.accessToken ?? null
     if (token !== (previous.session?.accessToken ?? null)) listener(token)
+  })
+
+/**
+ * Calls `listener` each time the account signed in leaves: a sign out (in this tab or another, or
+ * an expired session) or another account signing in. A first sign in is no leaving. Returns the
+ * unsubscribe.
+ */
+export const onAccountLeft = (listener: () => void): (() => void) =>
+  useAuthSession.subscribe((state, previous) => {
+    const before = previous.session?.userId ?? null
+    if (before !== null && before !== (state.session?.userId ?? null)) listener()
   })

@@ -8,6 +8,7 @@ import {
   type MediaItem,
   RATING_SOURCES,
   matchTypeFor,
+  pinnedShelvesOf,
   withLibraries,
   libraryPath,
 } from '@raven/core'
@@ -21,6 +22,7 @@ import { MediaCard } from '@/components/MediaCard/MediaCard'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
+import { usePinnedHere } from '@/lib/pins'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
   heroQuery,
@@ -287,7 +289,11 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const home = useQuery(homeQuery)
   const hero = useQuery(heroQuery)
   const albums = useQuery(homeAlbumsQuery)
-  const shelves = withLibraries({ shelves: home.data?.shelves ?? [], libraries })
+  const pinnedHere = usePinnedHere()
+  const shelves = withLibraries({
+    shelves: pinnedShelvesOf({ shelves: home.data?.shelves ?? [], pinnedHere }),
+    libraries,
+  })
   const featured = featuredOf({ hero: hero.data ?? [], libraries })
   const inProgress = home.data?.inProgress ?? []
   const isBare = home.isSuccess && inProgress.length === 0 && home.data.shelves.length === 0
@@ -332,7 +338,8 @@ const HOME_BODIES = {
 
 /**
  * `/`: the hero's titles, picked by the admin or the newest releases, taking turns, then what
- * is being watched, as wide tiles, then a row for each pinned library with
+ * is being watched, as wide tiles, then a row for each library the account
+ * pinned on this server (every library's while it pinned none here) with
  * its fifty newest releases, each row scrolling on its own, in the side
  * menu's order. A search from the shell's bar, which rides in the address as
  * `?q=`, shows what it found in place of all of it. A locked library never

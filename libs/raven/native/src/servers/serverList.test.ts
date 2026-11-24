@@ -6,8 +6,9 @@ import {
   ADD_OUTCOMES,
   type AppServer,
   addServer,
-  removeServer,
+  appServerOf,
   storedServersOf,
+  withHome,
 } from '@/servers/serverList'
 
 const NAS: AppServer = {
@@ -46,7 +47,7 @@ describe('addServer', () => {
     },
   )
 
-  it('refuses an id that is not a random UUID', () => {
+  it('refuses an id that is no uuid', () => {
     expect(addServer({ servers: [], server: { ...NEW, id: '../x' } })).toEqual({
       kind: ADD_OUTCOMES.invalid,
     })
@@ -68,10 +69,45 @@ describe('addServer', () => {
   })
 })
 
-describe('removeServer', () => {
-  it('drops the server with that id and keeps the rest', () => {
-    const other = { ...NAS, id: NEW_ID, origin: 'http://other:8080' }
-    expect(removeServer({ servers: [NAS, other], id: NAS.id })).toEqual([other])
+describe('withHome', () => {
+  const HOME: AppServer = {
+    id: '7c1f4e2a-3b5d-4a6e-8f90-1a2b3c4d5e6f',
+    name: 'raven',
+    origin: 'https://home.example',
+    addedAt: 0,
+  }
+
+  it('puts home first, as this build names it, then the others in their order', () => {
+    const stale = { ...HOME, origin: 'https://old.example', name: 'old' }
+    expect(withHome({ home: HOME, servers: [stale, NAS] })).toEqual([HOME, NAS])
+  })
+
+  it("leaves out one at home's origin and the second of a repeated id or origin", () => {
+    const atHome = { ...NAS, origin: HOME.origin }
+    const again = { ...NAS, id: NEW_ID }
+    expect(withHome({ home: HOME, servers: [atHome, NAS, again] })).toEqual([HOME, NAS])
+  })
+
+  it('keeps home and SERVERS_CAP others', () => {
+    const others = serversOf(SERVERS_CAP + 1)
+    expect(withHome({ home: HOME, servers: others })).toEqual([
+      HOME,
+      ...others.slice(0, SERVERS_CAP),
+    ])
+  })
+})
+
+describe('appServerOf', () => {
+  it("lists an account's server under the server's own id", () => {
+    expect(
+      appServerOf({
+        id: '9b2d3f4e-1a2b-4c3d-8e9f-0a1b2c3d4e5f',
+        serverId: NAS.id,
+        name: 'Meleys',
+        origin: NAS.origin,
+        addedAt: '2026-11-23T10:00:00.000Z',
+      }),
+    ).toEqual({ id: NAS.id, name: 'Meleys', origin: NAS.origin, addedAt: 1795428000000 })
   })
 })
 
@@ -104,10 +140,10 @@ describe('storedServersOf', () => {
     expect(storedServersOf(stored)).toEqual({ servers: [NAS], activeId: NAS.id })
   })
 
-  it('keeps no more than SERVERS_CAP, the first ones', () => {
+  it('keeps no more than home and SERVERS_CAP others, the first ones', () => {
     const stored = serversOf(SERVERS_CAP + 2)
     expect(storedServersOf({ servers: stored, activeId: null }).servers).toEqual(
-      stored.slice(0, SERVERS_CAP),
+      stored.slice(0, SERVERS_CAP + 1),
     )
   })
 

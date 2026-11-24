@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createApp } from '@/app'
 import type { ServerConfig } from '@/config'
 import { MediaIndex } from '@/media/mediaIndex'
-import { CORS_FLAGS, CORS_HEADERS } from '@/media/mediaPlaneCors'
+import { CORS_FLAGS, CORS_HEADERS } from '@/cors'
 import { MediaTickets } from '@/media/mediaTickets'
 import { ScannerService } from '@/scanner/scannerService'
 import { NOT_WATCHING, adminCookie, cookieSet, cookies, routePath, testConfig } from '@/test/app'
@@ -318,7 +318,7 @@ describe('the media plane routes', () => {
       expect(responses.map(({ headers }) => headers[CORS_HEADERS.allowOrigin])).toEqual(origins)
     })
 
-    it('answers the preflight for the other media plane routes, and for no other', async () => {
+    it('answers the preflight for the other media plane routes, and the JSON routes as the API', async () => {
       const ask = (url: string) =>
         on().app.inject({
           method: 'OPTIONS',
@@ -355,10 +355,11 @@ describe('the media plane routes', () => {
       const shut = await Promise.all(
         [`/api/media/${video}`, `/api/media/${video}/ticket`, '/api/media-origins'].map(ask),
       )
-      expect(shut.map(({ headers }) => headers[CORS_HEADERS.allowOrigin])).toEqual([
-        undefined,
-        undefined,
-        undefined,
+      // The JSON routes answer the API's preflight: the Bearer, never the media plane's Range.
+      expect(shut.map(({ headers }) => headers[CORS_HEADERS.allowHeaders])).toEqual([
+        `${HEADERS.authorization}, ${HEADERS.contentType}`,
+        `${HEADERS.authorization}, ${HEADERS.contentType}`,
+        `${HEADERS.authorization}, ${HEADERS.contentType}`,
       ])
     })
 

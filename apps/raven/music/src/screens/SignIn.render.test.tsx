@@ -78,7 +78,7 @@ const holdAs = (window: WindowOf) => act(() => Dimensions.set({ window, screen: 
 describe('SignIn', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    useActiveServer.setState({ servers: [], activeId: null })
+    useActiveServer.setState({ servers: [], activeId: RAVEN_SERVER.id })
     useWrenAccount.setState({ session: null, signIn: mockSignIn })
     mockSignIn.mockResolvedValue({ kind: AUTH_OUTCOMES.ok, session: SESSION })
     getHome.mockResolvedValue(HOME)

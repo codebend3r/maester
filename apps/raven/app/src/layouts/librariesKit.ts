@@ -30,10 +30,25 @@ export type LibraryCardProps = {
   isOpen: boolean
   /** What opens or folds the card, and its name aloud; null for a card that folds nothing away. */
   toggle: LibraryCardToggle | null
+  /** Pins the library for the account; null where the account cannot pin. */
+  pin: LibraryCardPin | null
   onOpen: () => void
   /** How its work stands and why a press failed, a line each; an alert is read out at once. */
   lines: readonly LibraryCardLine[]
   actions: readonly LibraryCardAction[]
+}
+
+/**
+ * The Pin toggle on a card, the web's: its words show whether the library is pinned, and its
+ * name aloud stays "Pin Films" whatever its state, which its selected state carries.
+ */
+export type LibraryCardPin = {
+  text: string
+  name: string
+  isPinned: boolean
+  /** Past the account's most pins, an unpinned library cannot be pinned. */
+  isDisabled: boolean
+  onPress: () => void
 }
 
 /** The chevron at a card's right, the web's: "Show more of Films" while folded, "Show less of Films" while open. */

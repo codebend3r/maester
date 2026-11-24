@@ -12,18 +12,18 @@ Run the steps **one after another, never at once**. The device app scripts share
 
 ## The steps
 
-| #   | App                             | Command                                                                                                           | CI job it mirrors                                 | Cold time                         |
-| --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------- |
-| 0   | Install                         | `bun install --frozen-lockfile`                                                                                   | every job                                         | 1 min                             |
-| 1   | Web, plus every project's build | `bun run build`                                                                                                   | `🏗️ Build` (PR checks)                            | 2 min                             |
-| 2   | Web in Chrome                   | `bun run web:e2e`                                                                                                 | `🌐 E2E Raven web` (main)                         | 3 min                             |
-| 3   | Desktop for Mac, native pieces  | see [Desktop for Mac](#desktop-for-mac)                                                                           | `🏗️ Build Mac native`                             | 40 min, or seconds with a handoff |
-| 4   | Desktop for Mac, the app        | `bun run desktop:build`, `bun run desktop:make`, `bun run desktop:audit:bundle`, `bun run desktop:smoke:packaged` | `🏗️ Build Mac app`                                | 5 min                             |
-| 5   | Desktop for Mac, playback       | `bun run ci:desktop:e2e`                                                                                          | `🎬 E2E Raven Mac desktop`                        | 5 min                             |
-| 6   | iPhone and iPad                 | `bun run ci:app:ios`                                                                                              | `🏗️ Build iPhone`                                 | 30 min                            |
-| 7   | Apple TV                        | `bun run ci:app:tvos`                                                                                             | `🏗️ Build Apple TV`                               | 30 min                            |
-| 8   | Google TV (Android TV)          | `bun run ci:app:android-tv`                                                                                       | `🏗️ Build Android TV`                             | 30 min                            |
-| 9   | Desktop for Windows             | see [Desktop for Windows](#desktop-for-windows)                                                                   | `🏗️ Build Windows native`, `🏗️ Build Windows app` | Windows only                      |
+| #   | App                             | Command                                                                                                           | CI job it mirrors                                             | Cold time                         |
+| --- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------- |
+| 0   | Install                         | `bun install --frozen-lockfile`                                                                                   | every job                                                     | 1 min                             |
+| 1   | Web, plus every project's build | `bun run build`                                                                                                   | `🏗️ Build every project` (PR checks)                          | 2 min                             |
+| 2   | Web in Chrome                   | `bun run web:e2e`                                                                                                 | `🌐 E2E Raven web` (main)                                     | 3 min                             |
+| 3   | Desktop for Mac, native pieces  | see [Desktop for Mac](#desktop-for-mac)                                                                           | `🏗️ Build Raven Mac native`                                   | 40 min, or seconds with a handoff |
+| 4   | Desktop for Mac, the app        | `bun run desktop:build`, `bun run desktop:make`, `bun run desktop:audit:bundle`, `bun run desktop:smoke:packaged` | `🏗️ Build Raven Mac app`                                      | 5 min                             |
+| 5   | Desktop for Mac, playback       | `bun run ci:desktop:e2e`                                                                                          | `🎬 E2E Raven Mac desktop`                                    | 5 min                             |
+| 6   | iPhone and iPad                 | `bun run ci:app:ios`                                                                                              | `🏗️ Build Raven iPhone`                                       | 30 min                            |
+| 7   | Apple TV                        | `bun run ci:app:tvos`                                                                                             | `🏗️ Build Raven Apple TV`                                     | 30 min                            |
+| 8   | Google TV (Android TV)          | `bun run ci:app:android-tv`                                                                                       | `🏗️ Build Raven Android TV`                                   | 30 min                            |
+| 9   | Desktop for Windows             | see [Desktop for Windows](#desktop-for-windows)                                                                   | `🏗️ Build Raven Windows native`, `🏗️ Build Raven Windows app` | Windows only                      |
 
 Stop at the first failure and report it, unless the user said to keep going past failures; then note it and run the next step. Steps 6 to 8 each have their own skill with the details of what they install and show: `run-ios-e2e`, `run-tvos-e2e`, `run-android-tv-e2e`. Read the matching one when a step fails.
 
@@ -61,7 +61,7 @@ bun run desktop:smoke:packaged
 
 `mpv:native:windows` places the pinned libmpv DLL under `libs/raven/mpv/resources/win32-x64` and tests it; the installer lands in `apps/raven/desktop/out/make`.
 
-From the Mac, the only way is CI: a pull request's checks build Windows (`🏗️ Build Windows native` and `🏗️ Build Windows app`) whenever the change affects the desktop. `🧱 Native checks` on main builds nothing.
+From the Mac, the only way is CI: a pull request's checks build Windows (`🏗️ Build Raven Windows native` and `🏗️ Build Raven Windows app`) on every pull request. `🧱 Native checks` on main builds nothing.
 
 ## On screen
 

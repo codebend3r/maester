@@ -9,7 +9,6 @@
   },
   "scripts": {
     "build": "vite build",
-    "comment-style": "bash ../../../scripts/check_comment_style.sh",
     "dead-code": "knip --no-progress --directory ../../.. --workspace apps/raven/music-web",
     "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
     "dev": "vite",
@@ -28,8 +27,7 @@
     "spellcheck": "uvx typos@1.51.1",
     "test": "bun test --dots",
     "test:watch": "bun test --dots --watch",
-    "typecheck": "tsgo --noEmit",
-    "typescript-only": "bash ../../../scripts/check_typescript_only.sh"
+    "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/instrument-sans": "5.3.0",
@@ -83,13 +81,11 @@
       "format:check",
       "test",
       "test:watch",
-      "comment-style",
       "dead-code",
       "dead-css",
       "lint:py",
       "one-command-per-script",
       "spellcheck",
-      "typescript-only",
       "lighthouse"
     ],
     "targets": {
@@ -100,13 +96,6 @@
           {
             "env": "NETLIFY"
           }
-        ]
-      },
-      "comment-style": {
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/**/*.{ts,tsx,scss}",
-          "{workspaceRoot}/scripts/check_comment_style.sh"
         ]
       },
       "dead-code": {
@@ -163,13 +152,6 @@
         "inputs": [
           "{projectRoot}/**/*",
           "{workspaceRoot}/typos.toml"
-        ]
-      },
-      "typescript-only": {
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/**/*.{js,jsx,mjs,cjs}",
-          "{workspaceRoot}/scripts/check_typescript_only.sh"
         ]
       },
       "lighthouse": {

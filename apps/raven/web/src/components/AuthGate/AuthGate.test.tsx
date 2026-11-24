@@ -17,8 +17,8 @@ import {
 } from '@raven/core'
 import { BROWSER_PLAY_PATH, browserPlayPathOf } from '@/browserDownloads/paths'
 import { AuthGate } from '@/components/AuthGate/AuthGate'
-import { api } from '@/lib/api'
-import { queryKeys } from '@raven/ui/headless'
+import { api, homeApi } from '@/lib/api'
+import { queryKeys, useActiveServer } from '@raven/ui/headless'
 import { queryClient } from '@/lib/queryClient'
 import { signOut } from '@/lib/session'
 import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
@@ -35,6 +35,7 @@ import { Where } from '@/test/authPage'
 import { asBrowserDownloads, fakeEngine } from '@/test/browserDownloads'
 import { asDesktop, FILE_ID } from '@/test/desktop'
 import { renderWithProviders } from '@/test/render'
+import { MELEYS_ID, MELEYS_ORIGIN } from '@/test/servers'
 
 type RenderGateProps = {
   authConfig?: AuthConfig | null
@@ -73,7 +74,7 @@ const refused = ({ status, reason }: RefusedProps) =>
 
 describe('AuthGate', () => {
   const getMe = spyOn(api, 'getMe')
-  const getAuthConfig = spyOn(api, 'getAuthConfig')
+  const getAuthConfig = spyOn(homeApi, 'getAuthConfig')
 
   afterEach(() => {
     getMe.mockReset()
@@ -259,6 +260,20 @@ describe('AuthGate', () => {
     renderGate()
     expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByTestId('where')).toBeNull())
+    expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull()
+  })
+
+  it('offers the way back home when another server fails to answer', async () => {
+    useActiveServer.getState().choose({
+      serverId: MELEYS_ID,
+      origin: MELEYS_ORIGIN,
+    })
+    getMe.mockRejectedValue(new TypeError('Failed to fetch'))
+    renderGate()
+    await userEvent.click(
+      await screen.findByRole('button', { name: `Back to ${window.location.host}` }),
+    )
+    expect(useActiveServer.getState().active).toBeNull()
   })
 
   it('goes to sign in after Sign out although the gate reads what the sign out empties', async () => {

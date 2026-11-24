@@ -22,9 +22,6 @@ export const CONFIG_FILE = 'desktop-config.json'
 /** What Raven calls its server in what it says: it plays from that one alone. */
 export const SERVER_NAME = 'raven'
 
-/** Said of a server an older Raven kept besides, which Raven no longer reaches. */
-export const SERVER_GONE = 'Raven no longer plays from that server.'
-
 /**
  * The server Raven plays from, by the opaque id its downloads are filed under, and the
  * origin that id was given for. Versions 2 to 4 kept a list of these, each with more fields
@@ -136,10 +133,16 @@ export const pickOutput = (output: OutputSettings): OutputSettings => ({
 
 /**
  * The config; the ids of the servers an older version kept that were the fixed server too (its
- * origin and an alias added as two), whose downloads move to the server's id; and whether it is
- * not what the file holds, so main writes it at once and the server keeps its id next launch.
+ * origin and an alias added as two), whose downloads move to the server's id; the ids of the
+ * others it kept, which Raven no longer reaches; and whether it is not what the file holds, so
+ * main writes it at once and the server keeps its id next launch.
  */
-export type UpgradedConfig = { config: DesktopConfig; adopted: string[]; isChanged: boolean }
+export type UpgradedConfig = {
+  config: DesktopConfig
+  adopted: string[]
+  dropped: string[]
+  isChanged: boolean
+}
 
 type FromListProps = {
   servers: readonly ServerEntry[]
@@ -147,16 +150,21 @@ type FromListProps = {
   newId: () => string
 }
 
+/** The id the fixed server goes by, and what becomes of the other servers on the list. */
+type FromList = Pick<UpgradedConfig, 'adopted' | 'dropped'> & { id: string }
+
 /**
  * The id the fixed server goes by: the first kept server that was it, so its downloads keep
- * their files, owed plays and sync; else a new one. The other servers that were it are adopted.
+ * their files, owed plays and sync; else a new one. The other servers that were it are adopted,
+ * and the rest dropped.
  */
-const fromList = ({ servers, server, newId }: FromListProps): { id: string; adopted: string[] } => {
+const fromList = ({ servers, server, newId }: FromListProps): FromList => {
   const ids = [
     ...new Set(servers.filter(({ origin }) => namesServer({ server, origin })).map(({ id }) => id)),
   ]
   const [first, ...adopted] = ids
-  return { id: first ?? newId(), adopted }
+  const dropped = [...new Set(servers.map(({ id }) => id).filter((id) => !ids.includes(id)))]
+  return { id: first ?? newId(), adopted, dropped }
 }
 
 /** The stored update settings rebuilt from their two fields; the defaults before version 3 had any. */
@@ -211,12 +219,17 @@ export const upgradeConfig = ({ stored, server, newId }: UpgradeConfigProps): Up
   const { origin } = server
   switch (stored.version) {
     case 1:
-      return { config: configFor({ stored, id: newId(), origin }), adopted: [], isChanged: true }
+      return {
+        config: configFor({ stored, id: newId(), origin }),
+        adopted: [],
+        dropped: [],
+        isChanged: true,
+      }
     case 2:
     case 3:
     case 4: {
-      const { id, adopted } = fromList({ servers: stored.servers, server, newId })
-      return { config: configFor({ stored, id, origin }), adopted, isChanged: true }
+      const { id, adopted, dropped } = fromList({ servers: stored.servers, server, newId })
+      return { config: configFor({ stored, id, origin }), adopted, dropped, isChanged: true }
     }
     case 5:
       return {
@@ -227,6 +240,7 @@ export const upgradeConfig = ({ stored, server, newId }: UpgradeConfigProps): Up
           lastAccountId: stored.lastAccountId,
         }),
         adopted: [],
+        dropped: [],
         isChanged: stored.server.origin !== origin,
       }
     default: {

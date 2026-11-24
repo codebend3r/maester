@@ -1,4 +1,4 @@
-import { type ApiClient, createApiClient } from '@raven/core'
+import { type ApiClient, type FetchLike, createApiClient } from '@raven/core'
 import { AppState } from 'react-native'
 import EventSource from 'react-native-sse'
 
@@ -13,7 +13,7 @@ import {
   isForegroundState,
 } from '@/servers/eventSource'
 import { secretStore } from '@/servers/deviceSecretStore'
-import { serverFetchFor } from '@/servers/serverFetch'
+import { FETCH_CREDENTIALS, serverFetchFor } from '@/servers/serverFetch'
 import { cookieHeadersFor } from '@/servers/serverHeaders'
 import type { AppServer } from '@/servers/serverList'
 import { noteCookies } from '@/stores/cookieSnapshots'
@@ -87,3 +87,7 @@ export const openEventsFor = ({ server, session }: OpenEventsForProps) =>
       },
     },
   })
+
+/** React Native's `fetch` for a call that carries no server's cookies, leaving the system's alone too. */
+export const openFetch: FetchLike = (url, init = {}) =>
+  fetch(url, { ...init, credentials: FETCH_CREDENTIALS.omit })

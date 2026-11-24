@@ -82,6 +82,7 @@ describe('usePlaylistMutations', () => {
     const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
 
     await act(() => result.current.create.mutateAsync('New'))
+    await waitFor(() => expect(result.current.create.isSuccess).toBe(true))
 
     expect(create).toHaveBeenCalledWith({ name: 'New' })
     expect(client.getQueryData<PlaylistDetails>(queryKeys.playlist(9))).toEqual(made)
@@ -160,6 +161,7 @@ describe('usePlaylistMutations', () => {
     const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
 
     await act(() => result.current.share.mutateAsync({ id: PAGE.playlist.id, isShared: true }))
+    await waitFor(() => expect(result.current.share.isSuccess).toBe(true))
 
     expect(share).toHaveBeenCalledWith({ id: PAGE.playlist.id, isShared: true })
     expect(pageIn(client)?.playlist.isShared ?? null).toBe(true)
@@ -173,6 +175,7 @@ describe('usePlaylistMutations', () => {
     const { result } = renderQueryHook({ client, hook: () => usePlaylistMutations() })
 
     await act(() => result.current.copy.mutateAsync(PAGE.playlist.id))
+    await waitFor(() => expect(result.current.copy.isSuccess).toBe(true))
 
     expect(copy).toHaveBeenCalledWith({ id: PAGE.playlist.id })
     expect(client.getQueryData<PlaylistDetails>(queryKeys.playlist(12))).toEqual(copied)

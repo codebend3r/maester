@@ -8,6 +8,7 @@ import {
   type ApiClient,
   DISCOVERY_PATHS,
   LIBRARY_KINDS,
+  LIBRARY_VIEWS,
   type LibraryInput,
   groupingsFor,
   isLibraryKind,
@@ -764,8 +765,11 @@ describe('the admin lock', () => {
       ),
     ).toBe(403)
     // Saving how an open library is laid out is fine.
-    const saved = await api().setLibraryView({ id: state.open, change: { pinned: false } })
-    expect(saved.settings).toMatchObject({ pinned: false, locked: false })
+    const saved = await api().setLibraryView({
+      id: state.open,
+      change: { view: LIBRARY_VIEWS.grid },
+    })
+    expect(saved.settings).toMatchObject({ view: LIBRARY_VIEWS.grid, locked: false })
   })
 
   it('holds back every route marked AdminOnly, until the password is entered', async () => {
@@ -806,9 +810,9 @@ describe('the admin lock', () => {
     ).toEqual([])
   })
 
-  it('lets anyone sort, view, group or pin a library, and change nothing else of it', async () => {
+  it('lets anyone sort, view or group a library, and change nothing else of it', async () => {
     const before = await api(state.admin).getLibrary(state.open)
-    const { kind, sort, view, groupBy, pinned } = before.settings
+    const { kind, sort, view, groupBy } = before.settings
     type AnotherProps<T> = { values: readonly T[]; current: T }
 
     const another = <T>({ values, current }: AnotherProps<T>): T =>
@@ -817,12 +821,16 @@ describe('the admin lock', () => {
       sort: another({ values: sortsFor(kind), current: sort }),
       view: another({ values: viewsFor(kind), current: view }),
       groupBy: another({ values: groupingsFor(kind), current: groupBy }),
-      pinned: !pinned,
     }
     const viewed = await api().setLibraryView({ id: state.open, change })
     expect(viewed.settings).toEqual({ ...before.settings, ...change })
 
-    const others = [{ name: 'Renamed' }, { sort, kind: 'movies' }, { locked: true }]
+    const others = [
+      { name: 'Renamed' },
+      { sort, kind: 'movies' },
+      { locked: true },
+      { pinned: true },
+    ]
     const refused = await Promise.all(
       others.map(async (payload) => {
         const response = await app().inject({
@@ -833,7 +841,7 @@ describe('the admin lock', () => {
         return response.statusCode
       }),
     )
-    expect(refused).toEqual([400, 400, 400])
+    expect(refused).toEqual([400, 400, 400, 400])
     expect(await api(state.admin).getLibrary(state.open)).toMatchObject({
       name: before.name,
       paths: before.paths,

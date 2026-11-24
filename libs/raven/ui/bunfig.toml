@@ -1,7 +1,9 @@
 [test]
-# Register the DOM and missing media globals before components or Testing Library.
+# Register the DOM and missing media globals before components or Testing Library. network
+# replaces happy-dom's fetch so no test reaches for a server.
 preload = [
   "./src/test/happy-dom.ts",
+  "../../../tooling/web/network.ts",
   "./src/test/mediaError.ts",
   "../../../tooling/web/scss-modules.ts",
   "./src/test-setup.ts",

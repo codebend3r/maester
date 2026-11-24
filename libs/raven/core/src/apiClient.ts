@@ -19,11 +19,12 @@ import { remoteAccessCalls } from '@/apiClient/remoteAccess'
 import { reportCalls } from '@/apiClient/reports'
 import { scrobblingCalls } from '@/apiClient/scrobbling'
 import { settingsCalls } from '@/apiClient/settings'
-import { createTransport, type FetchLike } from '@/apiClient/transport'
+import { type BaseUrl, createTransport, type FetchLike } from '@/apiClient/transport'
 import { isServerEvent, type ServerEvent } from '@/contract'
 
 export {
   ApiError,
+  type BaseUrl,
   type FetchInit,
   type FetchLike,
   type FetchResponse,
@@ -46,7 +47,7 @@ export const parseServerEvent = (data: string): ServerEvent | null => {
 export type ApiClient = ReturnType<typeof createApiClient>
 
 type CreateApiClientProps = {
-  baseUrl?: string
+  baseUrl?: BaseUrl
   fetch: FetchLike
   accessToken?: () => string | null
   pictureCdn?: string | null
@@ -56,7 +57,8 @@ type CreateApiClientProps = {
  * Every call a client makes to the media server, one module per resource
  * under `apiClient/`. `baseUrl` is '' for a web app served by the server
  * itself, or the server's origin for anything running elsewhere (a native
- * app, the Vite dev server behind a proxy). `pictureCdn` is the path of an
+ * app, the Vite dev server behind a proxy), or a getter of either for a
+ * client that follows whichever server is active. `pictureCdn` is the path of an
  * image CDN on the page's own site, such as Netlify's `/.netlify/images`:
  * capability pictures then go through it, which resizes them to the width
  * asked and re-encodes them as AVIF or WebP at the edge, and keeps each one

@@ -16,10 +16,8 @@ import { type AdminPanelProps, AdminPlaybackPanel } from '@/pages/SettingsPage/A
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { RemoteAccessSection } from '@/pages/SettingsPage/RemoteAccessSection'
 import { ScanSwitch } from '@/pages/SettingsPage/ScanSwitch'
-import { ServerSection } from '@/pages/SettingsPage/ServerSection'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { UsersSection } from '@/pages/SettingsPage/UsersSection'
-import { useIsDesktop } from '@/stores/desktop'
 
 type ResetControlProps = {
   isConfirming: boolean
@@ -76,16 +74,8 @@ const ResetControl = (props: ResetControlProps) => {
   return <View {...props} />
 }
 
-/** Admin's second tab: which server this is, where the app is not Raven's own, and the scans running across its libraries. */
-const ServerPanel = () => {
-  const isDesktop = useIsDesktop()
-  return (
-    <>
-      {!isDesktop && <ServerSection />}
-      <ScanSwitch />
-    </>
-  )
-}
+/** Admin's second tab: the scans running across the server's libraries. */
+const ServerPanel = () => <ScanSwitch />
 
 /** Admin's third tab: who reaches raven and how. Remote access, the accounts for their owner, and the admin lock where it is what guards managing. */
 const AccessPanel = () => {

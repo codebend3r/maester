@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { type PosterEntry, mediaLabel } from '@raven/core'
@@ -24,6 +24,12 @@ describe('FavouritesPage', () => {
     titles.mockReset()
     albums.mockReset()
     artists.mockReset()
+  })
+  // The account suite in this folder calls the real client through a recorded fetch.
+  afterAll(() => {
+    titles.mockRestore()
+    albums.mockRestore()
+    artists.mockRestore()
   })
 
   it('lists every favourite as a card', async () => {

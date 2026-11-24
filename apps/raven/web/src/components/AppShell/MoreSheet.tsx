@@ -1,14 +1,17 @@
-import { type Library, libraryPath } from '@raven/core'
+import { libraryPath } from '@raven/core'
 import { Icon } from '@raven/ui'
+import { useActiveServer } from '@raven/ui/headless'
 import { type ReactNode, useEffect, useId } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
-import { libraryPages, useIsCurrent } from '@/components/AppShell/currentPage'
+import { pinnedPages, useIsCurrent } from '@/components/AppShell/currentPage'
 import styles from '@/components/AppShell/MoreSheet.module.scss'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { SEARCH_ASK } from '@/components/SiteSearch/SiteSearch'
 import { APP_PATHS } from '@/lib/appPaths'
+import { type PinnedLibrary, followPin } from '@/lib/pins'
+import { type ServerEntry, isActiveEntry, isReachableFromPage, useOpenServer } from '@/lib/servers'
 import type { TabTarget } from '@/components/TabStrip/TabStrip'
 import { useModal } from '@/lib/useModal'
 
@@ -18,12 +21,14 @@ type SheetTileProps = {
   state?: unknown
   icon: ReactNode
   label: string
+  /** A line in very small type under the name: a pinned library's server, when there are several. */
+  detail?: string
   isCurrent: boolean
   onChoose: () => void
 }
 
 /** A tile of the sheet: its icon over its name, marked while its page is open. */
-const SheetTile = ({ to, state, icon, label, isCurrent, onChoose }: SheetTileProps) => (
+const SheetTile = ({ to, state, icon, label, detail, isCurrent, onChoose }: SheetTileProps) => (
   <li className={styles.item}>
     <Link
       to={to}
@@ -33,7 +38,15 @@ const SheetTile = ({ to, state, icon, label, isCurrent, onChoose }: SheetTilePro
       onClick={onChoose}
     >
       {icon}
-      <span className={styles.label}>{label}</span>
+      <span className={styles.label}>
+        {label}
+        {!!detail && (
+          <span className={styles.detail}>
+            <span className="visually-hidden">{APP_SHELL_COPY.on}</span>
+            {detail}
+          </span>
+        )}
+      </span>
     </Link>
   </li>
 )
@@ -71,26 +84,79 @@ const SearchTile = ({ onChoose }: SearchTileProps) => (
   />
 )
 
-type PinnedTileProps = { library: Library; onChoose: () => void }
+type PinnedTileProps = {
+  pinned: PinnedLibrary
+  /** Whether the account keeps more than one server, so each pin names its own. */
+  hasServers: boolean
+  onChoose: () => void
+}
 
-/** A pinned library: its type's icon over its name, marked while one of its pages is open. */
-const PinnedTile = ({ library, onChoose }: PinnedTileProps) => {
-  const isCurrent = useIsCurrent(libraryPages(library.id))
+/**
+ * A pinned library: its type's icon over its name, and its server's under that while the
+ * account keeps several, marked while one of its pages is open. One on another server switches
+ * to it as it opens.
+ */
+const PinnedTile = ({ pinned, hasServers, onChoose }: PinnedTileProps) => {
+  const { library, server } = pinned
+  const isCurrent = useIsCurrent(pinnedPages(pinned))
+  const choose = () => {
+    followPin(pinned)
+    onChoose()
+  }
   return (
     <SheetTile
       to={libraryPath(library.id)}
       icon={<LibraryIcon settings={library.settings} size={24} />}
       label={library.name}
+      detail={hasServers ? server.name : undefined}
       isCurrent={isCurrent}
-      onChoose={onChoose}
+      onChoose={choose}
     />
+  )
+}
+
+type ServerTileProps = { server: ServerEntry; onChoose: () => void }
+
+/**
+ * A server to switch to, marked while it is the one in use; choosing another opens its Home. One
+ * this https page cannot call says it needs https and cannot be chosen.
+ */
+const ServerTile = ({ server, onChoose }: ServerTileProps) => {
+  const open = useOpenServer()
+  const isCurrent = useActiveServer((state) => isActiveEntry({ server, active: state.active }))
+  const canReach = isReachableFromPage({ origin: server.origin })
+  const choose = () => {
+    onChoose()
+    open(server)
+  }
+  return (
+    <li className={styles.item}>
+      <button
+        type="button"
+        className={styles.tile}
+        aria-current={isCurrent}
+        disabled={!canReach}
+        onClick={choose}
+      >
+        <Icon name="globe" size={24} />
+        <span className={styles.label}>
+          {server.name}
+          {!canReach && <span className={styles.detail}>{APP_SHELL_COPY.needsHttps}</span>}
+        </span>
+      </button>
+    </li>
   )
 }
 
 type MoreSheetProps = {
   entries: readonly TabTarget[]
   /** The pinned libraries, under a Pinned label. */
-  pinned: readonly Library[]
+  pinned: readonly PinnedLibrary[]
+  /**
+   * The servers to switch between, under a Servers label, and each pin then names its own; none
+   * where there is nothing to switch.
+   */
+  servers: readonly ServerEntry[]
   /** Only for whoever may manage, under a Manage label. */
   manageEntries: readonly TabTarget[]
   /** Heard when the sheet closes: Escape, the scrim or its close event. */
@@ -103,19 +169,23 @@ type MoreSheetProps = {
  * The tab bar's More: a sheet rising from above the bar, which stays in view
  * beneath it, with a scrim over the page that closes it on a tap. Its pages
  * are tiles in rows of three, Search first, then the pinned libraries under a Pinned
- * label, as the phone app's sheet has them, and, for whoever may manage, a
+ * label, as the phone app's sheet has them, the servers to switch between under a
+ * Servers label while there are several, and, for whoever may manage, a
  * last group under a Manage label.
  */
 export const MoreSheet = ({
   entries,
   pinned,
+  servers,
   manageEntries,
   onClose,
   onChoose,
 }: MoreSheetProps) => {
+  const hasServers = servers.length > 0
   const { dialog, close, keepKeys } = useModal()
   const titleId = useId()
   const pinnedId = useId()
+  const serversId = useId()
   const manageId = useId()
   // Not every browser moves focus into a dialog it opens, so the first tile takes it here.
   useEffect(() => {
@@ -146,8 +216,25 @@ export const MoreSheet = ({
               {APP_SHELL_COPY.pinned}
             </h3>
             <ul className={styles.tiles} aria-labelledby={pinnedId}>
-              {pinned.map((library) => (
-                <PinnedTile key={library.id} library={library} onChoose={onChoose} />
+              {pinned.map((entry) => (
+                <PinnedTile
+                  key={entry.key}
+                  pinned={entry}
+                  hasServers={hasServers}
+                  onChoose={onChoose}
+                />
+              ))}
+            </ul>
+          </>
+        )}
+        {hasServers && (
+          <>
+            <h3 id={serversId} className={styles.eyebrow}>
+              {APP_SHELL_COPY.servers}
+            </h3>
+            <ul className={styles.tiles} aria-labelledby={serversId}>
+              {servers.map((server) => (
+                <ServerTile key={server.key} server={server} onChoose={onChoose} />
               ))}
             </ul>
           </>

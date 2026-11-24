@@ -1,6 +1,5 @@
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
-import { useQuery } from '@tanstack/react-query'
 import { usePathname } from 'expo-router'
 import { type ComponentRef, type Ref, useEffect, useMemo, useState } from 'react'
 import {
@@ -14,6 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { ServerRows } from '@/layouts/ServerRows.touch'
 import { PINNED_HEADING, SETTINGS_ENTRY, menuRowLabelOf } from '@/layouts/shelfKit'
 import { SCRIM_OPACITY, SWIPE_START, slide } from '@/layouts/slide'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -27,9 +27,9 @@ import {
   isPlayerPath,
   menuWidthOf,
 } from '@/layouts/touchMenuKit'
-import { pinnedLibrariesOf } from '@/queries/pinnedLibraries'
+import { openPinned, usePinnedLibraries } from '@/queries/pinnedLibraries'
 import type { AppQueries } from '@/queries/useAppQueries'
-import { APP_ROUTES, type Href, ROUTE_TARGETS, hrefOf } from '@/routes'
+import { APP_ROUTES, type Href } from '@/routes'
 import { useReduceMotion } from '@/stores/reduceMotion'
 import { useTouchMenu } from '@/stores/touchMenu'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
@@ -43,10 +43,19 @@ type MenuEntryProps = {
   ref?: Ref<ComponentRef<typeof Pressable>>
   /** A library locked behind the PIN, which wears a lock after its name, as the web's does. */
   isLocked?: boolean
+  /** A line in very small type under the name: a pinned library's server, while there are several. */
+  note?: string | null
 }
 
 /** One row of the menu: its icon and its name, a finger tall. */
-const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryProps) => {
+const MenuEntry = ({
+  icon,
+  label,
+  onPress,
+  ref,
+  isLocked = false,
+  note = null,
+}: MenuEntryProps) => {
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   return (
@@ -58,9 +67,16 @@ const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryPro
       style={({ pressed }) => [styles.entry, pressed && styles.pressed]}
     >
       <Icon colour={text} name={icon} size={SIZES.textXl} />
-      <Text numberOfLines={1} style={styles.entryLabel}>
-        {label}
-      </Text>
+      <View style={styles.words}>
+        <Text numberOfLines={1} style={styles.entryLabel}>
+          {label}
+        </Text>
+        {note !== null && (
+          <Text numberOfLines={1} style={styles.note}>
+            {note}
+          </Text>
+        )}
+      </View>
       {isLocked && <Icon colour={text} name={APP_ICONS.lock} size={SIZES.text} />}
     </Pressable>
   )
@@ -69,17 +85,16 @@ const MenuEntry = ({ icon, label, onPress, ref, isLocked = false }: MenuEntryPro
 type MenuContentProps = { session: AppQueries }
 
 /**
- * What the menu holds, in the web's side menu's order: Home, Continue watching, Binge,
+ * What the menu holds, in the web's side menu's order: the servers while there are several, Home, Continue watching, Binge,
  * Coming soon, Favourites, Downloads (which opens with the server out of reach) and Libraries, the pinned libraries
- * under their heading, a rule, then Settings. Choosing an entry shuts the menu and goes there.
+ * of every server under their heading, each with its server's name while there are several, a rule, then Settings. Choosing an entry shuts the menu and goes there.
  */
 const MenuContent = ({ session: { queries } }: MenuContentProps) => {
   const goTo = useMenuGo()
   const close = useTouchMenu((menu) => menu.close)
-  const libraries = useQuery(queries.librariesQuery)
   const insets = useSafeAreaInsets()
   const styles = useStyles()
-  const pinned = pinnedLibrariesOf(libraries.data ?? [])
+  const pinned = usePinnedLibraries({ queries })
   const go = (href: Href) => {
     close()
     goTo(href)
@@ -92,6 +107,7 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
       ]}
       keyboardShouldPersistTaps="handled"
     >
+      <ServerRows onChosen={() => go({ pathname: APP_ROUTES.home, params: {} })} />
       <MenuEntry
         icon={APP_ICONS.home}
         label={TOUCH_NAV_COPY.home}
@@ -134,13 +150,12 @@ const MenuContent = ({ session: { queries } }: MenuContentProps) => {
       )}
       {pinned.map((library) => (
         <MenuEntry
-          key={library.id}
+          key={library.key}
           icon={library.icon}
           isLocked={library.isLocked}
           label={library.name}
-          onPress={() =>
-            go(hrefOf({ kind: ROUTE_TARGETS.library, libraryId: library.id, query: '' }))
-          }
+          note={library.serverName}
+          onPress={() => openPinned({ library, go })}
         />
       ))}
       <View accessibilityElementsHidden importantForAccessibility="no" style={styles.divider} />
@@ -314,7 +329,9 @@ const useStyles = themedStyles((colours) =>
       minHeight: SIZES.fieldHeight,
       borderRadius: SIZES.radius,
     },
-    entryLabel: { flexShrink: 1, color: colours.text, fontSize: SIZES.textLg, fontWeight: '600' },
+    words: { flexShrink: 1 },
+    entryLabel: { color: colours.text, fontSize: SIZES.textLg, fontWeight: '600' },
+    note: { color: colours.muted, fontSize: SIZES.textXs },
     pressed: { opacity: OPACITIES.pressed },
   }),
 )

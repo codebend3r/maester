@@ -124,7 +124,7 @@ export const musicLibrary = (overrides: Partial<Library> = {}): Library =>
   library({
     id: 3,
     name: 'Music',
-    settings: { ...library().settings, kind: LIBRARY_KINDS.music, pinned: false },
+    settings: { ...library().settings, kind: LIBRARY_KINDS.music },
     ...overrides,
   })
 

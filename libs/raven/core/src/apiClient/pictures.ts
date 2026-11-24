@@ -109,17 +109,23 @@ type PictureCallsProps = {
  * The addresses of every picture: capability pictures through the image CDN
  * when there is one, which resizes them to the width asked and re-encodes
  * them at the edge, else straight from the server, which keeps a poster at
- * the fixed few `POSTER_WIDTHS`.
+ * the fixed few `POSTER_WIDTHS`. The CDN fetches only the page's own site's
+ * `/api`, so while the client talks to another server's origin its pictures
+ * come straight from that server.
  */
-export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsProps) => {
+export const pictureCalls = ({ transport: { url, isOwnSite }, pictureCdn }: PictureCallsProps) => {
   type PictureAtProps = { path: string; width?: number }
+
+  /** The CDN pictures go through now: none while the API is another server's. */
+  const cdn = (): string | null => (isOwnSite() ? pictureCdn : null)
 
   /** A capability picture at `path`, narrowed to `width` when one is given. */
   const pictureAt = ({ path, width }: PictureAtProps): string => {
-    if (pictureCdn !== null) {
+    const through = cdn()
+    if (through !== null) {
       const query: Record<string, string> =
         width === undefined ? { url: url(path) } : { url: url(path), w: String(width) }
-      return `${pictureCdn}?${toQueryString(query)}`
+      return `${through}?${toQueryString(query)}`
     }
     return width === undefined ? url(path) : `${url(path)}?${toQueryString({ w: String(width) })}`
   }
@@ -147,7 +153,7 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
   const itemImageAt = (picture: ItemPicturePathProps): string =>
     pictureAt({ path: itemPicturePath(picture) })
 
-  const posterWidths: readonly number[] = pictureCdn === null ? POSTER_WIDTHS : CDN_POSTER_WIDTHS
+  const posterWidths = (): readonly number[] => (cdn() === null ? POSTER_WIDTHS : CDN_POSTER_WIDTHS)
 
   return {
     /** null until the server has generated one; versioned so it can be cached forever. */
@@ -170,11 +176,11 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
         ? null
         : pictureSrcSet({
             path: itemPicturePath({ id, kind: ITEM_IMAGE_KINDS.poster, version }),
-            widths: posterWidths,
+            widths: posterWidths(),
             own: POSTER_OWN_WIDTH,
           }),
 
-    /** The widths `posterSrcSet` lists, narrowest first: finer through an image CDN. */
+    /** The widths `posterSrcSet` lists now, narrowest first: finer through an image CDN. */
     posterWidths,
 
     /**
@@ -183,7 +189,7 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
      * server keeps a backdrop at its own width alone, or with no backdrop.
      */
     backdropSrcSet: ({ id, version }: BackdropSrcSetProps): string | null =>
-      version == null || pictureCdn === null
+      version == null || cdn() === null
         ? null
         : pictureSrcSet({
             path: itemPicturePath({ id, kind: ITEM_IMAGE_KINDS.backdrop, version }),
@@ -262,7 +268,7 @@ export const pictureCalls = ({ transport: { url }, pictureCdn }: PictureCallsPro
         ? null
         : pictureSrcSet({
             path: albumCoverPath({ albumId, coverVersion }),
-            widths: posterWidths,
+            widths: posterWidths(),
             own: POSTER_OWN_WIDTH,
           }),
 

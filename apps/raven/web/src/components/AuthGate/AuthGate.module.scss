@@ -13,6 +13,19 @@
   max-inline-size: min(var(--measure), 100%);
 }
 
+// Try again, and the way back to the home server beside it.
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-2);
+}
+
+@media (max-width: 30rem) {
+  .actions {
+    grid-auto-flow: row;
+  }
+}
+
 .title {
   font-size: var(--font-size-2xl);
   line-height: var(--line-tight);

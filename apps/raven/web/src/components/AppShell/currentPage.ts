@@ -1,11 +1,16 @@
 import { matchPath, useLocation } from 'react-router-dom'
 import { APP_PATHS } from '@/lib/appPaths'
+import type { PinnedLibrary } from '@/lib/pins'
 
 /** A library's own pages, `:id` for any library's: its videos, its other tabs, its history and its sagas. */
 export const libraryPages = (id: number | string): string[] => {
   const library = `${APP_PATHS.libraries}/${id}`
   return [library, `${library}/:page`, `${library}/sagas/:saga`]
 }
+
+/** The pages that mark a pinned library as open: its own while its server is the one in use, else none. */
+export const pinnedPages = ({ library, isOnActiveServer }: PinnedLibrary): string[] =>
+  isOnActiveServer ? libraryPages(library.id) : []
 
 type IsAnyOfProps = {
   patterns: readonly string[]

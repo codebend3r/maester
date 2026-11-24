@@ -70,7 +70,7 @@ const run = ({
   const clock = { now }
   const { timers, pending } = fakeTimers()
   const picks = createOriginPicks({
-    server: SERVER,
+    server: { current: () => SERVER },
     calls,
     probe: network.probe,
     probeClock: network.clock,

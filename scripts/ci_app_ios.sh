@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🏗️ Build iPhone job and its end to end job, which CI runs on two runners, on this
+# Runs the 🏗️ Build Raven iPhone job and its end to end job, which CI runs on two runners, on this
 # Mac: the libraries, the fixture server, the iPhone simulator, the Release build through
 # ccache, the pods check, the install and the Maestro flows. Each step is a root script of its
 # own, which the whole job runs in order:

@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
-import { waitFor } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { AUDIO_BITRATES, LIBRARY_KINDS } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import { useAudiobookChapters, useTrackBitrate } from '@/query/useAudiobook'
-import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
+import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { library, track } from '@/test/fixtures'
 import { recordingApi } from '@/test/recordingApi'
 import { renderQueryHook } from '@/test/renderQueryHook'
@@ -63,8 +63,6 @@ describe('useAudiobookChapters', () => {
 })
 
 describe('useTrackBitrate', () => {
-  afterEach(() => usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.original))
-
   it("is the prefs' bitrate for a song, and null for a book, the original, or no track", () => {
     const client = holdingLibraries()
     const bitrateOf = (libraryId: number | null) =>
@@ -74,7 +72,7 @@ describe('useTrackBitrate', () => {
           useTrackBitrate({ api, track: libraryId === null ? null : track({ libraryId }) }),
       }).result.current
     expect(bitrateOf(4)).toBeNull()
-    usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.high)
+    act(() => usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.high))
     expect(bitrateOf(4)).toBe(AUDIO_BITRATES.high)
     expect(bitrateOf(3)).toBeNull()
     expect(bitrateOf(null)).toBeNull()

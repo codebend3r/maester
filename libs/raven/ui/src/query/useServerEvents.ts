@@ -91,6 +91,12 @@ type AccessTokenChanges = (listener: (token: string | null) => void) => () => vo
 /** A host with no access token, whose stream rides cookies alone. */
 const NO_ACCESS_TOKEN: AccessTokenChanges = () => () => undefined
 
+/** Calls the listener each time the app moves to another server; returns the unsubscribe. */
+type ServerChanges = (listener: () => void) => () => void
+
+/** A host that talks to one server only. */
+const ONE_SERVER: ServerChanges = () => () => undefined
+
 /** A host that shows no toasts; the notification is still on the account's log. */
 const NO_TOASTS: OnNotification = () => undefined
 
@@ -104,6 +110,8 @@ type ServerEventsForProps = {
   api: ApiClient
   openEvents: (url: string) => ServerEventSource
   onAccessTokenChange?: AccessTokenChanges
+  /** For a host that switches servers: the stream is opened again on the new one at each switch. */
+  onServerChange?: ServerChanges
   onNotification?: OnNotification
   /**
    * Whether this device is playing a video now. While it is, a `viewing` event is not followed:
@@ -117,7 +125,9 @@ type ServerEventsForProps = {
  * The server-event hook over one server's `api`, listening on what
  * `openEvents` opens at its event address. A host whose stream travels with
  * an access token passes `onAccessTokenChange`, so a new token replaces the
- * open stream and signing out closes it. A host that plays video passes
+ * open stream and signing out closes it. A host that switches servers passes
+ * `onServerChange`, so each switch opens the stream again, on the new server's
+ * address. A host that plays video passes
  * `isWatching`, so the viewing changes its own player causes are left for the
  * player's close to read again (`afterWatching`), not followed one by one.
  */
@@ -125,6 +135,7 @@ export const serverEventsFor = ({
   api,
   openEvents,
   onAccessTokenChange = NO_ACCESS_TOKEN,
+  onServerChange = ONE_SERVER,
   onNotification = NO_TOASTS,
   isWatching = NEVER_WATCHING,
 }: ServerEventsForProps) => {
@@ -180,8 +191,15 @@ export const serverEventsFor = ({
         connection.isDropped = true
         open()
       })
+      // A new server's cache is read afresh by the switch itself, so nothing is read again on open.
+      const unsubscribeServer = onServerChange(() => {
+        close()
+        connection.isDropped = false
+        open()
+      })
       return () => {
         unsubscribe()
+        unsubscribeServer()
         close()
       }
     }, [queryClient])

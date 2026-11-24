@@ -1,6 +1,6 @@
 import { DOWNLOAD_STATUS_KINDS } from '@raven/core'
 import { unlessStopped } from '@/main/bounded'
-import { SERVER_GONE, SERVER_NAME } from '@/main/desktopConfig'
+import { SERVER_NAME } from '@/main/desktopConfig'
 import {
   advance,
   bytesOf,
@@ -30,8 +30,15 @@ import {
 } from '@/main/downloads/fetchFile'
 import { fileUrlFor, type Access, type MediaAccess } from '@/main/downloads/mediaAccess'
 import { createQueueFailures } from '@/main/downloads/queueFailures'
-import { createQueueRuns, EVERY_RUN, type RunDisk, runOf } from '@/main/downloads/queueRuns'
+import {
+  createQueueRuns,
+  EVERY_RUN,
+  type RunDisk,
+  type RunPick,
+  runOf,
+} from '@/main/downloads/queueRuns'
 import { createQueueSchedule } from '@/main/downloads/queueSchedule'
+import type { ServerInUse } from '@/main/servers/activeServer'
 import {
   downloadsDirFor,
   entryDirFor,
@@ -67,8 +74,8 @@ export type QueueFs = {
 
 export type DownloadQueueDeps = {
   store: DownloadsStore
-  /** The id the server's downloads are filed under; a download of any other is no longer fetched. */
-  serverId: string
+  /** The server in use, whose downloads are fetched; another server's wait until it is in use. */
+  server: Pick<ServerInUse, 'isInUse'>
   access: MediaAccess
   /** A bare fetch with no cookie, `redirect: 'error'`: the ticket in the URL is the file's only key. */
   fetch: StreamFetch
@@ -114,6 +121,11 @@ export type DownloadQueue = {
   sweep: (input: SweepProps) => Promise<void>
   /** The page's sign-in ended in main: its files fetched with an account ticket fail. */
   accessEnded: () => void
+  /**
+   * The page switched servers: the last one's files stop where they are, still downloading or
+   * queued, and go on once it is in use again; the new one's start.
+   */
+  serverSwitched: () => Promise<void>
   /** Aborts every fetch; the entries stay as they are for the next launch. */
   dispose: () => void
 }
@@ -325,10 +337,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
   const work = async (job: Job): Promise<void> => {
     const { entry, signal } = job
     const { downloadId } = entry
-    if (entry.serverId !== deps.serverId) {
-      failures.failEntry({ entry, failure: { reason: FAIL_REASONS.other, message: SERVER_GONE } })
-      return
-    }
+    // Only the server in use is fetched from: another's file waits for it, as it stands.
+    if (!deps.server.isInUse(entry.serverId)) return
     // A crash between the rename and the next save leaves the video whole and the file not ready.
     const whole = await fs.size(mediaPathFor(partsOf(entry)))
     if (signal.aborted) return
@@ -403,7 +413,8 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     }
     const slots = DOWNLOAD_CONCURRENCY - runs.count()
     if (slots <= 0) return
-    const isIdle = (entry: DownloadEntry): boolean => !runs.isRunning(entry.downloadId)
+    const isIdle = (entry: DownloadEntry): boolean =>
+      deps.server.isInUse(entry.serverId) && !runs.isRunning(entry.downloadId)
     const { entries } = store.read()
     // A file left downloading by the last run goes first: it was under way.
     const resumed = entries.filter(
@@ -496,8 +507,21 @@ export const createDownloadQueue = (deps: DownloadQueueDeps): DownloadQueue => {
     deps.warn(`Raven stopped downloading from ${SERVER_NAME}: its sign-in ended`)
   }
 
+  const serverSwitched: DownloadQueue['serverSwitched'] = async () => {
+    if (isDisposed) return
+    const elsewhere: RunPick = ({ downloadId }) => {
+      const entry = entryById({ state: store.read(), downloadId })
+      return entry === null || !deps.server.isInUse(entry.serverId)
+    }
+    deps.access.forget()
+    runs.saveBytes(elsewhere)
+    await runs.stop(elsewhere)
+    kick()
+  }
+
   return {
     kick,
+    serverSwitched,
     pause: pauseOne,
     resume: resumeOne,
     retry: ({ downloadId }) => resumeEach({ downloadIds: [downloadId], isRetry: false }),

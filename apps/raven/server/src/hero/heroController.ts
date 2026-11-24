@@ -39,7 +39,7 @@ export class HeroController {
 
   /**
    * Puts a movie or show in the hero, or takes it out. Only a title with
-   * the pictures the hero lays out, in a pinned library that is in the hero and not locked, can go in, and
+   * the pictures the hero lays out, in a library that is in the hero and not locked, can go in, and
    * only while the hero has room.
    */
   @AdminOnly()
@@ -65,7 +65,7 @@ export class HeroController {
     })
     if (!canPick) {
       throw new BadRequestException(
-        'Only a movie or show with a poster and a backdrop, in a pinned library that is included in the hero and not locked, can go in it.',
+        'Only a movie or show with a poster and a backdrop, in a library that is included in the hero and not locked, can go in it.',
       )
     }
     const { itemIds } = this.state()

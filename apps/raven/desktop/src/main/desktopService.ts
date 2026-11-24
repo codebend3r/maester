@@ -14,7 +14,9 @@ import type { DownloadService } from '@/main/downloads/downloadService'
 import type { GrantedFile, Grants } from '@/main/grants'
 import { resumeFor, savePosition, setTrackPick, trackPickFor } from '@/main/playerState'
 import { DONE, refused } from '@/main/replies'
+import type { ActiveServer } from '@/main/servers/activeServer'
 import type { LinkOpener } from '@/main/servers/linkOpener'
+import { DIRECTORY_MESSAGES, type ServerDirectory } from '@/main/servers/serverDirectory'
 import type { ServerTitles } from '@/main/servers/serverTitles'
 import type { StateStore } from '@/main/stateStore'
 import { UPDATE_COPY, type UpdateService } from '@/main/updateService'
@@ -49,6 +51,8 @@ export type DesktopServiceDeps = {
   /** The page's sign in, which main uses for every call to the server. */
   account: Pick<PageAccount, 'set'>
   titles: ServerTitles
+  /** The server in use, and main's reads of the account's others. */
+  servers: Pick<ActiveServer, 'use'> & Pick<ServerDirectory, 'check' | 'librariesOf'>
 }
 
 export type DesktopService = {
@@ -169,6 +173,18 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
   const openRelease = async (): Promise<DesktopReply> =>
     (await deps.updates.openRelease()) ? DONE : refused(UPDATE_COPY.noRelease)
 
+  const checkServer = async (origin: string): Promise<DesktopReply> => {
+    const checked = await deps.servers.check(origin)
+    if (!checked.ok) return refused(DIRECTORY_MESSAGES.unreachable)
+    return { type: DESKTOP_REPLIES.server, serverId: checked.serverId }
+  }
+
+  const serverLibraries = async (serverId: string): Promise<DesktopReply> => {
+    const libraries = await deps.servers.librariesOf(serverId)
+    if (libraries === null) return refused(DIRECTORY_MESSAGES.unreachable)
+    return { type: DESKTOP_REPLIES.libraries, libraries }
+  }
+
   const handleRequest = async (request: DesktopRequest): Promise<DesktopReply> => {
     switch (request.type) {
       case DESKTOP_REQUESTS.ready:
@@ -255,6 +271,12 @@ export const createDesktopService = (deps: DesktopServiceDeps): DesktopService =
         return deps.downloads.ask({ target: request.target })
       case DESKTOP_REQUESTS.playTitle:
         return deps.titles.play({ mediaId: request.mediaId, at: request.at, next: request.next })
+      case DESKTOP_REQUESTS.useServer:
+        return deps.servers.use(request.serverId)
+      case DESKTOP_REQUESTS.checkServer:
+        return checkServer(request.origin)
+      case DESKTOP_REQUESTS.serverLibraries:
+        return serverLibraries(request.serverId)
       default: {
         const unreachable: never = request
         return unreachable
