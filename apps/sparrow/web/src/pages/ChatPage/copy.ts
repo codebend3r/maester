@@ -1,8 +1,9 @@
 export const CHAT_PAGE_COPY = {
   unreachable: "Couldn't reach sparrow; check that its server is running.",
   waking: 'Waking sparrow…',
-  signingIn: 'Sending you to sign in…',
-  unlinked:
-    "Your Plex account doesn't have access to this server yet. Ask the admin or the friend who invited you for an invite.",
+  signInUnavailable:
+    "Sign-in isn't available right now: raven couldn't be reached. Try again in a moment.",
+  notApproved:
+    "Your raven account isn't approved yet. Ask raven's owner to approve it, then sign in again.",
   transcript: 'Transcript',
 } as const

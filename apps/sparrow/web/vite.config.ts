@@ -17,7 +17,7 @@ export default defineConfig({
     },
   },
   server: {
-    // Its own port, beside raven's web app (5173) and rookery's (5180).
+    // Its own port, beside raven's web app (5173).
     port: 5190,
     strictPort: true,
     proxy: {

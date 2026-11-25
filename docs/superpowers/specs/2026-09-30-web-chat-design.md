@@ -9,16 +9,13 @@ Amended 2026-10-03 by the suite rename
 (`2026-10-02-suite-rename-design.md`): the assistant is luwin, in
 `apps/luwin/`. Its first chat surface is gone and its store started fresh,
 keyed by `user_id`, which covers most of steps 1 and 2 below. luwin is now
-meant to be a standalone chat app and a helper window inside raven and
-rookery, and rookery may own sign-in, so sections 2 and 5 are revisited
-before they are built.
-Amended 2026-10-09 by the shared sign-in
-(`2026-10-09-shared-sign-in-design.md`): rookery owns sign-in and luwin
-trusts its session. That spec replaces section 2, the `/login` page in
-section 5, and the sign-in decisions and config below (`PLEX_CLIENT_ID`,
-`SESSION_SECRET`, `PUBLIC_URL`); users are keyed by rookery's user id.
-In the order of work, step 2 is only the `inbox` table and step 3 is that
-spec's luwin step.
+meant to be a standalone chat app and a helper window inside raven, so
+sections 2 and 5 are revisited before they are built.
+Amended 2026-11-24: sign-in goes through raven's accounts. raven's
+`GET /api/me` decides who someone is: raven's owner is the admin, and
+raven's approved members are friends. Section 2, the `/login` page in
+section 5 and the config below describe that; users are keyed by raven's
+user id.
 Amended 2026-10-18 by the chat page and sandbox: step 4 is built in
 `luwin/web/chat.py` with `decide` answering JSON (an approved action runs a
 tool, not a model turn), `pick` and `forget` routes, and no history route
@@ -36,11 +33,11 @@ relative to `apps/maester/`.
 ## Goal
 
 luwin gets its own chat app. Friends open a web page, sign in with
-Plex, and chat with maester to request movies and shows or to report a
+their raven account, and chat with maester to request movies and shows or to report a
 title that won't play. The admin signs in the same way and gets an
 approval queue.
 
-Who it is for: the same people as today, the Plex server's friends, most
+Who it is for: the same people as today, raven's members, most
 of them away from the LAN and on a phone. Success is a friend opening the
 page, signing in once, and getting the same request and report flows the
 first chat surface gave, with ready notices waiting for them on their next visit.
@@ -48,7 +45,7 @@ first chat surface gave, with ready notices waiting for them on their next visit
 ## What stays
 
 The agent loop, tool registry and tiers, guardrails, rate limits, memory,
-the Seerr, Plex, Wizarr and per-host arr clients, playback diagnosis and
+the Seerr, raven and per-host arr clients, playback diagnosis and
 the guarded replace flow, performance diagnostics, the SQLite store, the
 Seerr webhook, the eval harness, and the Docker deploy on Meleys. The
 chat service (`maester/chat/service.py`) and the `Notifier` protocol
@@ -59,13 +56,13 @@ contracts.
 
 | Question | Decision |
 | --- | --- |
-| Sign-in | Plex PIN flow, owned by the API |
+| Sign-in | raven's accounts: the API asks raven who someone is |
 | Admin approvals | An admin view in the same web app |
 | Ready and resolved notices | In-app inbox, no email |
 | Frontend | React on Vite in `apps/maester/web/`, with weirwood's web tooling and conventions |
 | Hosting | The existing maester container serves the built app; one HTTPS origin via the reverse proxy or tunnel |
-| Ownership of auth and sessions | FastAPI owns everything; the web app is a thin client |
-| Existing data | Not migrated; users start fresh, keyed by Plex account id |
+| Ownership of auth | raven signs people in; FastAPI owns everything past that; the web app is a thin client |
+| Existing data | Not migrated; users start fresh, keyed by raven's user id |
 
 The "FastAPI owns everything" choice was made over a Next.js
 backend-for-frontend (auth split across two languages, a service token
@@ -85,7 +82,7 @@ app's client-side routes. The image builds the web app in a Bun stage from
 the repo root and copies its `dist/` in.
 
 The reverse proxy or tunnel exposes one HTTPS origin and forwards
-everything to `maester`. One origin means the session cookie needs no CORS.
+everything to `maester`. One origin means the API needs no CORS.
 The proxy itself is out of scope; `PUBLIC_URL` tells the API what origin it
 is served as.
 
@@ -100,18 +97,12 @@ updated in the docs.
 
 ### Sign-in
 
-Plex's PIN flow, owned by the API. The API is a Plex app with a fixed
-client identifier (`PLEX_CLIENT_ID`, generated once, kept in `.env`) and
-product name "maester".
+Sign-in belongs to raven. A friend signs in on raven's own sign-in page
+with their raven account, so the API never sees a password and keeps no
+session of its own. On each request the API passes the browser's raven
+session to raven's `GET /api/me` and gets back the account (`id`, `email`,
+display name) and its standing, or 401.
 
-- `POST /api/auth/plex/start` creates a strong PIN at plex.tv and returns
-  `{pin_id, auth_url}`. The browser opens `auth_url`.
-- `POST /api/auth/plex/complete` with `{pin_id}` checks the PIN once. While
-  the PIN has no token it returns `{status: "pending"}`. When it does, the
-  API fetches the Plex account (`id`, `username`, `email`, `thumb`),
-  creates a session, sets the cookie and returns `{status: "ok", user}`.
-  The friend's Plex token is discarded immediately and never stored.
-- `POST /api/auth/logout` deletes the session and clears the cookie.
 - `GET /api/me` returns the signed-in user and tier, or 401.
 
 ### Tier
@@ -119,36 +110,25 @@ product name "maester".
 Resolved on every request, so a change takes effect immediately.
 
 1. A `tier_override` on the user row wins, as today.
-2. The account that owns the Plex server is ADMIN. The owner is found once
-   at boot from `PLEX_TOKEN` (`/myplex/account` on the server, or
-   plex.tv `/api/v2/user` with that token) and compared by Plex id.
-3. An account matching a Seerr user by email or Plex username is FRIEND.
-   Seerr already imports the server's Plex friends, so this is the same
-   "who has access" answer the link flow used to reach through the admin.
+2. raven's owner is ADMIN.
+3. An approved raven member is FRIEND. raven's approval is the same "who
+   has access" answer the link flow used to reach through the admin.
 4. TRUSTED comes only from the override.
 5. Anyone else is UNLINKED and is refused the chat with a reason.
 
-### Session
-
-A random 32-byte id in a cookie named `maester_session`: httpOnly, Secure,
-SameSite=Lax, path `/`, 30 days. Sessions live in a new `sessions` table
-(`id`, `user_id`, `created_at`, `expires_at`, `last_seen_at`). Expired
-sessions are pruned when a new one is created. `SESSION_SECRET` signs the
-cookie value so a tampered cookie is rejected before a database lookup.
-
 ### Store changes
 
-- `users` is keyed by `plex_id` (text). Columns: `plex_username`,
-  `plex_email`, `thumb`, `seerr_user_id`, `tautulli_user_id`,
-  `tier_override`, `created_at`, `last_seen_at`. The Seerr match is
+- `users` is keyed by raven's user id (text). Columns: `email`,
+  `display_name`, `seerr_user_id`, `tier_override`, `created_at`,
+  `last_seen_at`. The Seerr match is
   refreshed at sign-in and cached on the row for tools that need the
   Seerr user id.
 - `LinkStatus`, the link status on `users`, `SeerrUserTaken` and the
   one-link-per-Seerr-user migration go away. `NotLinked` stays as the
   error tools raise for an UNLINKED user.
 - Every table's chat account column (`conversations`, `audit_log`,
-  `reports`, `pending_actions`, `held_calls`) is `user_id`, holding the
-  Plex id. Ready notices go to the inbox (section 3).
+  `reports`, `pending_actions`, `held_calls`) is `user_id`, holding
+  raven's user id. Ready notices go to the inbox (section 3).
 - Since nothing is migrated, this is one new initial migration replacing
   `001` to `007`, and the deployed `maester-data/maester.db` is removed
   on deploy.
@@ -158,11 +138,11 @@ cookie value so a tampered cookie is rejected before a database lookup.
 `chat/identity.py` keeps `IdentityService` and `resolve_tier`, drops
 `RoleMap`, `start_link`, `whoami` and `LINK_TTL`, and gains
 `sign_in(account)` (upsert the user, refresh the Seerr match) and
-`user_for(session_id)`. The `link_account` admin tool is removed.
+`user_for(account)`. The `link_account` admin tool is removed.
 
 ## 3. Chat and inbox API
 
-All routes need a valid session. An UNLINKED user gets 403 with
+All routes need a signed-in raven account. An UNLINKED user gets 403 with
 `{reason: "unlinked"}` so the page can show the invite message.
 
 - `POST /api/chat` with `{text}` streams Server-Sent Events:
@@ -193,7 +173,7 @@ A `WebNotifier` implements `Notifier`:
   the admin user with `kind` `admin` and `approval`.
 - `deliver()` never raises and returns nothing undeliverable, since a row
   insert is the delivery. If the admin has never signed in, admin notices
-  are filed under the owner's Plex id and appear on first sign-in.
+  are filed under the owner's raven user id and appear on first sign-in.
 
 Routes:
 
@@ -211,8 +191,7 @@ invited you for an invite".
 
 The existing per-user `RateLimiter` keys by user id and carries over
 unchanged. Every write route requires `Content-Type: application/json`,
-which with SameSite=Lax is sufficient CSRF protection for a same-origin
-app. Responses set `Cache-Control: no-store`.
+which a cross-site form cannot send. Responses set `Cache-Control: no-store`.
 
 ## 4. Admin
 
@@ -220,13 +199,13 @@ Gated on the ADMIN tier; the API enforces it regardless of what the page
 shows.
 
 - `GET /api/admin/pending` lists open `pending_actions`: id, kind, action,
-  summary, requester (Plex username), age.
+  summary, requester (raven display name), age.
 - `POST /api/admin/pending/{id}` with `{decision: "approve" | "deny"}`
   calls `ChatService.decide()` as the admin. It records who decided, runs
   the approved tool, and files the requester's notice, as today.
 - `GET /api/admin/users` lists known users with derived tier, override,
   Seerr match and last seen.
-- `POST /api/admin/users/{plex_id}/tier` with `{tier: "friend" |
+- `POST /api/admin/users/{user_id}/tier` with `{tier: "friend" |
   "trusted" | "admin" | null}` sets or clears the override, replacing the
   `/tier` command.
 
@@ -240,10 +219,9 @@ modules, no UI library, client-side routes. Tooling and code conventions
 follow weirwood's web app (`apps/weirwood/web`): oxlint, oxfmt, `tsgo`,
 targets inferred from `package.json` scripts.
 
-- `/login`: a "Sign in with Plex" button. Calls start, opens `auth_url`
-  in a new tab, polls complete every two seconds until `ok`, then goes to
-  `/`. An `unlinked` result shows "ask for an invite" with the admin's
-  Plex username.
+- `/login`: a "Sign in with raven" button that opens raven's sign-in page
+  and comes back to `/`. An `unlinked` result shows "ask for an invite"
+  with the admin's name.
 - `/`: the chat. Loads history and the inbox; unread notices render as
   messages from maester with a badge, and a ready notice carries a
   "Something's wrong" button that posts to `/api/inbox/{id}/report`.
@@ -273,15 +251,14 @@ dependency and settings, role-based tiers, emoji reactions and
 `link_account` tool, once sign-in replaces them.
 
 Config: `REQUIRED` becomes `ANTHROPIC_API_KEY`, `SEERR_URL`,
-`SEERR_API_KEY`, `PLEX_URL`, `PLEX_TOKEN`, `PLEX_CLIENT_ID`,
-`SESSION_SECRET`, `PUBLIC_URL`. `.env.example` follows.
+`SEERR_API_KEY`, `RAVEN_URL`, `PUBLIC_URL`. `.env.example` follows.
 
 Docs: `apps/maester/README.md`, `docs/architecture.md` and
-`docs/nas-deployment.md` are rewritten for the web app and the Plex
+`docs/nas-deployment.md` are rewritten for the web app and the raven
 sign-in. The Seerr
 webhook URL in the README becomes `/api/webhooks/seerr`. In the roadmap
 catalog (`scripts/catalog.py` at the repo root), E2 becomes "Web chat and identity" with
-stories for sign-in, sessions and tiers, the chat API, the inbox, and the
+stories for sign-in and tiers, the chat API, the inbox, and the
 web app; E6 and E7 lose their channel and role wording. Milestone M1's
 sentence becomes "A friend can sign in and chat with maester, and it
 answers using a read-only tool."
@@ -292,12 +269,11 @@ whatever survives in them is rebased or re-cut afterwards.
 
 ## 7. Testing
 
-Pytest, against a fake plex.tv client in `maester/clients`:
+Pytest, against a fake raven client in `maester/clients`:
 
-- Sign-in: start returns a PIN and URL; complete is pending until the fake
-  PIN has a token, then sets a cookie; the owner becomes ADMIN; a Seerr
-  match becomes FRIEND; a stranger is UNLINKED and gets 403 on chat; an
-  expired, missing or tampered session gets 401; logout clears it.
+- Sign-in: raven's owner becomes ADMIN; an approved member becomes
+  FRIEND; an account raven has not approved is UNLINKED and gets 403 on
+  chat; a request raven answers with 401 gets 401.
 - Chat: the SSE event sequence for a plain reply, a confirm, a choice and
   a failed turn, through the TestClient with the fake model; decide
   rejects the wrong user; history pages.
@@ -323,10 +299,9 @@ per step.
 1. Done in the suite rename: the first chat surface, its tests,
    dependency and settings are deleted; a `LogNotifier` stands in so the
    webhook still works; the app boots as the web server and the jobs.
-2. Store: `users` by Plex id, `sessions` and `inbox` on top of the fresh
+2. Store: `users` by raven's user id and `inbox` on top of the fresh
    initial migration, which already has `user_id` everywhere.
-3. Identity: fake and real plex.tv client, `sign_in`, sessions, tiers, the
-   auth routes and `/api/me`.
+3. Identity: fake and real raven client, `sign_in`, tiers and `/api/me`.
 4. Chat: SSE `/api/chat`, `/api/chat/decide`, history.
 5. Inbox: `WebNotifier` replaces the stand-in, the inbox routes, the
    report route, the Seerr webhook wired to it.

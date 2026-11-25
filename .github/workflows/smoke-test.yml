@@ -48,14 +48,6 @@ jobs:
             page: /
             # The web app shows it in the side menu.
             version-arg: VITE_RAVEN_VERSION
-          # rookery refuses to boot without its required settings, so the check
-          # passes placeholders; nothing here signs anyone in.
-          - product: rookery
-            port: 8030
-            health: /health
-            expect: .status == "ok"
-            page: /login
-            run-args: -e PUBLIC_URL=http://127.0.0.1:8030 -e SERVICE_TOKEN=ci
     env:
       PRODUCT: ${{ matrix.product }}
       IMAGE: ${{ matrix.product }}:ci
@@ -98,11 +90,11 @@ jobs:
         if: matrix.version-arg && inputs.version
         run: docker run --rm "$IMAGE" grep -rqF "$RELEASE_VERSION" /app/web/assets
 
-      # The matrix's own constants, split into words on purpose.
+      # The matrix's own command, split into words on purpose.
       - name: ▶️ Start server
         run: |
           docker run -d --name "$PRODUCT" -p "$PORT:$PORT" \
-            ${{ matrix.run-args }} "$IMAGE" ${{ matrix.command }}
+            "$IMAGE" ${{ matrix.command }}
 
       - name: 🩺 Wait for the health route
         run: |

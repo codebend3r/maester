@@ -1,0 +1,6 @@
+name: setup help comes from the guides
+tier: friend
+turns:
+  - user: "how do I install the raven app on my Mac? it says it can't verify it"
+    expect_tools: [setup_guide]
+    reply_matches: "(?i)open anyway"

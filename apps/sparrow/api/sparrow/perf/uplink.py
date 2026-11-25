@@ -1,13 +1,11 @@
-"""The server's upload, measured on demand, against the remote streams it carries.
+"""The servers' upload, measured on demand: what the streams going out leave free.
 
 A friend away from home streams over the servers' upload: the hosts share
 one network behind one internet connection, so one test measures it for
 all of them. The test runs in sparrow's own container (`SPEEDTEST_HOST`,
 `clients/speedtest.py`), alongside the streams already going out, so the
-upload it finds is what those streams leave free: the headroom. It's read
-next to what the remote streams Tautulli sees on every host send (their
-bitrates, read while the test runs) and put in plain words. A Plex server
-no Tautulli watches isn't counted.
+upload it finds is what those streams leave free: the headroom, put in
+plain words.
 
 A test briefly fills the upload for everyone's streams, so tests are
 rationed: a new test runs at most every `MIN_GAP`, failed or not, and until
@@ -20,16 +18,13 @@ never start one.
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from sparrow.clients import Services
 from sparrow.clients.speedtest import SpeedResult, SpeedTester, SpeedTestFailed
 from sparrow.formatting import ago, humanized, mbps
 from sparrow.memo import Key, Memo
-from sparrow.perf.load import read_loads
 
 # A result answers for this long; after it, it no longer describes the connection.
 REUSE = timedelta(minutes=10)
@@ -43,12 +38,10 @@ ROOMY_KBPS = 3 * HD_STREAM_KBPS
 
 @dataclass(frozen=True)
 class Uplink:
-    """A speed test's result, and the remote streams going out while it ran."""
+    """A speed test's result."""
 
     host: str  # where it ran
     result: SpeedResult
-    streaming_kbps: int  # every host's remote streams, together
-    uncounted: tuple[str, ...]  # hosts whose streams couldn't be read
 
     @property
     def spare_kbps(self) -> int:
@@ -62,11 +55,7 @@ class Uplink:
 
     def headroom(self) -> str:
         spare = f"{mbps(self.spare_kbps):g}"
-        alongside = (
-            f"alongside {mbps(self.streaming_kbps):g} Mbps of remote streams"
-            if self.streaming_kbps
-            else "with no remote streams running"
-        )
+        alongside = "alongside the streams already going out"
         if self.spare_kbps >= ROOMY_KBPS:
             return f"Plenty of room: about {spare} Mbps of upload is free {alongside}."
         if not self.tight:
@@ -81,19 +70,15 @@ class Uplink:
 
     def as_dict(self) -> dict[str, Any]:
         result = self.result
-        facts: dict[str, Any] = {
+        return {
             "upload_mbps": mbps(result.upload_kbps),
             "download_mbps": mbps(result.download_kbps),
             "ping_ms": result.ping_ms,
             "test_server": result.server,
             "isp": result.isp,
             "result_link": result.url,
-            "remote_streams_mbps": mbps(self.streaming_kbps),
             "headroom": self.headroom(),
         }
-        if self.uncounted:
-            facts["streams_not_counted"] = f"couldn't read {', '.join(self.uncounted)}"
-        return facts
 
 
 @dataclass(frozen=True)
@@ -114,12 +99,11 @@ async def _run(tester: SpeedTester) -> SpeedResult | NotMeasured:
         return NotMeasured(tester.host, str(exc))
 
 
-async def measure(services: Services, tester: SpeedTester) -> Measurement:
-    """Run a test, reading every host's remote streams while it runs."""
-    result, loads = await asyncio.gather(_run(tester), read_loads(services))
+async def measure(tester: SpeedTester) -> Measurement:
+    result = await _run(tester)
     if isinstance(result, NotMeasured):
         return result
-    return Uplink(tester.host, result, loads.remote_kbps, tuple(sorted(loads.unreachable)))
+    return Uplink(tester.host, result)
 
 
 @dataclass(frozen=True)
@@ -152,9 +136,9 @@ class Reading:
         return facts
 
 
-async def reading(memo: Memo, services: Services, tester: SpeedTester) -> Reading:
+async def reading(memo: Memo, tester: SpeedTester) -> Reading:
     """The last result until another test may run; then a new test's."""
-    kept = await memo.fresh(SPEED_TEST, MIN_GAP, lambda: measure(services, tester))
+    kept = await memo.fresh(SPEED_TEST, MIN_GAP, lambda: measure(tester))
     age = memo.age(kept)
     return Reading(kept.value, age, max(MIN_GAP - age, timedelta(0)))
 

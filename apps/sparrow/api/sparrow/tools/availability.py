@@ -1,55 +1,29 @@
-"""What is on the server: its versions, its seasons, and links that open Plex.
+"""Where a title stands with Seerr: its copies, its seasons, and, for shows, the owning host.
 
-`check_availability` puts Seerr's view (is the standard or the 4K copy
-there, which seasons) next to Plex's (every version of the item, how many
-episodes each season holds), with a deep link per Plex copy. For shows it
-also names the Sonarr host that owns the show, which `follow_show` needs,
-and for anime it reports which seasons' files carry English audio.
+`check_availability` gives Seerr's view (is the standard or the 4K copy
+there, which seasons) for a title, before a request or to say what's
+missing. For shows it also names the Sonarr host that owns the show, which
+`follow_show` and `find_gaps` need, and for anime it reports which seasons'
+files carry English audio. What raven holds, with links to watch it, is
+`search_library`'s.
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from sparrow.agent.tools import Tier, ToolContext, tool
 from sparrow.clients import Services
-from sparrow.clients.plex import Plex
 from sparrow.clients.seerr import MediaDetails
 from sparrow.dub import dub_coverage, is_anime
 from sparrow.library import Library, OwnerUnknown
 from sparrow.media import MediaType
-from sparrow.plex_versions import describe_version, items_of
 from sparrow.tools.args import TmdbId
 
 
-async def plex_copies(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:
-    """Each Plex item holding the title (standard, 4K), with its link and versions."""
-    if not (details.rating_key or details.rating_key_4k):
-        return []
-    machine, items = await asyncio.gather(plex.machine_identifier(), items_of(plex, details))
+def season_rows(details: MediaDetails) -> list[dict[str, Any]]:
     return [
-        {
-            "plex_link": plex.deep_link(machine, item.rating_key),
-            **({"versions": [describe_version(v) for v in item.versions]} if item.versions else {}),
-        }
-        for item in items
-    ]
-
-
-async def season_counts(plex: Plex, details: MediaDetails) -> list[dict[str, Any]]:
-    present = (
-        {s.number: s.episodes for s in await plex.seasons(details.rating_key)}
-        if details.rating_key
-        else {}
-    )
-    return [
-        {
-            "season": s.number,
-            "episodes_on_server": present.get(s.number, 0),
-            "episodes_total": s.episodes,
-            "status": s.status.label,
-        }
+        {"season": s.number, "episodes": s.episodes, "status": s.status.label}
         for s in details.seasons
     ]
 
@@ -79,11 +53,11 @@ async def show_details(services: Services, details: MediaDetails) -> dict[str, A
 
 @tool(
     "check_availability",
-    "Whether a movie or show is on the server: which versions (1080p, 4K, HEVC re-encode) "
-    "with size and bitrate, for shows how many episodes of each season are present, and a "
-    "plex_link per copy that opens it in Plex; link it in your reply. For shows it "
-    "also gives sonarr_host, the host follow_show needs, and for anime how many files of "
-    "each season have English audio.",
+    "Where a movie or show stands with Seerr: whether its 1080p and 4K copies are on the "
+    "server, requested or missing, and for shows each season's status and episode count. "
+    "For shows it also gives sonarr_host, the host follow_show and find_gaps need, and for "
+    "anime how many files of each season have English audio. To say where to watch it, "
+    "use search_library.",
     tier=Tier.FRIEND,
 )
 async def check_availability(
@@ -95,9 +69,8 @@ async def check_availability(
         "title": details.display,
         "availability": details.status.label,
         "availability_4k": details.status_4k.label,
-        "copies": await plex_copies(services.plex, details),
     }
     if media_type == MediaType.TV:
-        reply["seasons"] = await season_counts(services.plex, details)
+        reply["seasons"] = season_rows(details)
         reply.update(await show_details(services, details))
     return reply

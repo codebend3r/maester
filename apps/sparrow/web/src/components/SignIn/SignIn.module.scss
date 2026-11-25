@@ -1,0 +1,67 @@
+.page {
+  display: grid;
+  place-items: center;
+  min-block-size: 100dvh;
+  padding: var(--space-5);
+}
+
+.card {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  inline-size: 100%;
+  max-inline-size: var(--measure-narrow);
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  inline-size: var(--logo-badge);
+  block-size: var(--logo-badge);
+  border-radius: var(--radius-round);
+  background: var(--color-leaf);
+  color: var(--color-on-leaf);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-tight);
+}
+
+.lede {
+  margin: 0;
+  color: var(--color-lichen);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+  inline-size: 100%;
+  padding-block-start: var(--space-3);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-birch);
+}
+
+.input {
+  min-block-size: var(--rail-button);
+  padding: var(--space-2) var(--space-3);
+  border: var(--hairline) solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-canopy);
+  font-size: var(--font-size-body);
+  line-height: var(--line-body);
+}
+
+.alert {
+  margin: 0;
+  color: var(--color-alert);
+  font-size: var(--font-size-sm);
+}

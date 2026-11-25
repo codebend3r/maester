@@ -1,4 +1,4 @@
-# The suite rename: raven, luwin and rookery
+# The suite rename: raven and luwin
 
 Date: 2026-10-02. Status: names decided in conversation; the rest is open to
 review in the PRs.
@@ -7,15 +7,14 @@ review in the PRs.
 
 The workspace becomes a named suite. maester stays the name of the whole
 thing, and each app inside it gets its own name from the same story: a
-maester keeps the ravens in the rookery, and Maester Luwin is the one who
+maester keeps the ravens, and Maester Luwin is the one who
 serves the house.
 
-| Name    | What it is                                                                       | Today                            |
-| ------- | -------------------------------------------------------------------------------- | -------------------------------- |
-| maester | The suite: the repo, the workspace, the tracker                                  | The repo and the AI concierge    |
-| raven   | The media library and direct-play player, a Plex alternative                     | weirwood                         |
-| luwin   | The AI assistant: a standalone chat app and a helper window in raven and rookery | maester's agent, `apps/maester`  |
-| rookery | Sign-in and account management                                                   | Not built yet                    |
+| Name    | What it is                                                             | Today                           |
+| ------- | ---------------------------------------------------------------------- | ------------------------------- |
+| maester | The suite: the repo, the workspace, the tracker                        | The repo and the AI concierge   |
+| raven   | The media library and direct-play player, a Plex alternative           | weirwood                        |
+| luwin   | The AI assistant: a standalone chat app and a helper window in raven   | maester's agent, `apps/maester` |
 
 Success: every project builds, tests and deploys under its new name. raven
 keeps its database across the move; luwin starts fresh, without its first
@@ -26,7 +25,7 @@ behaviour changes except the names it uses.
 
 | Question | Decision |
 | --- | --- |
-| What keeps the maester name | The repo `codebend3r/maester`, the root `package.json` (`maester`), the `MAE:` commit prefix, the "maester roadmap" board, the NAS folder `/volume1/docker/maester`, and the plex.tv client headers (`X-Plex-Product`, `X-Plex-Client-Identifier`), so plex.tv keeps seeing the same client |
+| What keeps the maester name | The repo `codebend3r/maester`, the root `package.json` (`maester`), the `MAE:` commit prefix, the "maester roadmap" board, and the NAS folder `/volume1/docker/maester` |
 | Scopes | One per app, as today: `@raven/server`, `@raven/web`, `@raven/core`, `@luwin/api` |
 | Folders | `apps/raven/server`, `apps/raven/web`, `libs/raven/core`, `apps/luwin/api` |
 | Python package | `luwin`, with the console scripts `luwin` and `luwin-eval` |
@@ -37,7 +36,6 @@ behaviour changes except the names it uses.
 | Release line | luwin continues maester's version line: `apps/luwin/VERSION` stays `0.2.1` and the next release is `luwin-v0.3.0`, since renamed env vars are breaking and that goes in a minor while the version is `0.y`. The `maester-v*` and `v*` tags stay |
 | Tracker | `scripts/catalog.py`, `docs/roadmap.md`, `docs/issue-map.json`, the issues and the board keep their text. The suite is still maester, and re-syncing would rewrite every issue |
 | Dated specs | Specs in `docs/superpowers/specs/` from before this one stay as written |
-| rookery | Named in this spec and the root README. No folder or project until it has code |
 | Player prefs | The browser storage key `weirwood-player` becomes `raven-player`; volume and mute reset once |
 | Order | Two PRs: raven first, then luwin, which also removes luwin's first chat surface so it can become its own app, and is deployed to Meleys with a one-time move |
 
@@ -59,8 +57,7 @@ behaviour changes except the names it uses.
 - `git mv apps/maester apps/luwin` and `git mv apps/luwin/api/maester
   apps/luwin/api/luwin`, committed alone.
 - Imports, module paths, logger names, the persona and every message luwin
-  sends say luwin. The plex.tv headers keep
-  `maester`.
+  sends say luwin.
 - `pyproject.toml` names the package `luwin`, and `uv.lock` is regenerated.
 - The env vars are renamed as decided above, with the refusal on boot, and
   the store starts fresh.
@@ -83,10 +80,10 @@ The commands are in `apps/luwin/docs/nas-deployment.md`.
 
 ## Out of scope
 
-- Building rookery, or embedding luwin in raven or rookery.
+- Embedding luwin in raven.
 - The web chat spec's `apps/maester/web/` (`@maester/web`). Where it lives
   is decided when that work starts, now that luwin is meant to sit inside
-  raven and rookery.
+  raven.
 - Renaming the GitHub repo or the board.
 - Releasing `luwin-v0.3.0`. That runs through the `version-bump` skill
   after the deploy.

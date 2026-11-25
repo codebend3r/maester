@@ -42,7 +42,7 @@ MILESTONES: list[Milestone] = [
         "Troubleshooting",
         "Playback problems are diagnosed before anything is replaced; lag is explained with live data.",
     ),
-    ("M4", "Admin and onboarding", "Approvals, digests and Wizarr invites run from chat."),
+    ("M4", "Admin and onboarding", "Approvals, digests and raven invites run from chat."),
     ("M5", "Engagement", "sparrow gives friends reasons to come back."),
 ]
 
@@ -89,10 +89,10 @@ EPICS: list[Epic] = [
                 "title": "Service instance registry",
                 "size": "M",
                 "priority": "P0",
-                "story": "As the maintainer, I want Sonarr, Radarr, SABnzbd and Tautulli addressed by host name (meleys, vermithor) so that no tool ever acts on the wrong stack.",
+                "story": "As the maintainer, I want Sonarr, Radarr and SABnzbd addressed by host name (meleys, vermithor) so that no tool ever acts on the wrong stack.",
                 "criteria": [
                     "Registry loads named instances from env (`SONARR_MELEYS_URL`, `SONARR_VERMITHOR_URL`, ...)",
-                    "Seerr, Plex and Wizarr are singletons",
+                    "Seerr and raven are singletons",
                     "Every tool that touches an arr instance takes a `host` argument and logs it",
                     "A media item resolves to its owning host by path prefix or arr root folder",
                 ],
@@ -102,11 +102,10 @@ EPICS: list[Epic] = [
                 "title": "API clients with fakes",
                 "size": "L",
                 "priority": "P0",
-                "story": "As a developer, I want thin httpx clients for Seerr, Sonarr, Radarr, Tautulli, Plex, Wizarr and SABnzbd, each with an in-memory fake, so that tools and evals run without a live stack.",
+                "story": "As a developer, I want thin httpx clients for Seerr, Sonarr, Radarr, raven and SABnzbd, each with an in-memory fake, so that tools and evals run without a live stack.",
                 "criteria": [
                     "One module per service under `maester/clients/`, async, with typed return dataclasses",
                     "Each client has a `Fake*` sibling implementing the same interface",
-                    "Wizarr client ports the wizteros quirks (expiry honors only 1/7/30 days; `used_by` repr parsing)",
                     "Recorded JSON fixtures under `tests/fixtures/` for at least one call per client",
                 ],
             },
@@ -118,7 +117,7 @@ EPICS: list[Epic] = [
                 "story": "As the maintainer, I want every tool call recorded with who asked, the arguments and the result, so that any action the bot took can be traced later.",
                 "criteria": [
                     "SQLite file on `/data`, schema created on boot, migrations numbered",
-                    "Tables: `users` (chat id to Plex/Seerr identity, tier), `conversations`, `audit_log`, `reports`",
+                    "Tables: `users` (chat id to raven/Seerr identity, tier), `conversations`, `audit_log`, `reports`",
                     "`audit.record(user, tool, args, result, ok)` is called by the tool runner, never by tools",
                     "An admin command can dump the last N audit rows",
                 ],
@@ -228,7 +227,7 @@ EPICS: list[Epic] = [
         "title": "Chat and identity",
         "milestone": "M1",
         "area": "chat",
-        "summary": "sparrow's first chat surface, account linking to Plex/Seerr users, tiers, and interactive buttons. The surface has since been removed so sparrow can become its own app.",
+        "summary": "sparrow's first chat surface, account linking to raven/Seerr users, tiers, and interactive buttons. The surface has since been removed so sparrow can become its own app.",
         "stories": [
             {
                 "key": "E2.1",
@@ -248,9 +247,9 @@ EPICS: list[Epic] = [
                 "title": "Account linking",
                 "size": "M",
                 "priority": "P0",
-                "story": "As a friend, I want to link my chat account to my Plex user once so that requests are made as me and sparrow knows what I have watched.",
+                "story": "As a friend, I want to link my chat account to my raven account once so that requests are made as me and sparrow knows what I have watched.",
                 "criteria": [
-                    "Linking asks for the Plex email or username, matches against Seerr users, and stores the pair pending admin confirmation",
+                    "Linking asks for the raven email or username, matches against Seerr users, and stores the pair pending admin confirmation",
                     "Admin gets an approve/deny button; on approve the link becomes active",
                     "Unlinked users get the unlinked-user flow",
                     "Asking who I am shows the linked identity and tier",
@@ -288,7 +287,7 @@ EPICS: list[Epic] = [
                 "story": "As a newcomer, I want the bot to tell me how to get access when it does not know me, so that I am not stuck.",
                 "criteria": [
                     "Unlinked users get a short explanation and how to link",
-                    "If they have no Plex access at all, the reply points at the invite request flow (E7)",
+                    "If they have no raven account at all, the reply points at the invite request flow (E7)",
                     "No tools other than help are exposed to unlinked users",
                 ],
             },
@@ -353,13 +352,13 @@ EPICS: list[Epic] = [
             },
             {
                 "key": "E3.5",
-                "title": "Availability lookup with a Plex deep link",
+                "title": "Availability lookup with a raven deep link",
                 "size": "S",
                 "priority": "P0",
-                "story": 'As a friend, I want to ask "is Dune on the server?" and get versions plus a link that opens Plex, so that I can start watching right away.',
+                "story": 'As a friend, I want to ask "is Dune on the server?" and get versions plus a link that opens raven, so that I can start watching right away.',
                 "criteria": [
-                    "`check_availability(tmdb_id)` reports available versions (1080p, 4K, HEVC re-encode) from Seerr and Plex",
-                    "Reply includes a `https://app.plex.tv/desktop/#!/server/<machine>/details?key=...` link",
+                    "`check_availability(tmdb_id)` reports available versions (1080p, 4K, HEVC re-encode) from Seerr and raven",
+                    "Reply includes a link to the title's page in raven's web app",
                     "For TV, reports which seasons and how many episodes are present",
                 ],
             },
@@ -383,7 +382,7 @@ EPICS: list[Epic] = [
                 "story": "As a friend, I want a DM when my request is ready to watch, so that I do not have to keep asking.",
                 "criteria": [
                     "FastAPI route receives the Seerr webhook (media available event) with a shared secret",
-                    "The requester is resolved to their chat account and gets a DM with title, version and Plex link",
+                    "The requester is resolved to their chat account and gets a DM with title, version and raven link",
                     "Duplicate webhooks do not produce duplicate DMs",
                     "Reporting a problem from the DM opens a playback report (E4)",
                 ],
@@ -428,7 +427,7 @@ EPICS: list[Epic] = [
                 "priority": "P0",
                 "story": 'As a friend, I want to say "this won\'t play" without naming the file, so that reporting a problem takes one message.',
                 "criteria": [
-                    "`recent_sessions(user)` pulls the user's current and last few sessions from Tautulli",
+                    "`recent_sessions(user)` pulls the user's current and last few sessions from raven",
                     'The bot confirms the item ("Dune (2021), the 4K version?") before doing anything',
                     "If nothing recent exists, it asks for the title and uses the search picker",
                 ],
@@ -440,7 +439,7 @@ EPICS: list[Epic] = [
                 "priority": "P0",
                 "story": "As the maintainer, I want the bot to check whether a playback failure is the client's fault before blaming the file, so that working files are not deleted.",
                 "criteria": [
-                    "`session_diagnosis(session)` reports transcode decision, transcode reasons, container/video/audio codecs and the client platform from Tautulli",
+                    "`session_diagnosis(session)` reports transcode decision, transcode reasons, container/video/audio codecs and the client platform from raven",
                     "Known client limits are encoded (Dolby Vision profile 7, HEVC on older devices, TrueHD/DTS passthrough, PGS subtitle burn-in)",
                     "The reply gives the friend a concrete client-side fix when one applies",
                     "Only when no client cause is found does the flow move to the file health check",
@@ -548,7 +547,7 @@ EPICS: list[Epic] = [
                 "priority": "P0",
                 "story": 'As a friend, I want to say "it\'s laggy" and be told what my stream is actually doing, so that I know whether it is me, the server or the file.',
                 "criteria": [
-                    "`session_report(user)` from Tautulli `get_activity`: bitrate, direct play/stream/transcode, LAN vs WAN, relay flag, client and player",
+                    "`session_report(user)` from raven's live sessions: bitrate, direct play/stream/transcode, LAN vs WAN, relay flag, client and player",
                     "Relayed streams are called out explicitly with the relay bandwidth cap",
                     "The report names the host serving the stream",
                 ],
@@ -560,7 +559,7 @@ EPICS: list[Epic] = [
                 "priority": "P0",
                 "story": "As a friend, I want to know if the server is busy when things are slow, so that I can wait or pick a lighter version.",
                 "criteria": [
-                    "Active streams, transcodes and total outbound bandwidth per host from Tautulli",
+                    "Active streams, transcodes and total outbound bandwidth per host from raven",
                     "CPU and memory per NAS from the fleet monitor API where available",
                     "Reply says whether load is a plausible cause",
                 ],
@@ -594,9 +593,9 @@ EPICS: list[Epic] = [
                 "title": "Service health checks",
                 "size": "S",
                 "priority": "P1",
-                "story": 'As a friend, I want to ask "is Plex down?" and get a real answer, so that I do not message the admin at midnight.',
+                "story": 'As a friend, I want to ask "is raven down?" and get a real answer, so that I do not message the admin at midnight.',
                 "criteria": [
-                    "`service_health()` pings Plex, Seerr, both Sonarr/Radarr/SABnzbd/Tautulli instances and Wizarr",
+                    "`service_health()` pings raven, Seerr and both Sonarr/Radarr/SABnzbd instances",
                     "Reply lists what is up and down and any known maintenance window (E6)",
                     "Health is cached for 60 seconds",
                 ],
@@ -743,17 +742,17 @@ EPICS: list[Epic] = [
         "title": "Onboarding and accounts",
         "milestone": "M4",
         "area": "onboarding",
-        "summary": "Wizarr invites, device setup help, access changes and expiry reminders.",
+        "summary": "raven invites, device setup help, access changes and expiry reminders.",
         "stories": [
             {
                 "key": "E7.1",
-                "title": "Invite requests through Wizarr",
+                "title": "Invite requests through raven",
                 "size": "M",
                 "priority": "P0",
                 "story": "As a trusted friend, I want to ask for access for someone else and have the admin approve it, so that new people are onboarded without a group chat thread.",
                 "criteria": [
                     "`request_invite(for_whom, note)` creates a pending action in the approval queue",
-                    "On approval the Wizarr client creates an invite with the configured expiry and libraries",
+                    "On approval raven gets an invite with the configured expiry and libraries",
                     "The invite link is sent to the requester to forward, and the expiry is stated",
                 ],
             },
@@ -775,7 +774,7 @@ EPICS: list[Epic] = [
                 "priority": "P1",
                 "story": "As a friend, I want to ask for access to another library or the 4K tier and have it go to the admin, so that access changes are one message.",
                 "criteria": [
-                    "Pending action with the requested change; on approval the Wizarr or Plex share is updated and, for 4K, the tier raised",
+                    "Pending action with the requested change; on approval the raven library access is updated and, for 4K, the tier raised",
                 ],
             },
             {
@@ -785,7 +784,7 @@ EPICS: list[Epic] = [
                 "priority": "P2",
                 "story": "As a friend, I want a reminder before my access expires, so that I am not cut off mid-season.",
                 "criteria": [
-                    "Daily job checks Wizarr user expiries and DMs the user at 7 and 1 days out",
+                    "Daily job checks raven account expiries and DMs the user at 7 and 1 days out",
                     "Reminder text is configurable and points at the contribution link if one exists",
                 ],
             },
@@ -805,8 +804,8 @@ EPICS: list[Epic] = [
                 "priority": "P1",
                 "story": "As a friend, I want suggestions based on what I have watched, preferring what is already on the server, so that I find something tonight.",
                 "criteria": [
-                    "`watch_history(user)` from Tautulli feeds the model with genres, recent titles and ratings",
-                    "Suggestions that are on the server come with a Plex link; others come with an offer to request",
+                    "`watch_history(user)` from raven feeds the model with genres, recent titles and ratings",
+                    "Suggestions that are on the server come with a raven link; others come with an offer to request",
                 ],
             },
             {
@@ -816,29 +815,29 @@ EPICS: list[Epic] = [
                 "priority": "P1",
                 "story": "As a friend, I want a weekly post of what landed on the server, so that I do not miss new additions.",
                 "criteria": [
-                    "Scheduled job lists additions from Tautulli's recently added, grouped by library, with posters",
+                    "Scheduled job lists additions from raven's recently added, grouped by library, with posters",
                     "Posted to the configured channel",
                 ],
             },
             {
                 "key": "E8.3",
-                "title": "Plex Wrapped",
+                "title": "raven Wrapped",
                 "size": "M",
                 "priority": "P2",
                 "story": "As a friend, I want a yearly summary of my watching, so that I can share it with the group.",
                 "criteria": [
-                    "`/wrapped [year]` builds hours watched, top shows and movies, top genres and longest binge from Tautulli",
+                    "`/wrapped [year]` builds hours watched, top shows and movies, top genres and longest binge from raven",
                     "Rendered as an embed with a shareable image",
                 ],
             },
             {
                 "key": "E8.4",
-                "title": "Auto-request from the Plex watchlist",
+                "title": "Auto-request from the raven watchlist",
                 "size": "M",
                 "priority": "P2",
-                "story": "As a friend, I want titles I add to my Plex watchlist requested automatically, so that I can use the Plex app as my request list.",
+                "story": "As a friend, I want titles I add to my raven watchlist requested automatically, so that I can use raven as my request list.",
                 "criteria": [
-                    "Opt-in per user; watchlist synced via Seerr's watchlist feature or the plex.tv API",
+                    "Opt-in per user; watchlist synced via Seerr's watchlist feature or raven's API",
                     "4K and quota rules still apply; the friend is DMed about anything that needs approval",
                 ],
             },
@@ -849,7 +848,7 @@ EPICS: list[Epic] = [
                 "priority": "P2",
                 "story": "As the admin, I want a list of titles nobody has watched in N months, so that I can free space deliberately.",
                 "criteria": [
-                    "Admin-only tool joins Tautulli history with library items and sizes",
+                    "Admin-only tool joins raven's watch history with library items and sizes",
                     "Output sorted by size, with the last watcher and date",
                 ],
             },
@@ -860,7 +859,7 @@ EPICS: list[Epic] = [
                 "priority": "P2",
                 "story": "As a friend, I want new additions filtered to the genres I actually watch, so that the weekly post is relevant to me.",
                 "criteria": [
-                    "Per-user genre profile from Tautulli history",
+                    "Per-user genre profile from raven's watch history",
                     "`/new` returns the last two weeks of additions ranked by that profile",
                 ],
             },
@@ -882,7 +881,7 @@ EPICS: list[Epic] = [
                 "priority": "P2",
                 "story": "As a group of friends, we want to ask for something none of us have seen, so that movie night starts faster.",
                 "criteria": [
-                    "`/pick @a @b @c` intersects unwatched titles across the named users' Tautulli histories",
+                    "`/pick @a @b @c` intersects unwatched titles across the named users' raven watch histories",
                     "Filters by genre or runtime from the message",
                 ],
             },
@@ -904,7 +903,7 @@ EPICS: list[Epic] = [
                 "priority": "P2",
                 "story": "As a friend, I want a monthly post with the most-watched title and a vote for best request, so that the group has something to argue about.",
                 "criteria": [
-                    "A monthly job shares top titles from Tautulli and a vote for best request of the month",
+                    "A monthly job shares top titles from raven and a vote for best request of the month",
                     "Results announced a week later",
                 ],
             },
@@ -942,7 +941,7 @@ AREA_LABELS: dict[str, str] = {
     "playback": "Playback issue reports and file replacement",
     "perf": "Lag and network diagnostics",
     "admin": "Admin console and scheduled jobs",
-    "onboarding": "Wizarr invites and account help",
+    "onboarding": "raven invites and account help",
     "engagement": "Recommendations, digests and social features",
     "infra": "Scaffold, config, clients, storage, deploy and CI",
 }

@@ -3,7 +3,7 @@ tier: friend
 services:
   seerr:
     results:
-      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, rating_key: "4348", media_id: 12, runtime: 155}
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, media_id: 12, runtime: 155}
   radarr:
     meleys:
       movies:

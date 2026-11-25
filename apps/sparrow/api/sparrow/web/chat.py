@@ -1,6 +1,6 @@
 """The chat routes of sparrow's API, for its web app.
 
-Each route needs a friend or above (`Auth.linked`) and takes JSON only.
+Each route needs a friend or above (`Auth.approved`) and takes JSON only.
 
 - `POST /api/chat` with `{text}`: one turn, streamed as server-sent events
 - `POST /api/chat/pick` with `{label, value, year}`: the choice a picker
@@ -274,10 +274,10 @@ class ChatApi:
     def router(self) -> APIRouter:
         router = APIRouter(prefix="/api/chat")
         auth = self.auth
-        Linked = Annotated[Viewer, Depends(auth.linked)]
+        Approved = Annotated[Viewer, Depends(auth.approved)]
 
         @router.post("", dependencies=[Depends(require_json)])
-        async def send(message: Message, viewer: Linked) -> StreamingResponse:
+        async def send(message: Message, viewer: Approved) -> StreamingResponse:
             user = viewer.chat_user
             return StreamingResponse(
                 self._stream(
@@ -287,7 +287,7 @@ class ChatApi:
             )
 
         @router.post("/pick", dependencies=[Depends(require_json)])
-        async def pick(chosen: Pick, viewer: Linked) -> StreamingResponse:
+        async def pick(chosen: Pick, viewer: Approved) -> StreamingResponse:
             user = viewer.chat_user
             choice = Choice(label=chosen.label, value=chosen.value, year=chosen.year)
             return StreamingResponse(
@@ -296,7 +296,7 @@ class ChatApi:
             )
 
         @router.post("/decide", dependencies=[Depends(require_json)])
-        async def decide(press: Press, viewer: Linked) -> DecisionBody:
+        async def decide(press: Press, viewer: Approved) -> DecisionBody:
             decision = await self.chat.decide(press.pending_id, viewer.chat_user, press.approve)
             return DecisionBody(
                 text=decision.text,
@@ -305,11 +305,11 @@ class ChatApi:
             )
 
         @router.post("/forget", dependencies=[Depends(require_json)])
-        async def forget(viewer: Linked) -> ForgetBody:
+        async def forget(viewer: Approved) -> ForgetBody:
             return ForgetBody(text=self.chat.forget(viewer.chat_user))
 
         @router.get("/usage")
-        async def usage(viewer: Linked) -> UsageBody:
+        async def usage(viewer: Approved) -> UsageBody:
             """The model, and today's tokens against the daily budget, for the page's footer."""
             used = self.chat.usage(viewer.chat_user.id)
             return UsageBody(

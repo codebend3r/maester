@@ -7,7 +7,6 @@
 - `digest.py`     the admin's daily digest
 - `nas.py`        the weekly NAS health report
 - `landed.py`     a friend told when the new copy of a replaced file lands
-- `expiry.py`     reminders before a friend's access ends
 """
 
 from __future__ import annotations
@@ -18,7 +17,6 @@ from functools import partial
 from sparrow.clients import Services
 from sparrow.config import Settings
 from sparrow.jobs.digest import Digest
-from sparrow.jobs.expiry import remind_expiring
 from sparrow.jobs.landed import CHECK_EVERY, tell_landed
 from sparrow.jobs.nas import nas_report
 from sparrow.jobs.schedule import At, Every
@@ -43,11 +41,6 @@ def scheduled(services: Services, store: Store, settings: Settings) -> list[Job]
         ),
         Job("digest", At(jobs.digest_at, jobs.zone), Digest(services, store, settings)),
         Job("landed", Every(CHECK_EVERY), partial(tell_landed, services, store)),
-        Job(
-            "expiry_reminders",
-            At(jobs.digest_at, jobs.zone),
-            partial(remind_expiring, services, store, settings),
-        ),
         Job(
             "nas_report",
             At(jobs.digest_at, jobs.zone, weekday=jobs.nas_report_day),

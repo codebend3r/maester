@@ -4,41 +4,46 @@ Every tool module registers into the process-wide registry, and the case's
 seed (`sparrow/evals/seed.py`, checked when the case loads) is turned into
 the fakes' records. One `seerr.results`
 entry describes a title once: it is both what search finds and what the
-details lookup returns. The eval user is linked (to Tautulli too, when the
-case gives `user.tautulli_user_id`), so tools act as a real friend's would;
-their Tautulli sessions are seeded per host, and the files the health check
-reads under `probe`.
+details lookup returns. The eval user is an approved raven account linked to
+a Seerr user, so tools act as a real friend's would; their raven plays and
+live streams are seeded under `raven`, and the files the health check reads
+under `probe`.
 """
 
 from __future__ import annotations
 
-import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from sparrow.agent.tools import ToolRegistry
 from sparrow.agent.tools import registry as app_registry
 from sparrow.clients import (
     FakeFileProbe,
     FakeFleetMonitor,
-    FakePlexClient,
     FakeRadarrClient,
     FakeRavenClient,
     FakeSabnzbdClient,
     FakeSeerrClient,
     FakeSonarrClient,
     FakeSpeedTest,
-    FakeTautulliClient,
-    FakeWizarrClient,
     Services,
 )
 from sparrow.clients.arr import HistoryEvent, MediaFile, QueueItem, RootFolder
 from sparrow.clients.arr_library import ArrService, CustomFilter, FakeArrLibrary
 from sparrow.clients.fleet import Vitals
 from sparrow.clients.media import Inspection, Track
-from sparrow.clients.plex import PlexItem, PlexSeason, Version
-from sparrow.clients.plextv import FakePlexTv
 from sparrow.clients.radarr import Movie
-from sparrow.clients.raven import Part, RavenPerson, RavenTitle, Work
+from sparrow.clients.raven import (
+    LiveStream,
+    MemberStatus,
+    Part,
+    PlaybackMode,
+    Played,
+    RavenFile,
+    RavenItem,
+    RavenPerson,
+    RavenTitle,
+    Work,
+)
 from sparrow.clients.sabnzbd import Download
 from sparrow.clients.seerr import (
     ArrRef,
@@ -54,25 +59,21 @@ from sparrow.clients.seerr import (
 )
 from sparrow.clients.sonarr import Episode, Series
 from sparrow.clients.speedtest import SpeedResult
-from sparrow.clients.tautulli import HistoryRow, Session
 from sparrow.evals.seed import (
     ArrLibrarySeed,
     HistoryEventSeed,
-    PlayedSeed,
-    PlexSeed,
     ProbeSeed,
     RadarrFileSeed,
     RadarrSeed,
+    RavenFileSeed,
     RavenSeed,
     RequestSeed,
     SabnzbdSeed,
     Seed,
     SeerrSeed,
-    SessionSeed,
     SonarrFileSeed,
     SonarrSeed,
     SpeedSeed,
-    TautulliSeed,
     TitleSeed,
     VitalsSeed,
 )
@@ -82,8 +83,6 @@ from sparrow.store import Store
 import sparrow.tools  # noqa: F401  isort: skip
 
 EVAL_USER = "eval-user"
-# The Plex server sparrow reads (`PLEX_URL`): the first host's, watched by its Tautulli.
-PLEX_ID = "library-plex"
 UHD_SERVER_ID = 9  # Seerr's id for the 4K Radarr and Sonarr a `four_k` case lists
 ARR_URLS = {"radarr": "http://{host}.lan:7878", "sonarr": "http://{host}.lan:8989"}
 GB = 1e9
@@ -108,8 +107,6 @@ def _title(r: TitleSeed) -> tuple[SearchResult, MediaDetails]:
         overview=r.overview,
         status=r.status,
         status_4k=r.status_4k,
-        rating_key=r.rating_key,
-        rating_key_4k=r.rating_key_4k,
         arr_4k=ArrRef(UHD_SERVER_ID, r.arr_4k) if r.arr_4k is not None else None,
         media_id=r.media_id,
         runtime_minutes=r.runtime,
@@ -156,7 +153,7 @@ def _seerr(seed: SeerrSeed, seerr_user_id: int, hosts: list[str]) -> FakeSeerrCl
             c.id: Collection(c.id, c.name, tuple(by_id[t] for t in c.parts))
             for c in seed.collections
         },
-        user_list=[SeerrUser(u.id, u.email, u.username, u.plex_username) for u in seed.users],
+        user_list=[SeerrUser(u.id, u.email.lower(), u.username) for u in seed.users],
         requests=[_request(n, r, seerr_user_id) for n, r in enumerate(seed.requests, 1)],
         arr_servers=four_k if seed.four_k else {},
         auto_approve=seed.auto_approve,
@@ -241,33 +238,6 @@ def _sabnzbd(host: str, seed: SabnzbdSeed) -> FakeSabnzbdClient:
     )
 
 
-def _plex(seed: PlexSeed) -> FakePlexClient:
-    items = {
-        i.rating_key: PlexItem(
-            rating_key=i.rating_key,
-            title=i.title,
-            type=i.type,
-            year=i.year,
-            guids=(f"tmdb://{i.tmdb_id}",) if i.tmdb_id is not None else (),
-            versions=tuple(
-                Version(
-                    resolution=v.resolution,
-                    video_codec=v.codec,
-                    bitrate_kbps=int(v.bitrate_mbps * 1000),
-                    size_bytes=int(v.size_gb * GB),
-                    file=v.file,
-                )
-                for v in i.versions
-            ),
-        )
-        for i in seed.items
-    }
-    seasons = {
-        key: [PlexSeason(s.number, s.episodes) for s in rows] for key, rows in seed.seasons.items()
-    }
-    return FakePlexClient(machine_id=PLEX_ID, items=items, show_seasons=seasons)
-
-
 def _sonarr(host: str, seed: SonarrSeed) -> FakeSonarrClient:
     """A host's shows and their episode files."""
     return FakeSonarrClient(
@@ -304,85 +274,6 @@ def _sonarr(host: str, seed: SonarrSeed) -> FakeSonarrClient:
             )
             for e in seed.episodes
         ],
-    )
-
-
-def _session(n: int, x: SessionSeed, user_id: int) -> Session:
-    bitrate = int(x.bitrate_mbps * 1000)
-    source = x.source_mbps if x.source_mbps is not None else x.bitrate_mbps
-    return Session(
-        session_key=str(n),
-        user_id=x.user_id if x.user_id is not None else user_id,
-        user="eval",
-        rating_key=x.rating_key,
-        full_title=x.title,
-        media_type="episode" if x.show_key is not None else "movie",
-        state="playing",
-        progress_percent=10,
-        platform=x.platform,
-        player=x.player,
-        product=x.product,
-        location=x.location,
-        relayed=x.relayed,
-        secure=True,
-        bandwidth_kbps=bitrate,
-        stream_bitrate_kbps=bitrate,
-        transcode_decision=x.transcode_decision,
-        video_decision=x.video_decision,
-        audio_decision=x.audio_decision,
-        subtitle_decision=x.subtitle_decision,
-        container="mkv",
-        video_codec=x.video_codec,
-        video_resolution="1080",
-        video_dynamic_range="SDR",
-        audio_codec=x.audio_codec,
-        audio_channels=6,
-        subtitle_codec=x.subtitle_codec,
-        file=x.file,
-        show_key=x.show_key or "",
-        season=x.season,
-        episode=x.episode,
-        dovi_profile=x.dovi_profile,
-        source_bitrate_kbps=int(source * 1000),
-        transcode_speed=x.transcode_speed,
-        transcode_throttled=x.throttled,
-        tmdb_id=x.tmdb_id,
-    )
-
-
-def _played(n: int, x: PlayedSeed) -> HistoryRow:
-    started = int(time.time() - x.days_ago * 86400)
-    return HistoryRow(
-        user_id=x.user_id,
-        rating_key=x.rating_key,
-        full_title=x.title,
-        media_type="movie",
-        started=started,
-        stopped=started + 3600,
-        percent_complete=90,
-        transcode_decision="direct play",
-        platform="Roku",
-        player="Living Room",
-        location=x.location,
-        relayed=False,
-        row_id=n,
-    )
-
-
-def _tautulli(host: str, seed: TautulliSeed, user_id: int, library: str) -> FakeTautulliClient:
-    """A host's live sessions and finished plays (`history`), each naming its title's TMDB
-    id as `tmdb_id`. It watches its own host's Plex server; the `library` host's is the one
-    sparrow reads."""
-    return FakeTautulliClient(
-        host=host,
-        plex_id=PLEX_ID if host == library else f"{host}-plex",
-        sessions=[_session(n, x, user_id) for n, x in enumerate(seed.sessions, 1)],
-        history_rows=[_played(n, x) for n, x in enumerate(seed.history, 1)],
-        titles={
-            x.rating_key: x.tmdb_id
-            for x in (*seed.sessions, *seed.history)
-            if x.tmdb_id is not None
-        },
     )
 
 
@@ -434,9 +325,24 @@ def _speedtest(seed: SpeedSeed) -> FakeSpeedTest:
     return FakeSpeedTest(host=seed.host, result=result)
 
 
+def _raven_file(f: RavenFileSeed, title: str) -> RavenFile:
+    return RavenFile(
+        id=f.id,
+        title=title,
+        width=f.width,
+        video_codec=f.codec,
+        hdr=f.hdr,
+        dolby_vision=f.dolby_vision,
+        bitrate_kbps=round(f.bitrate_mbps * 1000),
+        size_bytes=int(f.size_gb * GB),
+        variant=f.variant,
+    )
+
+
 def _raven(seed: RavenSeed) -> FakeRavenClient:
-    """raven's libraries as a case lists them: each entry one library's copy of a title.
-    Its people each list their filmography; a work named like a title in raven is that item."""
+    """raven as a case lists it: each title one library's copy, the items behind them with
+    their files, the eval user's plays and live streams, and its people, who each list
+    their filmography; a work named like a title in raven is that item."""
     titles = [
         RavenTitle(
             library_id=t.library_id,
@@ -452,7 +358,7 @@ def _raven(seed: RavenSeed) -> FakeRavenClient:
         )
         for n, t in enumerate(seed.titles)
     ]
-    items = {(t.kind, t.title): t.item_id for t in titles}
+    held = {(t.kind, t.title): t.item_id for t in titles}
     persons = [
         RavenPerson(
             id=n + 1,
@@ -465,7 +371,7 @@ def _raven(seed: RavenSeed) -> FakeRavenClient:
                     year=int(w.released[:4]) if w.released else None,
                     released=w.released,
                     parts=(Part(w.department, w.role),),
-                    item_id=items.get((w.kind, w.title)),
+                    item_id=held.get((w.kind, w.title)),
                 )
                 for w in sorted(p.works, key=lambda w: w.released or "9999", reverse=True)
             ),
@@ -473,7 +379,57 @@ def _raven(seed: RavenSeed) -> FakeRavenClient:
         )
         for n, p in enumerate(seed.people)
     ]
-    return FakeRavenClient(titles=titles, persons=persons)
+    items = {
+        i.id: RavenItem(
+            id=i.id,
+            kind=i.kind,
+            title=i.title,
+            year=i.year,
+            tmdb_id=i.tmdb_id,
+            files=tuple(_raven_file(f, i.title) for f in i.files),
+        )
+        for i in seed.items
+    }
+    now = datetime.now(UTC)
+    plays = [
+        Played(
+            media_id=p.media_id,
+            played_at=(now - timedelta(days=p.days_ago)).isoformat(),
+            library=p.library,
+            title=p.title,
+            item_id=p.item_id,
+            show=p.show,
+            show_id=p.show_id,
+            season=p.season,
+            episode=p.episode,
+        )
+        for p in seed.plays
+    ]
+    streams = [
+        (
+            x.mine,
+            LiveStream(
+                file=next(f for f in items[x.item_id].files if f.id == x.media_id),
+                item_id=x.item_id,
+                library=x.library,
+                mode=PlaybackMode(x.mode),
+                device=x.device,
+                browser=x.browser,
+                address=x.address,
+                send_kbps=round(x.send_mbps * 1000) if x.send_mbps is not None else None,
+                quality=x.quality,
+            ),
+        )
+        for x in seed.streams
+    ]
+    return FakeRavenClient(
+        titles=titles,
+        persons=persons,
+        items=items,
+        plays=plays,
+        live=[s for _, s in streams],
+        mine=[s for mine, s in streams if mine],
+    )
 
 
 def _arr_libraries(
@@ -498,23 +454,15 @@ def _arr_libraries(
 
 def build_services(seed: Seed, seerr_user_id: int = 4) -> Services:
     hosts = seed.hosts
-    tautulli_user = seed.user.tautulli_user_id or 0
     services = Services(
         seerr=_seerr(seed.seerr, seerr_user_id, hosts),
-        plex=_plex(seed.plex),
-        wizarr=FakeWizarrClient(),
+        raven=_raven(seed.raven),
         sonarr={h: _sonarr(h, seed.sonarr.get(h, SonarrSeed())) for h in hosts},
         radarr={h: _radarr(h, seed.radarr.get(h, RadarrSeed())) for h in hosts},
         sabnzbd={h: _sabnzbd(h, seed.sabnzbd.get(h, SabnzbdSeed())) for h in hosts},
-        tautulli={
-            h: _tautulli(h, seed.tautulli.get(h, TautulliSeed()), tautulli_user, hosts[0])
-            for h in hosts
-        },
         probe=_probe(seed.probe),
         fleet=_fleet(seed.fleet) if seed.fleet is not None else None,
         speedtest=_speedtest(seed.speedtest) if seed.speedtest is not None else None,
-        plextv=FakePlexTv(),
-        raven=_raven(seed.raven),
         arr_libraries=_arr_libraries(seed.arr_libraries),
     )
     for name in seed.down:
@@ -529,8 +477,8 @@ def build_world(seed: Seed) -> tuple[ToolRegistry, Services, Store]:
     user = seed.user
     store.upsert_user(
         EVAL_USER,
+        email=user.email.lower(),
+        raven_status=MemberStatus.APPROVED,
         seerr_user_id=user.seerr_user_id,
-        tautulli_user_id=user.tautulli_user_id,
-        plex_username=user.plex_username,
     )
     return app_registry, build_services(seed, user.seerr_user_id), store

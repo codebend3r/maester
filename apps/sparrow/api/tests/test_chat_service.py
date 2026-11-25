@@ -6,7 +6,7 @@ from sparrow.agent.loop import Agent
 from sparrow.agent.runner import ToolRunner
 from sparrow.agent.tools import Choice, Tier, ToolRegistry, offer
 from sparrow.chat.identity import IdentityService
-from sparrow.chat.service import UNLINKED_HELP, ChatService, ChatUser, Decision
+from sparrow.chat.service import ChatService, ChatUser, Decision
 from sparrow.clients.seerr import SeerrUser
 from sparrow.config import Settings
 from sparrow.notify import AdminPost
@@ -47,23 +47,18 @@ def world(services, store):
             raise ConnectionError("arr down")
         return f"replaced file {file_id}"
 
+    for u in (FRIEND, TRUSTED, ADMIN):
+        store.upsert_user(u.id, raven_status="approved")
     for seerr_id, u in enumerate((FRIEND, TRUSTED), 2):
         store.upsert_user(u.id, seerr_user_id=seerr_id)
     store.upsert_user(TRUSTED.id, tier_override="trusted")
     store.upsert_user(ADMIN.id, tier_override="admin")
-    services.seerr.user_list = [SeerrUser(4, "new@example.com", "newbie", "")]
+    services.seerr.user_list = [SeerrUser(4, "new@example.com", "newbie")]
 
     def make(*script):
         return service(reg, services, store, *script)
 
     return make, store, calls
-
-
-async def test_unlinked_user_gets_help_without_calling_the_model(world):
-    make, *_ = world
-    svc = make()  # no scripted responses: any model call would raise
-    response = await svc.handle_message(ChatUser("nobody", "New"), "hi")
-    assert response.chunks == [UNLINKED_HELP]
 
 
 async def test_message_runs_agent_and_offers_choices(world):

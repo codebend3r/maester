@@ -3,7 +3,7 @@ tier: friend
 services:
   seerr:
     results:
-      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 4, tvdb_id: 403245, rating_key: "5120"}
+      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 4, tvdb_id: 403245}
   sonarr:
     meleys:
       series:

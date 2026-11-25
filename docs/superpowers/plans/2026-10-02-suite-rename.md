@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- Product names are lowercase everywhere, in code, UI copy, the persona and docs: maester (the suite), raven, luwin, rookery.
-- These keep the maester name: the repo `codebend3r/maester`, the root `package.json` `"name"`, the `MAE:` commit prefix, the "maester roadmap" board, the NAS folder `/volume1/docker/maester` (`/Volumes/docker/maester` when mounted), the `X-Plex-Product` and `X-Plex-Client-Identifier` header values, and existing `maester-v*` tags.
+- Product names are lowercase everywhere, in code, UI copy, the persona and docs: maester (the suite), raven, luwin.
+- These keep the maester name: the repo `codebend3r/maester`, the root `package.json` `"name"`, the `MAE:` commit prefix, the "maester roadmap" board, the NAS folder `/volume1/docker/maester` (`/Volumes/docker/maester` when mounted), and existing `maester-v*` tags.
 - Never edited by this plan: dated specs in `docs/superpowers/specs/` from before 2026-10-02, `docs/roadmap.md`, `docs/issue-map.json`, `scripts/catalog.py`, `scripts/sync_tracker.py`, `scripts/sync_board.py`, `scripts/setup_project.sh`, `.github/PROJECT_SETUP.md`, `.github/ISSUE_TEMPLATE/`, and the `commit-format`, `pr-format` and `board-sync` skills.
 - No em dashes or en dashes anywhere, including comments and UI copy.
 - Run tasks through Nx from the repo root. Never put a `.env` at the repo root.
@@ -26,7 +26,6 @@
 - A NAS `.env` still setting `MAESTER_MODEL`, `MAESTER_EFFORT` or `MAESTER_DB_PATH`: luwin refuses to boot and names the new variable, instead of running on the default model or a fresh empty database. Pinned in Task 4 (`test_config.py`, `test_app.py`).
 - A data folder copied after the container was killed rather than closed, so `maester.db-wal` or `weirwood.db-wal` holds recent writes: the WAL file moves with the database and no rows are lost. Pinned in Task 2 and Task 4.
 - A `luwin.db` or `raven.db` already beside an old file (a second boot, a restored backup): the new file is never overwritten, and a move cut short finishes on the next open. Pinned in Task 2 and Task 4.
-- The bulk rename reaching the plex.tv headers: plex.tv would see a new client. The headers stay `maester`. Pinned in Task 3 (`test_clients.py`).
 - Stale local state (`node_modules/@weirwood` links, a `.venv` holding the old console scripts, Nx's cache) letting a broken rename pass locally. Tasks 1 and 3 reinstall, run `nx reset`, and check `bun install --frozen-lockfile` and `uv sync --frozen` as CI does.
 
 ---
@@ -52,7 +51,6 @@ git commit -m "$(cat <<'EOF'
 MAE: design and plan for the raven and luwin rename
 
 - maester stays the suite; weirwood becomes raven, the agent becomes luwin
-- rookery is named for the account app to come
 EOF
 )"
 ```
@@ -326,7 +324,6 @@ PR 1 ends here. Pushing and opening it needs the user's go-ahead (Task 6).
 **Files:**
 - Move: `apps/maester/` to `apps/luwin/`, `apps/luwin/api/maester/` to `apps/luwin/api/luwin/`
 - Modify: every tracked file under `apps/luwin/api/`, plus `apps/luwin/Dockerfile`, `apps/luwin/Dockerfile.dockerignore`, `apps/luwin/docker-compose.yml`, `lefthook.yml`, `scripts/package.json`, `scripts/deploy-nas.sh`, `scripts/bump_version.sh`, `.github/workflows/main-smoke-test.yml`, `.gitignore`, `.claude/skills/version-bump/SKILL.md`, root `package.json` (scripts only)
-- Test: `apps/luwin/api/tests/test_clients.py` (new pin test, written before the move)
 - Regenerate: `apps/luwin/api/uv.lock`
 
 **Interfaces:**
@@ -343,29 +340,7 @@ bunx nx run-many -t lint:py format:check test eval -p @maester/api scripts
 
 Expected: all pass. Write down the pytest count for `@maester/api` (around 548).
 
-- [ ] **Step 2: Pin the plex.tv headers to the suite's name**
-
-The bulk rewrite in Step 5 skips every line containing `X-Plex-`, so this test and the client keep their header values. Add to `apps/maester/api/tests/test_clients.py`, after `test_plex_tv_reads_servers_libraries_and_friends_shares_and_writes_one`:
-
-```python
-@respx.mock
-async def test_plex_tv_sees_the_suite_name_in_its_client_headers():
-    # plex.tv tells clients apart by these headers; they carry the suite's name.
-    route = respx.get(f"{PLEX_TV}/api/servers").respond(text="<MediaContainer/>")
-    await PlexTvClient(PLEX_TV, "owner-token").servers()
-    sent = route.calls.last.request.headers
-    assert sent["X-Plex-Product"] == sent["X-Plex-Client-Identifier"] == "maester"
-```
-
-Run: `bunx nx run @maester/api:test -- tests/test_clients.py -k suite_name`
-Expected: 1 passed.
-
-```bash
-git add apps/maester/api/tests/test_clients.py
-git commit -m "MAE: pin the plex.tv client headers to the suite name"
-```
-
-- [ ] **Step 3: Move the folders and commit the renames alone**
+- [ ] **Step 2: Move the folders and commit the renames alone**
 
 ```bash
 git mv apps/maester apps/luwin
@@ -376,7 +351,7 @@ git commit -m "MAE: move the agent to apps/luwin and the package to luwin"
 
 Expected: `git status --short | grep -v '^R '` prints nothing.
 
-- [ ] **Step 4: Point the root scripts at luwin**
+- [ ] **Step 3: Point the root scripts at luwin**
 
 In the root `package.json`, change only this line (the `"name"` and `"description"` stay; Task 5 rewrites the description):
 
@@ -386,30 +361,28 @@ In the root `package.json`, change only this line (the `"name"` and `"descriptio
 
 replacing `"dev:maester": "nx run @maester/api:dev",`.
 
-- [ ] **Step 5: Rewrite the name**
+- [ ] **Step 4: Rewrite the name**
 
-Lowercase `maester` becomes `luwin` and `Maester` becomes `Luwin` (`MaesterBot` to `LuwinBot`). Uppercase `MAESTER_` is untouched (Task 4). Lines with `X-Plex-` are skipped, and the NAS folder, repo URL, board and old tags are protected.
+Lowercase `maester` becomes `luwin` and `Maester` becomes `Luwin` (`MaesterBot` to `LuwinBot`). Uppercase `MAESTER_` is untouched (Task 4). The NAS folder, repo URL, board and old tags are protected.
 
 ```bash
 git ls-files -z -- apps/luwin/api apps/luwin/Dockerfile apps/luwin/Dockerfile.dockerignore apps/luwin/docker-compose.yml \
     lefthook.yml scripts/package.json scripts/deploy-nas.sh scripts/bump_version.sh \
     .github/workflows/main-smoke-test.yml .gitignore .claude/skills/version-bump/SKILL.md \
   | xargs -0 grep -l --null -i maester \
-  | xargs -0 perl -pi -e 'next if /X-Plex-/; s{docker/maester}{\x00NAS\x00}g; s{codebend3r/maester}{\x00REPO\x00}g; s{maester roadmap}{\x00BOARD\x00}g; s{maester-v}{\x00TAG\x00}g; s{maester}{luwin}g; s{Maester}{Luwin}g; s{\x00NAS\x00}{docker/maester}g; s{\x00REPO\x00}{codebend3r/maester}g; s{\x00BOARD\x00}{maester roadmap}g; s{\x00TAG\x00}{maester-v}g'
+  | xargs -0 perl -pi -e 's{docker/maester}{\x00NAS\x00}g; s{codebend3r/maester}{\x00REPO\x00}g; s{maester roadmap}{\x00BOARD\x00}g; s{maester-v}{\x00TAG\x00}g; s{maester}{luwin}g; s{Maester}{Luwin}g; s{\x00NAS\x00}{docker/maester}g; s{\x00REPO\x00}{codebend3r/maester}g; s{\x00BOARD\x00}{maester roadmap}g; s{\x00TAG\x00}{maester-v}g'
 ```
 
-- [ ] **Step 6: Grep gate**
+- [ ] **Step 5: Grep gate**
 
 Run: `git grep -n -i maester -- apps/luwin/api apps/luwin/Dockerfile apps/luwin/Dockerfile.dockerignore apps/luwin/docker-compose.yml lefthook.yml scripts/package.json scripts/deploy-nas.sh scripts/bump_version.sh .github/workflows/main-smoke-test.yml .gitignore .claude/skills/version-bump/SKILL.md`
 Expected: only these, and nothing else:
-- `apps/luwin/api/luwin/clients/plextv.py`: the `X-Plex-Client-Identifier` and `X-Plex-Product` lines
-- `apps/luwin/api/tests/test_clients.py`: the pin test's `assert` line
 - `apps/luwin/api/luwin/config.py` and `apps/luwin/api/tests/test_config.py`: the `MAESTER_MODEL`, `MAESTER_EFFORT` and `MAESTER_DB_PATH` lines
 - `scripts/deploy-nas.sh`: the lines naming `/Volumes/docker/maester` or `/volume1/docker/maester`
 
-Then skim `git diff -- apps/luwin/api/luwin/agent/prompts.py apps/luwin/api/luwin/chat/service.py`: the persona reads "You are luwin, the concierge for a private Plex server" and the greeting "Hi! I'm luwin, the concierge for this Plex server."
+Then skim `git diff -- apps/luwin/api/luwin/agent/prompts.py apps/luwin/api/luwin/chat/service.py`: the persona reads "You are luwin, the concierge for a private raven server" and the greeting "Hi! I'm luwin, the concierge for this raven server."
 
-- [ ] **Step 7: Rebuild the environment**
+- [ ] **Step 6: Rebuild the environment**
 
 The old `.venv` holds a `maester` console script and paths to the old folder.
 
@@ -423,14 +396,14 @@ bunx nx show projects
 
 Expected: `uv lock` changes only the project's own entry name in `uv.lock` (`name = "luwin"`). `nx show projects` lists `@luwin/api` and no `@maester/api`.
 
-- [ ] **Step 8: Run luwin's checks**
+- [ ] **Step 7: Run luwin's checks**
 
 Run: `bunx nx run-many -t lint:py format:check test eval -p @luwin/api scripts`
-Expected: all pass. The pytest count is Step 1's plus 1. The fake-model eval gives the same result as Step 1's.
+Expected: all pass. The pytest count is Step 1's. The fake-model eval gives the same result as Step 1's.
 
 If `lint:py` reports import order (I001), run `bunx nx run @luwin/api:lint:py:fix` and `bunx nx run @luwin/api:format`, then rerun.
 
-- [ ] **Step 9: Build and check the image**
+- [ ] **Step 8: Build and check the image**
 
 ```bash
 docker build -f apps/luwin/Dockerfile -t luwin:check .
@@ -442,11 +415,11 @@ docker rm -f luwin-check
 
 Expected: `luwin 0.2.1`, then a `/health` body with `"status":"ok"` and `"version":"0.2.1"`.
 
-- [ ] **Step 10 (optional, uses the Anthropic API): real-model evals**
+- [ ] **Step 9 (optional, uses the Anthropic API): real-model evals**
 
 The persona's name changed, so the PR checklist asks for evals. With `ANTHROPIC_API_KEY` set, run `uv run luwin-eval` in `apps/luwin/api` and `uv run maester-eval` on `main` in a separate worktree, and compare. Expected: the same cases pass. Skip this only if the user says so, and say it was skipped in the PR.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -457,7 +430,6 @@ MAE: rename the agent package and project to luwin
 - the Nx project is `@luwin/api`; `bun run dev:luwin` starts it
 - the persona, greeting, log names and `LuwinBot` say luwin
 - the image, container and compose project are `luwin`, mounting `./luwin-data`
-- the plex.tv headers keep the suite's name, pinned by a test
 EOF
 )"
 ```
@@ -662,7 +634,7 @@ perl -pi -e 's/MAESTER_/LUWIN_/g; s/maester\.db/luwin.db/g' apps/luwin/.env.exam
 git grep -n -i maester -- apps/luwin/.env.example apps/luwin/api
 ```
 
-Expected from the grep: only the two `X-Plex-` lines in `plextv.py`, the pin test's `assert`, the `RENAMED` entries and docstring in `config.py`, `LEGACY_NAME` and the `adopt_legacy` docstring in `store/base.py`, and the new tests that name the old variables or `maester.db`.
+Expected from the grep: only the `RENAMED` entries and docstring in `config.py`, `LEGACY_NAME` and the `adopt_legacy` docstring in `store/base.py`, and the new tests that name the old variables or `maester.db`.
 
 If you have a local `apps/luwin/.env`, run the same `perl` line on it, or `bun run dev:luwin` stops on boot naming the old variables.
 
@@ -701,7 +673,7 @@ EOF
 - [ ] **Step 1: Rewrite the docs with the protected pass**
 
 ```bash
-perl -pi -e 'next if /X-Plex-/; s{docker/maester}{\x00NAS\x00}g; s{codebend3r/maester}{\x00REPO\x00}g; s{maester roadmap}{\x00BOARD\x00}g; s{maester-v}{\x00TAG\x00}g; s{MAESTER_}{LUWIN_}g; s{maester}{luwin}g; s{Maester}{Luwin}g; s{\x00NAS\x00}{docker/maester}g; s{\x00REPO\x00}{codebend3r/maester}g; s{\x00BOARD\x00}{maester roadmap}g; s{\x00TAG\x00}{maester-v}g' \
+perl -pi -e 's{docker/maester}{\x00NAS\x00}g; s{codebend3r/maester}{\x00REPO\x00}g; s{maester roadmap}{\x00BOARD\x00}g; s{maester-v}{\x00TAG\x00}g; s{MAESTER_}{LUWIN_}g; s{maester}{luwin}g; s{Maester}{Luwin}g; s{\x00NAS\x00}{docker/maester}g; s{\x00REPO\x00}{codebend3r/maester}g; s{\x00BOARD\x00}{maester roadmap}g; s{\x00TAG\x00}{maester-v}g' \
   apps/luwin/README.md apps/luwin/CLAUDE.md apps/luwin/docs/architecture.md apps/luwin/docs/deferred.md apps/luwin/docs/nas-deployment.md README.md CLAUDE.md
 ```
 
@@ -712,13 +684,12 @@ Root `README.md`: replace everything from the `# luwin` title through the paragr
 ```markdown
 # maester
 
-maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and soon their accounts. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
+maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
 
-| App     | What it is                                                                   |
-| ------- | ---------------------------------------------------------------------------- |
-| raven   | A self-hosted media library and direct-play player                           |
-| luwin   | The AI assistant: requests, playback fixes and lag answers for friends |
-| rookery | Sign-in and account management (planned)                                     |
+| App   | What it is                                                             |
+| ----- | ---------------------------------------------------------------------- |
+| raven | A self-hosted media library and direct-play player                     |
+| luwin | The AI assistant: requests, playback fixes and lag answers for friends |
 
 | Project         | Path                | What                                                                   |
 | --------------- | ------------------- | ---------------------------------------------------------------------- |
@@ -731,23 +702,21 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 Each app has a README of its own: [luwin](apps/luwin/README.md), [raven](apps/raven/README.md).
 ```
 
-Realign the app table so its column of pipes lines up after the longer luwin row.
-
 Root `package.json`, set the description:
 
 ```json
-  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for a private Plex server, and the apps and libraries around them",
+  "description": "Nx workspace for maester, a self-hosted media suite: raven, a media library and direct-play player, luwin, an AI assistant for the friends who share the server, and the apps and libraries around them",
 ```
 
 `apps/luwin/README.md`: lines 3 and 5 become:
 
 ```markdown
-The AI assistant of the maester suite, a concierge for a private Plex server. Friends talk to it in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
+The AI assistant of the maester suite, a concierge for a private raven server. Friends talk to it in plain language; it requests movies and shows, works out why something will not play, explains lag with live server data, and hands the admin an approval queue instead of a group chat thread.
 
 luwin is the suite's maester: it serves the house, answers its questions, and sends the ravens.
 ```
 
-`apps/luwin/CLAUDE.md` line 3: start it with `The AI assistant of the maester suite, a concierge for a private Plex server.` in place of `An AI concierge for a private Plex server.`
+`apps/luwin/CLAUDE.md` line 3: start it with `The AI assistant of the maester suite, a concierge for a private raven server.` in place of `An AI concierge for a private raven server.`
 
 - [ ] **Step 3: Replace the finished move section in the runbook**
 
@@ -802,7 +771,7 @@ luwin was released as maester until the rename, so its earlier tags are `maester
 
 ```bash
 git grep -n -w -i maester -- . ':!docs/superpowers' ':!docs/roadmap.md' ':!docs/issue-map.json' ':!scripts/catalog.py' ':!scripts/sync_tracker.py' ':!scripts/sync_board.py' ':!scripts/setup_project.sh' ':!.github/PROJECT_SETUP.md' ':!.github/ISSUE_TEMPLATE' ':!.claude/skills/commit-format' ':!.claude/skills/pr-format' ':!.claude/skills/board-sync' \
-  | grep -vE 'codebend3r/maester|docker/maester|maester roadmap|maester-v|X-Plex-'
+  | grep -vE 'codebend3r/maester|docker/maester|maester roadmap|maester-v'
 ```
 
 Expected: every line left is one of these, and nothing else:
@@ -829,7 +798,7 @@ git add -A
 git commit -m "$(cat <<'EOF'
 MAE: docs and runbook for the luwin and raven rename
 
-- the root README presents the maester suite: raven, luwin and rookery
+- the root README presents the maester suite: raven and luwin
 - luwin's README, CLAUDE.md and docs use the new names
 - `nas-deployment.md` gains the one-time move, with counts to compare and a way back
 - the version-bump skill notes that luwin's older tags are `maester-v*`
@@ -849,7 +818,7 @@ EOF
 
 - [ ] **Step 1: Ask, then push and open PR 1** from `rename-weirwood-to-raven` into `main`, written with the `pr-format` skill. Its Testing section lists the counts from Task 1 Step 7 and Task 2 Step 6, the image check, and the local `weirwood.db` adoption.
 
-- [ ] **Step 2: Ask, then push and open PR 2** from `rename-agent-to-luwin`, stacked on PR 1, with a "Deploy (one time, on Meleys)" section that links `apps/luwin/docs/nas-deployment.md#moving-to-luwin-once`. Say whether the real-model evals ran (Task 3 Step 10).
+- [ ] **Step 2: Ask, then push and open PR 2** from `rename-agent-to-luwin`, stacked on PR 1, with a "Deploy (one time, on Meleys)" section that links `apps/luwin/docs/nas-deployment.md#moving-to-luwin-once`. Say whether the real-model evals ran (Task 3 Step 9).
 
 - [ ] **Step 3: After both merge, ask, then deploy** by following "Moving to luwin (once)" on Meleys. Expected: `/health` answers, the two `users` counts match, and `docker logs luwin` shows "luwin is online as ...".
 

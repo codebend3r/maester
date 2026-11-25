@@ -1,7 +1,7 @@
 """Answers tools share across calls for a while, fetched once however many ask at once.
 
 A health check or a speed test costs the services (or the upload) something,
-and friends ask in bursts ("is Plex down?" from three people at midnight), so
+and friends ask in bursts ("is the server down?" from three people at midnight), so
 a tool keeps its answer under a key and reuses it while it's fresh. While
 one call fetches a key, the others asking for it wait and share that answer
 instead of fetching again. How long an answer stays fresh is each tool's

@@ -45,7 +45,9 @@
 
 .notice {
   display: grid;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: var(--space-4);
   min-block-size: 100dvh;
   padding: var(--space-5);
   color: var(--color-lichen);

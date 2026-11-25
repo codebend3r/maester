@@ -7,8 +7,7 @@ a codec, a resolution) aren't taken for one.
 
 A group whose files were reported `BAD_RELEASE_REPORTS` times or more in
 `WINDOW` is suggested for a block in the digest, once per window. Files are
-counted, not reports: two friends reporting one file is one bad file. A
-report the player explains doesn't count, since the file was fine.
+counted, not reports: two friends reporting one file is one bad file.
 """
 
 from __future__ import annotations

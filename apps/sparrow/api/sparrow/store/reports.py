@@ -48,7 +48,6 @@ class Reports(Database):
         kind: ReportKind,
         copy: Copy,
         title: str,
-        rating_key: str | None,
         host: str,
         file_id: int,
         file_path: str,
@@ -61,9 +60,9 @@ class Reports(Database):
         with self.transaction() as conn:
             row = conn.execute(
                 "INSERT INTO reports (ts, user_id, kind, title, media_type, tmdb_id, is_4k,"
-                " season, episode, rating_key, host, file_id, file_path, release_group,"
+                " season, episode, host, file_id, file_path, release_group,"
                 " health, diagnosis, description, decision)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *",
                 (
                     now(),
                     user_id,
@@ -74,7 +73,6 @@ class Reports(Database):
                     int(copy.is_4k),
                     copy.season,
                     copy.episode,
-                    rating_key,
                     host,
                     file_id,
                     file_path,
@@ -123,12 +121,10 @@ class Reports(Database):
         return [self._report(r) for r in rows]
 
     def file_reports_since(self, since: datetime) -> list[ReportRow]:
-        """Reports since `since` that count against their file: all but those a player
-        limit explained, where the file was fine."""
+        """Every report since `since`, oldest first."""
         with self._lock:
             rows = self._conn.execute(
-                "SELECT * FROM reports WHERE ts >= ? AND decision != ? ORDER BY id",
-                (stamp(since), Decision.ADVISED),
+                "SELECT * FROM reports WHERE ts >= ? ORDER BY id", (stamp(since),)
             ).fetchall()
         return [self._report(r) for r in rows]
 

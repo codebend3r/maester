@@ -19,63 +19,17 @@ sparrow runs as one container on **Meleys** (`192.168.50.2`). The whole repo is 
 
 ## Updates
 
-`scripts/deploy-nas.sh` again, then the same `compose up -d --build`. The `.env` and `luwin-data/` directory on the NAS are never touched by the sync.
+`scripts/deploy-nas.sh` again, then the same `compose up -d --build`. The `.env` and `sparrow-data/` directory on the NAS are never touched by the sync.
 
-## Sign-in through rookery
+## Sign-in through raven
 
-sparrow trusts rookery's sign-in and won't boot without it, so rookery runs on Meleys first (`apps/rookery/README.md`). Then add three variables to `apps/sparrow/.env` and restart sparrow:
+sparrow runs no sign-in. Its page signs people in to raven's Supabase project with their raven account, and sparrow asks raven's `GET /api/me` (at `RAVEN_URL`) whose each token is, so raven must answer on the LAN with accounts `ready` (`apps/raven/README.md`, "Accounts"). sparrow won't boot without `RAVEN_URL`. `curl -i http://127.0.0.1:8020/api/me` answers 401 `{"reason": "signed_out"}` without a token, and `curl http://127.0.0.1:8020/api/auth/config` relays raven's sign-in settings.
 
-- `ROOKERY_URL`: rookery on the LAN, as the NAS sees it, such as `http://127.0.0.1:8030`
-- `ROOKERY_PUBLIC_URL`: where browsers sign in, rookery's public address, such as `https://rookery.maester.example.com`
-- `ROOKERY_SERVICE_TOKEN`: the same value as rookery's `SERVICE_TOKEN`
+raven's owner is sparrow's admin, and an account raven's owner approved is a friend; pending and removed accounts are turned away.
 
-The first start after this change rebuilds sparrow's `users` table (migration `002`); it was empty, since nothing has signed in yet, and every other table stays as it was. `curl -i http://127.0.0.1:8020/api/me` should then answer 401 with rookery's login page as `sign_in`.
+## A fresh store
 
-sparrow's public address must sit under rookery's `COOKIE_DOMAIN` (`sparrow.maester.example.com` beside `rookery.maester.example.com`), so the browser sends it the session cookie, and must be in rookery's `APP_ORIGINS`, so sign-in can send the browser back.
-
-## Moving to sparrow (once)
-
-The assistant previously ran as `luwin` from `apps/luwin/`. Stop that compose
-project before starting sparrow, then copy its settings and rename the three
-`LUWIN_*` variables. sparrow keeps the same database and schema: its compose
-file mounts `apps/luwin/luwin-data/`, and the default database filename stays
-`luwin.db`. Do not remove that directory. If `LUWIN_DB_PATH` points elsewhere,
-keep its value under `SPARROW_DB_PATH` and preserve the matching mount.
-
-```bash
-scripts/deploy-nas.sh
-ssh crivas@192.168.50.2
-cd /volume1/docker/maester/apps
-(cd luwin && sudo -n /usr/local/bin/docker compose down) \
-  && cp -p luwin/.env sparrow/.env \
-  && sed -i -e 's/^LUWIN_MODEL=/SPARROW_MODEL=/' \
-    -e 's/^LUWIN_EFFORT=/SPARROW_EFFORT=/' \
-    -e 's/^LUWIN_DB_PATH=/SPARROW_DB_PATH=/' sparrow/.env
-```
-
-The chain stops at the first step that fails, before anything starts. Update
-reverse proxy targets from container `luwin` to `sparrow`. If changing its public
-hostname, update rookery's `APP_ORIGINS` together. Then start sparrow:
-
-```bash
-cd /volume1/docker/maester/apps/sparrow && sudo -n /usr/local/bin/docker compose up -d --build
-for i in $(seq 1 30); do curl -fs http://127.0.0.1:8020/health && echo && break; sleep 2; done
-sudo -n /usr/local/bin/docker logs sparrow 2>&1 | tail -5
-```
-
-The loop prints the health line once sparrow answers; if it prints nothing
-within a minute, its log says why. Confirm existing users and conversations are
-present before accepting the deployment.
-
-To go back to luwin, whose files, settings and image are untouched:
-
-```bash
-cd /volume1/docker/maester/apps
-(cd sparrow && sudo -n /usr/local/bin/docker compose down) && (cd luwin && sudo -n /usr/local/bin/docker compose up -d)
-```
-
-The sync never deletes old product folders. Keep `apps/luwin/luwin-data/`: it
-is still sparrow's live store, not a leftover to clean up.
+The store started fresh when raven replaced the old sign-in: users are now raven accounts, and earlier users and conversations are not carried over. The default database is `/data/sparrow.db` in `apps/sparrow/sparrow-data/`; a database from before that is refused on open, so move any old file aside rather than pointing `SPARROW_DB_PATH` at it.
 
 ## Media mounts
 
@@ -85,7 +39,7 @@ is still sparrow's live store, not a leftover to clean up.
 
 The image carries Ookla's speedtest CLI (pinned in `apps/sparrow/Dockerfile`), and `SPEEDTEST_HOST` names the NAS the container runs on (`meleys`), where `speed_test` measures the servers' shared internet connection. Leave it empty to turn speed tests off.
 
-CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN), read with a static bearer token (`FLEET_MONITOR_TOKEN`) from `/fleet/cpu` and `/fleet/memory`, and each NAS's health for the weekly report from `/fleet`. The monitor has no guard for such a token yet, so leave `FLEET_MONITOR_URL` empty until wizteros adds one that opens only those three routes. Until then, server load comes from Tautulli alone, and the NAS report covers the media volumes only.
+CPU and memory per NAS come from the fleet monitor (wizteros' `fleet-monitor`, `http://192.168.50.2:8010` on the LAN), read with a static bearer token (`FLEET_MONITOR_TOKEN`) from `/fleet/cpu` and `/fleet/memory`, and each NAS's health for the weekly report from `/fleet`. The monitor has no guard for such a token yet, so leave `FLEET_MONITOR_URL` empty until wizteros adds one that opens only those three routes. Until then, server load has no CPU or memory to read (the admin still sees raven's streams), and the NAS report covers the media volumes only.
 
 ## Scheduled jobs
 
@@ -93,4 +47,4 @@ The digest, the stalled-download sweeper, the nightly free-space sample and the 
 
 ## Data
 
-`apps/luwin/luwin-data/luwin.db` is the default state file. Back it up with the rest of `/volume1/docker`.
+`apps/sparrow/sparrow-data/sparrow.db` is the default state file. Back it up with the rest of `/volume1/docker`.

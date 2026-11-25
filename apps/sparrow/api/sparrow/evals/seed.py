@@ -8,16 +8,14 @@ as the cases write them.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from sparrow.clients.arr_library import ArrService
 from sparrow.clients.seerr import MediaStatus
 from sparrow.media import MediaType
 
-# A Plex rating key or show key, which YAML reads as a number when it looks like one.
-Key = Annotated[str, BeforeValidator(str)]
 DEFAULT_HOSTS = ["meleys", "vermithor"]
 
 
@@ -42,8 +40,6 @@ class TitleSeed(Block):
     year: int | None = None
     overview: str = ""
     poster_path: str | None = None
-    rating_key: Key | None = None
-    rating_key_4k: Key | None = None
     # The title's id in the 4K Radarr or Sonarr (`four_k` seeds those).
     arr_4k: int | None = None
     media_id: int | None = None
@@ -73,7 +69,6 @@ class SeerrUserSeed(Block):
     id: int
     email: str = ""
     username: str = ""
-    plex_username: str = ""
 
 
 class SeerrSeed(Block):
@@ -156,33 +151,6 @@ class SabnzbdSeed(Block):
     history: list[SabDownloadSeed] = []
 
 
-class VersionSeed(Block):
-    resolution: Key
-    codec: str = "h264"
-    bitrate_mbps: float = 10
-    size_gb: float = 10
-    file: str = ""
-
-
-class PlexItemSeed(Block):
-    rating_key: Key
-    title: str
-    type: str = "movie"
-    year: int | None = None
-    tmdb_id: int | None = None
-    versions: list[VersionSeed] = []
-
-
-class PlexSeasonSeed(Block):
-    number: int
-    episodes: int
-
-
-class PlexSeed(Block):
-    items: list[PlexItemSeed] = []
-    seasons: dict[Key, list[PlexSeasonSeed]] = {}
-
-
 class SeriesSeed(Block):
     id: int
     title: str
@@ -207,53 +175,6 @@ class SonarrSeed(Block):
     series: list[SeriesSeed] = []
     files: list[SonarrFileSeed] = []
     episodes: list[EpisodeSeed] = []
-
-
-class SessionSeed(Block):
-    """A live session, the eval user's unless it names another `user_id`; unset fields read
-    as a 1080p file direct-played on the home network."""
-
-    rating_key: Key
-    title: str
-    user_id: int | None = None
-    show_key: Key | None = None
-    season: int | None = None
-    episode: int | None = None
-    platform: str = "Roku"
-    player: str = "Living Room"
-    product: str = "Plex for Roku"
-    location: str = "lan"
-    relayed: bool = False
-    transcode_decision: str = "direct play"
-    video_decision: str = "direct play"
-    audio_decision: str = "direct play"
-    subtitle_decision: str = ""
-    video_codec: str = "h264"
-    audio_codec: str = "eac3"
-    subtitle_codec: str = ""
-    file: str = ""
-    dovi_profile: int = 0
-    bitrate_mbps: float = 20
-    source_mbps: float | None = None  # the bitrate when left out
-    transcode_speed: float = 0
-    throttled: bool = False
-    tmdb_id: int | None = None
-
-
-class PlayedSeed(Block):
-    """A finished play by anyone (`user_id`), `days_ago` days back."""
-
-    rating_key: Key
-    title: str = ""
-    user_id: int = 99
-    location: str = "lan"
-    days_ago: float = 1
-    tmdb_id: int | None = None
-
-
-class TautulliSeed(Block):
-    sessions: list[SessionSeed] = []
-    history: list[PlayedSeed] = []
 
 
 class TrackSeed(Block):
@@ -321,9 +242,67 @@ class PersonSeed(Block):
     works: list[WorkSeed] = []
 
 
+class RavenFileSeed(Block):
+    """One file raven holds; unset fields read as a 1080p H.264 file at 10 Mbps."""
+
+    id: int
+    width: int = 1920
+    codec: str = "h264"
+    hdr: bool = False
+    dolby_vision: int | None = None
+    bitrate_mbps: float = 10
+    size_gb: float = 10
+    variant: str | None = None
+
+
+class RavenItemSeed(Block):
+    """A movie, show or episode raven matched, with its TMDB id and its files."""
+
+    id: int
+    title: str
+    kind: Literal["movie", "show", "episode"] = "movie"
+    year: int | None = None
+    tmdb_id: int | None = None
+    files: list[RavenFileSeed] = []
+
+
+class RavenPlaySeed(Block):
+    """One of the eval user's plays in raven, newest first in the list; an episode names
+    its show."""
+
+    media_id: int
+    title: str
+    item_id: int | None = None
+    show: str | None = None
+    show_id: int | None = None
+    season: int | None = None
+    episode: int | None = None
+    days_ago: float = 0
+    library: str = "Movies"
+
+
+class RavenStreamSeed(Block):
+    """A live stream of one of the items' files; unset fields read as a play as it is, at
+    home, in Chrome on a Mac."""
+
+    item_id: int
+    media_id: int
+    mode: Literal["direct", "remux", "transcode"] = "direct"
+    address: str = "192.168.50.20"
+    device: str = "Mac"
+    browser: str = "Chrome 141"
+    send_mbps: float | None = None
+    quality: str | None = None
+    library: str = "Movies"
+    mine: bool = True  # the eval user's, or someone else's that only the admin sees
+
+
 class RavenSeed(Block):
     titles: list[RavenTitleSeed] = []
     people: list[PersonSeed] = []
+    items: list[RavenItemSeed] = []
+    plays: list[RavenPlaySeed] = []
+    streams: list[RavenStreamSeed] = []
 
 
 class FilterSeed(Block):
@@ -342,8 +321,7 @@ class ArrLibrarySeed(Block):
 
 class UserSeed(Block):
     seerr_user_id: int = 4
-    tautulli_user_id: int | None = None
-    plex_username: str = "eval"
+    email: str = "eval@example.com"
 
 
 class Seed(Block):
@@ -351,16 +329,14 @@ class Seed(Block):
 
     hosts: list[str] = Field(default_factory=lambda: list(DEFAULT_HOSTS))
     seerr: SeerrSeed = SeerrSeed()
-    plex: PlexSeed = PlexSeed()
     radarr: dict[str, RadarrSeed] = {}
     sonarr: dict[str, SonarrSeed] = {}
     sabnzbd: dict[str, SabnzbdSeed] = {}
-    tautulli: dict[str, TautulliSeed] = {}
     probe: ProbeSeed = ProbeSeed()
     fleet: dict[str, VitalsSeed] | None = None
     speedtest: SpeedSeed | None = None
     raven: RavenSeed = RavenSeed()
     arr_libraries: dict[ArrService, dict[str, ArrLibrarySeed]] = {}
-    # Services that answer like unreachable ones: "plex", or "radarr:vermithor" per host.
+    # Services that answer like unreachable ones: "raven", or "radarr:vermithor" per host.
     down: list[str] = []
     user: UserSeed = UserSeed()

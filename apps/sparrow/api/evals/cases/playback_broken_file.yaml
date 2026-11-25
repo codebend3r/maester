@@ -1,10 +1,9 @@
 name: a file that fails its health check is offered for replacement, behind Confirm
 tier: friend
 services:
-  user: {tautulli_user_id: 8008135}
   seerr:
     results:
-      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 5, tvdb_id: 403245, rating_key: "5120", media_id: 31, runtime: 30}
+      - {tmdb_id: 136315, title: "The Bear", year: 2022, media_type: tv, status: 5, tvdb_id: 403245, media_id: 31, runtime: 30}
   sonarr:
     meleys:
       series:

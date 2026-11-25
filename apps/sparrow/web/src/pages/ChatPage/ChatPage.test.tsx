@@ -1,15 +1,26 @@
 import { beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ROUTES, TIERS } from '@/lib/api'
-import { browser } from '@/lib/browser'
+import type { Session } from '@supabase/supabase-js'
+import { HEADERS } from '@shared/http'
+import { AUTH_CONFIG_STATES, REFUSALS, ROUTES, TIERS } from '@/lib/api'
+import type { AuthClient } from '@/lib/authClient'
 import { ENTRY_KINDS } from '@/lib/entries'
 import { CHAT_EVENTS, NOTICE_KINDS } from '@/lib/events'
 import { ChatPage } from '@/pages/ChatPage/ChatPage'
+import { AUTH_SESSION_STATUSES, useAuthSession } from '@/stores/authSession'
 import { CHAT_STORAGE_KEY, useChat } from '@/stores/chat'
 import { eventStream, renderWithQueries } from '@/test/render'
 
 type Sent = { url: string; body: unknown }
+
+type Asked = { url: string; bearer: string | null }
+
+type Routes = Record<string, (bearer: string | null) => Response>
+
+type Serving = { routes: Routes; asked?: Asked[] }
+
+type Credentials = { email: string; password: string }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
@@ -36,27 +47,75 @@ const SANDBOX = {
   ],
 }
 
-const FRIEND = { user: { id: 'eval-user', display_name: 'Sandbox friend' }, tier: TIERS.friend }
+const FRIEND = { user: { id: 'eval-user', email: 'eval@sparrow.test' }, tier: TIERS.friend }
+
+const READY_CONFIG = {
+  state: AUTH_CONFIG_STATES.ready,
+  supabaseUrl: 'https://supabase.test',
+  publishableKey: 'sb_publishable_test',
+  webUrl: 'https://raven.test',
+  cookieName: 'maester-auth',
+}
+
+const SESSION: Session = {
+  access_token: 'token-1',
+  refresh_token: 'refresh-1',
+  expires_in: 3600,
+  token_type: 'bearer',
+  user: {
+    id: 'account-1',
+    aud: 'authenticated',
+    app_metadata: {},
+    user_metadata: {},
+    created_at: '2026-11-24T00:00:00Z',
+  },
+}
 
 const urlOf = (input: RequestInfo | URL): string => {
   if (typeof input === 'string') return input
   return input instanceof URL ? input.href : input.url
 }
 
-/** Answers each route from `routes`, and records what was posted. */
-const serve = (routes: Record<string, () => Response>) => {
+const bearerOf = (init?: RequestInit): string | null =>
+  new Headers(init?.headers).get(HEADERS.authorization)
+
+/** Answers each route from `routes`, and records what was posted and every bearer sent. */
+const serve = ({ routes, asked = [] }: Serving) => {
   const sent: Sent[] = []
   const answer = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = urlOf(input)
+    const bearer = bearerOf(init)
+    asked.push({ url, bearer })
     if (typeof init?.body === 'string') sent.push({ url, body: JSON.parse(init.body) })
-    return routes[url]?.() ?? json({ detail: 'Not Found' }, 404)
+    return routes[url]?.(bearer) ?? json({ detail: 'Not Found' }, 404)
   }
   // Bun's fetch type carries `preconnect` too.
   spyOn(globalThis, 'fetch').mockImplementation(Object.assign(answer, { preconnect: () => {} }))
   return sent
 }
 
-const sandboxRoutes = (extra: Record<string, () => Response> = {}) => ({
+/** A Supabase client that lets `SESSION` in with any password, and records each sign-in. */
+const fakeAuthClient = (signedIn: Credentials[]): AuthClient => ({
+  signInWithPassword: async (credentials) => {
+    if ('email' in credentials) signedIn.push(credentials)
+    return { data: { user: SESSION.user, session: SESSION }, error: null }
+  },
+  signOut: async () => ({ error: null }),
+  getSession: async () => ({ data: { session: null }, error: null }),
+  onAuthStateChange: () => ({
+    data: { subscription: { id: 'fake', callback: () => {}, unsubscribe: () => {} } },
+  }),
+})
+
+/** The auth store as it stands once Supabase's client has loaded and found no session kept. */
+const startedWith = (client: AuthClient) =>
+  useAuthSession.setState({
+    clientLoad: Promise.resolve(client),
+    session: null,
+    status: AUTH_SESSION_STATUSES.ready,
+  })
+
+const sandboxRoutes = (extra: Routes = {}) => ({
   [ROUTES.me]: () => json(FRIEND),
   [ROUTES.sandbox]: () => json(SANDBOX),
   ...extra,
@@ -66,11 +125,16 @@ describe('ChatPage', () => {
   beforeEach(() => {
     window.localStorage.clear()
     useChat.setState({ owner: null, entries: [], settled: [], isBusy: false })
+    useAuthSession.setState({
+      clientLoad: null,
+      session: null,
+      status: AUTH_SESSION_STATUSES.booting,
+    })
   })
 
   it('sends a case message and shows the reply, its tools and the verdict', async () => {
-    const sent = serve(
-      sandboxRoutes({
+    const sent = serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -111,7 +175,7 @@ describe('ChatPage', () => {
             ]),
           ),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
 
     expect(await screen.findByText('raven · localhost:5174')).toBeInTheDocument()
@@ -140,8 +204,8 @@ describe('ChatPage', () => {
 
   it('shows the model and the tokens left, read again after each turn, and ＋ starts over', async () => {
     const used = [15_750]
-    const sent = serve(
-      sandboxRoutes({
+    const sent = serve({
+      routes: sandboxRoutes({
         [ROUTES.usage]: () =>
           json({ model: 'claude-sonnet-5-5', tokens_used: used[0], token_budget: 200_000 }),
         [ROUTES.chat]: () => {
@@ -155,7 +219,7 @@ describe('ChatPage', () => {
         },
         [ROUTES.forget]: () => json({ text: 'Forgotten.' }),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
 
     expect(await screen.findByText('claude-sonnet-5-5')).toBeInTheDocument()
@@ -172,8 +236,8 @@ describe('ChatPage', () => {
   })
 
   it('presses a confirmation once and picks a choice as the next message', async () => {
-    const sent = serve(
-      sandboxRoutes({
+    const sent = serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -198,7 +262,7 @@ describe('ChatPage', () => {
             ]),
           ),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'replace dune{Enter}')
 
@@ -217,8 +281,8 @@ describe('ChatPage', () => {
   })
 
   it('shows a note for the admin, with no buttons, and the tier can change', async () => {
-    const sent = serve(
-      sandboxRoutes({
+    const sent = serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -229,7 +293,7 @@ describe('ChatPage', () => {
           ),
         [ROUTES.sandboxTier]: () => json({ tier: TIERS.admin }),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'dune skips{Enter}')
 
@@ -243,19 +307,19 @@ describe('ChatPage', () => {
   })
 
   it('says so when the turn cannot reach sparrow or breaks on its side', async () => {
-    serve(
-      sandboxRoutes({
+    serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () => new Response(eventStream([[CHAT_EVENTS.error, { ref: 'abc123' }]])),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
     expect(await screen.findByRole('alert')).toHaveTextContent('ref abc123')
   })
 
   it('shows why a turn broke when the sandbox says', async () => {
-    serve(
-      sandboxRoutes({
+    serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -265,7 +329,7 @@ describe('ChatPage', () => {
             ]),
           ),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
     expect(await screen.findByRole('region', { name: 'Why it broke' })).toHaveTextContent(
@@ -274,8 +338,8 @@ describe('ChatPage', () => {
   })
 
   it("keeps the chat across a reload while the world is the same, and drops another world's", async () => {
-    serve(
-      sandboxRoutes({
+    serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -284,7 +348,7 @@ describe('ChatPage', () => {
             ]),
           ),
       }),
-    )
+    })
     const first = renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
     expect(await screen.findByText('Hello.')).toBeInTheDocument()
@@ -313,7 +377,7 @@ describe('ChatPage', () => {
       }),
     )
     await useChat.persist.rehydrate()
-    serve(sandboxRoutes())
+    serve({ routes: sandboxRoutes() })
     renderWithQueries(<ChatPage />)
     expect(await screen.findByText('How can I help?')).toBeInTheDocument()
     expect(screen.queryByText('from before')).not.toBeInTheDocument()
@@ -350,15 +414,15 @@ describe('ChatPage', () => {
     )
     await useChat.persist.rehydrate()
     expect(useChat.getState().entries).toEqual([])
-    serve(sandboxRoutes())
+    serve({ routes: sandboxRoutes() })
     renderWithQueries(<ChatPage />)
     expect(await screen.findByText('How can I help?')).toBeInTheDocument()
     expect(screen.queryByText('an old answer')).not.toBeInTheDocument()
   })
 
   it('keeps the conversation when sparrow does not answer Start over', async () => {
-    serve(
-      sandboxRoutes({
+    serve({
+      routes: sandboxRoutes({
         [ROUTES.chat]: () =>
           new Response(
             eventStream([
@@ -368,7 +432,7 @@ describe('ChatPage', () => {
           ),
         [ROUTES.forget]: () => json({ detail: 'down' }, 503),
       }),
-    )
+    })
     renderWithQueries(<ChatPage />)
     await userEvent.type(await screen.findByLabelText('Message sparrow'), 'hi{Enter}')
     expect(await screen.findByText('Hello.')).toBeInTheDocument()
@@ -377,22 +441,75 @@ describe('ChatPage', () => {
     expect(screen.getByText('Hello.')).toBeInTheDocument()
   })
 
-  it('sends anyone signed out to rookery, coming back here after', async () => {
-    const goTo = spyOn(browser, 'goTo').mockImplementation(() => undefined)
+  it('signs a signed-out visitor in with raven, then asks sparrow with the bearer', async () => {
+    const signedIn: Credentials[] = []
+    startedWith(fakeAuthClient(signedIn))
+    const asked: Asked[] = []
     serve({
-      [ROUTES.me]: () => json({ reason: 'signed_out', sign_in: 'https://rookery.test/login' }, 401),
+      routes: {
+        [ROUTES.me]: (bearer) =>
+          bearer === `Bearer ${SESSION.access_token}`
+            ? json(FRIEND)
+            : json({ reason: REFUSALS.signedOut }, 401),
+        [ROUTES.authConfig]: () => json(READY_CONFIG),
+      },
+      asked,
     })
     renderWithQueries(<ChatPage />)
-    expect(await screen.findByText('Sending you to sign in…')).toBeInTheDocument()
-    expect(goTo).toHaveBeenCalledWith(
-      `https://rookery.test/login?return_to=${encodeURIComponent(window.location.href)}`,
-    )
+
+    await userEvent.type(await screen.findByLabelText('Email'), 'friend@raven.test')
+    await userEvent.type(screen.getByLabelText('Password'), 'hunter2')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByLabelText('Message sparrow')).toBeInTheDocument()
+    expect(signedIn).toEqual([{ email: 'friend@raven.test', password: 'hunter2' }])
+    expect(asked.filter(({ url }) => url === ROUTES.me).map(({ bearer }) => bearer)).toEqual([
+      null,
+      `Bearer ${SESSION.access_token}`,
+    ])
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
   })
 
-  it('has no sandbox controls on the real server, and tells an unlinked user whom to ask', async () => {
-    serve({ [ROUTES.me]: () => json({ ...FRIEND, tier: TIERS.unlinked }) })
+  it('asks for both fields before trying Supabase', async () => {
+    const signedIn: Credentials[] = []
+    startedWith(fakeAuthClient(signedIn))
+    serve({
+      routes: {
+        [ROUTES.me]: () => json({ reason: REFUSALS.signedOut }, 401),
+        [ROUTES.authConfig]: () => json(READY_CONFIG),
+      },
+    })
     renderWithQueries(<ChatPage />)
-    expect(await screen.findByText(/doesn't have access to this server yet/)).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter your email and password.')
+    expect(signedIn).toEqual([])
+  })
+
+  it("says sign-in isn't available when raven's accounts are off or out of reach", async () => {
+    serve({
+      routes: {
+        [ROUTES.me]: () => json({ reason: REFUSALS.signedOut }, 401),
+        [ROUTES.authConfig]: () => json({ reason: REFUSALS.signInUnavailable }, 503),
+      },
+    })
+    renderWithQueries(<ChatPage />)
+    expect(await screen.findByText(/Sign-in isn't available right now/)).toBeInTheDocument()
+  })
+
+  it("has no sandbox controls on the real server, and tells someone raven hasn't approved whom to ask", async () => {
+    serve({ routes: { [ROUTES.me]: () => json({ reason: REFUSALS.notApproved }, 403) } })
+    renderWithQueries(<ChatPage />)
+    expect(await screen.findByText(/raven account isn't approved yet/)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Sandbox' })).not.toBeInTheDocument()
+  })
+
+  it('runs the sandbox with no sign-in and no bearer', async () => {
+    const asked: Asked[] = []
+    serve({ routes: sandboxRoutes(), asked })
+    renderWithQueries(<ChatPage />)
+    expect(await screen.findByLabelText('Message sparrow')).toBeInTheDocument()
+    expect(asked.every(({ bearer }) => bearer === null)).toBe(true)
+    expect(asked.some(({ url }) => url === ROUTES.authConfig)).toBe(false)
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument()
   })
 })

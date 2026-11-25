@@ -1,11 +1,10 @@
 name: replace flow stops at confirmation
 tier: trusted
 services:
-  user: {tautulli_user_id: 8008135}
   seerr:
     four_k: true
     results:
-      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, status_4k: 5, rating_key: "4348", rating_key_4k: "4349", media_id: 12, arr_4k: 18, runtime: 155}
+      - {tmdb_id: 438631, title: "Dune", year: 2021, media_type: movie, status: 5, status_4k: 5, media_id: 12, arr_4k: 18, runtime: 155}
   radarr:
     vermithor:
       movies:

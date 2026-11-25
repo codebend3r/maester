@@ -9,8 +9,8 @@ ENV = {
     "LIDARR_VERMITHOR_URL": "http://192.168.50.3:8686",
     "LIDARR_VERMITHOR_API_KEY": "v-lid",
     "SEERR_URL": "http://192.168.50.3:5055",
-    "PLEX_MELEYS_URL": "ignored, not a per-host service",
-    "TAUTULLI_MELEYS_URL": "",
+    "SEERR_MELEYS_URL": "ignored, not a per-host service",
+    "SABNZBD_MELEYS_URL": "",
 }
 
 

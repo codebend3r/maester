@@ -91,9 +91,9 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
         async def close(self):
             self.is_closed = True
 
-    case = Case.load(CASES_DIR / "setup_roku.yaml")
+    case = Case.load(CASES_DIR / "setup_mac.yaml")
     store = Store(":memory:")
-    closing = ClosingModel.scripted(text_message("Go to plex.tv/link."))
+    closing = ClosingModel.scripted(text_message("Choose Open Anyway."))
     agent = Agent(
         model_client=closing,
         model="fake",
@@ -105,7 +105,7 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
     await run_case_and_close(case, agent)
     assert closing.is_closed
 
-    agent.client = FakeModel.scripted(text_message("Go to plex.tv/link."))
+    agent.client = FakeModel.scripted(text_message("Choose Open Anyway."))
     await run_case_and_close(case, agent)
     store.close()
 
@@ -115,7 +115,7 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
     [
         ("trusted_4k_goes_to_admin", ("request_media_4k", {"tmdb_id": 438631, "media_type": "movie"})),
         ("tv_request_by_season", ("request_media", {"tmdb_id": 136315, "media_type": "tv", "seasons": [2, 3]})),
-        ("availability_with_plex_link", ("check_availability", {"tmdb_id": 438631, "media_type": "movie"})),
+        ("version_for_slow_connection", ("pick_version", {"tmdb_id": 438631, "connection_mbps": 20})),
         ("request_status", ("request_status", {})),
         ("collection_request", ("find_collection", {"tmdb_id": 954})),
         ("anime_english_dub", ("check_availability", {"tmdb_id": 209867, "media_type": "tv"})),
@@ -146,7 +146,6 @@ FORKS = {"tmdb_id": 136315, "media_type": "tv", "version": "1080p", "season": 2,
     ("case_file", "call", "expect"),
     [
         ("playback_identify_recent", ("recent_sessions", {}), "movie:438631:1080p"),
-        ("playback_client_fix", ("report_problem", {**DUNE_1080P, "kind": "wont_play", "description": "stalls"}), '"decision": "advised"'),
         ("playback_broken_file", ("report_problem", {**FORKS, "kind": "wont_play", "description": "freezes", "at": "20:00"}), '"decision": "replaceable"'),
         ("wrong_file_report", ("report_problem", {**DUNE_1080P, "kind": "cam", "description": "a cam"}), '"decision": "recorded"'),
         ("subtitle_question", ("list_tracks", DUNE_1080P), '"language": "spa"'),
@@ -166,12 +165,8 @@ async def test_playback_case_worlds_reach_what_their_cases_expect(case_file, cal
 @pytest.mark.parametrize(
     ("case_file", "call", "expect"),
     [
-        ("lag_relayed", ("session_report", {}), '"fix": "avoid_relay"'),
-        ("lag_remote_quality", ("session_report", {}), '"fix": "original_quality"'),
-        ("lag_subtitle_burn_in", ("session_report", {}), '"fix": "subtitles_off"'),
-        ("lag_busy_server", ("session_report", {}), '"fix": "wait"'),
-        ("lag_heavy_remux", ("session_report", {}), '"what_to_do": "Play the 1080p version instead'),
-        ("lag_details_on_request", ("session_report", {"details": True}), '"findings": [{"fix": "original_quality"'),
+        ("lag_heavy_remux", ("session_report", {}), '"what_to_do": "Play the 1080p (H.264) version instead'),
+        ("lag_details_on_request", ("session_report", {"details": True}), '"findings": [{"fix": "other_version"'),
         ("server_load", ("server_status", {}), '"load_is_a_plausible_cause": true'),
     ],
 )  # fmt: skip
@@ -193,11 +188,9 @@ async def test_the_slow_uplink_world_is_found_by_a_speed_test():
     before = await runner.run(ctx, "session_report", {})
     assert '"fix": null' in before.text and "speed_test(host=meleys)" in before.text
     tested = await runner.run(ctx, "speed_test", {"host": "meleys"})
-    assert (
-        "The upload is nearly full" in tested.text and '"remote_streams_mbps": 20.0' in tested.text
-    )
+    assert "The upload is nearly full" in tested.text
     after = await runner.run(ctx, "session_report", {})
-    assert '"fix": "lower_quality"' in after.text and "4 Mbps 720p" in after.text
+    assert '"fix": "lower_quality"' in after.text and "Convert to 1080p HD (Standard)" in after.text
     store.close()
 
 
@@ -206,7 +199,7 @@ async def test_the_health_world_has_what_its_case_says_is_down():
     registry, services, store = build_world(case.services)
     ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
     outcome = await ToolRunner(registry).run(ctx, "service_health", {})
-    assert [d["service"] for d in outcome.content["down"]] == ["Plex", "Radarr on vermithor"]
+    assert [d["service"] for d in outcome.content["down"]] == ["raven", "Radarr on vermithor"]
     store.close()
 
 
@@ -216,18 +209,8 @@ async def test_the_version_world_recommends_what_its_case_expects():
     ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
     call = {"tmdb_id": 438631, "connection_mbps": 20}
     outcome = await ToolRunner(registry).run(ctx, "pick_version", call)
-    assert '"recommended": {"version": "1080p", "fits": true' in outcome.text
+    assert '"recommended": {"version": "1080p (H.264)", "fits": true' in outcome.text
     assert outcome.notices == ()
-    store.close()
-
-
-async def test_the_heavy_remux_world_flags_the_remux_to_the_admin():
-    case = Case.load(CASES_DIR / "lag_heavy_remux.yaml")
-    registry, services, store = build_world(case.services)
-    ctx = ToolContext(EVAL_USER, case.tier, services, store, Settings(), Memo())
-    outcome = await ToolRunner(registry).run(ctx, "session_report", {})
-    (notice,) = outcome.notices
-    assert "watched away from home 3 times" in notice.text
     store.close()
 
 

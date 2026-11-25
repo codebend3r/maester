@@ -1,9 +1,0 @@
-{
-  "extends": "../../../tooling/tsconfig/nest.json",
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["src", "vitest.config.ts"]
-}

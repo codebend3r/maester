@@ -18,11 +18,11 @@ def client():
 def test_it_opens_a_blank_world_as_an_admin_with_no_sign_in(client):
     web, _ = client
     assert web.get("/api/me").json() == {
-        "user": {"id": "eval-user", "display_name": "Sandbox user"},
+        "user": {"id": "eval-user", "email": "Sandbox user"},
         "tier": "admin",
     }
     state = web.get("/api/sandbox").json()
-    assert state["model"] == "fake" and state["raven"] is None
+    assert state["model"] == "fake" and state["raven"] == "http://localhost:5174"
     assert state["case"] == {"id": BLANK, "name": "Blank world", "turns": []}
     ids = [c["id"] for c in state["cases"]]
     assert ids[0] == BLANK and "simple_request" in ids

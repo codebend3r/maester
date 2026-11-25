@@ -223,7 +223,7 @@ Three stacked PRs, each built by subagents (an implementer and a reviewer per ta
 
 ## Out of scope
 
-- Watched state per person: raven has no accounts until rookery signs viewers in.
+- Watched state per person: raven has no accounts yet.
 - Music libraries, albums, tracks and playlists, beyond the shape above.
 - Select mode on Home, the History page, people pages and search results.
 - Long-press to select on touch; Select is the way in there.

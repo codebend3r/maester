@@ -54,9 +54,6 @@ RENAMED = {
     "MAESTER_MODEL": "SPARROW_MODEL",
     "MAESTER_EFFORT": "SPARROW_EFFORT",
     "MAESTER_DB_PATH": "SPARROW_DB_PATH",
-    "LUWIN_MODEL": "SPARROW_MODEL",
-    "LUWIN_EFFORT": "SPARROW_EFFORT",
-    "LUWIN_DB_PATH": "SPARROW_DB_PATH",
 }
 
 
@@ -176,28 +173,6 @@ def _weekday(env: Mapping[str, str], name: str, default: int) -> int:
     return WEEKDAYS.index(raw)
 
 
-def _days(env: Mapping[str, str], name: str, default: tuple[int, ...]) -> tuple[int, ...]:
-    """Whole days, "7,1"; most first."""
-    raw = _list(env, name)
-    if not raw:
-        return default
-    if not all(d.isdigit() for d in raw):
-        raise ValueError(f"{name}: {env[name]!r} isn't a list of days like 7,1")
-    return tuple(sorted({int(d) for d in raw}, reverse=True))
-
-
-def _reminder(env: Mapping[str, str], name: str, default: str) -> str:
-    """The expiry reminder's text, checked so a typo in a placeholder fails on boot."""
-    text = env.get(name, "").strip() or default
-    try:
-        text.format(when="in 7 days", date="Sat Oct 04", renew="")
-    except (KeyError, IndexError, ValueError) as exc:
-        raise ValueError(
-            f"{name}: only {{when}}, {{date}} and {{renew}} can be filled in ({exc!r})"
-        ) from None
-    return text
-
-
 @dataclass(frozen=True)
 class FleetMonitorAccess:
     """Where the fleet monitor is, and the bearer token for its CPU and memory routes."""
@@ -243,20 +218,6 @@ class Jobs:
 # The model sparrow answers with unless `SPARROW_MODEL` names another.
 DEFAULT_MODEL = "claude-sonnet-5-5"
 
-EXPIRY_REMINDER = "Heads up: your Plex access ends {when} ({date}). {renew}"
-
-
-@dataclass(frozen=True)
-class Access:
-    """How friends hear their access is ending."""
-
-    # Where a friend keeps their access going, named in the expiry reminder.
-    contribution_url: str = setting("", "CONTRIBUTION_URL", _url)
-    # The reminder DM: {when} ("in 7 days", "tomorrow", "today"), {date}, and {renew}.
-    reminder: str = setting(EXPIRY_REMINDER, "EXPIRY_REMINDER", _reminder)
-    # How many days before access ends a reminder goes out, each once.
-    remind_days: tuple[int, ...] = setting((7, 1), "EXPIRY_REMIND_DAYS", _days)
-
 
 @dataclass(frozen=True)
 class Guardrails:
@@ -275,21 +236,10 @@ class Settings:
     seerr_url: str = setting("", "SEERR_URL", _url, required=True)
     seerr_api_key: str = setting("", "SEERR_API_KEY", _raw, required=True)
     seerr_webhook_secret: str = setting("", "SEERR_WEBHOOK_SECRET", _raw)
-    plex_url: str = setting("", "PLEX_URL", _url)
-    plex_token: str = setting("", "PLEX_TOKEN", _raw)
-    wizarr_url: str = setting("", "WIZARR_URL", _url)
-    wizarr_api_key: str = setting("", "WIZARR_API_KEY", _raw)
-    # plex.tv, which says whose account `PLEX_TOKEN` is: the owner's, the admin's.
-    plex_tv_url: str = setting("https://plex.tv", "PLEX_TV_URL", _url)
-    # raven, the suite's own library: searched for what is on the server, and the address
-    # its links open, so it must be one friends' browsers reach too. Empty for none.
-    raven_url: str = setting("", "RAVEN_URL", _url)
-    # rookery, which owns sign-in: its LAN address, which sparrow asks who a session
-    # belongs to with the service token; and the public address browsers sign in at.
-    rookery_url: str = setting("", "ROOKERY_URL", _url, required=True)
-    rookery_public_url: str = setting("", "ROOKERY_PUBLIC_URL", _url, required=True)
-    rookery_service_token: str = setting("", "ROOKERY_SERVICE_TOKEN", required=True)
-    access: Access = field(default_factory=Access)
+    # raven, the suite's library, player and sign-in: it says who a token is, tools read it
+    # as the person asking, and its links open there, so it must be an address friends'
+    # browsers reach too.
+    raven_url: str = setting("", "RAVEN_URL", _url, required=True)
     # A friend who wants an English dub gets this Sonarr/Radarr tag on the
     # request, and the quality profile named here when it exists.
     dub_tag: str = setting("dub", "DUB_TAG")
@@ -308,8 +258,7 @@ class Settings:
     jobs: Jobs = field(default_factory=Jobs)
 
     guardrails: Guardrails = field(default_factory=Guardrails)
-    # Keep the deployed database filename so a rebrand never opens an empty store.
-    db_path: str = setting("/data/luwin.db", "SPARROW_DB_PATH")
+    db_path: str = setting("/data/sparrow.db", "SPARROW_DB_PATH")
     web_port: int = setting(8020, "WEB_PORT", _int)
 
 

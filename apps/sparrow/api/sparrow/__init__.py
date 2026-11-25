@@ -1,4 +1,4 @@
-"""sparrow: an AI concierge for a private Plex server."""
+"""sparrow: the AI concierge of the maester suite, for its friends and its admin."""
 
 from importlib.metadata import PackageNotFoundError, version
 

@@ -8,14 +8,12 @@ import respx
 
 from sparrow.clients import (
     ClientError,
-    FakeTautulliClient,
-    PlexClient,
+    FakeSabnzbdClient,
     RadarrClient,
+    RavenClient,
     SabnzbdClient,
     SeerrClient,
     SonarrClient,
-    TautulliClient,
-    WizarrClient,
 )
 from sparrow.clients.base import every_host
 from sparrow.clients.fleet import FakeFleetMonitor, FleetMonitorClient, Vitals
@@ -126,27 +124,21 @@ BASE = "http://svc.test"
 @respx.mock
 async def test_each_client_pings_its_cheapest_live_route():
     routes = [
-        respx.get(f"{BASE}/identity").respond(json={"MediaContainer": {"machineIdentifier": "m"}}),
+        respx.get(f"{BASE}/api/health").respond(json={"status": "ok"}),
         respx.get(f"{BASE}/api/v1/status").respond(json={"version": "2.7.3", "commitTag": "x"}),
-        respx.get(f"{BASE}/api/status").respond(json={"users": 12, "invites": 3, "pending": 1, "expired": 0}),
         respx.get(f"{BASE}/api/v3/system/status").respond(json={"appName": "Sonarr", "version": "4.0.9"}),
         respx.get(f"{BASE}/api", params={"mode": "queue", "limit": "1"}).respond(
             json={"queue": {"status": "Idle", "slots": []}}
         ),
-        respx.get(f"{BASE}/api/v2", params={"cmd": "status"}).respond(
-            json={"response": {"result": "success", "message": "Ok", "data": {}}}
-        ),
     ]  # fmt: skip
-    await PlexClient(BASE, "tok").ping()
+    await RavenClient(BASE).ping()
     await SeerrClient(BASE, "k").ping()
-    await WizarrClient(BASE, "k").ping()
     await SonarrClient("meleys", BASE, "arr-key").ping()
     await RadarrClient("meleys", BASE, "arr-key").ping()
     await SabnzbdClient("meleys", BASE, "k").ping()
-    await TautulliClient("meleys", BASE, "k").ping()
     assert all(route.called for route in routes)
-    assert routes[3].calls.last.request.headers["X-Api-Key"] == "arr-key"
-    assert routes[3].call_count == 2  # Sonarr and Radarr share the route
+    assert routes[2].calls.last.request.headers["X-Api-Key"] == "arr-key"
+    assert routes[2].call_count == 2  # Sonarr and Radarr share the route
 
 
 @respx.mock
@@ -154,15 +146,6 @@ async def test_sabnzbd_refuses_a_wrong_key_in_its_answer_and_the_ping_says_so():
     respx.get(f"{BASE}/api").respond(json={"status": False, "error": "API Key Incorrect"})
     with pytest.raises(ClientError, match="API Key Incorrect"):
         await SabnzbdClient("meleys", BASE, "bad").ping()
-
-
-@respx.mock
-async def test_plex_pings_by_naming_itself():
-    identity = respx.get(f"{BASE}/identity").respond(
-        json={"MediaContainer": {"machineIdentifier": "abc123", "version": "1.43.4"}}
-    )
-    await PlexClient(BASE, "tok").ping()
-    assert identity.call_count == 1
 
 
 async def test_every_host_names_the_hosts_that_cant_answer_and_raises_on_a_bug():
@@ -175,7 +158,7 @@ async def test_every_host_names_the_hosts_that_cant_answer_and_raises_on_a_bug()
                 raise self.answer
             return self.answer
 
-    refused = ClientError("tautulli", "GET", "/api/v2", None, "connection refused")
+    refused = ClientError("sabnzbd", "GET", "/api", None, "connection refused")
     found = await every_host({"b": Host(2), "a": Host(1), "c": Host(refused)}, lambda h: h.ask())
     assert found.answered == {"a": 1, "b": 2} and "connection refused" in found.unreachable["c"]
     with pytest.raises(KeyError):
@@ -183,21 +166,16 @@ async def test_every_host_names_the_hosts_that_cant_answer_and_raises_on_a_bug()
 
 
 async def test_a_downable_fake_answers_like_an_unreachable_service():
-    tautulli = FakeTautulliClient(host="meleys")
-    await tautulli.ping()
-    tautulli.down = True
-    with pytest.raises(ClientError, match="tautulli GET ping failed"):
-        await tautulli.ping()
-    assert FakeTautulliClient().down is False  # one fake's outage is its own
+    sabnzbd = FakeSabnzbdClient(host="meleys")
+    await sabnzbd.ping()
+    sabnzbd.down = True
+    with pytest.raises(ClientError, match="sabnzbd GET ping failed"):
+        await sabnzbd.ping()
+    assert FakeSabnzbdClient().down is False  # one fake's outage is its own
 
 
 @respx.mock
 async def test_a_ping_that_isnt_answered_is_a_client_error():
-    respx.get(f"{BASE}/api/v2").respond(
-        json={"response": {"result": "error", "message": "Invalid apikey", "data": {}}}
-    )
     respx.get(f"{BASE}/api/v3/system/status").respond(status_code=401, text="Unauthorized")
-    with pytest.raises(ClientError, match="Invalid apikey"):
-        await TautulliClient("meleys", BASE, "bad").ping()
     with pytest.raises(ClientError, match="401"):
         await RadarrClient("meleys", BASE, "bad").ping()

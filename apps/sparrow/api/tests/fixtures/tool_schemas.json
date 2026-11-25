@@ -2,18 +2,11 @@
   "arr_history": {
     "additionalProperties": false,
     "properties": {
-      "service": {
-        "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
-        "enum": [
-          "radarr",
-          "sonarr",
-          "lidarr"
-        ],
-        "type": "string"
-      },
-      "host": {
-        "description": "The host it runs on, such as vermithor; empty for every host.",
-        "type": "string"
+      "count": {
+        "description": "How many events.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
       },
       "event": {
         "enum": [
@@ -25,11 +18,18 @@
         ],
         "type": "string"
       },
-      "count": {
-        "description": "How many events.",
-        "maximum": 100,
-        "minimum": 1,
-        "type": "integer"
+      "host": {
+        "description": "The host it runs on, such as vermithor; empty for every host.",
+        "type": "string"
+      },
+      "service": {
+        "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
+        "enum": [
+          "radarr",
+          "sonarr",
+          "lidarr"
+        ],
+        "type": "string"
       }
     },
     "required": [
@@ -40,6 +40,19 @@
   "arr_move": {
     "additionalProperties": false,
     "properties": {
+      "custom_filter": {
+        "description": "A custom filter saved in the arr's list, by its label: Movies (Requested).",
+        "type": "string"
+      },
+      "host": {
+        "description": "The host it runs on, such as vermithor.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "path": {
+        "description": "Part of the path: /Meleys/Movies/Requests/.",
+        "type": "string"
+      },
       "service": {
         "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
         "enum": [
@@ -49,29 +62,16 @@
         ],
         "type": "string"
       },
-      "host": {
-        "description": "The host it runs on, such as vermithor.",
-        "minLength": 1,
-        "type": "string"
-      },
-      "custom_filter": {
-        "description": "A custom filter saved in the arr's list, by its label: Movies (Requested).",
-        "type": "string"
-      },
       "title": {
         "description": "Part of the title (an artist's name for lidarr).",
         "type": "string"
       },
-      "path": {
-        "description": "Part of the path: /Meleys/Movies/Requests/.",
+      "to_letter_buckets_under": {
+        "description": "The folder whose letter folders they go to: /Meleys/Movies.",
         "type": "string"
       },
       "to_root_folder": {
         "description": "One root folder for them all: /Meleys/Movies/Requests.",
-        "type": "string"
-      },
-      "to_letter_buckets_under": {
-        "description": "The folder whose letter folders they go to: /Meleys/Movies.",
         "type": "string"
       }
     },
@@ -84,6 +84,10 @@
   "arr_overview": {
     "additionalProperties": false,
     "properties": {
+      "host": {
+        "description": "The host it runs on, such as vermithor; empty for every host.",
+        "type": "string"
+      },
       "service": {
         "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
         "enum": [
@@ -91,10 +95,6 @@
           "sonarr",
           "lidarr"
         ],
-        "type": "string"
-      },
-      "host": {
-        "description": "The host it runs on, such as vermithor; empty for every host.",
         "type": "string"
       }
     },
@@ -106,29 +106,26 @@
   "arr_titles": {
     "additionalProperties": false,
     "properties": {
-      "service": {
-        "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
-        "enum": [
-          "radarr",
-          "sonarr",
-          "lidarr"
-        ],
+      "custom_filter": {
+        "description": "A custom filter saved in the arr's list, by its label: Movies (Requested).",
         "type": "string"
       },
       "host": {
         "description": "The host it runs on, such as vermithor; empty for every host.",
         "type": "string"
       },
-      "custom_filter": {
-        "description": "A custom filter saved in the arr's list, by its label: Movies (Requested).",
-        "type": "string"
+      "limit": {
+        "description": "How many to list.",
+        "maximum": 200,
+        "minimum": 1,
+        "type": "integer"
       },
-      "title": {
-        "description": "Part of the title (an artist's name for lidarr).",
-        "type": "string"
-      },
-      "path": {
-        "description": "Part of the path: /Meleys/Movies/Requests/.",
+      "monitored": {
+        "enum": [
+          "any",
+          "monitored",
+          "unmonitored"
+        ],
         "type": "string"
       },
       "on_disk": {
@@ -140,11 +137,16 @@
         ],
         "type": "string"
       },
-      "monitored": {
+      "path": {
+        "description": "Part of the path: /Meleys/Movies/Requests/.",
+        "type": "string"
+      },
+      "service": {
+        "description": "radarr (movies), sonarr (TV series) or lidarr (music artists).",
         "enum": [
-          "any",
-          "monitored",
-          "unmonitored"
+          "radarr",
+          "sonarr",
+          "lidarr"
         ],
         "type": "string"
       },
@@ -158,11 +160,9 @@
         ],
         "type": "string"
       },
-      "limit": {
-        "description": "How many to list.",
-        "maximum": 200,
-        "minimum": 1,
-        "type": "integer"
+      "title": {
+        "description": "Part of the title (an artist's name for lidarr).",
+        "type": "string"
       }
     },
     "required": [
@@ -317,18 +317,18 @@
   "newest_in_library": {
     "additionalProperties": false,
     "properties": {
+      "count": {
+        "description": "How many titles to list.",
+        "maximum": 25,
+        "minimum": 1,
+        "type": "integer"
+      },
       "kind": {
         "enum": [
           "movie",
           "show"
         ],
         "type": "string"
-      },
-      "count": {
-        "description": "How many titles to list.",
-        "maximum": 25,
-        "minimum": 1,
-        "type": "integer"
       }
     },
     "required": [
@@ -569,17 +569,11 @@
   "search_people": {
     "additionalProperties": false,
     "properties": {
-      "name": {
-        "description": "The person's name, or part of it.",
-        "minLength": 2,
-        "type": "string"
-      },
-      "kind": {
-        "enum": [
-          "movie",
-          "show"
-        ],
-        "type": "string"
+      "count": {
+        "description": "How many of their latest titles to list.",
+        "maximum": 25,
+        "minimum": 1,
+        "type": "integer"
       },
       "job": {
         "enum": [
@@ -591,11 +585,17 @@
         ],
         "type": "string"
       },
-      "count": {
-        "description": "How many of their latest titles to list.",
-        "maximum": 25,
-        "minimum": 1,
-        "type": "integer"
+      "kind": {
+        "enum": [
+          "movie",
+          "show"
+        ],
+        "type": "string"
+      },
+      "name": {
+        "description": "The person's name, or part of it.",
+        "minLength": 2,
+        "type": "string"
       }
     },
     "required": [
@@ -628,11 +628,7 @@
     "properties": {
       "device": {
         "enum": [
-          "android_tv",
-          "apple_tv",
-          "fire_tv",
-          "mobile",
-          "roku",
+          "mac",
           "web"
         ],
         "type": "string"

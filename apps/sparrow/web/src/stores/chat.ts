@@ -22,8 +22,8 @@ import {
 } from '@/lib/entries'
 import type { Choice } from '@/lib/events'
 
-/** The pre-sparrow key, kept from the rebrand; a save older than `SAVED_CHAT_VERSION` is dropped, not read. */
-export const CHAT_STORAGE_KEY = 'luwin-chat'
+/** Where the conversation is kept; a save older than `SAVED_CHAT_VERSION` is dropped, not read. */
+export const CHAT_STORAGE_KEY = 'sparrow-chat'
 
 /** The browser's storage, or nothing when it is refused (a locked-down private window). */
 const quietStorage: StateStorage = {

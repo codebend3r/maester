@@ -22,7 +22,6 @@ from pydantic import Field
 from sparrow.agent.tools import (
     Failed,
     Ok,
-    Refused,
     Result,
     Tier,
     Title,
@@ -105,9 +104,7 @@ async def search_library(
     ctx: ToolContext,
     title: Annotated[str, Field(description="The title, or a word from it.", min_length=1)],
 ) -> Result:
-    raven = ctx.services.raven
-    if raven is None:
-        return Refused("raven isn't set up on this server (RAVEN_URL).")
+    raven = ctx.raven
     try:
         found = await raven.search(title)
         if not found and title.lower().endswith("s"):
@@ -178,9 +175,7 @@ async def newest_in_library(
         int, Field(description="How many titles to list.", ge=1, le=MAX_NEWEST)
     ] = NEWEST_COUNT,
 ) -> Result:
-    raven = ctx.services.raven
-    if raven is None:
-        return Refused("raven isn't set up on this server (RAVEN_URL).")
+    raven = ctx.raven
     try:
         found = await raven.newest(kind)
     except ClientError as exc:
@@ -269,9 +264,7 @@ async def search_people(
         int, Field(description="How many of their latest titles to list.", ge=1, le=MAX_NEWEST)
     ] = NEWEST_COUNT,
 ) -> Result:
-    raven = ctx.services.raven
-    if raven is None:
-        return Refused("raven isn't set up on this server (RAVEN_URL).")
+    raven = ctx.raven
     try:
         matches = await raven.people(name)
         if not matches:

@@ -17,9 +17,9 @@ from pathlib import Path
 
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
-# Set by the initial migration ('luwn'). A database with migrations recorded
+# Set by the initial migration ('sprw'). A database with migrations recorded
 # but not this id was made before sparrow's fresh start.
-APPLICATION_ID = 0x6C75776E
+APPLICATION_ID = 0x73707277
 
 
 class OldDatabase(RuntimeError):

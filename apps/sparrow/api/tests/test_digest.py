@@ -19,7 +19,7 @@ BEAR = MediaDetails(136315, "tv", "The Bear", 2022, "", MediaStatus.AVAILABLE, M
 
 @pytest.fixture
 def digest(services, store):
-    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, email="dany@example.com")
     services.seerr.details.update({("movie", 438631): DUNE, ("tv", 136315): BEAR})
     settings = Settings(guardrails=Guardrails(storage_pause_4k_percent=90))
     return Digest(services, store, settings)
@@ -55,7 +55,7 @@ async def test_every_section_says_what_happened_in_the_last_day(digest, services
     ]
     report = store.add_report(
         user_id="d1", kind=ReportKind.WONT_PLAY, copy=Copy("movie", 438631, True),
-        title="Dune (2021)", rating_key=None, host="vermithor", file_id=55,
+        title="Dune (2021)", host="vermithor", file_id=55,
         file_path="/m/Dune.mkv", release_group="FLUX", health="corrupt", diagnosis={},
         description="", decision=Decision.REPLACEABLE,
     )  # fmt: skip
@@ -84,7 +84,7 @@ async def test_every_section_says_what_happened_in_the_last_day(digest, services
     found = sections(text)
     assert "Switched on" not in found and not any(h.startswith("Waiting") for h in found)
     assert found["New requests"] == [
-        "Dune (2021) in 4K for dany: waiting for approval",
+        "Dune (2021) in 4K for dany@example.com: waiting for approval",
         "The Bear (2022) in 1080p for Grandpa: requested, downloading",
     ]
     assert found["Open issues"] == [
@@ -123,7 +123,7 @@ async def test_the_forecast_and_a_bad_release_group_come_along_when_they_matter(
     for n in (1, 2, 3):
         store.add_report(
             user_id="d1", kind=ReportKind.CAM, copy=Copy("movie", n, False),
-            title=f"Movie {n}", rating_key=None, host="meleys", file_id=n, file_path="",
+            title=f"Movie {n}", host="meleys", file_id=n, file_path="",
             release_group="CAMz", health=None, diagnosis={}, description="",
             decision=Decision.REPLACEABLE,
         )  # fmt: skip

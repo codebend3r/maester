@@ -33,7 +33,7 @@ titles.
 | Like Plex: posters, title | TMDB is the one source for titles, summaries, images, cast and crew, content ratings and its own score. TVDB is left out: TMDB covers TV, and one source means one matcher |
 | Cast and crew | TMDB's credits, with photos: billed cast, then directors, writers, creators and producers. A person's page lists what else of theirs raven holds |
 | Ratings | TMDB's score always. IMDb, Rotten Tomatoes (critics) and Metacritic through OMDb when `OMDB_API_KEY` is set. Rotten Tomatoes' audience score has no free source and is left out |
-| Critic reviews | Rotten Tomatoes reviews have no public API, and the reviews in Plex's screenshot are written by Plex's own members. raven shows reviews by TMDB members and says so. raven's own Rate & Review waits until raven signs viewers in through rookery |
+| Critic reviews | Rotten Tomatoes reviews have no public API, and the reviews in Plex's screenshot are written by Plex's own members. raven shows reviews by TMDB members and says so. raven's own Rate & Review waits until raven signs viewers in |
 | Do not ask questions | Every choice here is a default taken from Plex's behaviour and raven's code. The PR is where they get reviewed |
 
 ## How Plex does it
@@ -748,8 +748,7 @@ One PR per phase. Each leaves raven working and shippable on its own.
 - Matching by absolute number or air date, and other episode orders (TMDB's
   episode groups).
 - Theme music, clear logos and chapter images.
-- raven's own Rate & Review, which needs raven to sign viewers in through
-  rookery.
+- raven's own Rate & Review, which needs raven to sign viewers in.
 - Rotten Tomatoes' audience score and Letterboxd (MDBList, a paid key).
 - TVDB as a second source.
 - One card for a movie kept in two libraries.

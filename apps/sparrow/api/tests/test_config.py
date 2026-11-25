@@ -23,7 +23,7 @@ def test_defaults_when_env_is_empty():
     assert s == Settings()
     assert s.model == "claude-sonnet-5-5"
     assert s.guardrails.replace_daily_cap == 3
-    assert s.db_path == "/data/luwin.db"
+    assert s.db_path == "/data/sparrow.db"
 
 
 def test_values_are_parsed_and_urls_stripped():
@@ -146,10 +146,11 @@ def test_old_variable_names_are_refused_with_their_new_names():
     )
 
 
-@pytest.mark.parametrize("name", ["LUWIN_MODEL", "LUWIN_EFFORT", "LUWIN_DB_PATH"])
+@pytest.mark.parametrize("name", ["MAESTER_MODEL", "MAESTER_EFFORT", "MAESTER_DB_PATH"])
 def test_previous_brand_variables_are_refused_even_when_new_names_are_set(name):
-    with pytest.raises(RenamedConfig, match=f"{name} is now {name.replace('LUWIN', 'SPARROW')}"):
-        refuse_renamed({name: "old", name.replace("LUWIN", "SPARROW"): "new"})
+    new = name.replace("MAESTER", "SPARROW")
+    with pytest.raises(RenamedConfig, match=f"{name} is now {new}"):
+        refuse_renamed({name: "old", new: "new"})
 
 
 def test_new_variable_names_pass_and_are_read():
@@ -163,28 +164,14 @@ def test_new_variable_names_pass_and_are_read():
     assert (s.model, s.effort, s.db_path) == ("claude-sonnet-5", "low", "/data/x.db")
 
 
-def test_sparrow_needs_the_model_key_seerr_and_rookery_to_boot():
-    assert REQUIRED == (
-        "ANTHROPIC_API_KEY",
-        "SEERR_URL",
-        "SEERR_API_KEY",
-        "ROOKERY_URL",
-        "ROOKERY_PUBLIC_URL",
-        "ROOKERY_SERVICE_TOKEN",
-    )
+def test_sparrow_needs_the_model_key_seerr_and_raven_to_boot():
+    assert REQUIRED == ("ANTHROPIC_API_KEY", "SEERR_URL", "SEERR_API_KEY", "RAVEN_URL")
 
 
-def test_rookery_is_read_with_its_urls_stripped():
-    s = load_settings(
-        {
-            "ROOKERY_URL": "http://192.168.50.2:8030/",
-            "ROOKERY_PUBLIC_URL": " https://rookery.maester.example.com/ ",
-            "ROOKERY_SERVICE_TOKEN": " tok ",
-        }
+def test_raven_is_read_with_its_url_stripped():
+    assert load_settings({"RAVEN_URL": " http://192.168.50.6:8484/ "}).raven_url == (
+        "http://192.168.50.6:8484"
     )
-    assert s.rookery_url == "http://192.168.50.2:8030"
-    assert s.rookery_public_url == "https://rookery.maester.example.com"
-    assert s.rookery_service_token == "tok"
 
 
 def test_every_setting_is_read_from_one_variable_of_its_own():

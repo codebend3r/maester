@@ -8,7 +8,7 @@
 # The whole repo is synced because each product's image builds from the repo
 # root. Deliberately EXCLUDED so live NAS state is never clobbered, at any depth:
 #   .env            each product's own (service URLs as the NAS sees them)
-#   luwin-data/   sparrow's SQLite file
+#   sparrow-data/   sparrow's SQLite file
 #   data/           raven's index and thumbnail cache
 #
 # Prereq: mount the share first: Finder > Cmd+K > smb://192.168.50.2 > "docker".
@@ -42,7 +42,7 @@ rsync -av \
   --exclude 'dist' \
   --exclude '.nx' \
   --exclude '.env' \
-  --exclude 'luwin-data' \
+  --exclude 'sparrow-data' \
   --exclude 'data' \
   "$REPO/" \
   "$DEST/"

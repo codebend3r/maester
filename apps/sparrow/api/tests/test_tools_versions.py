@@ -1,22 +1,24 @@
-import time
 from datetime import timedelta
 
-from sparrow.agent.tools import Refused, Tier, registry
-from sparrow.clients.plex import PlexItem, Version
+from sparrow.agent.tools import Failed, Refused, Tier, registry
+from sparrow.clients.raven import RavenItem, RavenTitle
+from sparrow.clients.speedtest import SpeedResult
+from sparrow.perf.uplink import SPEED_TEST, Uplink
 from sparrow.tools.versions import GUESSED, pick_version
-from tests.factories import history_row, session
+from tests.factories import raven_file
 from tests.playback_world import DUNE
 
-REMUX = Version("4k", "hevc", 62103, 72_600_000_000, "/Vermithor/Movies/Dune (2021)/Dune (2021) Bluray-2160p.mkv")  # fmt: skip
-REENCODE = Version("4k", "hevc", 18412, 21_500_000_000, "/Vermithor/Movies/Dune (2021)/Dune (2021) 2160p HEVC.mkv")  # fmt: skip
-WEBDL = Version("1080", "h264", 10240, 12_000_000_000, "/Meleys/Movies/Dune (2021)/Dune (2021) WEBDL-1080p.mkv")  # fmt: skip
+REMUX = raven_file()
+REENCODE = raven_file(id=402, hdr=False, bitrate_kbps=18_400, variant="2160p HEVC")
+WEBDL = raven_file(id=403, width=1920, video_codec="h264", hdr=False, bitrate_kbps=10_200)
 
 
-def dune(ctx, *uhd: Version):
+def dune(ctx, *files):
     ctx.services.seerr.details[("movie", 438631)] = DUNE
-    ctx.services.plex.items = {
-        "4348": PlexItem("4348", "Dune", "movie", 2021, (), (WEBDL,)),
-        "9001": PlexItem("9001", "Dune", "movie", 2021, (), uhd or (REMUX, REENCODE)),
+    raven = ctx.services.raven
+    raven.titles = [RavenTitle(4, "4K Movies", "movie", "Dune", 2021, 40)]
+    raven.items = {
+        40: RavenItem(40, "movie", "Dune", 2021, 438631, files or (WEBDL, REMUX, REENCODE))
     }
 
 
@@ -24,59 +26,56 @@ async def test_versions_are_listed_and_one_recommended_for_the_speed_given(ctx):
     dune(ctx)
     out = await pick_version(ctx, 438631, connection_mbps=20)
     assert [(v["version"], v["bitrate_mbps"]) for v in out["versions"]] == [
-        ("1080p", 10.2), ("4K", 62.1), ("4K HEVC re-encode", 18.4),
+        ("1080p (H.264)", 10.2), ("4K HDR (HEVC)", 62.1), ("2160p HEVC, 4K (HEVC)", 18.4),
     ]  # fmt: skip
     assert out["recommended"] == {
-        "version": "1080p",
+        "version": "1080p (H.264)",
         "fits": True,
-        "remote_quality": "Original",
+        "quality_menu": "Play original quality",
         "connection": "about 20 Mbps: you said about 20 Mbps",
     }
     assert (await pick_version(ctx, 438631, connection_mbps=30))["recommended"]["version"] == (
-        "4K HEVC re-encode"
+        "2160p HEVC, 4K (HEVC)"
     )
-    assert (await pick_version(ctx, 438631, connection_mbps=500))["recommended"]["version"] == "4K"
+    assert (await pick_version(ctx, 438631, connection_mbps=500))["recommended"]["version"] == (
+        "4K HDR (HEVC)"
+    )
     assert "note" not in out
+    assert ctx.services.raven.viewers  # read as the asker
 
 
-async def test_with_nothing_known_a_typical_remote_connection_is_assumed(ctx):
+async def test_with_nothing_known_a_typical_connection_is_assumed_and_said(ctx):
     dune(ctx)
     out = await pick_version(ctx, 438631)
-    assert out["note"] == GUESSED and out["recommended"]["version"] == "1080p"
-    assert "most connections away from home" in out["recommended"]["connection"]
+    assert out["note"] == GUESSED and out["recommended"]["version"] == "1080p (H.264)"
 
 
-async def test_their_last_play_away_from_home_limits_it(ctx):
+async def test_the_last_speed_test_limits_it_too(ctx):
     dune(ctx)
-    ctx.store.upsert_user("d1", tautulli_user_id=7)
-    ctx.services.tautulli["meleys"].sessions = [session(user_id=7, location="wan", relayed=True)]
-    pick = (await pick_version(ctx, 438631, connection_mbps=50))["recommended"]
-    assert (pick["version"], pick["fits"], pick["remote_quality"]) == (
-        "1080p",
-        False,
-        "2 Mbps 720p",
-    )
-    assert pick["connection"] == "about 2 Mbps: Plex relays your stream, at most 2 Mbps"
+    measured = Uplink("meleys", SpeedResult(6_000, 1, 1.0, "s", "i", "u"))
+    await ctx.memo.fresh(SPEED_TEST, timedelta(minutes=20), lambda: _now(measured))
+    out = await pick_version(ctx, 438631, connection_mbps=500)
+    assert out["recommended"] == {
+        "version": "1080p (H.264)",
+        "fits": False,
+        "quality_menu": "Convert to 720p HD (High)",
+        "connection": "about 6 Mbps: the servers' free upload at the last test",
+    }
 
 
-async def test_nothing_on_plex_and_a_bad_speed(ctx):
-    ctx.services.seerr.details[("movie", 438631)] = DUNE
-    assert (await pick_version(ctx, 438631))["note"] == "No version of it is on Plex."
-    refused = await pick_version(ctx, 438631, connection_mbps=0)
-    assert isinstance(refused, Refused) and "above 0" in refused.content
+async def _now(value):
+    return value
 
 
-async def test_asking_about_a_title_only_reads(ctx):
-    """Flagging remuxes is the lag report's job; asking which version to play changes nothing."""
-    dune(ctx, REMUX)
-    now = int(time.time())
-    ctx.services.tautulli["meleys"].history_rows = [
-        history_row(rating_key="9001", location="wan", user_id=u, started=now - 60)
-        for u in (1, 2, 3)
-    ]
-    assert isinstance(await pick_version(ctx, 438631), dict)
-    assert ctx.store.claim("reencode", "9001", window=timedelta(days=30))  # nothing claimed it
+async def test_a_movie_raven_does_not_hold_or_cannot_be_searched(ctx):
+    dune(ctx)
+    ctx.services.raven.items = {}
+    out = await pick_version(ctx, 438631)
+    assert out["versions"] == [] and "No version of it is in raven" in out["note"]
+    ctx.services.raven.down = True
+    assert isinstance(await pick_version(ctx, 438631), Failed)
+    assert isinstance(await pick_version(ctx, 438631, connection_mbps=0), Refused)
 
 
 def test_tool_is_registered_for_friends():
-    assert "pick_version" in {s.name for s in registry.for_tier(Tier.FRIEND)}
+    assert registry.get("pick_version").tier == Tier.FRIEND

@@ -31,10 +31,11 @@ from sparrow.store import LinkedUser, NotLinked, Store
 
 if TYPE_CHECKING:
     from sparrow.clients import Services
+    from sparrow.clients.raven import Raven
 
 
 class Tier(enum.IntEnum):
-    UNLINKED = 0
+    UNAPPROVED = 0  # not approved in raven: refused before chat
     FRIEND = 1
     TRUSTED = 2
     ADMIN = 3
@@ -50,7 +51,7 @@ class Tier(enum.IntEnum):
 
 # The tiers an admin (or the sandbox) can give someone, by their lowercase names.
 AssignableTier = enum.StrEnum(
-    "AssignableTier", {t.name: t.name.lower() for t in Tier if t > Tier.UNLINKED}
+    "AssignableTier", {t.name: t.name.lower() for t in Tier if t > Tier.UNAPPROVED}
 )
 
 
@@ -62,7 +63,10 @@ class ToolContext:
     is the chat identity the call runs as and is audited under. `settings`
     is the deployment's configuration, for the few tools that need a knob.
     `memo` keeps answers tools share across calls for a while (a health
-    check, a speed test), one per app.
+    check, a speed test), one per app. `raven_token` is the asker's own
+    Supabase access token, which `raven` reads raven with, so raven's
+    rules for their account apply; None in the sandbox, which signs no
+    one in.
     """
 
     user_id: str
@@ -71,21 +75,27 @@ class ToolContext:
     store: Store
     settings: Settings
     memo: Memo
+    raven_token: str | None = None
+
+    @property
+    def raven(self) -> Raven:
+        """raven, read as the person asking."""
+        return self.services.raven.as_viewer(self.raven_token)
 
     def linked_user(self) -> LinkedUser:
         """The caller's link: who requests go to Seerr as.
 
         Requests carry `X-API-User: seerr_user_id`, so the friend's name,
-        quotas and permissions apply. Someone whose Plex account matches no
-        Seerr user has none, and the tool refuses.
+        quotas and permissions apply. Someone whose email matches no Seerr
+        user has none, and the tool refuses.
         """
         link = self.store.active_link(self.user_id)
         if link is None:
-            raise NotLinked(f"User {self.user_id} isn't linked to a Plex account")
+            raise NotLinked(f"User {self.user_id} isn't linked to a Seerr user")
         return link
 
     def name_of(self, user_id: str) -> str:
-        """Someone as the admin knows them: their Plex name, or their user id if unlinked."""
+        """Someone as the admin knows them: their email, or their user id if unlinked."""
         link = self.store.active_link(user_id)
         return link.name if link else user_id
 

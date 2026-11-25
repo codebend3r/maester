@@ -33,17 +33,16 @@ def test_the_arrs_word_for_a_group_wins_over_the_file_name():
 def filed(store, file_id, group, *, who="d1", decision=Decision.RECORDED, host="vermithor"):
     return store.add_report(
         user_id=who, kind=ReportKind.WONT_PLAY, copy=Copy("movie", file_id, True),
-        title=f"Movie {file_id} (2021)", rating_key=None, host=host, file_id=file_id,
+        title=f"Movie {file_id} (2021)", host=host, file_id=file_id,
         file_path=f"/m/{file_id}.mkv", release_group=group, health="corrupt", diagnosis={},
         description="", decision=decision,
     )  # fmt: skip
 
 
-def test_files_are_counted_per_group_not_reports_and_player_limits_dont_count(store):
+def test_files_are_counted_per_group_not_reports(store):
     filed(store, 1, "FLUX")
     filed(store, 1, "FLUX", who="d2")  # one file, two friends: still one bad file
     filed(store, 2, "FLUX")
-    filed(store, 3, "FLUX", decision=Decision.ADVISED)  # the player's fault, not the file's
     filed(store, 4, "NTb")
     filed(store, 5, None)
     reports = store.file_reports_since(datetime.now(UTC) - timedelta(days=30))

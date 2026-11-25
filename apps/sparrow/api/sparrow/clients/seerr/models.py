@@ -76,13 +76,7 @@ def int_or_none(value: Any) -> int | None:
 
 def _user_name(raw: dict[str, Any]) -> str:
     """A Seerr user as Seerr shows them."""
-    return (
-        raw.get("displayName")
-        or raw.get("plexUsername")
-        or raw.get("username")
-        or raw.get("email")
-        or ""
-    )
+    return raw.get("displayName") or raw.get("username") or raw.get("email") or ""
 
 
 @dataclass(frozen=True)
@@ -156,8 +150,6 @@ class MediaDetails:
     overview: str
     status: MediaStatus
     status_4k: MediaStatus
-    rating_key: str | None = None  # Plex, standard copy
-    rating_key_4k: str | None = None
     arr: ArrRef | None = None  # the arr holding the standard copy, when Seerr sent it
     arr_4k: ArrRef | None = None
     tvdb_id: int | None = None
@@ -167,7 +159,7 @@ class MediaDetails:
     genre_ids: frozenset[int] = frozenset()
     original_language: str = ""
     # Seerr's own id for the title, which issues are filed against; None
-    # until Seerr tracks it (requested, or found in Plex).
+    # until Seerr tracks it (requested, or found on the server).
     media_id: int | None = None
     runtime_minutes: int | None = None  # a movie's, or a show's typical episode
 
@@ -189,9 +181,6 @@ class MediaDetails:
 
     def status_for(self, is_4k: bool) -> MediaStatus:
         return self.status_4k if is_4k else self.status
-
-    def rating_key_for(self, is_4k: bool) -> str | None:
-        return self.rating_key_4k if is_4k else self.rating_key
 
     def arr_for(self, is_4k: bool) -> ArrRef | None:
         return self.arr_4k if is_4k else self.arr
@@ -222,8 +211,6 @@ class MediaDetails:
             overview=raw.get("overview") or "",
             status=MediaStatus(info.get("status", MediaStatus.UNKNOWN)),
             status_4k=MediaStatus(info.get("status4k", MediaStatus.UNKNOWN)),
-            rating_key=info.get("ratingKey") or None,
-            rating_key_4k=info.get("ratingKey4k") or None,
             arr=ArrRef.from_media(info, is_4k=False),
             arr_4k=ArrRef.from_media(info, is_4k=True),
             tvdb_id=int_or_none((raw.get("externalIds") or {}).get("tvdbId") or info.get("tvdbId")),
@@ -268,9 +255,8 @@ class MediaRequest:
     requested_by_id: int
     seasons: tuple[int, ...] = ()
     tvdb_id: int | None = None
-    # Where this request's version (standard or 4K) stands, and its Plex key.
+    # Where this request's version (standard or 4K) stands.
     media_status: MediaStatus = MediaStatus.UNKNOWN
-    rating_key: str | None = None
     requested_by_name: str = ""  # the requester as Seerr shows them
     created_at: str = ""  # ISO 8601, as Seerr gives it
 
@@ -294,7 +280,6 @@ class MediaRequest:
             media_status=MediaStatus(
                 media.get("status4k" if is_4k else "status", MediaStatus.UNKNOWN)
             ),
-            rating_key=media.get("ratingKey4k" if is_4k else "ratingKey") or None,
             requested_by_name=_user_name(raw.get("requestedBy") or {}),
             created_at=raw.get("createdAt") or "",
         )
@@ -442,7 +427,6 @@ class SeerrUser:
     id: int
     email: str
     username: str
-    plex_username: str
 
     @classmethod
     def from_api(cls, raw: dict[str, Any]) -> SeerrUser:
@@ -450,7 +434,6 @@ class SeerrUser:
             id=int(raw["id"]),
             email=(raw.get("email") or "").lower(),
             username=raw.get("displayName") or raw.get("username") or "",
-            plex_username=raw.get("plexUsername") or "",
         )
 
 

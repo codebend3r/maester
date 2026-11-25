@@ -21,7 +21,5 @@ def test_default_run_fails_fast_naming_missing_config(monkeypatch, tmp_path):
         "ANTHROPIC_API_KEY",
         "SEERR_URL",
         "SEERR_API_KEY",
-        "ROOKERY_URL",
-        "ROOKERY_PUBLIC_URL",
-        "ROOKERY_SERVICE_TOKEN",
+        "RAVEN_URL",
     ]
