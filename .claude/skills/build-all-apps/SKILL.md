@@ -1,47 +1,65 @@
 ---
 name: build-all-apps
-description: Use when building every raven app and putting it on every physical device at once: "build all the apps", "build and deploy everything", "put this branch on all my devices", "build web, desktop, Apple TV, Google TV and iPhone", "update every device", "check everything builds", "build the Mac and Windows desktop". Builds the working tree and installs it on this Mac, the Google TV Streamer, the Apple TV and every paired iPhone and iPad; never stops at a simulator or emulator. Covers the order, the commands, what a Mac cannot build (Windows) and how long each takes.
+description: Use when building every app, raven and Wren, and putting them on every physical device at once: "build all the apps", "build and deploy everything", "put this branch on all my devices", "build raven and Wren for the Apple TV, Google TV, iPads and iPhone", "update every device", "check everything builds". Builds the working tree and installs raven on the Google TV Streamer, the Apple TV, both iPads and the iPhone, and Wren on both iPads and the iPhone. Packages Raven for Mac without installing it. Covers the order, the commands, what a Mac cannot build (Windows) and how long each takes.
 ---
 
 # Build every app and put it on every device
 
-The point of this skill is the devices: the working tree, built, installed and opened on every real device raven runs on. A build that only reached a simulator, an emulator or a folder is not done. Run it from the repo root on a Mac with Apple silicon and Xcode. Each step goes through Nx, so a step whose inputs are unchanged replays from the cache in seconds.
+The point of this skill is the devices: the working tree, both apps, built, installed and opened on every real device they run on. There are five, and nothing else is a target:
 
-Run the steps **one after another, never at once**: every device deploy regenerates a native project with `expo prebuild --clean`, and two prebuilds at once break each other. Run each long step in the background, report its steps as they print, and never ask before taking a device over: each install replaces raven on that device, over whatever is playing, and opens it.
+| Device             | raven | Wren |
+| ------------------ | ----- | ---- |
+| Apple TV           | yes   | no   |
+| Google TV Streamer | yes   | no   |
+| iPad (two of them) | yes   | yes  |
+| iPhone             | yes   | yes  |
+
+Wren is a phone and tablet app, so the TVs get raven only. The desktop app is built and never deployed: this skill does not touch `/Applications/Raven.app` or run `desktop:deploy`.
+
+Run it from the repo root on a Mac with Apple silicon and Xcode. Each step goes through Nx, so a step whose inputs are unchanged replays from the cache in seconds.
+
+Run the steps **one after another, never at once**: every device deploy regenerates a native project with `expo prebuild --clean`, and two prebuilds at once break each other. Run each long step in the background, report its steps as they print, and never ask before taking a device over: each install replaces the app on that device, over whatever is playing, and opens it.
 
 ## The steps
 
-| #   | Device                          | Command                                                             | Cold time                         |
-| --- | ------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
-| 0   | Install                         | `bun install --frozen-lockfile`                                     | 1 min                             |
-| 1   | Every project's build (web too) | `bun run build`                                                     | 2 min                             |
-| 2   | Mac: native pieces              | see [Desktop for Mac](#desktop-for-mac)                             | 40 min, or seconds with a handoff |
-| 3   | Mac: signed, notarized, audited | see [Signing](#signing): `desktop:make` then `desktop:audit:bundle` | 5 min, plus Apple's notary        |
-| 4   | **This Mac**                    | `bun run desktop:deploy`                                            | seconds                           |
-| 5   | **Google TV Streamer**          | `bun run app:deploy:android-tv`                                     | 20 min cold, 2 min warm           |
-| 6   | **Apple TV**                    | `bun run app:deploy:tvos`                                           | 15 min cold                       |
-| 7   | **Every iPhone and iPad**       | `bun run app:deploy:ios`                                            | 15 min cold                       |
-| 8   | Windows                         | CI only, see [Desktop for Windows](#desktop-for-windows)            | Windows only                      |
+| #   | What                                    | Command                                                             | Cold time                         |
+| --- | --------------------------------------- | ------------------------------------------------------------------- | --------------------------------- |
+| 0   | Install                                 | `bun install --frozen-lockfile`                                     | 1 min                             |
+| 1   | Every project's build (web too)         | `bun run build`                                                     | 2 min                             |
+| 2   | **raven on the Google TV Streamer**     | `bun run app:deploy:android-tv`                                     | 20 min cold, 2 min warm           |
+| 3   | **raven on the Apple TV**               | `bun run app:deploy:tvos`                                           | 15 min cold                       |
+| 4   | **raven on both iPads and the iPhone**  | `bun run app:deploy:ios`                                            | 15 min cold                       |
+| 5   | **Wren on both iPads and the iPhone**   | `bun run wren:deploy:ios`                                           | 15 min cold                       |
+| 6   | Mac: native pieces, build only          | see [Desktop for Mac](#desktop-for-mac)                             | 40 min, or seconds with a handoff |
+| 7   | Mac: signed, notarized, audited package | see [Signing](#signing): `desktop:make` then `desktop:audit:bundle` | 5 min, plus Apple's notary        |
+| 8   | Windows                                 | CI only, see [Desktop for Windows](#desktop-for-windows)            | Windows only                      |
 
-Steps 4 to 7 are one command, `bun run deploy:devices` (`bun run --sequential desktop:deploy app:deploy:android-tv app:deploy:tvos app:deploy:ios`). `bun run --sequential` stops at the first failure, so when one deploy fails, fix it and run the ones after it on their own.
+Steps 2 to 5 are one command, `bun run deploy:devices` (`bun run --sequential app:deploy:android-tv app:deploy:tvos app:deploy:ios wren:deploy:ios`). `bun run --sequential` stops at the first failure, so when one deploy fails, fix it and run the ones after it on their own. The devices come first: the Mac package waits until every device has its builds, and it is only ever built.
 
-Before steps 5 to 7, export Android Studio's JDK: `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. The shell's own `JAVA_HOME` is Homebrew's newest Java, which Gradle refuses, and the scripts default to Android Studio's only when the shell sets none.
+Before the device steps, export Xcode and Android Studio's JDK:
+
+```bash
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+```
+
+The shell's own `JAVA_HOME` is Homebrew's newest Java, which Gradle refuses, and the scripts default to Android Studio's only when the shell sets none. `xcode-select` may point at the Command Line Tools, where `devicectl` and Forge's `actool` do not exist (`tool 'actool' requires Xcode`); `DEVELOPER_DIR` settles it for the shell without changing the system setting.
 
 Stop at the first failure and report it, unless the user said to keep going; then note it and run the next device. A device that is off or out of reach is not a failure of the others: say which one and go on.
 
 ## What each deploy does and needs
 
-- **This Mac** (`apps/raven/desktop/scripts/deploy_mac.sh`): quits the running Raven, replaces `/Applications/Raven.app` with `out/Raven-darwin-arm64/Raven.app`, the one step 3 made, and opens it. It builds nothing, so it never replaces the signed build with an unsigned one; with no package it says to run `desktop:make` first. The data in `~/Library/Application Support/raven` stays. It prints `Raven <version> is on this Mac`.
 - **Google TV Streamer** and **Apple TV**: the `deploy-tv-apps` skill holds the details (discovery, the adb relay, pairing, a sleeping Apple TV). They print `raven is on the Android TV` and `raven is on the Apple TV`.
-- **iPhones and iPads** (`apps/raven/app/scripts/deploy_ios.sh`): reads the team off the keychain, regenerates `ios/` with it, builds one signed Release for `generic/platform=iOS` into `build/ios-device`, then installs and launches it on every paired physical iPhone and iPad `xcrun devicectl list devices` shows. A device out of reach for two minutes (`IOS_WAIT_SECONDS`) is skipped and named at the end; a locked one takes the install and opens once unlocked. `IOS_DEVICES="Morty Jr,Naruto Smith"` limits it. It ends with which devices have raven open, which have it installed and which were skipped.
+- **raven on the iPads and the iPhone** (`apps/raven/app/scripts/deploy_ios.sh`): reads the team off the keychain, regenerates `ios/` with it, builds one signed Release for `generic/platform=iOS` into `build/ios-device`, then installs and launches it on every paired physical iPhone and iPad `xcrun devicectl list devices` shows. A device out of reach for two minutes (`IOS_WAIT_SECONDS`) is skipped and named at the end; a locked one takes the install and opens once unlocked. `IOS_DEVICES="Morty Jr,Naruto Smith"` limits it. It ends with which devices have raven open, which have it installed and which were skipped.
+- **Wren on the iPads and the iPhone** (`apps/wren/wren-app/scripts/deploy_ios.sh`): the same script, run for Wren's folder, Xcode project and bundle (`app.netlify.wren`), so it takes the same variables and ends with the same three lists, naming Wren. It launches last, so Wren is the app left in front on each device.
 
-All three device apps build the development variant (`APP_VARIANT=development`, plain http to a LAN server allowed); `APP_VARIANT=production bun run deploy:devices` builds the strict release. Never set `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN` for a device: that is the fixture build, which looks for a server on the device itself.
+Every device app builds the development variant (`APP_VARIANT=development`, plain http to a LAN server allowed); `APP_VARIANT=production bun run deploy:devices` builds the strict release. Never set `EXPO_PUBLIC_RAVEN_BYPASS_ORIGIN` for a device: that is the fixture build, which looks for a server on the device itself.
 
 ## Signing
 
 Every build this skill makes is signed by the team **VF8PR3CHKX** (Chester Rivas, an Individual membership of the Apple Developer Program, so its Apple ID is the Account Holder).
 
-**Raven for Mac is signed with the Developer ID and notarized.** Step 3 is:
+**Raven for Mac is signed with the Developer ID and notarized.** Step 7 is:
 
 ```bash
 export RAVEN_SIGN_IDENTITY="Developer ID Application: Chester Rivas (VF8PR3CHKX)"
@@ -85,17 +103,15 @@ Then `bun run mpv:native` audits them and runs the headless libmpv tests, as CI 
 
 A Mac cannot build it: the addon, libmpv and Forge's installer are all Windows x64. On a Windows x64 machine, from the repo root: `bun install --frozen-lockfile`, `bun run mpv:native:windows`, `bun run desktop:make`, `bun run desktop:audit:bundle`, `bun run desktop:smoke:packaged`; the installer lands in `apps/raven/desktop/out/make`. From the Mac the only way is a pull request's checks (`🎬 Build Raven Windows native`, `🎬 Build Raven Windows app`). Never report Windows as built after a Mac run.
 
-## CI's checks, only when asked
-
-The simulators, the emulator and the e2e suites are CI's checks, not this skill's job. Run them only when the user asks for the tests or for CI locally, and always after the devices have their builds, never in their place: `bun run web:e2e`, `bun run wren:web:e2e`, `bun run ci:desktop:e2e`, `bun run ci:app:ios`, `bun run ci:app:tvos`, `bun run ci:app:android-tv` (their skills: `run-desktop-e2e`, `run-ios-e2e`, `run-tvos-e2e`, `run-android-tv-e2e`). `desktop:smoke:packaged` launches the packaged Raven with the user's own profile and makes a real update check; say so before it. Shut down each simulator before the next (`xcrun simctl shutdown all`).
-
 ## Afterwards
 
-Report per device: for the Mac, whether Gatekeeper accepted it as notarized; the branch and commit (`git log --oneline -1`), whether uncommitted changes went with it (`git status --short`), the variant, and whether its deploy printed its closing line (open, installed but not opened, or skipped and why). Name Windows as not built.
+Report per device and per app: the branch and commit (`git log --oneline -1`), whether uncommitted changes went with it (`git status --short`), the variant, and whether its deploy printed its closing line (open, installed but not opened, or skipped and why). All five devices are named, with raven and Wren apart on the iPads and the iPhone. For the Mac package, say whether Gatekeeper accepted it as notarized and that it was not installed. Name Windows as not built.
 
 ## Common mistakes
 
-- Treating a `ci:app:*` run as a deploy: it installs the fixture build on a simulator or emulator, never on a device, and that build cannot reach a real server.
-- Running two deploys, or a deploy and a `ci:app:*` script, at once: the prebuilds collide.
+- Installing the desktop app: this skill packages Raven for Mac and leaves `/Applications` alone.
+- Deploying raven and leaving Wren out: the iPads and the iPhone get both.
+- Treating a `ci:app:*` run as a deploy: it installs the fixture build, never on a device, and that build cannot reach a real server.
+- Running two deploys at once: the prebuilds collide.
 - Leaving the shell's Homebrew `JAVA_HOME` in place for the Android TV build.
-- Asking before taking a TV or a phone over, or asking for a device's address: the scripts find them.
+- Asking before taking a TV, a tablet or a phone over, or asking for a device's address: the scripts find them.

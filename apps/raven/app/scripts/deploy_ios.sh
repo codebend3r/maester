@@ -13,14 +13,19 @@
 # lasts seven days; run this again to renew it. A device that is not reachable within
 # IOS_WAIT_SECONDS (120 by default) is skipped and named at the end, so one iPad left in a drawer
 # never holds the others back.
+#
+# Wren's deploy (apps/wren/wren-app/scripts/deploy_ios.sh) runs this script too, naming its own
+# folder, Xcode project and bundle through APP_DIR, APP_NAME, APP_LABEL and IOS_BUNDLE_ID.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "${APP_DIR:-$(dirname "$0")/..}"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export APP_VARIANT="${APP_VARIANT:-development}"
-BUNDLE_ID=io.github.codebend3r.raven.app
+APP_NAME="${APP_NAME:-Raven}"
+APP_LABEL="${APP_LABEL:-raven}"
+BUNDLE_ID="${IOS_BUNDLE_ID:-io.github.codebend3r.raven.app}"
 DERIVED=build/ios-device
-APP="$DERIVED/Build/Products/Release-iphoneos/Raven.app"
+APP="$DERIVED/Build/Products/Release-iphoneos/$APP_NAME.app"
 WAIT_SECONDS="${IOS_WAIT_SECONDS:-120}"
 
 say() { printf '\n==> %s\n' "$*"; }
@@ -71,13 +76,13 @@ if [ -z "$DEVICES" ]; then
   echo "No paired iPhone or iPad: pair one in Xcode's Devices window." >&2
   exit 1
 fi
-say "Deploying to: $(printf '%s\n' "$DEVICES" | cut -f2 | paste -sd ',' - | sed 's/,/, /g')"
+say "Deploying $APP_LABEL to: $(printf '%s\n' "$DEVICES" | cut -f2 | paste -sd ',' - | sed 's/,/, /g')"
 
 say "Regenerating the iOS project for team $TEAM ($APP_VARIANT variant)"
 bun run prebuild:ios
 
 say "Building the signed Release"
-xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release \
+xcodebuild -workspace "ios/$APP_NAME.xcworkspace" -scheme "$APP_NAME" -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
   DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic build -quiet
@@ -135,8 +140,8 @@ while IFS=$'\t' read -r udid name; do
   esac
 done <<<"$DEVICES"
 
-[ "${#deployed[@]}" -gt 0 ] && say "raven is open on: ${deployed[*]}"
-[ "${#installed[@]}" -gt 0 ] && say "raven is installed but not opened (locked or refused) on: ${installed[*]}"
+[ "${#deployed[@]}" -gt 0 ] && say "$APP_LABEL is open on: ${deployed[*]}"
+[ "${#installed[@]}" -gt 0 ] && say "$APP_LABEL is installed but not opened (locked or refused) on: ${installed[*]}"
 [ "${#skipped[@]}" -gt 0 ] && say "Not deployed (unreachable or the install failed): ${skipped[*]}"
 if [ "${#deployed[@]}" -eq 0 ] && [ "${#installed[@]}" -eq 0 ]; then
   exit 1

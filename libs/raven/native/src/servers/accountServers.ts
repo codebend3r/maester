@@ -15,13 +15,17 @@ import {
   serverNameFor,
 } from '@raven/core'
 
+import { refreshingFetch } from '@/account/refreshingFetch'
 import type { ActiveServerStore } from '@/servers/activeServerStore'
 import { checkNewServer, openRead } from '@/servers/newServerCheck'
 import { appServerOf } from '@/servers/serverList'
 
-/** Who is signed in, as the account's calls need it: their token and their id. */
+/** Who is signed in, as the account's calls need it: their token, their id and a new token once that one ends. */
 type AccountReader = {
-  getState: () => { session: { accessToken: string; userId: string } | null }
+  getState: () => {
+    session: { accessToken: string; userId: string } | null
+    refresh: () => Promise<string | null>
+  }
 }
 
 type AccountServersForProps = {
@@ -91,7 +95,12 @@ export const accountServersFor = ({ servers, session, fetch }: AccountServersFor
               supabaseUrl: body.supabaseUrl,
               publishableKey: body.publishableKey,
               accessToken: async () => session.getState().session?.accessToken ?? null,
-              fetch,
+              /*
+               * An app opened after an hour away still holds its last token, which the database
+               * refuses, and nothing asks for the servers or the pins again once the timer has
+               * renewed it: the refused call renews it itself and goes again.
+               */
+              fetch: refreshingFetch({ fetch, refresh: () => session.getState().refresh() }),
             })
           : null
       return { config: body, client }

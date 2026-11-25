@@ -38,6 +38,7 @@ import {
   ICON_SIZES,
   LOGO_HEIGHT,
   LOGO_WIDTH_SHARE,
+  SCRUBBER_REACH,
   useTouchChromeStyles,
 } from '@/layouts/PlayerChromeStyles.touch'
 
@@ -59,7 +60,7 @@ const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
   const styles = useTouchChromeStyles()
   const { share, lineProps } = useScrub({ position, duration, onSeek, inset: 0, canDrag: true })
   return (
-    <View {...lineProps} style={styles.scrubber}>
+    <View {...lineProps} hitSlop={SCRUBBER_REACH} style={styles.scrubber}>
       <View pointerEvents="none" style={styles.line}>
         <View style={[styles.played, { width: share }]} />
       </View>

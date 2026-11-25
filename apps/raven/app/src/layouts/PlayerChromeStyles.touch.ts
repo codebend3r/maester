@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native'
 
-import { OPACITIES, SEEK_LINE_HEIGHT, SIZES } from '@/theme/appTheme'
+import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { pictureStyles } from '@/theme/useTheme'
 
 // The touch chrome's styles, dark in every theme as the web player's.
@@ -10,6 +10,23 @@ const SCRIM_OPACITY = 0.45
 
 /** The web's icon sizes: its transport, its play and its glass pills. */
 export const ICON_SIZES = { transport: 24, play: 28, pill: 20, skip: 32 } as const
+
+/**
+ * The scrubber's height under the thumb: half as tall again as a field, so a finger that lands
+ * a little above or below the thin line it draws still takes it.
+ */
+const SCRUBBER_HEIGHT = SIZES.fieldHeight * 1.5
+
+/**
+ * How far past its own edges the scrubber still takes a finger: up over the picture, down to
+ * the buttons and out to the times at either end, where a drag reads as the line's nearest end.
+ */
+export const SCRUBBER_REACH = {
+  top: SIZES.space4,
+  bottom: SIZES.space1,
+  left: SIZES.space3,
+  right: SIZES.space3,
+} as const
 
 /** The vertical volume slider's track: a field wide, six fields tall, standing over its speaker. */
 const VOLUME_TRACK = { width: SIZES.fieldHeight, height: SIZES.fieldHeight * 6 } as const
@@ -123,7 +140,7 @@ export const useTouchChromeStyles = pictureStyles((colours) =>
     },
     time: { color: colours.text, fontSize: SIZES.textSm, fontVariant: ['tabular-nums'] },
     scrubberSlot: { flex: 1 },
-    scrubber: { height: SEEK_LINE_HEIGHT, justifyContent: 'center' },
+    scrubber: { height: SCRUBBER_HEIGHT, justifyContent: 'center' },
     line: {
       height: SIZES.space1,
       borderRadius: SIZES.space1,

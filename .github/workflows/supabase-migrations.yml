@@ -45,6 +45,10 @@ jobs:
         uses: ./.github/actions/bun-install
       - name: 🔗 Link the cloud project
         run: bunx nx run @raven/supabase:db:link -- --project-ref "$SUPABASE_PROJECT_REF"
+      # `config.toml` names `signing_keys.json`, which git ignores, and the CLI reads the config
+      # before any push. A throwaway key will do: this pushes migrations, never the auth config.
+      - name: 🔑 Local signing keys
+        run: bunx nx run @raven/supabase:db:keys
       # Lists what is about to run, so the log says which migrations went out.
       - name: 📋 List pending migrations
         run: bunx nx run @raven/supabase:deploy:db -- --dry-run

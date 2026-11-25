@@ -12,6 +12,7 @@
   "scripts": {
     "build:android": "./android/gradlew -p android assembleRelease",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Wren.xcworkspace -scheme Wren -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
+    "deploy:ios": "./scripts/deploy_ios.sh",
     "dev:android": "APP_VARIANT=development expo run:android",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device wren-phone",
     "e2e": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} maestro test --platform ios e2e",
@@ -106,6 +107,7 @@
       "prebuild:android",
       "build:ios",
       "build:android",
+      "deploy:ios",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -169,6 +171,12 @@
           "{projectRoot}/android/app/build/outputs/apk/release"
         ],
         "cache": true
+      },
+      "deploy:ios": {
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
       },
       "prebuild:ios": {
         "dependsOn": [
