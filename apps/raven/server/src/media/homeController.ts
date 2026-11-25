@@ -10,6 +10,12 @@ import {
   type MediaSort,
   SORT_DIRECTIONS,
   MUSIC_SORTS,
+  type MusicSort,
+  DEFAULT_SHELF_ORDER,
+  SHELF_ORDERS,
+  SHELF_ORDER_PARAM,
+  type ShelfOrder,
+  isShelfOrder,
   isString,
   listsShows,
   isMusicLibrary,
@@ -24,8 +30,24 @@ import type { AccountKey } from '@/media/viewingAccountKeys'
 import { QUERY_PARAMS } from '@/queryValues'
 import { ViewingAccount } from '@/media/viewingAccountParam'
 
-/** How many of a library's newest releases its shelf on the home page holds. */
+/** How many of a library's newest arrivals or releases its shelf on the home page holds. */
 const SHELF_SIZE = 50
+
+/** How a library's videos and shows are sorted for each shelf order. */
+const SHELF_MEDIA_SORTS = {
+  [SHELF_ORDERS.added]: MEDIA_SORTS.added,
+  [SHELF_ORDERS.released]: MEDIA_SORTS.yearNew,
+} as const satisfies Record<ShelfOrder, MediaSort>
+
+/** How a music library's albums are sorted for each shelf order, the newest first. */
+const SHELF_ALBUM_SORTS = {
+  [SHELF_ORDERS.added]: MUSIC_SORTS.added,
+  [SHELF_ORDERS.released]: MUSIC_SORTS.release,
+} as const satisfies Record<ShelfOrder, MusicSort>
+
+/** The shelf order `?order=` names; anything else, or nothing, is the default. */
+const shelfOrderFrom = (order: unknown): ShelfOrder =>
+  isShelfOrder(order) ? order : DEFAULT_SHELF_ORDER
 
 /** How many of a library's matches a search from home shows; the library's own search lists them all. */
 const SEARCH_SHELF_SIZE = 16
@@ -73,9 +95,16 @@ export class HomeController {
       .filter((library) => !library.settings.locked && viewer.seesLibrary(library.id))
   }
 
-  /** Every video in progress with the poster its card shows, then each library's newest releases. */
+  /**
+   * Every video in progress with the poster its card shows, then each library's newest
+   * arrivals, or its newest releases for `?order=released`.
+   */
   @Get()
-  home(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): Home {
+  home(
+    @Req() request: FastifyRequest,
+    @Query(SHELF_ORDER_PARAM) order: unknown,
+    @ViewingAccount() account: AccountKey,
+  ): Home {
     const libraries = this.onHome(this.lock.viewer({ request }))
     const shown = new Set(libraries.map(({ id }) => id))
     return {
@@ -86,7 +115,7 @@ export class HomeController {
         this.shelf({
           library,
           search: '',
-          sort: MEDIA_SORTS.yearNew,
+          sort: SHELF_MEDIA_SORTS[shelfOrderFrom(order)],
           limit: SHELF_SIZE,
           account,
         }),
@@ -95,11 +124,15 @@ export class HomeController {
   }
 
   /**
-   * A shelf of albums for each music library, the newest release
-   * first, read apart from the shelves.
+   * A shelf of albums for each music library, the one added last first, or the newest release
+   * first for `?order=released`, read apart from the shelves.
    */
   @Get('albums')
-  albums(@Req() request: FastifyRequest, @ViewingAccount() account: AccountKey): AlbumShelf[] {
+  albums(
+    @Req() request: FastifyRequest,
+    @Query(SHELF_ORDER_PARAM) order: unknown,
+    @ViewingAccount() account: AccountKey,
+  ): AlbumShelf[] {
     return this.onHome(this.lock.viewer({ request }))
       .filter((library) => isMusicLibrary(library))
       .map((library) => ({
@@ -108,7 +141,7 @@ export class HomeController {
           .listAlbums({
             libraryId: library.id,
             search: '',
-            sort: MUSIC_SORTS.release,
+            sort: SHELF_ALBUM_SORTS[shelfOrderFrom(order)],
             order: SORT_DIRECTIONS.descending,
             account,
           })

@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 
 import { BingeCardView } from '@/layouts/BingeCard.touch'
+import { Chip } from '@/layouts/Chip.touch'
 import { BingeRowView } from '@/layouts/BingeRow.touch'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES } from '@/queries/cards'
@@ -28,6 +29,7 @@ import {
   bingeRowsOf,
   seeAllLabelOf,
   seeAllOf,
+  shelfOrderToggleOf,
   shelfStateOf,
   type ShelfPageProps,
 } from '@/layouts/shelfKit'
@@ -92,15 +94,19 @@ const Shelves = ({ title, notice, children }: ShelvesProps) => {
   )
 }
 
-type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>
+type ShelfTitleProps = Pick<
+  ShelfProps,
+  'shelf' | 'onOpenLibrary' | 'onOpenContinue' | 'onTurnOrder'
+>
 
 /**
- * A shelf's title, and beside a library's the way into the library, as the web's shelf
- * heading links to it; beside Continue watching, the way to every video in progress once it
- * holds more than Home shows.
+ * A shelf's title, and beside a library's its order toggle and the way into the library, as
+ * the web's shelf heading links to it; beside Continue watching, the way to every video in
+ * progress once it holds more than Home shows.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) => {
+const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue, onTurnOrder }: ShelfTitleProps) => {
   const seeAll = seeAllOf({ shelf, onOpenLibrary, onOpenContinue })
+  const toggle = shelfOrderToggleOf({ shelf, onTurnOrder })
   const styles = useStyles()
   return (
     <View style={styles.titleRow}>
@@ -112,6 +118,9 @@ const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) =
       >
         {shelf.title}
       </Text>
+      {toggle !== null && (
+        <Chip icon={toggle.icon} label={toggle.label} onPress={toggle.onTurn} text={toggle.text} />
+      )}
       {seeAll !== null && (
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
@@ -210,6 +219,7 @@ const Shelf = (props: ShelfProps) => {
       <ShelfTitle
         onOpenContinue={props.onOpenContinue}
         onOpenLibrary={props.onOpenLibrary}
+        onTurnOrder={props.onTurnOrder}
         shelf={props.shelf}
       />
       <Row {...props} />
@@ -317,7 +327,13 @@ const useStyles = themedStyles((colours) =>
       gap: SIZES.space2,
       paddingHorizontal: SIZES.space3,
     },
-    shelfTitle: { flexShrink: 1, color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },
+    shelfTitle: {
+      flex: 1,
+      flexShrink: 1,
+      color: colours.text,
+      fontSize: SIZES.textLg,
+      fontWeight: 'bold',
+    },
     seeAll: { color: colours.muted, fontSize: SIZES.textSm, fontWeight: '600' },
     pressed: { opacity: OPACITIES.pressed },
     // The bottom room keeps a resume card's shadow from being cut off by the row.

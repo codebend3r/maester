@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { LIBRARY_VIEWS, MEDIA_GROUPINGS, MEDIA_SORTS } from '@raven/core'
+import { LIBRARY_VIEWS, MEDIA_GROUPINGS, MEDIA_SORTS, SHELF_ORDERS } from '@raven/core'
 import type { StateStorage } from 'zustand/middleware'
 
 import {
   LIBRARY_VIEWS_KEY,
   configureLibraryViews,
   libraryChoiceOf,
+  shelfOrdersOn,
   useLibraryViews,
 } from '@/stores/libraryViews'
 
@@ -44,6 +45,26 @@ describe('useLibraryViews', () => {
       sort: MEDIA_SORTS.largest,
     })
     expect(libraryChoiceOf({ choices, serverId: SERVER, libraryId: 2 })).toEqual({})
+  })
+
+  it("turns a library's shelf on Home and back, per server, beside its other choices", () => {
+    const { choose, turnShelfOrder } = useLibraryViews.getState()
+    choose({ serverId: SERVER, libraryId: 1, change: { sort: MEDIA_SORTS.added } })
+    turnShelfOrder({ serverId: SERVER, libraryId: 1 })
+    turnShelfOrder({ serverId: SERVER, libraryId: 2 })
+    turnShelfOrder({ serverId: SERVER, libraryId: 2 })
+    turnShelfOrder({ serverId: OTHER, libraryId: 3 })
+
+    const { choices } = useLibraryViews.getState()
+    expect(libraryChoiceOf({ choices, serverId: SERVER, libraryId: 1 })).toEqual({
+      sort: MEDIA_SORTS.added,
+      shelfOrder: SHELF_ORDERS.released,
+    })
+    expect(shelfOrdersOn({ choices, serverId: SERVER })).toEqual({
+      1: SHELF_ORDERS.released,
+      2: SHELF_ORDERS.added,
+    })
+    expect(shelfOrdersOn({ choices, serverId: OTHER })).toEqual({ 3: SHELF_ORDERS.released })
   })
 
   it('reads back only the choices it can use', async () => {

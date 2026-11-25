@@ -101,6 +101,8 @@ export {
 export { edit, editAll, useOptimisticMutation } from '@/query/optimistic'
 export type { Edit } from '@/query/optimistic'
 export { usePinToggle } from '@/query/usePinToggle'
+export { useReleasedShelves } from '@/query/useReleasedShelves'
+export type { ReleasedShelves } from '@/query/useReleasedShelves'
 export type { PinToggle } from '@/query/usePinToggle'
 export {
   albumFavouriteEdits,

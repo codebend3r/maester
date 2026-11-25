@@ -22,6 +22,8 @@ import {
 import { FILMS, HERO, HOME, NAS, SEVERANCE_PAGE, SPARSE, homeApi } from '@/test/homeServer'
 import { heldAnswer } from '@/test/heldAnswer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
+import { cardButtons } from '@/test/shelfToggles'
+import { useLibraryViews } from '@/stores/libraryViews'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import {
   askedFor,
@@ -51,9 +53,9 @@ const mockApi = jest.fn((server: AppServer) => {
   return {
     ...api,
     listLibraries: async () => (server.id === MELEYS.id ? [MELEYS_FILMS] : api.listLibraries()),
-    getHome: async () => {
+    getHome: async (query?: Parameters<typeof api.getHome>[0]) => {
       await mockHome.answer
-      return mockHome.home ?? api.getHome()
+      return mockHome.home ?? api.getHome(query)
     },
     getHero: async () => mockHome.hero ?? api.getHero(),
   }
@@ -130,7 +132,7 @@ const answerHome = async ({ home, card, isDrawn }: AnswerHomeProps) => {
 
 /** Whatever on screen asks for the remote's focus, by its label. */
 const preferred = (): unknown[] =>
-  [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]
+  [...cardButtons(), ...screen.getAllByRole('link')]
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
@@ -144,12 +146,33 @@ describe('Home on a TV', () => {
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
   })
 
+  it('turns a library shelf to its newest releases from the plate beside its title', async () => {
+    useLibraryViews.setState({ choices: {} })
+    await renderHome()
+    const toggle = await screen.findByRole('button', {
+      name: 'Films: Recently added. Show newly released',
+    })
+    await fireEvent.press(toggle)
+    expect(
+      await screen.findByRole('button', { name: 'Films: Newly released. Show recently added' }),
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(cardButtons().map((card) => card.props.accessibilityLabel)).toEqual([
+        BUSBOYS,
+        NIGHT_TRAIN,
+        BUSBOYS,
+        'Severance',
+      ]),
+    )
+    useLibraryViews.setState({ choices: {} })
+  })
+
   it('shows the same shelves and cards as the touch layout', async () => {
     await renderHome()
     expect(await screen.findByRole('header', { name: 'Continue watching' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Films' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Series' })).toBeTruthy()
-    const cards = screen.getAllByRole('button').map((card) => card.props.accessibilityLabel)
+    const cards = cardButtons().map((card) => card.props.accessibilityLabel)
     expect(cards).toEqual(['Busboys', 'Busboys', 'Night Train', 'Severance'])
   })
 
@@ -168,7 +191,7 @@ describe('Home on a TV', () => {
   it('puts focus on the first card as it opens, and on no other', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const [first, ...rest] = screen.getAllByRole('button')
+    const [first, ...rest] = cardButtons()
     if (first === undefined) throw new Error('No card')
     expect(first.props.hasTVPreferredFocus).toBe(true)
     expect(rest.some((card) => card.props.hasTVPreferredFocus === true)).toBe(false)
@@ -178,7 +201,7 @@ describe('Home on a TV', () => {
     useReduceMotion.setState({ isReduced: true })
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const [first] = screen.getAllByRole('button')
+    const [first] = cardButtons()
     if (first === undefined) throw new Error('No card')
     const scaleOf = () => {
       const [face] = first.children
@@ -213,7 +236,7 @@ describe('Home on a TV', () => {
     // The menu closes, and the show joins the Binge section at the top of Home, synopsis and all.
     expect(screen.queryByRole('button', { name: 'Add to binge' })).toBeNull()
     expect(await screen.findByText(SEVERANCE_PAGE.summary ?? '')).toBeTruthy()
-    expect(screen.getAllByRole('button')[0]?.props.accessibilityLabel).toBe('Severance')
+    expect(cardButtons()[0]?.props.accessibilityLabel).toBe('Severance')
     await untilIdle(shown.client)
   })
 
@@ -245,7 +268,7 @@ describe('Home on a TV', () => {
     await screen.findByRole('header', { name: 'Films' })
     const search = screen.getByRole('link', { name: 'Search' })
     expect(search.props.hasTVPreferredFocus).not.toBe(true)
-    expect(screen.getAllByRole('button')[0]!.props.hasTVPreferredFocus).toBe(true)
+    expect(cardButtons()[0]!.props.hasTVPreferredFocus).toBe(true)
 
     await fireEvent.press(search)
     expect(mockPush).toHaveBeenCalledWith(APP_ROUTES.search)
@@ -325,7 +348,7 @@ describe('Home on a TV', () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     expect(screen.getByRole('header', { name: 'Cartoons' })).toBeTruthy()
-    const [first, ...rest] = screen.getAllByRole('button')
+    const [first, ...rest] = cardButtons()
     if (first === undefined) throw new Error('No card')
     expect(first.props.accessibilityLabel).toBe('Busboys')
     expect(first.props.hasTVPreferredFocus).toBe(true)
@@ -350,7 +373,7 @@ describe('Home on a TV', () => {
   it('takes the focus back to the card a screen was opened from, on the shelf it sits on', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    const cards = screen.getAllByRole('button')
+    const cards = cardButtons()
     await fireEvent(cards[2]!, NATIVE_EVENTS.focus)
     await fireEvent.press(cards[2]!)
     expect(mockPush).toHaveBeenCalledTimes(1)
@@ -367,7 +390,7 @@ describe('Home on a TV', () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     // Busboys is under Continue watching and under Films; the one in Films opens.
-    const [, inFilms] = screen.getAllByRole('button')
+    const [, inFilms] = cardButtons()
     await fireEvent.press(inFilms!)
     await leaveTestScreen()
     await returnToTestScreen()
@@ -376,7 +399,7 @@ describe('Home on a TV', () => {
     expect(again === instance).toBe(true)
     expect(more.length).toBe(0)
     // The view the card hands over is drawn as the element on screen with its own handlers.
-    const [inContinue, inFilmsNow] = screen.getAllByRole('button')
+    const [inContinue, inFilmsNow] = cardButtons()
     const focusOf = (view: unknown) =>
       isRecord(view) && isRecord(view.props) ? view.props.onFocus : null
     expect(focusOf(instance) === inFilmsNow!.props.onFocus).toBe(true)
@@ -386,14 +409,14 @@ describe('Home on a TV', () => {
   it('takes it back once, never on a later return from a screen no card opened', async () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
-    await fireEvent.press(screen.getAllByRole('button')[2]!)
+    await fireEvent.press(cardButtons()[2]!)
     await leaveTestScreen()
     await returnToTestScreen()
     // Once as Home comes to the front, again as the transition that reveals it ends.
     expect(askedFor()).toEqual(['Night Train', 'Night Train'])
 
     // The viewer moves on, then opens the search, which is not a card, and comes back.
-    await fireEvent(screen.getAllByRole('button')[3]!, NATIVE_EVENTS.focus)
+    await fireEvent(cardButtons()[3]!, NATIVE_EVENTS.focus)
     await fireEvent.press(screen.getByRole('link', { name: 'Search' }))
     await leaveTestScreen()
     await returnToTestScreen()
@@ -440,8 +463,8 @@ describe('Home on a TV', () => {
     await renderHome()
     await screen.findByRole('header', { name: 'Films' })
     // Busboys under Continue watching opens; while its page covers Home, the spot is cleared.
-    await fireEvent(screen.getAllByRole('button')[2]!, NATIVE_EVENTS.focus)
-    await fireEvent.press(screen.getAllByRole('button')[0]!)
+    await fireEvent(cardButtons()[2]!, NATIVE_EVENTS.focus)
+    await fireEvent.press(cardButtons()[0]!)
     await leaveTestScreen()
     mockHome.home = { ...HOME, inProgress: [] }
     await act(async () => shown.client.invalidateQueries())

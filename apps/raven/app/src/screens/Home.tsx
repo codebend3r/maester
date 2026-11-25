@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 import { useMemo } from 'react'
-import { type AlbumShelf, pinnedShelvesOf } from '@raven/core'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { type AlbumShelf, pinnedShelvesOf, shelvesInOrder } from '@raven/core'
+import { KeyedView, type ViewOf, type ViewsOf, useReleasedShelves } from '@raven/ui/headless'
 
 import type { BingeCard } from '@/queries/bingeCards'
 import type { ShelfCard } from '@/queries/cards'
@@ -20,6 +20,7 @@ import type { LoadingProps } from '@/layouts/loadingKit'
 import type { ShelvesProps } from '@/layouts/shelfKit'
 import { APP_ROUTES, ROUTE_TARGETS, type RouteTarget, hrefOf } from '@/routes'
 import { HOME_COPY } from '@/screens/copy'
+import { shelfOrdersOn, useLibraryViews } from '@/stores/libraryViews'
 
 type HomeShelvesProps = {
   /** The shows the viewer binges, first on the page; none leaves the hero at the top. */
@@ -29,6 +30,8 @@ type HomeShelvesProps = {
   shelves: readonly ShelfView[]
   notice: string | null
   libraries: ShelvesProps['libraries']
+  /** Turns a library's shelf to its other order. */
+  onTurnOrder: (libraryId: number) => void
 }
 
 /**
@@ -36,7 +39,14 @@ type HomeShelvesProps = {
  * shelves, beside the side menu on a TV. The focus starts on the first binge card, else on the
  * hero's Play, else on the first card.
  */
-const HomeShelves = ({ binge, slides, shelves, notice, libraries }: HomeShelvesProps) => {
+const HomeShelves = ({
+  binge,
+  slides,
+  shelves,
+  notice,
+  libraries,
+  onTurnOrder,
+}: HomeShelvesProps) => {
   const router = useRouter()
   const hasBinge = binge.length > 0
   const hasHero = slides.length > 0
@@ -69,6 +79,7 @@ const HomeShelves = ({ binge, slides, shelves, notice, libraries }: HomeShelvesP
           onOpen={open}
           onOpenContinue={() => router.push(APP_ROUTES.continueWatching)}
           onOpenLibrary={openLibrary}
+          onTurnOrder={onTurnOrder}
           shelf={shelf}
         />
       ))}
@@ -101,6 +112,13 @@ const ServerHome = ({ session }: ServerHomeProps) => {
   const pinnedLibraries = usePinnedLibraries({ queries })
   const hero = useQuery(queries.heroQuery)
   const albums = useQuery(queries.homeAlbumsQuery)
+  const choices = useLibraryViews((state) => state.choices)
+  const turnShelfOrder = useLibraryViews((state) => state.turnShelfOrder)
+  const orders = useMemo(
+    () => shelfOrdersOn({ choices, serverId: server.id }),
+    [choices, server.id],
+  )
+  const released = useReleasedShelves({ queries, orders })
   const libraries = useQuery(queries.librariesQuery)
   const pictures = usePictures({ server, api })
   const binge = useBingeCards({ queries, pictures })
@@ -114,7 +132,14 @@ const ServerHome = ({ session }: ServerHomeProps) => {
    * The shelves wait for the albums too, so a music library's row never flips from its files
    * to its covers as they land; albums that cannot be read leave each row as its files.
    */
-  const albumShelves = albums.data ?? (albums.isError ? NO_ALBUMS : null)
+  const addedAlbums = albums.data ?? (albums.isError ? NO_ALBUMS : null)
+  const albumShelves = useMemo(
+    () =>
+      addedAlbums === null
+        ? null
+        : shelvesInOrder({ shelves: addedAlbums, released: released.albums, orders }),
+    [addedAlbums, released.albums, orders],
+  )
   /*
    * Built only when what they are made of changes, never on every render: Home renders again as
    * each of its queries lands, and on a TV's Hermes building hundreds of cards each time held
@@ -124,8 +149,15 @@ const ServerHome = ({ session }: ServerHomeProps) => {
     () =>
       home.data === undefined
         ? undefined
-        : { ...home.data, shelves: pinnedShelvesOf({ shelves: home.data.shelves, pinnedHere }) },
-    [home.data, pinnedHere],
+        : {
+            ...home.data,
+            shelves: shelvesInOrder({
+              shelves: pinnedShelvesOf({ shelves: home.data.shelves, pinnedHere }),
+              released: released.shelves,
+              orders,
+            }),
+          },
+    [home.data, pinnedHere, released.shelves, orders],
   )
   const shelves = useMemo(
     () =>
@@ -139,9 +171,10 @@ const ServerHome = ({ session }: ServerHomeProps) => {
             libraries: libraries.data,
             albumShelves,
             arts,
+            orders,
             ...pictures,
           }),
-    [homeData, libraries.data, albumShelves, arts, pictures],
+    [homeData, libraries.data, albumShelves, arts, orders, pictures],
   )
   const slides = useMemo(
     () =>
@@ -168,14 +201,21 @@ const ServerHome = ({ session }: ServerHomeProps) => {
     ? { key: HOME_VIEW_KEYS.loading, props: { label: HOME_COPY.loading, isHome: true } }
     : {
         key: HOME_VIEW_KEYS.shelves,
-        props: { binge, slides, shelves, notice, libraries: pinnedLibraries },
+        props: {
+          binge,
+          slides,
+          shelves,
+          notice,
+          libraries: pinnedLibraries,
+          onTurnOrder: (libraryId) => turnShelfOrder({ serverId: server.id, libraryId }),
+        },
       }
   return <KeyedView<HomeViewProps> view={view} views={HOME_VIEWS} />
 }
 
 /**
  * `/`: the shows being binged, the featured titles, what is being watched, then each pinned
- * library's newest, as shelves of cards. A card
+ * library's newest arrivals, or its newest releases once its toggle turns it, as shelves of cards. A card
  * opens its item, a library shelf's See all the library, and Search the search through every
  * library. Each server gets a Home of its own, so nothing one showed, its scroll or its focus,
  * carries over to the next.

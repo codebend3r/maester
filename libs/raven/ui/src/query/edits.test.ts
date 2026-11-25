@@ -130,6 +130,21 @@ describe('watchedEdits', () => {
     ])
   })
 
+  it('marks the video on the shelves turned to Newly released too', () => {
+    const client = new QueryClient()
+    client.setQueryData(queryKeys.releasedShelves, [
+      { libraryId: 2, type: HOME_SHELF_TYPES.media, media: [anotherMovie, cardFile] },
+    ])
+    apply({ client, edits: watchedEdits({ media: cardFile, watched: true }) })
+    expect(client.getQueryData(queryKeys.releasedShelves)).toEqual([
+      {
+        libraryId: 2,
+        type: HOME_SHELF_TYPES.media,
+        media: [anotherMovie, { ...cardFile, watched: true, position: 0 }],
+      },
+    ])
+  })
+
   it('covers sagas, duplicates, history and the item versions', () => {
     const client = new QueryClient()
     const marked = { ...cardFile, watched: true, position: 0 }

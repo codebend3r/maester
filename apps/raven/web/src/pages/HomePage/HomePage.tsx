@@ -7,15 +7,19 @@ import {
   type Library,
   type MediaItem,
   RATING_SOURCES,
+  SHELF_ORDER_COPY,
+  SHELF_TOGGLE_COPY,
   matchTypeFor,
   pinnedShelvesOf,
+  shelfOrderOf,
+  shelvesInOrder,
   withLibraries,
   libraryPath,
 } from '@raven/core'
 import { type ComponentType, type ReactNode, useId } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Icon } from '@raven/ui'
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { BUTTON_TONES, Button, Icon, SHELF_ORDER_ICONS } from '@raven/ui'
+import { KeyedView, type ViewOf, type ViewsOf, useReleasedShelves } from '@raven/ui/headless'
 import { AlbumCard } from '@/components/AlbumGrid/AlbumGrid'
 import { BackButton } from '@/components/BackButton/BackButton'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
@@ -30,7 +34,9 @@ import {
   homeQuery,
   homeSearchQuery,
   librariesQuery,
+  ravenQueries,
 } from '@/lib/queries'
+import { useShelfOrders } from '@/stores/shelfOrders'
 import { ContinueWatching } from '@/pages/HomePage/ContinueWatching'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import { HomeHero } from '@/pages/HomePage/HomeHero'
@@ -65,18 +71,22 @@ const SHELF_BODIES = {
 
 type ShelfProps = {
   title: ReactNode
+  /** What sits at the heading's right: a library shelf's order toggle on Home. */
+  aside?: ReactNode
   isEmpty: boolean
   /** The cards, each its own `li`. */
   children: ReactNode
 }
 
 /** A row of cards under its ruled heading, or a line saying it has none yet. */
-const Shelf = ({ title, isEmpty, children }: ShelfProps) => {
+const Shelf = ({ title, aside, isEmpty, children }: ShelfProps) => {
   const id = useId()
   const Body = SHELF_BODIES[isEmpty ? SHELF_STATES.empty : SHELF_STATES.filled]
   return (
     <section className={frames.section} aria-labelledby={id}>
-      <SectionHeading id={id}>{title}</SectionHeading>
+      <SectionHeading id={id} aside={aside}>
+        {title}
+      </SectionHeading>
       <Body>{children}</Body>
     </section>
   )
@@ -111,6 +121,7 @@ const SHELF_CARDS = {
 
 type ShelfContentProps = {
   title: ReactNode
+  aside: ReactNode
   matchType: ReturnType<typeof matchTypeFor>
 }
 
@@ -118,8 +129,8 @@ type ShowsShelfProps = ShelfContentProps & {
   shelf: Extract<HomeShelf, { type: typeof HOME_SHELF_TYPES.shows }>
 }
 
-const ShowsShelf = ({ title, shelf }: ShowsShelfProps) => (
-  <Shelf title={title} isEmpty={shelf.shows.length === 0}>
+const ShowsShelf = ({ title, aside, shelf }: ShowsShelfProps) => (
+  <Shelf title={title} aside={aside} isEmpty={shelf.shows.length === 0}>
     {shelf.shows.map((entry) => (
       <ShowCard
         key={entry.show.id}
@@ -135,11 +146,11 @@ type MediaShelfProps = ShelfContentProps & {
   shelf: Extract<HomeShelf, { type: typeof HOME_SHELF_TYPES.media }>
 }
 
-const MediaShelf = ({ title, matchType, shelf }: MediaShelfProps) => {
+const MediaShelf = ({ title, aside, matchType, shelf }: MediaShelfProps) => {
   const Card =
     SHELF_CARDS[matchType === ITEM_TYPES.movie ? CARD_PICTURES.poster : CARD_PICTURES.frame]
   return (
-    <Shelf title={title} isEmpty={shelf.media.length === 0}>
+    <Shelf title={title} aside={aside} isEmpty={shelf.media.length === 0}>
       {shelf.media.map((media) => (
         <Card key={media.id} media={media} matchType={matchType} />
       ))}
@@ -199,6 +210,8 @@ type LibraryShelfProps = {
   shelf: HomeShelf
   library: Library
   query?: string
+  /** The order toggle at the heading's right, on Home's shelves; a search's rows have none. */
+  aside?: ReactNode
 }
 
 /**
@@ -206,24 +219,25 @@ type LibraryShelfProps = {
  * frame grabs. Its heading opens the library, on `query` when the row is
  * what a search found, so the library lists every match.
  */
-const LibraryShelf = ({ shelf, library, query = '' }: LibraryShelfProps) => {
+const LibraryShelf = ({ shelf, library, query = '', aside = null }: LibraryShelfProps) => {
   const matchType = matchTypeFor(library.settings.kind)
   const to = librarySearchPath({ libraryId: library.id, query })
   const title = <ShelfHeadingLink to={to}>{library.name}</ShelfHeadingLink>
   return (
     <KeyedView<LibraryShelfViewProps>
       views={LIBRARY_SHELVES}
-      view={libraryShelfViewOf({ shelf, title, matchType })}
+      view={libraryShelfViewOf({ shelf, title, aside, matchType })}
     />
   )
 }
 
-type AlbumsShelfProps = { shelf: AlbumShelf; library: Library }
+type AlbumsShelfProps = { shelf: AlbumShelf; library: Library; aside: ReactNode }
 
-/** A music library's row: its newest releases first, one cover each, the library's name opening it. */
-const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
+/** A music library's row: its newest arrivals or releases first, one cover each, the library's name opening it. */
+const AlbumsShelf = ({ shelf, library, aside }: AlbumsShelfProps) => (
   <Shelf
     title={<ShelfHeadingLink to={libraryPath(library.id)}>{library.name}</ShelfHeadingLink>}
+    aside={aside}
     isEmpty={shelf.albums.length === 0}
   >
     {shelf.albums.map((album) => (
@@ -232,15 +246,37 @@ const AlbumsShelf = ({ shelf, library }: AlbumsShelfProps) => (
   </Shelf>
 )
 
+type ShelfOrderToggleProps = { library: Library }
+
+/**
+ * A library shelf's order on Home, Recently added or Newly released, as a button that turns it
+ * to the other; the choice is kept on this browser.
+ */
+const ShelfOrderToggle = ({ library }: ShelfOrderToggleProps) => {
+  const order = useShelfOrders(({ orders }) => shelfOrderOf({ orders, libraryId: library.id }))
+  const turn = useShelfOrders((state) => state.turn)
+  return (
+    <Button
+      tone={BUTTON_TONES.ghost}
+      icon={SHELF_ORDER_ICONS[order]}
+      aria-label={SHELF_TOGGLE_COPY.label({ name: library.name, order })}
+      onClick={() => turn({ libraryId: library.id })}
+    >
+      {SHELF_ORDER_COPY[order]}
+    </Button>
+  )
+}
+
 type LibraryRowProps = { shelf: HomeShelf; library: Library; albumShelves: readonly AlbumShelf[] }
 
 /** A library's row on Home: its albums when it is a music library, else its shelf laid out as its files are. */
 const LibraryRow = ({ shelf, library, albumShelves }: LibraryRowProps) => {
   const albums = albumShelves.find(({ libraryId }) => libraryId === library.id)
+  const toggle = <ShelfOrderToggle library={library} />
   return albums === undefined ? (
-    <LibraryShelf shelf={shelf} library={library} />
+    <LibraryShelf shelf={shelf} library={library} aside={toggle} />
   ) : (
-    <AlbumsShelf shelf={albums} library={library} />
+    <AlbumsShelf shelf={albums} library={library} aside={toggle} />
   )
 }
 
@@ -284,15 +320,29 @@ const SearchResults = ({ query, libraries }: SearchResultsProps) => {
 
 type ShelvesProps = HomeBodyProps
 
-/** The hero's titles in turn, then what is being watched, then each pinned library's newest releases. */
+/**
+ * The hero's titles in turn, then what is being watched, then each pinned library's newest
+ * arrivals, or its newest releases where its shelf is turned to them.
+ */
 const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
   const home = useQuery(homeQuery)
   const hero = useQuery(heroQuery)
   const albums = useQuery(homeAlbumsQuery)
+  const orders = useShelfOrders((state) => state.orders)
+  const released = useReleasedShelves({ queries: ravenQueries, orders })
   const pinnedHere = usePinnedHere()
   const shelves = withLibraries({
-    shelves: pinnedShelvesOf({ shelves: home.data?.shelves ?? [], pinnedHere }),
+    shelves: shelvesInOrder({
+      shelves: pinnedShelvesOf({ shelves: home.data?.shelves ?? [], pinnedHere }),
+      released: released.shelves,
+      orders,
+    }),
     libraries,
+  })
+  const albumShelves = shelvesInOrder({
+    shelves: albums.data ?? [],
+    released: released.albums,
+    orders,
   })
   const featured = featuredOf({ hero: hero.data ?? [], libraries })
   const inProgress = home.data?.inProgress ?? []
@@ -323,7 +373,7 @@ const Shelves = ({ libraries, areLibrariesPending }: ShelvesProps) => {
             key={library.id}
             shelf={shelf}
             library={library}
-            albumShelves={albums.data ?? []}
+            albumShelves={albumShelves}
           />
         ))}
       </div>
@@ -340,8 +390,8 @@ const HOME_BODIES = {
  * `/`: the hero's titles, picked by the admin or the newest releases, taking turns, then what
  * is being watched, as wide tiles, then a row for each library the account
  * pinned on this server (every library's while it pinned none here) with
- * its fifty newest releases, each row scrolling on its own, in the side
- * menu's order. A search from the shell's bar, which rides in the address as
+ * its fifty newest arrivals, or its newest releases once its heading's toggle
+ * turns it to them, each row scrolling on its own, in the side menu's order. A search from the shell's bar, which rides in the address as
  * `?q=`, shows what it found in place of all of it. A locked library never
  * shows on it, PIN or not.
  */

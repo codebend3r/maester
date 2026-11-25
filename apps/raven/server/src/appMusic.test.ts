@@ -9,6 +9,8 @@ import {
   MATCH_STATES,
   MUSIC_SORTS,
   NOTIFICATION_TONES,
+  SHELF_ORDERS,
+  SORT_DIRECTIONS,
   THUMBNAIL_STATES,
 } from '@raven/core'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -212,13 +214,27 @@ describe('a music library', () => {
     expect(artist.albums.find(({ id }) => id === first?.id)?.modifiedAt).toBe(first?.modifiedAt)
   })
 
-  it("gives Home one shelf of the music library's albums, newest releases first", async () => {
+  it("gives Home one shelf of the music library's albums, the one added last first", async () => {
     const [shelf, ...rest] = await api().getHomeAlbums()
-    const released = await api().listAlbums({ libraryId: state.library, sort: MUSIC_SORTS.release })
+    const added = await api().listAlbums({
+      libraryId: state.library,
+      sort: MUSIC_SORTS.added,
+      order: SORT_DIRECTIONS.descending,
+    })
     expect(rest).toEqual([])
     expect(shelf?.libraryId).toBe(state.library)
-    expect(shelf?.albums.map(({ id }) => id)).toEqual(released.map(({ id }) => id))
+    expect(shelf?.albums.map(({ id }) => id)).toEqual(added.map(({ id }) => id))
     expect(shelf?.albums.length).toBeGreaterThan(1)
+  })
+
+  it("gives Home the music library's newest releases first for ?order=released", async () => {
+    const [shelf] = await api().getHomeAlbums({ order: SHELF_ORDERS.released })
+    const released = await api().listAlbums({
+      libraryId: state.library,
+      sort: MUSIC_SORTS.release,
+      order: SORT_DIRECTIONS.descending,
+    })
+    expect(shelf?.albums.map(({ id }) => id)).toEqual(released.map(({ id }) => id))
   })
 
   it('matches each album to MusicBrainz: by the id in its tags, by a sure search, or not at all', async () => {

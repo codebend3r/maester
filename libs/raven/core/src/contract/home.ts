@@ -8,6 +8,7 @@ import {
   listOf,
   nullable,
   object,
+  oneOf,
   union,
   literal,
 } from '@/schema'
@@ -15,8 +16,24 @@ import {
 export const HOME_SHELF_TYPES = { shows: 'shows', media: 'media' } as const
 
 /**
- * A library's row on the home page: a library's newest arrivals,
- * newest first, or what a search found in it, by title. A TV shows library
+ * The two orders a library's shelf on Home comes in: what the library gained last first, or
+ * what came out last first (a film's or a show's year, an album's release).
+ */
+export const SHELF_ORDERS = { added: 'added', released: 'released' } as const
+
+export type ShelfOrder = (typeof SHELF_ORDERS)[keyof typeof SHELF_ORDERS]
+
+export const isShelfOrder = oneOf(Object.values(SHELF_ORDERS))
+
+/** The order a shelf comes in when nothing names one. */
+export const DEFAULT_SHELF_ORDER: ShelfOrder = SHELF_ORDERS.added
+
+/** The query parameter `GET /api/home` and `GET /api/home/albums` take a shelf order in: `?order=`. */
+export const SHELF_ORDER_PARAM = 'order'
+
+/**
+ * A library's row on the home page: a library's newest arrivals or newest
+ * releases, as `?order=` asks, or what a search found in it, by title. A TV shows library
  * gives its shows; any other library gives its videos.
  */
 export const isHomeShelf = union(
@@ -30,14 +47,14 @@ export const isHomeShelf = union(
 
 export type HomeShelf = Infer<typeof isHomeShelf>
 
-/** A music library's row on the home page: its albums, the one added last first, one cover for each. */
+/** A music library's row on the home page: its albums, the one added or released last first, one cover for each. */
 export const isAlbumShelf = object({ libraryId: isNumber, albums: isAlbumList })
 
 export type AlbumShelf = Infer<typeof isAlbumShelf>
 
 /**
- * `GET /api/home/albums`: a shelf of albums for each music library, as
- * the side menu orders them. Read apart from the shelves, which keep each
+ * `GET /api/home/albums?order=`: a shelf of albums for each music library, as
+ * the side menu orders them, the newest arrivals first when no order is named. Read apart from the shelves, which keep each
  * music library's files for the clients that do not draw albums.
  */
 export const isAlbumShelves = listOf(isAlbumShelf)
@@ -64,7 +81,10 @@ export const isPosterEntries = listOf(isPosterEntry)
  */
 export const isFavouriteTitles = listOf(isItemSummary)
 
-/** `GET /api/home`: every video in progress, then each library's shelf, as the side menu orders them. */
+/**
+ * `GET /api/home?order=`: every video in progress, then each library's shelf in that order (the
+ * newest arrivals when none is named), as the side menu orders them.
+ */
 export const isHome = object({
   /** Videos with a saved spot, the most recently watched first. */
   inProgress: isPosterEntries,
