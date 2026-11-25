@@ -11,6 +11,7 @@
     "build:clean": "rm -rf dist",
     "build:main": "bun build src/main/main.ts --target node --format esm --external electron --sourcemap=linked --define process.env.RAVEN_DESKTOP_SERVER_ORIGIN=\\\"$RAVEN_DESKTOP_SERVER_ORIGIN\\\" --define process.env.RAVEN_DESKTOP_LINK_ORIGINS=\\\"$RAVEN_DESKTOP_LINK_ORIGINS\\\" --outdir dist/main",
     "build:preload": "bun build src/preload/preload.ts --target node --format cjs --external electron --outfile dist/preload/preload.cjs",
+    "deploy:mac": "./scripts/deploy_mac.sh",
     "dev": "electron .",
     "e2e": "playwright test",
     "format": "oxfmt .",
@@ -80,6 +81,7 @@
       "stage:mpv",
       "package",
       "make",
+      "deploy:mac",
       "audit:bundle",
       "smoke:packaged",
       "release:assets"
@@ -164,6 +166,9 @@
           "build",
           "stage:mpv"
         ]
+      },
+      "deploy:mac": {
+        "cache": false
       },
       "audit:bundle": {
         "cache": false

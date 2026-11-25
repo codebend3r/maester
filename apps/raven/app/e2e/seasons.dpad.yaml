@@ -67,7 +67,8 @@ tags:
 - assertVisible: S01 · E01
 - assertVisible: Go to Season 1
 - assertVisible: Go to Lantern Bay
-# Back through the season and the show to the library, then Home, which shows its hero again.
+# Back through the season and the show to the library, then Libraries, then Home, which shows its
+# hero again.
 - pressKey: Back
 - extendedWaitUntil:
     visible:
@@ -84,6 +85,12 @@ tags:
 - extendedWaitUntil:
     visible:
       text: Lantern Bay
+      focused: true
+    timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Series
       focused: true
     timeout: 30000
 - pressKey: Back

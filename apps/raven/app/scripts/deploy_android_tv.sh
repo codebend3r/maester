@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Puts the APK `build:android-tv` made (the Nx target this one depends on) on the real Android TV
 # and opens it, with nothing to do on the TV but accept its "Allow debugging?" prompt the first
-# time: finds the TV over mDNS, relays adb to it through the loopback (`scripts/adb_relay.py`,
-# run by Apple's python3, since macOS Local Network privacy keeps the SDK's adb off the LAN),
+# time: finds the TV over mDNS, relays adb to it through the loopback (`scripts/adb_relay.py`, or nc
+# when Apple's python3 cannot reach the LAN, since Local Network privacy keeps the SDK's adb off it),
 # waits for the TV to accept the connection, installs over the raven that is there (-r keeps its sign-in and
 # settings), launches it and checks it is in front.
 #
@@ -48,15 +48,33 @@ find_tv() {
 is_listening() { lsof -nP -iTCP:"$RELAY_PORT" -sTCP:LISTEN > /dev/null 2>&1; }
 
 RELAY_PID=""
+RELAY_FIFO=""
 stop_relay() {
   [ -n "$RELAY_PID" ] || return 0
   "$ADB" disconnect "$SERIAL" > /dev/null 2>&1 || true
+  pkill -P "$RELAY_PID" 2> /dev/null || true
   kill "$RELAY_PID" 2> /dev/null || true
+  [ -z "$RELAY_FIFO" ] || rm -f "$RELAY_FIFO"
 }
 trap stop_relay EXIT
 
+# Local Network privacy is granted per program, and Apple's python3 has lost it before (no route
+# to the TV while /usr/bin/nc still reached it), so python3 relays only when it can reach the TV,
+# and otherwise a loop of two nc's joined by a fifo does, one adb connection at a time.
 start_relay() {
-  /usr/bin/python3 -I "$REPO/scripts/adb_relay.py" "$1" "$2" "$RELAY_PORT" &
+  if /usr/bin/python3 -I -c 'import socket, sys; socket.create_connection((sys.argv[1], int(sys.argv[2])), 3).close()' "$1" "$2" > /dev/null 2>&1; then
+    /usr/bin/python3 -I "$REPO/scripts/adb_relay.py" "$1" "$2" "$RELAY_PORT" &
+    RELAY_PID=$!
+    return
+  fi
+  say "Apple's python3 cannot reach the TV (Local Network privacy), so nc relays"
+  RELAY_FIFO="$(mktemp -u)"
+  mkfifo "$RELAY_FIFO"
+  (
+    while true; do
+      /usr/bin/nc -l 127.0.0.1 "$RELAY_PORT" < "$RELAY_FIFO" | /usr/bin/nc "$1" "$2" > "$RELAY_FIFO"
+    done
+  ) &
   RELAY_PID=$!
 }
 

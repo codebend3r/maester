@@ -2,9 +2,10 @@ appId: io.github.codebend3r.raven.app
 name: Home shows the fixture's movie and series
 ---
 - runFlow: signIn.yaml
-# On a TV the series' shelf sits below the screen, under the hero and the films (and Continue
-# watching, when anything is), so the remote moves down to it: from the hero's Play to the film,
-# to the series' See all, then to its card.
+# On a TV the series' shelf sits below the screen, under the hero, the films and the music (and
+# Continue watching, when anything is), since Home shows every library while none is pinned, so
+# the remote moves down to it: from the hero's Play through each shelf's See all and card to the
+# series' card.
 - runFlow:
     when:
       platform: Android
@@ -12,7 +13,7 @@ name: Home shows the fixture's movie and series
       - repeat:
           while:
             notVisible: Lantern Bay
-          times: 5
+          times: 8
           commands:
             - pressKey: Remote Dpad Down
 # On an iPhone the hero fills most of the screen, so Home scrolls down to the series' card.

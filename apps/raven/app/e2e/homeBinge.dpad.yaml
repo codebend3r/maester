@@ -6,8 +6,8 @@ tags:
 - runFlow: signIn.yaml
 - runFlow: steps/healHome.dpad.yaml
 # Binge, in the second row of the show's marks, puts the show on the binge list. Back through
-# the library to Home, where the show now stands first as a Binge card, which the remote reaches
-# from the side menu's row along the first row of Home.
+# the library and Libraries to Home, where the show now stands first as a Binge card, which the
+# remote reaches from the side menu's row along the first row of Home.
 - runFlow:
     file: steps/openShow.dpad.yaml
     env:
@@ -19,9 +19,22 @@ tags:
       MARKED: Binging
       ROW: second
 - pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Lantern Bay.*
+      focused: true
+    timeout: 30000
 - pressKey: Back
 - extendedWaitUntil:
-    visible: Films
+    visible:
+      text: Series
+      focused: true
+    timeout: 30000
+- pressKey: Back
+# The Binge card stands over the hero now and pushes the shelves below the screen, so Home is
+# known by the card, the one on Home that writes its episode as S01E01 with its name.
+- extendedWaitUntil:
+    visible: 'S\d\dE\d\d · .*'
     timeout: 30000
 - repeat:
     while:
@@ -58,10 +71,9 @@ tags:
 # the episode's page offering to resume, where a mark and its undoing clear the spot, as the
 # fixture had it; Back then finds the library on its grid, with nothing left to continue.
 - runFlow:
-    file: steps/menuRow.dpad.yaml
+    file: steps/openLibrary.dpad.yaml
     env:
-      ROW: Series
-- pressKey: Remote Dpad Center
+      LIBRARY: Series
 - extendedWaitUntil:
     visible:
       text: Lantern Bay, .*Low Tide
@@ -76,9 +88,15 @@ tags:
     visible: Show In progress
     timeout: 30000
 - assertVisible: Lantern Bay
-# Back to Home, and the show is taken off the binge list on its page again. Opened afresh, Home
-# gives its opening focus to the hero's Play, as it does with no show binged, and nothing is in
-# progress, so the flows after this one find Home as the fixture had it.
+# Back through Libraries to Home, and the show is taken off the binge list on its page again.
+# Opened afresh, Home gives its opening focus to the hero's Play, as it does with no show binged,
+# and nothing is in progress, so the flows after this one find Home as the fixture had it.
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Series
+      focused: true
+    timeout: 30000
 - pressKey: Back
 - runFlow:
     file: steps/openShow.dpad.yaml

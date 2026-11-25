@@ -13,6 +13,7 @@
     "build:android-tv": "bun run assemble:android",
     "banner:tv": "./scripts/tv_banner.sh",
     "icons:tvos": "./scripts/tv_apple_icons.sh",
+    "deploy:ios": "./scripts/deploy_ios.sh",
     "deploy:tvos": "./scripts/deploy_tvos.sh",
     "deploy:android": "./scripts/deploy_android.sh",
     "deploy:android-tv": "./scripts/deploy_android_tv.sh",
@@ -27,7 +28,7 @@
     "e2e:android": "bun run --sequential e2e:reverse e2e:android:flows",
     "e2e:android:flows": "maestro test --platform android --udid ${ANDROID_SERIAL:?set ANDROID_SERIAL to the phone emulator, as bun run ci:app:android does} --include-tags touch e2e",
     "e2e:android-tv": "bun run --sequential e2e:reverse e2e:android-tv:flows",
-    "e2e:android-tv:flows": "maestro test --platform android --exclude-tags touch e2e",
+    "e2e:android-tv:flows": "maestro test --platform android --udid ${ANDROID_SERIAL:?set ANDROID_SERIAL to the Android TV emulator, as bun run ci:app:android-tv does} --exclude-tags touch e2e",
     "e2e:reverse": "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK folder}/platform-tools/adb reverse tcp:8490 tcp:8490",
     "e2e:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild test -project ios/Raven.xcodeproj -scheme RavenRemoteTests -destination \"platform=tvOS Simulator,name=${TVOS_SIMULATOR:-Apple TV 4K (3rd generation)}\" -derivedDataPath build/tvos-e2e CODE_SIGNING_ALLOWED=NO",
     "format": "oxfmt .",
@@ -157,6 +158,7 @@
       "dev:ios",
       "dev:ipad",
       "dev:tvos",
+      "deploy:ios",
       "deploy:tvos",
       "deploy:android-tv",
       "deploy:android"
@@ -386,6 +388,12 @@
         "dependsOn": [
           "^build"
         ]
+      },
+      "deploy:ios": {
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
       },
       "deploy:tvos": {
         "dependsOn": [
