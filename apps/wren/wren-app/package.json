@@ -1,6 +1,6 @@
 {
   "name": "@wren/app",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "description": "Wren, raven's music app for iPhone, iPad and Android phones",
   "main": "index.ts",
