@@ -4,7 +4,7 @@ import { THEME_SCHEMES, WREN_THEMES } from '@raven/wren'
 
 const GLOBALS = new URL('./globals.scss', import.meta.url)
 
-const APP_TOKENS = new URL('../../../music/src/theme/wrenTokens.ts', import.meta.url)
+const APP_TOKENS = new URL('../../../../wren/wren-app/src/theme/wrenTokens.ts', import.meta.url)
 
 const stylesheet = await Bun.file(GLOBALS).text()
 

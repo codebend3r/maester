@@ -153,7 +153,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/wren`      | `libs/raven/wren`      | Wren's words and pure models, shared by its phone app and its web app: copy, counts, sorts, queue facts |
 | `@raven/desktop`   | `apps/raven/desktop`   | Raven: Electron 45 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e         |
 | `@raven/app`       | `apps/raven/app`       | raven on phones, tablets, Apple TV and Android TV: Expo 58 on react-native-tvos, expo-router, jest-expo |
-| `@raven/music`     | `apps/raven/music`     | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router  |
+| `@wren/app`        | `apps/wren/wren-app`   | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router  |
 | `@raven/music-web` | `apps/raven/music-web` | Wren on the web: React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom          |
 | `@rookery/server`  | `apps/rookery/server`  | The suite's sign-in: NestJS 12 on Fastify, SQLite (better-sqlite3), vitest                              |
 | `@rookery/web`     | `apps/rookery/web`     | rookery's login and logout pages: React 19, Vite 8, bun test + happy-dom                                |

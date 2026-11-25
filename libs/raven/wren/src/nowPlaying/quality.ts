@@ -1,46 +1,42 @@
-import { TRACK_STREAM_KINDS, type Track, type TrackStream } from '@raven/core'
+import { type AudioQuality, qualityChipsOf, qualityRestOf } from '@raven/core'
 
 import { NOW_PLAYING_COPY } from '@/copy/screens'
-import { factsLineOf } from '@/copy/kit'
-
-const PER_KILO = 1000
+import { KIT_COPY, factsLineOf } from '@/copy/kit'
 
 /** A lossless file's resolution, "16-bit / 44.1 kHz"; null for a lossy one or one not read yet. */
-const resolutionOf = ({ isLossless, bitDepth, sampleRate }: Track): string | null =>
-  isLossless && bitDepth !== null && sampleRate !== null
-    ? NOW_PLAYING_COPY.resolution({ bits: bitDepth, kilohertz: sampleRate / PER_KILO })
+const resolutionOf = ({ bitDepth, sampleRate }: AudioQuality): string | null =>
+  bitDepth !== null && sampleRate !== null
+    ? NOW_PLAYING_COPY.resolution({ bitDepth, sampleRate })
     : null
 
-/** The file itself: "FLAC · 16-bit / 44.1 kHz · 912 kbps", each fact the server has not read left out. */
-const fileLineOf = (track: Track): string =>
+/*
+ * The format and quality of what is playing as one sentence: "FLAC · 16-bit / 44.1 kHz · 912 kbps",
+ * the transcode's "AAC · 256 kbps", or the download's with "Downloaded" after it.
+ */
+const qualityLineOf = (quality: AudioQuality): string =>
   factsLineOf([
-    (track.codec ?? track.container).toUpperCase(),
-    resolutionOf(track),
-    track.bitrate === null ? null : NOW_PLAYING_COPY.kbps(Math.round(track.bitrate / PER_KILO)),
+    quality.format,
+    resolutionOf(quality),
+    quality.bitrate,
+    quality.isDownloaded ? NOW_PLAYING_COPY.downloaded : null,
   ])
 
-type QualityLineOfProps = { track: Track; stream: TrackStream }
+/** The quality of what is playing as both Wrens draw it. */
+export type QualityView = {
+  /** The format, then a lossless file's bit depth, each a chip. */
+  chips: string[]
+  /** What follows the chips as quiet words, "44.1 kHz · 912 kbps"; null when nothing does. */
+  facts: string | null
+  /** What a screen reader says in the chips' and the words' place: "Quality, FLAC · 912 kbps". */
+  label: string
+}
 
-/**
- * The format and quality of what is playing, which is not always the track's own file: the
- * file's codec, resolution and bitrate, the transcode's "AAC · 256 kbps", or the download's with
- * "Downloaded" after it.
- */
-export const qualityLineOf = ({ track, stream }: QualityLineOfProps): string => {
-  switch (stream.kind) {
-    case TRACK_STREAM_KINDS.file:
-      return fileLineOf(track)
-    case TRACK_STREAM_KINDS.transcode:
-      return factsLineOf([NOW_PLAYING_COPY.aac, NOW_PLAYING_COPY.kbps(stream.kbps)])
-    case TRACK_STREAM_KINDS.download:
-      return factsLineOf([
-        NOW_PLAYING_COPY.aac,
-        stream.kbps === null ? null : NOW_PLAYING_COPY.kbps(stream.kbps),
-        NOW_PLAYING_COPY.downloaded,
-      ])
-    default: {
-      const unreachable: never = stream
-      return unreachable
-    }
+/** The quality line's chips, its words and its one spoken sentence. */
+export const qualityViewOf = (quality: AudioQuality): QualityView => {
+  const rest = qualityRestOf(quality)
+  return {
+    chips: qualityChipsOf(quality),
+    facts: rest.length === 0 ? null : KIT_COPY.facts(rest),
+    label: KIT_COPY.labelled({ label: NOW_PLAYING_COPY.quality, value: qualityLineOf(quality) }),
   }
 }

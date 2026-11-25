@@ -94,11 +94,12 @@ export const PLAYER_COPY = {
   output: 'Output',
   position: 'Playback position',
   volume: 'Volume',
+  /** The speaker beside the web's volume line, named for what a press does. */
+  mute: 'Mute',
+  unmute: 'Unmute',
   speed: 'Speed',
   /** Where the scrubber stands, read out: "1:02 of 4:44". */
   scrubText: ({ at, length }: ScrubTextProps) => `${at} of ${length}`,
-  /** How long is left, as the scrubber's right end says it: "-1:09". */
-  remaining: (left: string) => `-${left}`,
   /** What the mini player is called aloud: what it opens, and the track it shows. */
   open: ({ title, artists }: TitledProps) => `Now Playing: ${title}, ${artists}`,
 } as const

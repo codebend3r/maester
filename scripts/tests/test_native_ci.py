@@ -74,9 +74,9 @@ HANDOFF_SETTINGS = ("APP_SETUP", "APP_PROJECT", "APP_ARTIFACT", "APP_BUNDLE")
 HANDOFF = "${{ env.APP_ARTIFACT }}-${{ inputs.sha }}"
 FOUND_HANDOFF = "${{ env.APP_ARTIFACT }}-${{ env.BUILD_SHA }}"
 NATIVE_SHA = "${{ env.NATIVE_BUILD_SHA }}"
-END_TO_END_TARGETS = ("app:e2e", "@raven/music:e2e")
+END_TO_END_TARGETS = ("app:e2e", "@wren/app:e2e")
 # Each app's folder and its Nx project.
-PROJECTS = {"apps/raven/app": "@raven/app", "apps/raven/music": "@raven/music"}
+PROJECTS = {"apps/raven/app": "@raven/app", "apps/wren/wren-app": "@wren/app"}
 PLAN_SCRIPT = ROOT / "scripts/plan_native_builds.sh"
 FIND_SCRIPT = ROOT / "scripts/find_pr_builds.sh"
 # Every row of the pull request's one matrix, by the name its job carries.

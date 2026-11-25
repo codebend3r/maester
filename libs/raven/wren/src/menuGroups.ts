@@ -21,6 +21,21 @@ type MenuIcons<Icon> = {
 /** A song's favourite as the menu turns it: whether it is one, and the press that flips it. */
 export type MenuLike = { isLiked: boolean; onToggle: () => void }
 
+/** What the menu shows: its actions, or the listener's playlists to add the tracks to. */
+export const MENU_VIEWS = { actions: 'actions', playlists: 'playlists' } as const
+
+export type MenuView = (typeof MENU_VIEWS)[keyof typeof MENU_VIEWS]
+
+/** What a listener does with the playing song from Now Playing itself. */
+export type SongActions = {
+  /** The song's heart, which its menu's Like shows too. */
+  like: MenuLike
+  /** Opens the listener's playlists, to add the song to one. */
+  onAddToPlaylist: () => void
+  /** Opens the song's menu, for everything else. */
+  onMore: () => void
+}
+
 type MenuGroupsOfProps<Icon> = {
   icons: MenuIcons<Icon>
   /** Like or Unlike, first, on a song's menu; left out where the menu is about more than one. */

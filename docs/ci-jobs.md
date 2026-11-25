@@ -54,7 +54,7 @@ The step times are from the same 150 runs, which ran the device app's and Wren's
 | Raven on the desktop     | 🎬 E2E Raven Mac desktop (its own job)          | Playwright driving Electron           | `@raven/desktop:e2e`        | 2m 21s   | 78%              |
 | Device app on Apple TV   | 🎬 E2E Raven Apple TV, after 🎬 Build Raven Apple TV | XCUITest on an Apple TV simulator  | `@raven/app:e2e:tvos`       | 1m 58s   | 16%              |
 | raven on the web         | 🌐 E2E Raven web (its own job)              | Playwright in Google Chrome           | `@raven/web:e2e:browser`    | 0m 47s   | 53%              |
-| Wren on iPhone           | 🎵 E2E Wren iPhone, after 🎵 Build Wren iPhone | Maestro on an iPhone simulator        | `@raven/music:e2e`          | 4m 45s   | 15%              |
+| Wren on iPhone           | 🎵 E2E Wren iPhone, after 🎵 Build Wren iPhone | Maestro on an iPhone simulator        | `@wren/app:e2e`          | 4m 45s   | 15%              |
 
 - The Android TV step's time includes booting the emulator, since one action boots it and runs the flows.
 - Wren's build jobs (🎵 Build Wren iPhone and 🎵 Build Wren Android) run on every pull request, and its 🎵 E2E Wren iPhone runs on main whenever a push touches Wren. The two build jobs ran once in those runs.

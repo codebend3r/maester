@@ -26,7 +26,7 @@ function SpeedControl() {
 
 type PlayerExtrasProps = { isAudiobook: boolean }
 
-/** Under the transport: Wren's own volume, a thin line, and an audiobook's speed. */
+/** Under the transport: Wren's own volume, a speaker beside its line, and an audiobook's speed. */
 export function PlayerExtras({ isAudiobook }: PlayerExtrasProps) {
   return (
     <div className={styles.extras}>

@@ -1,6 +1,6 @@
-import { formatDuration } from '@raven/core'
+import { formatDuration, remainingTimeOf } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, remainingTextOf, scrubTextOf } from '@raven/wren'
+import { PLAYER_COPY, scrubTextOf } from '@raven/wren'
 import type { ComponentType, ReactElement } from 'react'
 import { Adjuster } from '@/player/Adjuster/Adjuster'
 import styles from '@/player/Scrubber/Scrubber.module.scss'
@@ -8,11 +8,8 @@ import styles from '@/player/Scrubber/Scrubber.module.scss'
 // How far an arrow key moves the scrubber, in seconds.
 const SCRUB_STEP = 15
 
-/**
- * Where the scrubber is drawn: Now Playing's, its times under it, the player bar's, beside it, or
- * the wide Now Playing's, the line alone.
- */
-export const SCRUBBERS = { player: 'player', bar: 'bar', bare: 'bare' } as const
+/** Where the scrubber is drawn: Now Playing's, its times under it, or the player bar's, beside it. */
+export const SCRUBBERS = { player: 'player', bar: 'bar' } as const
 
 type ScrubberKind = (typeof SCRUBBERS)[keyof typeof SCRUBBERS]
 
@@ -27,41 +24,41 @@ function Time({ text }: TimeProps) {
   )
 }
 
-type ScrubLayoutProps = { line: ReactElement; position: number; length: number }
+type ScrubLayoutProps = {
+  line: ReactElement
+  /** How far in it is, "1:02". */
+  played: string
+  /** How long is left, "-3:42". */
+  left: string
+}
 
 /** Now Playing's: the line over how far in it is and how long is left. */
-function StackedScrub({ line, position, length }: ScrubLayoutProps) {
+function StackedScrub({ line, played, left }: ScrubLayoutProps) {
   return (
     <div className={styles.stacked}>
       {line}
       <div className={styles.times}>
-        <Time text={formatDuration(position)} />
-        <Time text={remainingTextOf({ position, length })} />
+        <Time text={played} />
+        <Time text={left} />
       </div>
     </div>
   )
 }
 
-/** The player bar's: how far in it is, the line, and how long the track is, along one row. */
-function InlineScrub({ line, position, length }: ScrubLayoutProps) {
+/** The player bar's: how far in it is, the line, and how long is left, along one row. */
+function InlineScrub({ line, played, left }: ScrubLayoutProps) {
   return (
     <div className={styles.inline}>
-      <Time text={formatDuration(position)} />
+      <Time text={played} />
       {line}
-      <Time text={formatDuration(length)} />
+      <Time text={left} />
     </div>
   )
-}
-
-/** The wide Now Playing's: the line alone, since its column holds no words. */
-function BareScrub({ line }: ScrubLayoutProps) {
-  return line
 }
 
 const SCRUB_LAYOUTS = {
   [SCRUBBERS.player]: StackedScrub,
   [SCRUBBERS.bar]: InlineScrub,
-  [SCRUBBERS.bare]: BareScrub,
 } as const satisfies Record<ScrubberKind, ComponentType<ScrubLayoutProps>>
 
 type ScrubberProps = {
@@ -70,14 +67,17 @@ type ScrubberProps = {
   kind: ScrubberKind
 }
 
-/** The scrubber: the line a pointer drags to seek, read out as "1:02 of 4:44", and its times. */
+/**
+ * The scrubber: the line a pointer drags to seek, read out as "1:02 of 4:44", with how far in it
+ * is at its start and how long is left, "-3:42", at its end.
+ */
 export function Scrubber({ length, kind }: ScrubberProps) {
   const position = useAudioQueue((store) => store.position)
   const seekTo = useAudioQueue((store) => store.seekTo)
   const Layout = SCRUB_LAYOUTS[kind]
   return (
     <Layout
-      length={length}
+      left={remainingTimeOf({ position, length })}
       line={
         <Adjuster
           label={PLAYER_COPY.position}
@@ -88,7 +88,7 @@ export function Scrubber({ length, kind }: ScrubberProps) {
           valueText={(at) => scrubTextOf({ position: at, length })}
         />
       }
-      position={position}
+      played={formatDuration(position)}
     />
   )
 }

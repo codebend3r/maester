@@ -19,7 +19,7 @@ inputs:
     description: ios, tvos or android-tv
     required: true
   project:
-    description: The app's folder, apps/raven/app or apps/raven/music
+    description: The app's folder, apps/raven/app or apps/wren/wren-app
     required: true
   node-version:
     description: The Node the app's tooling runs on, at least 22.18 (babel.config.ts)

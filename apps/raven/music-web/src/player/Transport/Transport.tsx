@@ -1,13 +1,5 @@
-import { REPEAT_MODES } from '@raven/core'
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
-import {
-  PLAYER_COPY,
-  STEPS,
-  type Step,
-  TRANSPORTS,
-  type TransportKind,
-  hasTogglesOf,
-} from '@raven/wren'
+import { PLAYER_COPY, STEPS, type Step, TRANSPORTS, type TransportKind } from '@raven/wren'
 import { COLORS, type Size, SIZES } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
@@ -49,55 +41,6 @@ function StepButton({ step, size }: StepButtonProps) {
   return <IconButton color={COLORS.text} icon={icon} label={label} onPress={onPress} size={size} />
 }
 
-type ToggleProps = {
-  /** The circle's size; Up next's toggles sit on a filled circle. */
-  size?: Size
-  isFilled?: boolean
-}
-
-type ToggleFillOfProps = { isOn: boolean; isFilled: boolean }
-
-/** A toggle's ground: none unless it sits on a circle, which is soft red while it is on. */
-const toggleFillOf = ({ isOn, isFilled }: ToggleFillOfProps) => {
-  if (!isFilled) return undefined
-  return isOn ? COLORS.accentSoft : COLORS.surface2
-}
-
-/** Shuffle, red while on; Up next's sits on a soft red circle while on. */
-export function ShuffleToggle({ size = SIZES.touchTarget, isFilled = false }: ToggleProps) {
-  const isShuffled = useAudioQueue((store) => store.queue.isShuffled)
-  const toggleShuffle = useAudioQueue((store) => store.toggleShuffle)
-  return (
-    <IconButton
-      color={isShuffled ? COLORS.accentText : COLORS.text3}
-      fill={toggleFillOf({ isOn: isShuffled, isFilled })}
-      icon={ICONS.shuffle}
-      isSelected={isShuffled}
-      label={PLAYER_COPY.shuffle}
-      onPress={toggleShuffle}
-      size={size}
-    />
-  )
-}
-
-/** Repeat, moving from off to all to one, named for the mode it is in and red while on. */
-export function RepeatToggle({ size = SIZES.touchTarget, isFilled = false }: ToggleProps) {
-  const repeat = useAudioQueue((store) => store.queue.repeat)
-  const cycleRepeat = useAudioQueue((store) => store.cycleRepeat)
-  const isOn = repeat !== REPEAT_MODES.off
-  return (
-    <IconButton
-      color={isOn ? COLORS.accentText : COLORS.text3}
-      fill={toggleFillOf({ isOn, isFilled })}
-      icon={repeat === REPEAT_MODES.one ? ICONS.repeatOne : ICONS.repeat}
-      isSelected={isOn}
-      label={PLAYER_COPY.repeat[repeat]}
-      onPress={cycleRepeat}
-      size={size}
-    />
-  )
-}
-
 type TransportLook = {
   /** Play or Pause's circle. */
   play: Size
@@ -116,22 +59,21 @@ const TRANSPORT_LOOKS = {
   },
   [TRANSPORTS.queue]: { play: SIZES.playQueue, step: SIZES.transportSmall, isPlayLifted: false },
   [TRANSPORTS.bar]: { play: SIZES.playBar, step: SIZES.touchTarget, isPlayLifted: true },
-  [TRANSPORTS.column]: { play: SIZES.playQueue, step: SIZES.transportSmall, isPlayLifted: false },
 } as const satisfies Record<TransportKind, TransportLook>
 
 type TransportProps = { kind: TransportKind }
 
-/** Shuffle, Previous, Play or Pause, Next and Repeat, as large as the place they sit in asks. */
+/**
+ * Previous, Play or Pause and Next, alone in their row, as large as the place they sit in asks.
+ * Shuffle and Repeat are the queue's, in Up next's head.
+ */
 export function Transport({ kind }: TransportProps) {
   const { play, step, isPlayLifted } = TRANSPORT_LOOKS[kind]
-  const hasToggles = hasTogglesOf(kind)
   return (
     <div className={styles[kind]}>
-      {hasToggles && <ShuffleToggle />}
       <StepButton size={step} step={STEPS.previous} />
       <PlayButton isLifted={isPlayLifted} size={play} />
       <StepButton size={step} step={STEPS.next} />
-      {hasToggles && <RepeatToggle />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { classNames } from '@raven/ui/headless'
-import { PANES, type Pane, TRANSPORTS, paneAfter } from '@raven/wren'
+import { PANES, type Pane, type SongActions, TRANSPORTS, paneAfter } from '@raven/wren'
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
 import { Transport } from '@/player/Transport/Transport'
@@ -14,11 +14,12 @@ import styles from '@/screens/NowPlaying/PhonePlayer.module.scss'
 
 type PaneProps = {
   playing: Playing
+  actions: SongActions
   /** Where the sheet places the pane. */
   className: string
 }
 
-type CompactPaneProps = PaneProps & {
+type CompactPaneProps = Omit<PaneProps, 'actions'> & {
   /** What fills the middle: the lyrics, or Up next. */
   body: ReactNode
   /** What sits under it: the scrubber and the transport, or the transport alone. */
@@ -59,7 +60,7 @@ function LyricsPane({ playing, className }: PaneProps) {
   )
 }
 
-/** What plays next, the transport under it. */
+/** What plays next, under what changes the queue, the transport under it. */
 function UpNextPane({ playing, className }: PaneProps) {
   return (
     <CompactPane
@@ -77,21 +78,21 @@ const PANE_VIEWS = {
   [PANES.upNext]: UpNextPane,
 } as const satisfies Record<Pane, ComponentType<PaneProps>>
 
-type PhonePlayerProps = { playing: Playing; onMore: () => void }
+type PhonePlayerProps = { playing: Playing; actions: SongActions }
 
 /**
  * The narrow Now Playing, over everything: the header, the pane picked (the player, the lyrics
  * or Up next) and the bar along the foot that picks it.
  */
-export function PhonePlayer({ playing, onMore }: PhonePlayerProps) {
+export function PhonePlayer({ playing, actions }: PhonePlayerProps) {
   const [pane, setPane] = useState<Pane>(PANES.player)
   const PaneView = PANE_VIEWS[pane]
   return (
     <div className={styles.sheet}>
       <div className={styles.header}>
-        <PlayerHeader onClose={playing.close} onMore={onMore} title={playing.title} />
+        <PlayerHeader onClose={playing.close} onMore={actions.onMore} title={playing.title} />
       </div>
-      <PaneView className={styles.pane} playing={playing} />
+      <PaneView actions={actions} className={styles.pane} playing={playing} />
       <div className={styles.bar}>
         <BottomBar
           onPane={(pressed) => setPane(paneAfter({ current: pane, pressed }))}

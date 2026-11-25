@@ -1,3 +1,4 @@
+import type { AudioQuality } from '@raven/core'
 import { classNames } from '@raven/ui/headless'
 import { PLAYER_COPY } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
@@ -5,6 +6,7 @@ import { RADII, type Size } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator/EqualizerIndicator'
 import { Pressable } from '@/ui/Pressable/Pressable'
+import { QualityChips } from '@/ui/QualityChips/QualityChips'
 import styles from '@/ui/PlayingSummary/PlayingSummary.module.scss'
 
 type PlayingSummaryProps = {
@@ -12,8 +14,8 @@ type PlayingSummaryProps = {
   artists: string
   /** The line under the title: the artists, or more about the track where there is room. */
   line: string
-  /** The file's format and quality, a line of its own under the other; null where there is no room. */
-  quality: string | null
+  /** The format and quality of what plays, chips on a line of their own; null where there is no room. */
+  quality: AudioQuality | null
   /** What went wrong playing, said in the line's place. */
   error: string | null
   cover: Cover | null
@@ -54,7 +56,7 @@ export function PlayingSummary({
           <span className={styles.title}>{title}</span>
         </span>
         <span className={error === null ? styles.line : styles.error}>{error ?? line}</span>
-        {quality !== null && error === null && <span className={styles.quality}>{quality}</span>}
+        {quality !== null && error === null && <QualityChips quality={quality} />}
       </span>
     </Pressable>
   )

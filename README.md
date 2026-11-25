@@ -37,7 +37,7 @@ Every pull request installs the dependencies once per runner OS, runs every chec
 
 ![The pull request checks: one install per runner OS, the standard checks matrix, then the native builds, all gated by Checks](docs/images/pr-checks-workflow.png)
 
-The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps, and [Wren's end to end coverage](apps/wren/docs/e2e-coverage.md) does the same for Wren's.
+The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps, and [Wren's end to end coverage](apps/raven/docs/e2e-coverage.md) does the same for Wren's.
 
 The git hooks are lefthook's (`lefthook.yml`):
 

@@ -5,7 +5,7 @@ description: Use when building and installing raven on a physical iPad or iPhone
 
 # Deploy raven to a connected iPad or iPhone
 
-Build `@raven/app` for a physical Apple device through Xcode. Default to a Release build that runs without Metro or the cable. This is raven, not Wren (`@raven/music`).
+Build `@raven/app` for a physical Apple device through Xcode. Default to a Release build that runs without Metro or the cable. This is raven, not Wren (`@wren/app`).
 
 Read the root `CLAUDE.md`, `apps/raven/CLAUDE.md`, `apps/raven/app/CLAUDE.md`, and the app's current `package.json` before running commands. Use the repository's `get-started` skill for missing tools.
 

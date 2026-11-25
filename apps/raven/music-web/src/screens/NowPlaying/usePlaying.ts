@@ -1,4 +1,4 @@
-import { QUEUE_SOURCE_KINDS, type Track } from '@raven/core'
+import { type AudioQuality, QUEUE_SOURCE_KINDS, type Track } from '@raven/core'
 import { useAudioQueue, useIsAudiobook } from '@raven/ui/headless'
 import {
   NOW_PLAYING_COPY,
@@ -39,8 +39,8 @@ export type Playing = NowPlayingTrack & {
   /** "Playing on this browser". */
   playingOn: string
   close: () => void
-  /** The format and quality of what is playing, "FLAC · 16-bit / 44.1 kHz · 912 kbps"; null until its source is made. */
-  quality: string | null
+  /** The format and quality of what is playing; null until its source is made. */
+  quality: AudioQuality | null
   /** The song's first artist's page, or that it credits none to open. */
   artist: PlayingArtist
 }

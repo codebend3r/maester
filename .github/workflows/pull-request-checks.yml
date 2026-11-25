@@ -343,8 +343,8 @@ jobs:
     permissions: *native-permissions
     env:
       APP_SETUP: ios
-      APP_PROJECT: apps/raven/music
-      APP_BUILD: bunx nx run @raven/music:build:ios --excludeTaskDependencies
+      APP_PROJECT: apps/wren/wren-app
+      APP_BUILD: bunx nx run @wren/app:build:ios --excludeTaskDependencies
       APP_ARTIFACT: raven-music-ios-simulator
       APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Wren.app
       APP_RUNTIME: iOS
@@ -358,8 +358,8 @@ jobs:
     permissions: *native-permissions
     env:
       APP_SETUP: android-tv
-      APP_PROJECT: apps/raven/music
-      APP_BUILD: bunx nx run @raven/music:build:android --excludeTaskDependencies
+      APP_PROJECT: apps/wren/wren-app
+      APP_BUILD: bunx nx run @wren/app:build:android --excludeTaskDependencies
       APP_ARTIFACT: raven-music-android
       APP_BUNDLE: ''
     steps: *build-steps

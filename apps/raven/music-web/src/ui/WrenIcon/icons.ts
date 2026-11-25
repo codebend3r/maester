@@ -38,6 +38,8 @@ const EYE = 'M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 
 
 const RING = circle({ cx: 12, cy: 12, r: 8.5 })
 
+const SPEAKER = 'M4 9.5h3.5l4.5-4v13l-4.5-4H4z'
+
 /**
  * Wren's line icons, from the redesign handoff's reference pages, the same drawings as the phone
  * and tablet apps': a 24 unit box, lines 1.75 wide with round ends and joins. Play, pause, next,
@@ -108,6 +110,9 @@ export const ICONS = {
   ),
   lyrics: lines('M4.5 5.5h15v10.5H10l-5.5 4z', 'M8.5 9.5h7M8.5 12.5h4.5'),
   upNext: lines('M4 6h13M4 11h13M4 16h7', 'M15 14.2v6.2l5-3.1z'),
+  // The speaker beside the volume line, which the web alone draws: a phone's volume is its buttons'.
+  volume: lines(SPEAKER, 'M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8'),
+  volumeMuted: lines(SPEAKER, 'm16 9.5 5 5M21 9.5l-5 5'),
   output: lines(
     rect({ x: 6, y: 3, width: 12, height: 18, rx: 3 }),
     circle({ cx: 12, cy: 14.2, r: 2.8 }),

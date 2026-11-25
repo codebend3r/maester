@@ -1,6 +1,6 @@
 import type { Track } from '@raven/core'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { NOW_PLAYING_COPY } from '@raven/wren'
+import { MENU_VIEWS, type MenuView, NOW_PLAYING_COPY, type SongActions } from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 import { TrackMenu } from '@/components/TrackMenu/TrackMenu'
 import { useTrackLike } from '@/lib/useTrackLike'
@@ -15,7 +15,7 @@ import { useGoBack } from '@/shell/useGoBack'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 import styles from '@/screens/NowPlaying/NowPlaying.module.scss'
 
-type LayoutProps = { playing: Playing; onMore: () => void }
+type LayoutProps = { playing: Playing; actions: SongActions }
 
 const LAYOUT_VIEWS = {
   [FORM_FACTORS.phone]: PhonePlayer,
@@ -34,18 +34,30 @@ type Sheet =
 
 type SheetViewProps<K extends SheetState> = { sheet: Sheet & { state: K } }
 
-/** A song is queued: the layout for the window, and the song's actions over it from More. */
+/*
+ * A song is queued: the layout for the window, and the song's menu over it, opened on its
+ * actions from More or on the listener's playlists from Add to playlist.
+ */
 function PlayingSheet({ sheet: { track } }: SheetViewProps<typeof SHEET_STATES.playing>) {
   const playing = usePlaying({ track })
   const like = useTrackLike({ track })
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [menu, setMenu] = useState<MenuView | null>(null)
   const Layout = LAYOUT_VIEWS[usePlayerFormFactor()]
   // While the menu is open Escape is its own, and closes it alone.
-  useEscape({ onEscape: playing.close, isEnabled: !isMenuOpen })
+  useEscape({ onEscape: playing.close, isEnabled: menu === null })
   return (
     <>
-      <Layout onMore={() => setIsMenuOpen(true)} playing={playing} />
-      {isMenuOpen && <TrackMenu like={like} onClose={() => setIsMenuOpen(false)} track={track} />}
+      <Layout
+        actions={{
+          like,
+          onAddToPlaylist: () => setMenu(MENU_VIEWS.playlists),
+          onMore: () => setMenu(MENU_VIEWS.actions),
+        }}
+        playing={playing}
+      />
+      {menu !== null && (
+        <TrackMenu like={like} onClose={() => setMenu(null)} startsOn={menu} track={track} />
+      )}
     </>
   )
 }
@@ -78,11 +90,13 @@ function SheetView<K extends SheetState>({ sheet }: SheetViewProps<K>) {
 }
 
 /**
- * `/now-playing`, the player opened up, drawn alone with no chrome. In a window up to `64rem`
- * wide: the cover large, the song, the scrubber and the transport, with a bar at the foot for
- * the lyrics (a synced line plays from where it is sung) and Up next (each song playable, moved
- * up or down and removed). Wider, the cover and the controls beside the lyrics, over Up next
- * across the foot. The header's button and Escape close it, back to the page it was opened over.
+ * `/now-playing`, the player opened up, drawn alone with no chrome: the cover large, the song
+ * with its heart and Add to playlist beside its name, the scrubber with the time played and the
+ * time left, Previous, Play or Pause and Next, and the volume. In a window up to `64rem` wide a
+ * bar at the foot swaps the player for the lyrics (a synced line plays from where it is sung)
+ * or Up next (Shuffle, Repeat and Clear over the songs, each playable, moved up or down and
+ * removed). Wider, those two are the tabs of one pane beside the player. The header's button
+ * and Escape close it, back to the page it was opened over.
  */
 export function NowPlaying() {
   const track = useAudioQueue(playingTrackOf)

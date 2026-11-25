@@ -65,8 +65,8 @@ jobs:
             prefix: raven-app
             download: android.apk
           - name: 🎵 Build and attach the Wren APK
-            project: '@raven/music'
-            folder: apps/raven/music
+            project: '@wren/app'
+            folder: apps/wren/wren-app
             target: build:android
             prefix: wren
             download: android.apk

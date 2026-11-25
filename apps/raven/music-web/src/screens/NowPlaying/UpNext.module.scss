@@ -16,7 +16,7 @@
   --up-next-head-bottom: var(--size-up-next-head-bottom);
 }
 
-// Along the foot of the wide player, whose panel pads itself.
+// Beside the wide player, in a pane that pads itself.
 .panel {
   --up-next-inset: 0rem;
   --up-next-head-top: 0rem;
@@ -48,10 +48,12 @@
   font: var(--type-meta);
 }
 
-.toggles {
+// What changes the queue: Shuffle, Repeat and Clear.
+.modes {
   display: grid;
   grid-auto-flow: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  align-items: center;
 }
 
 .list {

@@ -31,7 +31,7 @@ export default {
        */
       ignoreDependencies: ['expo-updates', '@raven/audio', 'expo-file-system'],
     },
-    'apps/raven/music': {
+    'apps/wren/wren-app': {
       /*
        * Wren, read as the app is: its routes by path, the binaries the Mac installs, and no
        * over-the-air updates.

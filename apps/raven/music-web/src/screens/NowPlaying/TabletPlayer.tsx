@@ -1,57 +1,74 @@
-import { TRANSPORTS } from '@raven/wren'
-import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
-import { Transport } from '@/player/Transport/Transport'
+import {
+  NOW_PLAYING_COPY,
+  PANES,
+  SIDE_PANE_CHOICES,
+  type SidePane,
+  type SongActions,
+} from '@raven/wren'
+import { type ComponentType, useState } from 'react'
 import { LyricsView } from '@/screens/NowPlaying/LyricsView'
-import { PlayerCover } from '@/screens/NowPlaying/PlayerCover'
-import { HEADER_TITLES, PlayerHeader } from '@/screens/NowPlaying/PlayerHeader'
-import { PlayerExtras } from '@/screens/NowPlaying/PlayerExtras'
-import { SongTitle } from '@/screens/NowPlaying/SongTitle'
+import { PlayerHeader } from '@/screens/NowPlaying/PlayerHeader'
+import { PlayerStack } from '@/screens/NowPlaying/PlayerStack'
 import { UP_NEXT_PLACES, UpNext } from '@/screens/NowPlaying/UpNext'
 import type { Playing } from '@/screens/NowPlaying/usePlaying'
 import { COLORS, SIZES } from '@/theme/tokens'
+import { SegmentedControl } from '@/ui/SegmentedControl/SegmentedControl'
 import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/NowPlaying/TabletPlayer.module.scss'
 
-type TabletPlayerProps = { playing: Playing; onMore: () => void }
+type SidePaneProps = { playing: Playing }
+
+/** What plays next, under what changes the queue: Shuffle, Repeat and Clear. */
+function UpNextTab({ playing }: SidePaneProps) {
+  return <UpNext place={UP_NEXT_PLACES.panel} sourceName={playing.title.sourceName} />
+}
+
+/** The song's words. */
+function LyricsTab({ playing }: SidePaneProps) {
+  return <LyricsView lyrics={playing.lyrics} />
+}
+
+const SIDE_PANE_VIEWS = {
+  [PANES.upNext]: UpNextTab,
+  [PANES.lyrics]: LyricsTab,
+} as const satisfies Record<SidePane, ComponentType<SidePaneProps>>
+
+type TabletPlayerProps = { playing: Playing; actions: SongActions }
 
 /**
- * The wide Now Playing, the whole screen in two rows. The first is two columns: the cover over
- * the controls, icons and lines with no words, in under a third of the width, and beside them
- * the song, where the music plays and the lyrics. The second, the screen's whole width, is Up
- * next: what the album, the playlist or the shuffle plays after this song. The stylesheet
- * divides the window as the apps' `tabletFitOf` does.
+ * The wide Now Playing, the whole screen in two columns. The first is the player, as the narrow
+ * layout draws it: the header, the cover, the song, the scrubber, the transport and the volume.
+ * The second is one pane of two tabs, Up next (which it opens on) and Lyrics, under where the
+ * music plays.
  */
-export function TabletPlayer({ playing, onMore }: TabletPlayerProps) {
-  const { title } = playing
+export function TabletPlayer({ playing, actions }: TabletPlayerProps) {
+  const [pane, setPane] = useState<SidePane>(SIDE_PANE_CHOICES[0].key)
+  const PaneView = SIDE_PANE_VIEWS[pane]
   return (
     <div className={styles.screen}>
       <div className={styles.player}>
-        <PlayerHeader
-          onClose={playing.close}
-          onMore={onMore}
-          title={title}
-          variant={HEADER_TITLES.none}
-        />
-        <PlayerCover className={styles.cover} cover={playing.cover} />
-        <Scrubber kind={SCRUBBERS.bare} length={playing.length} />
-        <Transport kind={TRANSPORTS.column} />
-        <PlayerExtras isAudiobook={playing.isAudiobook} />
+        <div className={styles.header}>
+          <PlayerHeader onClose={playing.close} onMore={actions.onMore} title={playing.title} />
+        </div>
+        <PlayerStack actions={actions} className={styles.stack} playing={playing} />
       </div>
-      <div className={styles.lyrics}>
-        <div className={styles.lyricsHead}>
-          <SongTitle playing={playing} />
+      <div className={styles.side}>
+        <div className={styles.sideHead}>
+          <SegmentedControl
+            choices={SIDE_PANE_CHOICES}
+            label={NOW_PLAYING_COPY.sidePanes}
+            onSelect={setPane}
+            selected={pane}
+          />
           <p className={styles.output}>
             <WrenIcon color={COLORS.text2} name={ICONS.output} size={SIZES.smallIcon} />
             <span className={styles.outputText}>{playing.playingOn}</span>
           </p>
         </div>
-        <div className={styles.words}>
-          <LyricsView lyrics={playing.lyrics} />
+        <div className={styles.sideBody}>
+          <PaneView playing={playing} />
         </div>
-      </div>
-      <div className={styles.upNext}>
-        <UpNext place={UP_NEXT_PLACES.panel} sourceName={title.sourceName} />
       </div>
     </div>
   )

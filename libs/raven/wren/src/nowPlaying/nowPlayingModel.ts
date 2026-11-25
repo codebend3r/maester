@@ -42,6 +42,15 @@ export const barWordsOf = ({ pane, output }: BarWordsOfProps): BarWords => {
   return words[pane]
 }
 
+/** The panes the wide layout shows beside the player, as tabs: every pane but the player itself. */
+export type SidePane = Exclude<Pane, typeof PANES.player>
+
+/** The wide layout's tabs in the order they sit, each named as the bottom bar names its pane; it opens on the first. */
+export const SIDE_PANE_CHOICES = [
+  { key: PANES.upNext, label: PLAYER_COPY.upNext },
+  { key: PANES.lyrics, label: PLAYER_COPY.lyrics },
+] as const satisfies readonly { key: SidePane; label: string }[]
+
 /** A song still to play, as Up next lists it. */
 export type UpNextRow = {
   key: string

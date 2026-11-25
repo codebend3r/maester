@@ -1,0 +1,34 @@
+@use '../../styles/mixins';
+
+// The chips, then the words in the room they leave.
+.quality {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.chips {
+  display: grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+}
+
+.chip {
+  padding-inline: var(--space-2);
+  border: var(--size-hairline) solid var(--color-line-2);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-2);
+  font: var(--type-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.facts {
+  @include mixins.one-line;
+  color: var(--color-text-3);
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+}
