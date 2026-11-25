@@ -199,6 +199,16 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
+                "wren:deploy:ios",
+                "Builds Wren's signed Release and puts it on every paired iPhone and iPad.",
+                "Xcode",
+            ),
+            Command(
+                "deploy:devices",
+                "Puts raven on both TVs, and raven and Wren on every paired iPhone and iPad.",
+                "Xcode",
+            ),
+            Command(
                 "app:deploy:tvos",
                 "Builds the signed Release and puts it on the paired Apple TV.",
                 "Xcode",
@@ -268,11 +278,6 @@ GROUPS: tuple[Group, ...] = (
                 "desktop:deploy",
                 "Replaces /Applications/Raven.app with what desktop:make packaged, and opens it.",
                 "macOS",
-            ),
-            Command(
-                "deploy:devices",
-                "Puts the checked-out apps on this Mac, both TVs and every iPhone and iPad.",
-                "Xcode",
             ),
             Command("desktop:release:assets", "Names and gathers the release's files for upload."),
             Command(

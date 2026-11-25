@@ -25,6 +25,7 @@ type ScrubLineProps = ReturnType<typeof scrubberAccessibilityOf> &
     | 'onResponderMove'
     | 'onResponderRelease'
     | 'onResponderTerminate'
+    | 'onResponderTerminationRequest'
   >
 
 type Scrub = {
@@ -68,6 +69,8 @@ export const useScrub = ({ position, duration, onSeek, inset, canDrag }: UseScru
         setDragged(null)
       },
       onResponderTerminate: () => setDragged(null),
+      // A drag along the line is the line's until the finger lifts: nothing above it takes it over.
+      onResponderTerminationRequest: () => false,
     },
   }
 }

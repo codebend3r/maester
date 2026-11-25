@@ -26,6 +26,11 @@ export const WREN_ICONS = {
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
 const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appVariant] })
 const isCarPlay = process.env[CARPLAY_FLAG.name] === CARPLAY_FLAG.on
+/*
+ * The team a device build is signed under, from `scripts/deploy_ios.sh` or the shell; a prebuild
+ * rewrites `ios/`, and with no team written Xcode asks for one on every regeneration.
+ */
+const appleTeamId = process.env[BUILD_ENV.appleTeamId]?.trim() ?? ''
 
 const LOCAL_NETWORK_USE = 'Wren reaches your raven server on your local network.'
 
@@ -50,6 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: APP_ID,
       buildNumber: String(buildNumber),
+      ...(appleTeamId === '' ? {} : { appleTeamId }),
       supportsTablet: true,
       infoPlist: {
         NSLocalNetworkUsageDescription: LOCAL_NETWORK_USE,

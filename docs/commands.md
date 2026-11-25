@@ -87,6 +87,8 @@ Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 | `app:build:android-tv`    | A Release APK for Android TV, to install on the emulator or a TV.               | Android SDK |
 | `app:build:android`       | A Release APK for Android phones, to install on the emulator or a phone.        | Android SDK |
 | `app:deploy:ios`          | Builds the signed Release and puts it on every paired iPhone and iPad.          | Xcode       |
+| `wren:deploy:ios`         | Builds Wren's signed Release and puts it on every paired iPhone and iPad.       | Xcode       |
+| `deploy:devices`          | Puts raven on both TVs, and raven and Wren on every paired iPhone and iPad.     | Xcode       |
 | `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.                   | Xcode       |
 | `app:deploy:android-tv`   | Builds the Release APK and puts it on the Android TV over adb, found over mDNS. | Android SDK |
 | `app:deploy:android`      | Builds the Release APK and puts it on the Android phone or emulator adb sees.   | Android SDK |
@@ -110,7 +112,6 @@ The Electron app on macOS and Windows, with libmpv.
 | `desktop:audit:bundle`   | Checks the packaged engine's binaries and their imports.                                                     |               |
 | `desktop:smoke:packaged` | Launches the packaged app and checks it starts and quits. Uses your own ~/Library/Application Support/raven. | macOS         |
 | `desktop:deploy`         | Replaces /Applications/Raven.app with what desktop:make packaged, and opens it.                              | macOS         |
-| `deploy:devices`         | Puts the checked-out apps on this Mac, both TVs and every iPhone and iPad.                                   | Xcode         |
 | `desktop:release:assets` | Names and gathers the release's files for upload.                                                            |               |
 | `mpv:native`             | Builds the pinned libmpv and the addon, then runs its audit and native tests.                                | macOS + Xcode |
 | `mpv:native:windows`     | The Windows addon's audit and native tests against the pinned libmpv DLL.                                    | Windows       |

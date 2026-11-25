@@ -127,6 +127,12 @@ const DEVICE_NAVS = {
   [NAV_KINDS.focus]: FocusNav,
 } as const satisfies Record<NavKind, ComponentType<DeviceNavProps>>
 
+/**
+ * The player takes no gesture that moves between pages: a finger dragged along its timeline
+ * scrubs, where the swipe from the edge would have gone back. Its own back button leaves.
+ */
+const PLAY_SCREEN_OPTIONS = { gestureEnabled: false } as const
+
 /** The routes, once the stores are read: every route but sign-in needs a server. */
 const AppRoutes = () => {
   const session = useAppQueries()
@@ -180,7 +186,7 @@ const AppRoutes = () => {
               <Stack.Screen name={APP_SCREENS.home} />
               <Stack.Screen name={APP_SCREENS.item} />
               <Stack.Screen name={APP_SCREENS.library} />
-              <Stack.Screen name={APP_SCREENS.play} />
+              <Stack.Screen name={APP_SCREENS.play} options={PLAY_SCREEN_OPTIONS} />
               <Stack.Screen name={APP_SCREENS.album} />
               <Stack.Screen name={APP_SCREENS.artist} />
               <Stack.Screen name={APP_SCREENS.saga} />

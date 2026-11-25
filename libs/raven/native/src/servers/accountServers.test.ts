@@ -92,7 +92,11 @@ const fakeFetch = ({ config = READY_CONFIG, rows = () => [], health = {} }: Fake
   return { fetch, calls }
 }
 
-const SIGNED_IN = { session: { accessToken: 'token', userId: 'user' } }
+const NO_REFRESH = async (): Promise<string | null> => null
+
+const SIGNED_IN = { session: { accessToken: 'token', userId: 'user' }, refresh: NO_REFRESH }
+
+const SIGNED_OUT = { session: null, refresh: NO_REFRESH }
 
 type AccountOfProps = FakeFetchProps & { isSignedIn?: boolean }
 
@@ -103,7 +107,7 @@ const accountOf = ({ isSignedIn = true, ...answers }: AccountOfProps = {}) => {
     home: HOME,
   })
   const { fetch, calls } = fakeFetch(answers)
-  const session = { getState: () => (isSignedIn ? SIGNED_IN : { session: null }) }
+  const session = { getState: () => (isSignedIn ? SIGNED_IN : SIGNED_OUT) }
   return { servers, calls, account: accountServersFor({ servers, session, fetch }) }
 }
 
@@ -119,6 +123,31 @@ describe('accountServersFor', () => {
     expect(listing?.init.headers ?? {}).toMatchObject({
       [HEADERS.authorization]: `${AUTH_SCHEME} token`,
     })
+  })
+
+  it('renews a token the database refuses as expired and asks again, so a launch after an hour away still reads the account', async () => {
+    const servers = createActiveServerStore({
+      store: memoryStore().store,
+      jar: { forget: async () => {} },
+      home: HOME,
+    })
+    const fresh = `${AUTH_SCHEME} fresh`
+    const tokens: unknown[] = []
+    const fetch: FetchLike = async (url, init = {}) => {
+      if (url === `${HOME.origin}${AUTH_PATHS.config}`) {
+        return responseOf({ status: HTTP_STATUSES.ok, body: READY_CONFIG })
+      }
+      const token = init.headers?.[HEADERS.authorization]
+      tokens.push(token)
+      return token === fresh
+        ? responseOf({ status: HTTP_STATUSES.ok, body: [MELEYS_ROW] })
+        : responseOf({ status: HTTP_STATUSES.unauthorized, body: { message: 'JWT expired' } })
+    }
+    const session = { getState: () => ({ ...SIGNED_IN, refresh: async () => 'fresh' }) }
+    const account = accountServersFor({ servers, session, fetch })
+    expect(await account.sync()).toBe(SYNC_OUTCOMES.followed)
+    expect(tokens).toEqual([`${AUTH_SCHEME} token`, fresh])
+    expect(servers.getState().servers).toMatchObject([HOME, { id: MELEYS_ID }])
   })
 
   it('goes home when the server in use is no longer on the account', async () => {

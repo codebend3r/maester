@@ -70,7 +70,7 @@
     "claude-audit": "bash scripts/audit_claude_md.sh",
     "dead-code": "nx run maester:dead-code",
     "dead-css": "nx run maester:dead-css",
-    "deploy:devices": "bun run --sequential desktop:deploy app:deploy:android-tv app:deploy:tvos app:deploy:ios",
+    "deploy:devices": "bun run --sequential app:deploy:android-tv app:deploy:tvos app:deploy:ios wren:deploy:ios",
     "desktop:audit:bundle": "nx run @raven/desktop:audit:bundle",
     "desktop:build": "nx run @raven/desktop:build",
     "desktop:deploy": "nx run @raven/desktop:deploy:mac",
@@ -113,6 +113,7 @@
     "verify:uncached": "bun run verify --skip-nx-cache",
     "web:build": "nx run @raven/web:build",
     "web:e2e": "nx run @raven/web:e2e:browser",
+    "wren:deploy:ios": "APP_VARIANT=${APP_VARIANT:-development} nx run @wren/app:deploy:ios",
     "wren:web:e2e": "nx run @wren/web:e2e:browser",
     "wren:web:lighthouse": "nx run @wren/web:lighthouse"
   },
