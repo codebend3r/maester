@@ -12,22 +12,13 @@
 # `xcrun devicectl manage pair`), and a signing certificate must be in the keychain (sign in
 # to Xcode once). A Personal Team's profile lasts seven days; run this again to renew it.
 set -euo pipefail
+source "$(dirname "$0")/apple_team.sh"
 cd "$(dirname "$0")/.."
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export APP_VARIANT="${APP_VARIANT:-development}"
 BUNDLE_ID=io.github.codebend3r.raven.app
 DERIVED=build/tvos-device
 APP="$DERIVED/Build/Products/Release-appletvos/Raven.app"
-
-say() { printf '\n==> %s\n' "$*"; }
-
-# The team is the OU of the Apple Development certificate, the one field that names it.
-team_id() {
-  security find-certificate -c "Apple Development" -p 2>/dev/null \
-    | openssl x509 -noout -subject 2>/dev/null \
-    | sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p' | head -1
-}
 
 # The paired Apple TV's hardware UDID, which xcodebuild and devicectl both take. A pairing id
 # (36 characters) is not a destination; the hardware one is 40 hex characters.
@@ -43,12 +34,7 @@ apple_tv() {
         }'
 }
 
-TEAM="${APPLE_TEAM_ID:-$(team_id)}"
-if [ -z "$TEAM" ]; then
-  echo "No Apple Development certificate in the keychain: sign in to Xcode (Settings > Accounts) once." >&2
-  exit 1
-fi
-export APPLE_TEAM_ID="$TEAM"
+require_team "No Apple Development certificate in the keychain: sign in to Xcode (Settings > Accounts) once." "Apple Development"
 
 UDID="$(apple_tv)"
 if [ -z "$UDID" ]; then
