@@ -38,6 +38,7 @@ import {
   bingeRowsOf,
   seeAllLabelOf,
   seeAllOf,
+  shelfOrderToggleOf,
   shelfStateOf,
   type ShelfPageProps,
 } from '@/layouts/shelfKit'
@@ -46,6 +47,7 @@ import { BingeRowFocus } from '@/layouts/BingeRow.focus'
 import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { Logo } from '@/layouts/Logo'
+import { PlateButton } from '@/layouts/tvControls'
 import { type ShelfViewport, scrollTargetOf } from '@/layouts/shelfScroll'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
 import { SideMenu, useSideMenuRoom } from '@/layouts/SideMenu.focus'
@@ -161,15 +163,19 @@ const Shelves = ({
   )
 }
 
-type ShelfTitleProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>
+type ShelfTitleProps = Pick<
+  ShelfProps,
+  'shelf' | 'onOpenLibrary' | 'onOpenContinue' | 'onTurnOrder'
+>
 
 /**
- * A shelf's title, and after a library's the way into the library, which the remote reaches
- * above the row, as the web's shelf heading links to it; after Continue watching, the way to
- * every video in progress once it holds more than Home shows.
+ * A shelf's title, and after a library's its order toggle and the way into the library, which
+ * the remote reaches above the row, as the web's shelf heading links to it; after Continue
+ * watching, the way to every video in progress once it holds more than Home shows.
  */
-const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) => {
+const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue, onTurnOrder }: ShelfTitleProps) => {
   const seeAll = seeAllOf({ shelf, onOpenLibrary, onOpenContinue })
+  const toggle = shelfOrderToggleOf({ shelf, onTurnOrder })
   const { settle } = useOpeningFocus()
   const styles = useStyles()
   return (
@@ -177,6 +183,15 @@ const ShelfTitle = ({ shelf, onOpenLibrary, onOpenContinue }: ShelfTitleProps) =
       <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.shelfTitle}>
         {shelf.title}
       </Text>
+      {toggle !== null && (
+        <PlateButton
+          icon={toggle.icon}
+          label={toggle.label}
+          onFocused={settle}
+          onPress={toggle.onTurn}
+          text={toggle.text}
+        />
+      )}
       {seeAll !== null && (
         <Pressable
           accessibilityLabel={seeAllLabelOf(shelf.title)}
@@ -338,6 +353,7 @@ const ShelfBody = (props: ShelfProps) => {
       <ShelfTitle
         onOpenContinue={props.onOpenContinue}
         onOpenLibrary={props.onOpenLibrary}
+        onTurnOrder={props.onTurnOrder}
         shelf={props.shelf}
       />
       <Row {...props} />

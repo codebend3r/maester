@@ -24,6 +24,7 @@ import {
   type UpcomingShelf,
   type ViewingSession,
   asksServerForNext,
+  SHELF_ORDERS,
 } from '@raven/core'
 import { LISTING_GC_MS, queryKeys } from '@/query/queryClient'
 import { playerQueriesFor } from '@/lib/playerQueries'
@@ -270,6 +271,18 @@ export const ravenQueriesFor = (api: ApiClient) => {
     homeAlbumsQuery: queryOptions({
       queryKey: queryKeys.homeAlbums,
       queryFn: () => api.getHomeAlbums(),
+    }),
+
+    /** Each library's shelf by its newest releases, for the shelves turned to Newly released. */
+    releasedShelvesQuery: queryOptions({
+      queryKey: queryKeys.releasedShelves,
+      queryFn: async () => (await api.getHome({ order: SHELF_ORDERS.released })).shelves,
+    }),
+
+    /** Each music library's albums by their newest releases, for the shelves turned to Newly released. */
+    releasedAlbumsQuery: queryOptions({
+      queryKey: queryKeys.releasedAlbums,
+      queryFn: () => api.getHomeAlbums({ order: SHELF_ORDERS.released }),
     }),
 
     /** The admin's picks for the hero, and how many it holds at most. */

@@ -6,7 +6,11 @@ import {
   isMediaSort,
   isMusicSort,
   isRecord,
+  isShelfOrder,
   isSortDirection,
+  otherShelfOrder,
+  DEFAULT_SHELF_ORDER,
+  type ShelfOrders,
   withoutView,
 } from '@raven/core'
 import { loadPersisted } from '@raven/native/headless'
@@ -18,8 +22,8 @@ import { type StateStorage, createJSONStorage, persist } from 'zustand/middlewar
 export const LIBRARY_VIEWS_KEY = 'raven-library-views'
 
 /**
- * How a viewer left one library on this device: its sort, view and grouping, any of them, and
- * for a music library the albums' sort and its direction.
+ * How a viewer left one library on this device: its sort, view and grouping, any of them, for
+ * a music library the albums' sort and its direction, and the order its shelf on Home is in.
  */
 const isLibraryChoice = exactPartial({
   sort: isMediaSort,
@@ -27,6 +31,7 @@ const isLibraryChoice = exactPartial({
   groupBy: isMediaGroupBy,
   musicSort: isMusicSort,
   musicOrder: isSortDirection,
+  shelfOrder: isShelfOrder,
 })
 
 export type LibraryChoice = Infer<typeof isLibraryChoice>
@@ -35,12 +40,14 @@ type Choices = Record<string, LibraryChoice>
 
 type ChooseProps = { serverId: string; libraryId: number; change: LibraryChoice }
 
+type KeyOfProps = { serverId: string; libraryId: number }
+
 type LibraryViews = {
   choices: Choices
   choose: (args: ChooseProps) => void
+  /** Turns a library's shelf on Home to its other order, read from the choices as they stand. */
+  turnShelfOrder: (args: KeyOfProps) => void
 }
-
-type KeyOfProps = { serverId: string; libraryId: number }
 
 const keyOf = ({ serverId, libraryId }: KeyOfProps): string => `${serverId}/${libraryId}`
 
@@ -56,6 +63,16 @@ type LibraryChoiceOfProps = {
 /** The choice made for a library on a server, or nothing chosen. */
 export const libraryChoiceOf = ({ choices, ...library }: LibraryChoiceOfProps): LibraryChoice =>
   choices[keyOf(library)] ?? NO_CHOICE
+
+type ShelfOrdersOnProps = { choices: Choices; serverId: string }
+
+/** The order each library's shelf on Home is turned to on a server, by library id. */
+export const shelfOrdersOn = ({ choices, serverId }: ShelfOrdersOnProps): ShelfOrders =>
+  Object.entries(choices).reduce<ShelfOrders>((orders, [key, { shelfOrder }]) => {
+    const [server, libraryId] = key.split('/')
+    if (server !== serverId || shelfOrder === undefined) return orders
+    return { ...orders, [Number(libraryId)]: shelfOrder }
+  }, {})
 
 /** What was read back, kept only where it is a choice. */
 const choicesOf = (saved: unknown): Choices => {
@@ -91,6 +108,12 @@ export const useLibraryViews = create<LibraryViews>()(
         set(({ choices }) => ({
           choices: { ...choices, [keyOf(library)]: { ...choices[keyOf(library)], ...change } },
         })),
+      turnShelfOrder: (library) =>
+        set(({ choices }) => {
+          const choice = choices[keyOf(library)]
+          const shelfOrder = otherShelfOrder(choice?.shelfOrder ?? DEFAULT_SHELF_ORDER)
+          return { choices: { ...choices, [keyOf(library)]: { ...choice, shelfOrder } } }
+        }),
     }),
     {
       name: LIBRARY_VIEWS_KEY,

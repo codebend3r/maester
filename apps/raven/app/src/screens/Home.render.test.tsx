@@ -34,6 +34,8 @@ import {
   accountFetchOf,
   signInTestAccount,
 } from '@/test/accountData'
+import { cardButtons } from '@/test/shelfToggles'
+import { useLibraryViews } from '@/stores/libraryViews'
 import { FILMS, NAS, OTHER, SERIES, homeApi } from '@/test/homeServer'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen } from '@/test/renderScreen'
@@ -47,7 +49,7 @@ const NAV_LABELS: ReadonlySet<string | undefined> = new Set([
 
 /** The cards on the page: its buttons but the header's. */
 const cardsOnPage = () =>
-  screen.getAllByRole('button').filter((button) => !NAV_LABELS.has(button.props.accessibilityLabel))
+  cardButtons().filter((button) => !NAV_LABELS.has(button.props.accessibilityLabel))
 const mockApi = jest.fn(homeApi)
 const mockCookies = jest.fn<() => Record<string, string>>(() => ({}))
 /** The first light theme, which the default is not. */
@@ -103,6 +105,37 @@ describe('Home on a phone or tablet', () => {
     expect(await screen.findByRole('header', { name: 'Continue watching' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Films' })).toBeTruthy()
     expect(screen.getByRole('header', { name: 'Series' })).toBeTruthy()
+  })
+
+  it('opens each library shelf on what it gained last, and turns one to its newest releases', async () => {
+    useLibraryViews.setState({ choices: {} })
+    await renderHome()
+    const toggle = await screen.findByRole('button', {
+      name: 'Films: Recently added. Show newly released',
+    })
+    expect(cardsOnPage().map((card) => card.props.accessibilityLabel)).toEqual([
+      'Busboys',
+      'Busboys',
+      'Night Train',
+      'Severance',
+    ])
+    await fireEvent.press(toggle)
+    expect(
+      await screen.findByRole('button', { name: 'Films: Newly released. Show recently added' }),
+    ).toBeTruthy()
+    await waitFor(() =>
+      expect(cardsOnPage().map((card) => card.props.accessibilityLabel)).toEqual([
+        'Busboys',
+        'Night Train',
+        'Busboys',
+        'Severance',
+      ]),
+    )
+    // The other shelf keeps its own order, and its toggle says so.
+    expect(
+      screen.getByRole('button', { name: 'Series: Recently added. Show newly released' }),
+    ).toBeTruthy()
+    useLibraryViews.setState({ choices: {} })
   })
 
   it("follows the account's pins on the server in use, leaving out the others' shelves", async () => {

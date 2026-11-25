@@ -1,7 +1,14 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { type Hero, type Home, type HomeSearch, HOME_SHELF_TYPES, mediaLabel } from '@raven/core'
+import {
+  type Hero,
+  type Home,
+  type HomeSearch,
+  HOME_SHELF_TYPES,
+  SHELF_ORDERS,
+  mediaLabel,
+} from '@raven/core'
 import { Link, useLocation } from 'react-router-dom'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { api } from '@/lib/api'
@@ -17,6 +24,7 @@ import { held } from '@/test/held'
 import { renderWithProviders } from '@/test/render'
 import { EPISODE_TWO, SEASON_ONE_CARD, SEVERANCE } from '@/test/tv'
 import { asDesktop, downloadsMain } from '@/test/desktop'
+import { useShelfOrders } from '@/stores/shelfOrders'
 
 const LIBRARIES = [
   library({ id: 2, name: 'Films', settings: { ...library().settings, kind: 'movies' } }),
@@ -67,6 +75,7 @@ describe('HomePage', () => {
 
   afterEach(() => {
     cleanup()
+    useShelfOrders.setState({ orders: {} })
     spies.home.mockReset()
     spies.libraries.mockReset()
     spies.search.mockReset()
@@ -128,6 +137,41 @@ describe('HomePage', () => {
       'href',
       '/artists/2',
     )
+  })
+
+  it("opens each library's row on what it gained last, and turns one to its newest releases", async () => {
+    const added = matchedMovie({ id: 21, item: itemSummary({ id: 31, title: 'Added Last' }) })
+    const newest = matchedMovie({ id: 22, item: itemSummary({ id: 32, title: 'Out Last' }) })
+    spies.home.mockImplementation(async (query) => ({
+      inProgress: [],
+      shelves: [
+        {
+          libraryId: 2,
+          type: HOME_SHELF_TYPES.media,
+          media: [query?.order === SHELF_ORDERS.released ? newest : added],
+        },
+      ],
+    }))
+    spies.libraries.mockImplementation(async () => LIBRARIES)
+    renderWithProviders({ ui: <HomePage /> })
+    const toggle = await screen.findByRole('button', {
+      name: 'Films: Recently added. Show newly released',
+    })
+    expect(toggle).toHaveTextContent('Recently added')
+    expect(
+      within(shelf('Films')).getAllByRole('link', { name: /Added Last/ })[0],
+    ).toBeInTheDocument()
+    // Nothing is turned yet, so the newest releases are never asked for.
+    expect(spies.home).not.toHaveBeenCalledWith({ order: SHELF_ORDERS.released })
+
+    await userEvent.click(toggle)
+    expect(
+      (await within(shelf('Films')).findAllByRole('link', { name: /Out Last/ }))[0],
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Films: Newly released. Show recently added' }),
+    ).toHaveTextContent('Newly released')
+    expect(useShelfOrders.getState().orders).toEqual({ 2: SHELF_ORDERS.released })
   })
 
   it('puts what is in progress first, then a row for each pinned library', async () => {

@@ -11,6 +11,8 @@ import {
   RATINGS_REFRESH_STATES,
   SCAN_KINDS,
   SCAN_STATES,
+  SHELF_ORDERS,
+  SHELF_ORDER_PARAM,
   type Hero,
   type Home,
   ITEM_TYPES,
@@ -223,8 +225,18 @@ const SPARSE_HOME: Home = {
   ],
 }
 
+/** Home by its newest releases: the Films shelf the other way round. */
+const RELEASED_HOME: Home = {
+  ...HOME,
+  shelves: HOME.shelves.map((shelf) =>
+    shelf.type === HOME_SHELF_TYPES.media ? { ...shelf, media: shelf.media.toReversed() } : shelf,
+  ),
+}
+
 const ANSWERS: Record<string, unknown> = {
   [`${NAS.origin}${APP_CLIENT_CALLS.getHome.path}`]: HOME,
+  [`${NAS.origin}${APP_CLIENT_CALLS.getHome.path}?${SHELF_ORDER_PARAM}=${SHELF_ORDERS.released}`]:
+    RELEASED_HOME,
   [`${NAS.origin}${APP_CLIENT_CALLS.listLibraries.path}`]: [FILMS, SERIES],
   [`${NAS.origin}${pathWithId({ path: APP_CLIENT_CALLS.getItem.path, id: SEVERANCE_PAGE.id })}`]:
     SEVERANCE_PAGE,
@@ -243,7 +255,8 @@ const ANSWERS: Record<string, unknown> = {
 }
 
 /**
- * A client for `server` as it answers: `NAS` with `HOME`, its two libraries, Severance's page
+ * A client for `server` as it answers: `NAS` with `HOME` (by its newest releases, the films the
+ * other way round), its two libraries, Severance's page
  * and the binge list, `OTHER` with its one library, `SPARSE` with an empty shelf before Films,
  * each 404 to the rest.
  */

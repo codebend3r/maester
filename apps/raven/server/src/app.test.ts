@@ -7,6 +7,8 @@ import {
   type LibraryInput,
   type LibrarySettings,
   type MediaItem,
+  MEDIA_SORTS,
+  SHELF_ORDERS,
   isScanning,
 } from '@raven/core'
 import { CACHE_POLICIES, CONTENT_TYPES, ENCODINGS, HEADERS } from '@shared/server'
@@ -577,7 +579,7 @@ describe('the media server', () => {
       const shelfOf = async (libraryId: number) =>
         (await api().getHome()).shelves.find((shelf) => shelf.libraryId === libraryId)
 
-      it("shows what is in progress, then each library's newest releases", async () => {
+      it("shows what is in progress, then each library's newest arrivals", async () => {
         const [movie] = await listMedia(library.id)
         const id = movie?.id ?? -1
         await api().saveProgress({ id, position: 3, audio: null })
@@ -590,13 +592,25 @@ describe('the media server', () => {
           expect(await shelfOf(library.id)).toEqual({
             libraryId: library.id,
             type: 'media',
-            media: await api().listMedia({ libraryId: library.id, sort: 'year-new' }),
+            media: await api().listMedia({ libraryId: library.id, sort: MEDIA_SORTS.added }),
           })
         } finally {
           // Barely started again: the spot is cleared.
           await api().saveProgress({ id, position: 0, audio: null })
         }
         expect((await api().getHome()).inProgress).toEqual([])
+      })
+
+      it("gives each library's newest releases for ?order=released, and the arrivals for anything else", async () => {
+        const released = await api().getHome({ order: SHELF_ORDERS.released })
+        expect(released.shelves.find((shelf) => shelf.libraryId === library.id)).toEqual({
+          libraryId: library.id,
+          type: 'media',
+          media: await api().listMedia({ libraryId: library.id, sort: MEDIA_SORTS.yearNew }),
+        })
+        const response = await app().inject({ method: 'GET', url: '/api/home?order=sideways' })
+        expect(response.statusCode).toBe(200)
+        expect(response.json()).toEqual(await api().getHome())
       })
 
       it('searches every library by title, leaving out those with no match', async () => {

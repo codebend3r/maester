@@ -18,6 +18,7 @@ import {
   MIX_KINDS,
   MUSIC_PAGE,
   MUSIC_SORTS,
+  SHELF_ORDERS,
 } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import { HISTORY_SHOWS, type RavenQueries, ravenQueriesFor } from '@/query/ravenQueries'
@@ -309,6 +310,18 @@ const QUERIES = [
     key: queryKeys.home,
     pick: (queries) => queries.homeQuery,
     call: (api) => api.getHome(),
+  }),
+  asking({
+    name: 'releasedShelvesQuery',
+    key: queryKeys.releasedShelves,
+    pick: (queries) => queries.releasedShelvesQuery,
+    call: async (api) => (await api.getHome({ order: SHELF_ORDERS.released })).shelves,
+  }),
+  asking({
+    name: 'releasedAlbumsQuery',
+    key: queryKeys.releasedAlbums,
+    pick: (queries) => queries.releasedAlbumsQuery,
+    call: (api) => api.getHomeAlbums({ order: SHELF_ORDERS.released }),
   }),
   asking({
     name: 'homeSearchQuery',

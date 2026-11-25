@@ -1,4 +1,10 @@
-import { type LibraryIconName, REPEAT_MODES, type RepeatMode } from '@raven/core'
+import {
+  type LibraryIconName,
+  REPEAT_MODES,
+  type RepeatMode,
+  SHELF_ORDERS,
+  type ShelfOrder,
+} from '@raven/core'
 
 /*
  * The icons' drawings alone, on a 24 unit square, with nothing of the web's: the web's `Icon`
@@ -407,3 +413,9 @@ export const volumeIconOf = ({ volume, isMuted }: VolumeIconOfProps): IconName =
 /** The repeat button's icon: the loop, with a one inside while one track repeats. */
 export const repeatIconOf = (repeat: RepeatMode): IconName =>
   repeat === REPEAT_MODES.one ? 'repeatOne' : 'repeat'
+
+/** A Home shelf's order toggle's icon: something new for Recently added, the calendar for Newly released. */
+export const SHELF_ORDER_ICONS = {
+  [SHELF_ORDERS.added]: 'plus',
+  [SHELF_ORDERS.released]: 'calendar',
+} as const satisfies Record<ShelfOrder, IconName>

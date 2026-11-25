@@ -9,6 +9,8 @@ import {
   type HomeSearch,
   type ItemSummary,
   type PosterEntry,
+  SHELF_ORDER_PARAM,
+  type ShelfOrder,
   type Upcoming,
   type UpcomingPage,
   type UpcomingSearch,
@@ -24,10 +26,19 @@ type UpcomingShelfQuery = {
   after: string | null
 }
 
+type ShelfOrderQuery = {
+  /** The order the library shelves come in; the server's newest arrivals when left out. */
+  order?: ShelfOrder
+}
+
+const shelfOrderQueryOf = ({ order }: ShelfOrderQuery): Record<string, string> =>
+  order === undefined ? {} : { [SHELF_ORDER_PARAM]: order }
+
 /** The home page: what is in progress, each library's shelf, the hero, and the favourites across every library. */
 export const homeCalls = ({ ask }: Transport) => ({
-  /** Every video in progress, then each library's newest arrivals; libraries still locked stay out. */
-  getHome: (): Promise<Home> => ask({ route: ROUTES.getHome }),
+  /** Every video in progress, then each library's shelf in `order`; libraries still locked stay out. */
+  getHome: (query: ShelfOrderQuery = {}): Promise<Home> =>
+    ask({ route: ROUTES.getHome, query: shelfOrderQueryOf(query) }),
 
   /** What `query` finds in every library, a row for each holding a match; libraries still locked stay out. */
   searchHome: (query: string): Promise<HomeSearch> =>
@@ -36,8 +47,9 @@ export const homeCalls = ({ ask }: Transport) => ({
   /** The titles home's hero takes turns with, each with the line it reads; libraries still locked stay out. */
   getHero: (): Promise<Hero> => ask({ route: ROUTES.getHero }),
 
-  /** A shelf of albums for each music library, the one added last first; libraries still locked stay out. */
-  getHomeAlbums: (): Promise<AlbumShelf[]> => ask({ route: ROUTES.getHomeAlbums }),
+  /** A shelf of albums for each music library in `order`; libraries still locked stay out. */
+  getHomeAlbums: (query: ShelfOrderQuery = {}): Promise<AlbumShelf[]> =>
+    ask({ route: ROUTES.getHomeAlbums, query: shelfOrderQueryOf(query) }),
 
   /** The movies and shows the admin picked for the hero, and how many it holds at most. */
   getHeroPicks: (): Promise<HeroPicks> => ask({ route: ROUTES.getHeroPicks }),

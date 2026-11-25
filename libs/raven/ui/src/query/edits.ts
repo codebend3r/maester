@@ -166,6 +166,7 @@ const videoPlaces = ({
           : { ...home, inProgress: progressing, shelves: shelved }
       },
     }),
+    editKey<HomeShelf[]>({ queryKey: queryKeys.releasedShelves, update: shelves }),
     editAll<HomeSearch>({ filters: { queryKey: queryKeys.homeSearches }, update: shelves }),
     ...(media.item
       ? [

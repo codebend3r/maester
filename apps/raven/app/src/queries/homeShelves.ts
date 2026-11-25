@@ -7,6 +7,9 @@ import {
   ITEM_IMAGE_KINDS,
   type Library,
   type PosterEntry,
+  type ShelfOrder,
+  type ShelfOrders,
+  shelfOrderOf,
   tileWords,
   withLibraries,
 } from '@raven/core'
@@ -42,7 +45,12 @@ export type ShelfView = {
   cards: ShelfCard[]
   layout: ShelfLayout
   hasMore: boolean
+  /** The order a library's shelf on Home is in, which its toggle turns; null for a shelf with no toggle. */
+  order: ShelfOrder | null
 }
+
+/** No shelf turned yet: every library's shelf in the default order. */
+const NO_ORDERS: ShelfOrders = {}
 
 export const CONTINUE_WATCHING = 'Continue watching'
 
@@ -120,7 +128,7 @@ export const homeRowsOf = ({ shelves, albumShelves }: HomeRowsOfProps): HomeRow[
 type LibraryCardsProps = Pictures & { row: HomeRow; library: Library }
 
 /**
- * A library's row of cards: a music library's albums, one cover each, newest release first as
+ * A library's row of cards: a music library's albums, one cover each, in the order
  * the server lists them, as the web's Home draws it; any other library's shelf as its files are.
  */
 const libraryCards = ({ row, library, ...pictures }: LibraryCardsProps): ShelfCard[] => {
@@ -143,15 +151,19 @@ const libraryCards = ({ row, library, ...pictures }: LibraryCardsProps): ShelfCa
 type LibraryShelvesOfProps = Pictures & {
   rows: readonly HomeRow[]
   libraries: readonly Library[]
+  /** The order each of Home's shelves is turned to, which gives each its toggle; a search's rows have none. */
+  orders?: ShelfOrders | null
 }
 
 /**
  * A shelf for each library's row, under the library's name, in the server's order: Home's
- * newest arrivals, or what a search found. A row for a library not in the list is left out.
+ * newest arrivals or releases, or what a search found. A row for a library not in the list is
+ * left out.
  */
 export const libraryShelvesOf = ({
   rows,
   libraries,
+  orders = null,
   ...pictures
 }: LibraryShelvesOfProps): ShelfView[] =>
   withLibraries({ shelves: rows, libraries }).map(({ shelf: row, library }) => ({
@@ -161,6 +173,7 @@ export const libraryShelvesOf = ({
     cards: libraryCards({ row, library, ...pictures }),
     layout: SHELF_LAYOUTS.row,
     hasMore: false,
+    order: orders === null ? null : shelfOrderOf({ orders, libraryId: library.id }),
   }))
 
 type HomeShelvesOfProps = Pictures & {
@@ -169,18 +182,22 @@ type HomeShelvesOfProps = Pictures & {
   albumShelves: readonly AlbumShelf[]
   /** The art of the shows and films in progress, as `useShowArts` reads it. */
   arts: ShowArts
+  /** The order each library's shelf is turned to; the rows are already in it. */
+  orders?: ShelfOrders
 }
 
 /**
  * Home's shelves as the web lays them out: what is being watched, its newest
- * `HOME_CONTINUE_COUNT` as a grid, then each pinned library's newest (`libraryShelvesOf`), a
- * music library's as its albums (`homeRowsOf`). An empty Continue watching is left out.
+ * `HOME_CONTINUE_COUNT` as a grid, then each pinned library's newest arrivals or releases, as
+ * `orders` turns each (`libraryShelvesOf`), a music library's as its albums (`homeRowsOf`). An
+ * empty Continue watching is left out.
  */
 export const homeShelvesOf = ({
   home,
   libraries,
   albumShelves,
   arts,
+  orders = NO_ORDERS,
   ...pictures
 }: HomeShelvesOfProps): ShelfView[] => {
   const continuing: ShelfView[] =
@@ -196,6 +213,7 @@ export const homeShelvesOf = ({
               .map((entry) => continueCard({ entry, arts, ...pictures })),
             layout: SHELF_LAYOUTS.grid,
             hasMore: home.inProgress.length > HOME_CONTINUE_COUNT,
+            order: null,
           },
         ]
   return [
@@ -203,6 +221,7 @@ export const homeShelvesOf = ({
     ...libraryShelvesOf({
       rows: homeRowsOf({ shelves: home.shelves, albumShelves }),
       libraries,
+      orders,
       ...pictures,
     }),
   ]

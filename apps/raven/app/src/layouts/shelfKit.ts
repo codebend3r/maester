@@ -1,4 +1,5 @@
-import type { LibraryIconName } from '@raven/core'
+import { type LibraryIconName, SHELF_ORDER_COPY, SHELF_TOGGLE_COPY } from '@raven/core'
+import { type IconName, SHELF_ORDER_ICONS } from '@raven/ui/iconDrawings'
 import type { ReactNode } from 'react'
 
 import { LOCKED_LIBRARY_COPY } from '@/layouts/copy'
@@ -55,6 +56,8 @@ export type ShelfProps = {
   onOpenLibrary: (libraryId: number) => void
   /** Opens every video in progress, from a grid that holds more than it shows. */
   onOpenContinue: () => void
+  /** Turns a library shelf to its other order, from its toggle; a shelf with no `order` has none. */
+  onTurnOrder?: (libraryId: number) => void
   /** The shelf the screen opens on: its first card takes focus first, on a TV. */
   isFirst?: boolean
 }
@@ -84,6 +87,31 @@ export type ShelfKit = {
   /** The Binge page's list, the web's: a row a show, with how much of it is watched. */
   BingeRows: (props: BingeShelfProps) => ReactNode
   ShelfPage: (props: ShelfPageProps) => ReactNode
+}
+
+/** A library shelf's order toggle: what it shows and says, and what a press does. */
+export type ShelfOrderToggle = {
+  icon: IconName
+  text: string
+  label: string
+  onTurn: () => void
+}
+
+type ShelfOrderToggleOfProps = Pick<ShelfProps, 'shelf' | 'onTurnOrder'>
+
+/** The toggle a library shelf on Home carries beside its title, or null for any other shelf. */
+export const shelfOrderToggleOf = ({
+  shelf,
+  onTurnOrder,
+}: ShelfOrderToggleOfProps): ShelfOrderToggle | null => {
+  const { order, libraryId, title } = shelf
+  if (order === null || libraryId === null || onTurnOrder === undefined) return null
+  return {
+    icon: SHELF_ORDER_ICONS[order],
+    text: SHELF_ORDER_COPY[order],
+    label: SHELF_TOGGLE_COPY.label({ name: title, order }),
+    onTurn: () => onTurnOrder(libraryId),
+  }
 }
 
 type SeeAllOfProps = Pick<ShelfProps, 'shelf' | 'onOpenLibrary' | 'onOpenContinue'>

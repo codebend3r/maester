@@ -185,6 +185,10 @@ export const queryKeys = {
   hero: ['home', 'hero'],
   /** The albums shelves, under home's key like the hero. */
   homeAlbums: ['home', 'albums'],
+  /** Each library's newest releases, which a shelf turned to Newly released shows, under home's key. */
+  releasedShelves: ['home', 'released'],
+  /** Each music library's newest album releases, under home's key like the albums shelves. */
+  releasedAlbums: ['home', 'albums', 'released'],
   /** The movies and shows the admin picked for the hero. */
   heroPicks: ['hero', 'picks'],
   /** What TMDB says is coming soon. */

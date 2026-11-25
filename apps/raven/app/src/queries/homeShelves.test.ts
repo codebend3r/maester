@@ -4,6 +4,7 @@ import {
   HOME_SHELF_TYPES,
   ITEM_TYPES,
   LIBRARY_KINDS,
+  SHELF_ORDERS,
   THUMBNAIL_STATES,
 } from '@raven/core'
 import { mediaItemFor, summaryFor } from '@raven/native/testing'
@@ -57,6 +58,23 @@ describe('homeShelvesOf', () => {
       headersFor,
     })
     expect(shelves.map(({ libraryId }) => libraryId)).toEqual([null, FILMS.id, SERIES.id])
+  })
+
+  it('gives each library shelf the order it is turned to, and Continue watching no toggle', () => {
+    const shelves = homeShelvesOf({
+      arts: NO_ARTS,
+      albumShelves: [],
+      home: HOME,
+      libraries: [FILMS, SERIES],
+      orders: { [SERIES.id]: SHELF_ORDERS.released },
+      api: homeApi(),
+      headersFor,
+    })
+    expect(shelves.map(({ order }) => order)).toEqual([
+      null,
+      SHELF_ORDERS.added,
+      SHELF_ORDERS.released,
+    ])
   })
 
   it('shows Continue watching wide, on the backdrop, with how far in it is', () => {
@@ -359,6 +377,8 @@ describe('libraryShelvesOf', () => {
       { key: `library:${FILMS.id}`, title: 'Films', libraryId: FILMS.id },
       { key: `library:${SERIES.id}`, title: 'Series', libraryId: SERIES.id },
     ])
+    // A search's rows are by title, with no order to turn.
+    expect(shelves.map(({ order }) => order)).toEqual([null, null])
     expect(shelves.map(({ cards }) => cards.map(({ title }) => title))).toEqual([
       ['Busboys', 'Night Train'],
       ['Severance'],
