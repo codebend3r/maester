@@ -45,7 +45,13 @@ export { configureStorage } from '@/stores/configureStorage'
 export { activeServerId, onActiveServerChange, useActiveServer } from '@/stores/activeServer'
 export type { ActiveServer } from '@/stores/activeServer'
 export { serverClientsFor } from '@/lib/serverClients'
-export { accountServersQuery, libraryPinsQuery, serverLibrariesQuery } from '@/query/accountQueries'
+export {
+  accountPreferencesQuery,
+  accountServersQuery,
+  libraryPinsQuery,
+  serverLibrariesQuery,
+  serverNamesQuery,
+} from '@/query/accountQueries'
 export { useHostPlayer, useHostServices, usePlayerServices } from '@/stores/playerServices'
 export { playerQueriesFor } from '@/lib/playerQueries'
 export { useTrackCues } from '@/lib/useTrackCues'

@@ -68,6 +68,10 @@ describe('ServerSection', () => {
     add: spyOn(accountData, 'addServer'),
     rename: spyOn(accountData, 'renameServer'),
     remove: spyOn(accountData, 'removeServer'),
+    names: spyOn(accountData, 'listServerNames'),
+    name: spyOn(accountData, 'nameServer'),
+    preferences: spyOn(accountData, 'readPreferences'),
+    setPreferences: spyOn(accountData, 'setPreferences'),
     health,
   }
 
@@ -76,6 +80,10 @@ describe('ServerSection', () => {
     spies.add.mockImplementation(async () => meleysRow())
     spies.rename.mockImplementation(async () => meleysRow())
     spies.remove.mockImplementation(async () => undefined)
+    spies.names.mockImplementation(async () => [])
+    spies.name.mockImplementation(async ({ serverId, name }) => ({ serverId, name }))
+    spies.preferences.mockImplementation(async () => ({ showPinServers: true }))
+    spies.setPreferences.mockImplementation(async (written) => written)
     spies.health.mockImplementation(async () => healthOf({ serverId: VERMITHOR_ID }))
   })
 
@@ -85,7 +93,16 @@ describe('ServerSection', () => {
   })
 
   afterAll(() =>
-    [spies.list, spies.add, spies.rename, spies.remove].forEach((spy) => spy.mockRestore()),
+    [
+      spies.list,
+      spies.add,
+      spies.rename,
+      spies.remove,
+      spies.names,
+      spies.name,
+      spies.preferences,
+      spies.setPreferences,
+    ].forEach((spy) => spy.mockRestore()),
   )
 
   it("names the home server and links its address, this page's own when /api is raven, with accounts off", () => {
@@ -105,7 +122,7 @@ describe('ServerSection', () => {
     const meleys = await within(list()).findByText('Meleys')
     expect(within(list()).getAllByRole('listitem')).toHaveLength(2)
     expect(meleys).toBeInTheDocument()
-    expect(within(list()).queryByRole('button', { name: `Rename ${homeEntry().name}` })).toBeNull()
+    expect(within(list()).queryByRole('button', { name: `Remove ${homeEntry().name}` })).toBeNull()
     await userEvent.click(within(list()).getByRole('button', { name: 'Use Meleys' }))
     expect(useActiveServer.getState().active).toEqual({
       serverId: MELEYS_ID,
@@ -186,6 +203,34 @@ describe('ServerSection', () => {
     await waitFor(() =>
       expect(spies.rename).toHaveBeenCalledWith({ id: meleysRow().id, name: 'Meleys upstairs' }),
     )
+  })
+
+  it('renames the home server by its id, and lists it by that name', async () => {
+    spies.names.mockImplementation(async () => [{ serverId: HOME_ID, name: 'Vhagar' }])
+    renderWithProviders({ ui: <ServerSection />, account: fakeAccount() })
+    await userEvent.click(await within(list()).findByRole('button', { name: 'Rename Vhagar' }))
+    const field = within(list()).getByRole('textbox', { name: 'New name' })
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Vhagar upstairs')
+    await userEvent.click(within(list()).getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(spies.name).toHaveBeenCalledWith({ serverId: HOME_ID, name: 'Vhagar upstairs' }),
+    )
+    expect(spies.rename).not.toHaveBeenCalled()
+  })
+
+  it("turns the pins' server names off for the account", async () => {
+    renderWithProviders({ ui: <ServerSection />, account: fakeAccount() })
+    const toggle = await within(region()).findByRole('checkbox', {
+      name: /Show the server on pinned libraries/,
+    })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(toggle).toBeChecked()
+    await userEvent.click(toggle)
+    await waitFor(() =>
+      expect(spies.setPreferences).toHaveBeenCalledWith({ showPinServers: false }),
+    )
+    await waitFor(() => expect(toggle).not.toBeChecked())
   })
 
   it('refuses a blank name without asking the database', async () => {

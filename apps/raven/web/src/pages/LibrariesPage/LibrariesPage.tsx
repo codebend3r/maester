@@ -45,6 +45,7 @@ import { foldersByParent } from '@/lib/folders'
 import { libraryPollDelay } from '@/lib/libraryPolling'
 import { useLibraryOrdering } from '@/lib/useLibraryOrdering'
 import { librariesQuery, lockQuery } from '@/lib/queries'
+import { useActiveServerName } from '@/lib/servers'
 import { LIBRARIES_COPY } from '@/pages/LibrariesPage/copy'
 import { OrderedLibraries } from '@/pages/LibrariesPage/OrderedLibraries'
 import { PinButton, usePinning } from '@/pages/LibrariesPage/PinButton'
@@ -114,6 +115,7 @@ type LibraryRowProps = {
 
 /**
  * A library's card: its type icon in a well beside its name, its counts,
+ * the server it is on while the account keeps several,
  * its folders grouped by the folder that holds them, how its scan stands,
  * and at its right Pin and the library page's own actions. The picture of
  * its newest video fades in at the card's right. While it is locked to
@@ -125,6 +127,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
   const detailsId = useId()
   const actions = useLibraryActions(library)
   const pinning = usePinning()
+  const serverName = useActiveServerName()
   const picture = isShut ? null : library.backdrop
   const lockNote = isShut ? LIBRARIES_COPY.locked : LIBRARIES_COPY.unlocked
   // The server sends no folders to a browser with the admin lock on; this holds a list cached from before to the same.
@@ -157,6 +160,7 @@ const LibraryRow = ({ library, isShut, isOpen, onToggle }: LibraryRowProps) => {
           {COMMON_COPY.separator}
           {COMMON_COPY.videos(library.itemCount)}
           {library.unmatchedCount > 0 && LIBRARIES_COPY.notMatched(library.unmatchedCount)}
+          {serverName !== null && LIBRARIES_COPY.onServer(serverName)}
         </span>
         <Button
           icon="expand"

@@ -31,9 +31,10 @@ services:
     volumes:
       - /volume1/docker/raven/data:/config
       # Every NAS's share under /media/<nas>, read-write so deleting in the
-      # app removes the file. Vhagar's own share is local; the other four
-      # are its cifs mounts of theirs.
+      # app removes the file. Vhagar's own share is local; the other five
+      # are its cifs mounts of theirs (Balerion's is its Media share).
       - /volume1/Vhagar:/media/vhagar
+      - /volume1/Vhagar/Balerion:/media/balerion
       - /volume1/Vhagar/Caraxes:/media/caraxes
       - /volume1/Vhagar/Meleys:/media/meleys
       - /volume1/Vhagar/Syrax:/media/syrax

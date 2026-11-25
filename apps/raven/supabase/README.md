@@ -13,7 +13,7 @@ bunx nx run @raven/supabase:test:db
 bunx nx run @raven/supabase:lint:db
 ```
 
-The pinned CLI starts only Postgres, Auth, PostgREST, Kong and Mailpit. API: `http://127.0.0.1:54321`; Mailpit: `http://127.0.0.1:54324`. Email callbacks use raven at `http://localhost:5173/auth/confirm`, which raven's web app handles (see `apps/raven/README.md`).
+The pinned CLI starts only Postgres, Auth, PostgREST, Kong and Mailpit. API: `http://127.0.0.1:54321`; Mailpit: `http://127.0.0.1:54324`. Email callbacks use raven at `http://localhost:5175/auth/confirm`, which raven's web app handles (see `apps/raven/README.md`).
 
 `db:keys` creates a gitignored ES256 key once with private file permissions; restart preserves it. `db:status` prints local connection settings, including secrets: never paste its output into a PR. `db:reset` destroys and reseeds the local database; `db:stop` stops this project's containers.
 

@@ -39,17 +39,25 @@ export const meleysEntry = (): ServerEntry => ({
   apiBase: MELEYS_ORIGIN,
 })
 
-type PinnedOfProps = { library: Library; server?: ServerEntry; isOnActiveServer?: boolean }
+type PinnedOfProps = {
+  library: Library
+  server?: ServerEntry
+  isOnActiveServer?: boolean
+  /** Whether it names its server, as it does while the account keeps several. */
+  isServerNamed?: boolean
+}
 
 /** A library pinned on `server`, home's unless named. */
 export const pinnedOf = ({
   library,
   server = homeEntry(),
   isOnActiveServer = true,
+  isServerNamed = false,
 }: PinnedOfProps): PinnedLibrary => ({
   key: `${server.key}:${library.id}`,
   library,
   server,
+  serverNote: isServerNamed ? server.name : undefined,
   isOnActiveServer,
 })
 

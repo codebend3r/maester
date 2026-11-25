@@ -50,11 +50,11 @@ Start a product with `bun run dev:sparrow` or `bun run dev:raven`, then open it 
 
 | Project         | Started by            | URL                                | What's there                                                  |
 | --------------- | --------------------- | ---------------------------------- | ------------------------------------------------------------- |
-| `@raven/web`    | `bun run dev:raven`   | <http://localhost:5173>            | The library and player, hot reloaded; proxies `/api` to :8484 |
+| `@raven/web`    | `bun run dev:raven`   | <http://localhost:5175>            | The library and player, hot reloaded; proxies `/api` to :8484 |
 | `@raven/server` | `bun run dev:raven`   | <http://localhost:8484/api/health> | The API only; in dev it serves no pages                       |
 | `@sparrow/api`  | `bun run dev:sparrow` | <http://localhost:8020/health>     | The health check; otherwise it serves only the Seerr webhook  |
 
-If 5173 is taken, Vite moves to the next free port; select `@raven/web:dev` in Nx's task view to see the URL it printed. `WEB_PORT` in `apps/sparrow/.env` moves sparrow's.
+raven's Vite holds 5175 strictly, off Vite's default 5173, and fails to start when another process has it. `WEB_PORT` in `apps/sparrow/.env` moves sparrow's.
 
 Run one target through Nx: `bunx nx run @sparrow/api:test`, `bunx nx run @raven/server:test`, `bunx nx show project @raven/web`, `bun run graph`.
 

@@ -194,6 +194,11 @@ GROUPS: tuple[Group, ...] = (
                 "Android SDK",
             ),
             Command(
+                "app:deploy:ios",
+                "Builds the signed Release and puts it on every paired iPhone and iPad.",
+                "Xcode",
+            ),
+            Command(
                 "app:deploy:tvos",
                 "Builds the signed Release and puts it on the paired Apple TV.",
                 "Xcode",
@@ -258,6 +263,16 @@ GROUPS: tuple[Group, ...] = (
                 "Launches the packaged app and checks it starts and quits. Uses your own "
                 "~/Library/Application Support/raven.",
                 "macOS",
+            ),
+            Command(
+                "desktop:deploy",
+                "Replaces /Applications/Raven.app with what desktop:make packaged, and opens it.",
+                "macOS",
+            ),
+            Command(
+                "deploy:devices",
+                "Puts the checked-out apps on this Mac, both TVs and every iPhone and iPad.",
+                "Xcode",
             ),
             Command("desktop:release:assets", "Names and gathers the release's files for upload."),
             Command(

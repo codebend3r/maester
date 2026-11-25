@@ -18,6 +18,7 @@ export const POSTGREST = {
   select: 'select',
   order: 'order',
   equals: 'eq.',
+  onConflict: 'on_conflict',
   ascending: '.asc',
 } as const
 
@@ -26,6 +27,7 @@ const PREFERENCES = {
   row: 'return=representation',
   nothing: 'return=minimal',
   keepExisting: 'resolution=ignore-duplicates,return=minimal',
+  replaceExisting: 'resolution=merge-duplicates,return=representation',
 } as const
 
 type Preference = (typeof PREFERENCES)[keyof typeof PREFERENCES]
@@ -68,6 +70,11 @@ type ListProps<T> = RowsRead<T> & {
 type InsertProps<T> = { table: string; row: Record<string, unknown>; returning: RowsRead<T> }
 
 type InsertOnceProps = { table: string; row: Record<string, unknown> }
+
+type UpsertProps<T> = InsertProps<T> & {
+  /** The columns of the key a row already there is found by, the caller's own left to the database. */
+  onConflict: readonly string[]
+}
 
 type UpdateProps<T> = {
   table: string
@@ -168,6 +175,21 @@ export const createPostgrest = ({
         body: row,
         prefer: PREFERENCES.keepExisting,
       })
+    },
+
+    /** Adds a row, or changes the one already there under the same key, and answers it as the table wrote it. */
+    upsert: async <T>({ table, row, returning, onConflict }: UpsertProps<T>): Promise<T[]> => {
+      const response = await request({
+        table,
+        method: HTTP_METHODS.post,
+        query: {
+          [POSTGREST.onConflict]: onConflict.join(','),
+          [POSTGREST.select]: returning.select,
+        },
+        body: row,
+        prefer: PREFERENCES.replaceExisting,
+      })
+      return readRows({ response, guard: returning.guard })
     },
 
     /** Changes the rows `where` names and answers each as it now reads; none when no row matched. */

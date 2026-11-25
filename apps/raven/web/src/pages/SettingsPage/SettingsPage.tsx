@@ -1,10 +1,11 @@
 import { myRequestsOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
-import { type ComponentType, useId, useState } from 'react'
+import { type ComponentType, useId } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AUTOPLAY_COUNTDOWN_SECONDS, usePlayerPrefs } from '@raven/ui/headless'
 import { BackButton, HOME } from '@/components/BackButton/BackButton'
 import { Tabs } from '@/components/Tabs/Tabs'
-import { ACCESS_KINDS, useAccessState } from '@/lib/accessState'
+import { ACCESS_KINDS, type AccessState, useAccessState } from '@/lib/accessState'
 import { requestsQuery } from '@/lib/queries'
 import { AccountSection } from '@/pages/SettingsPage/AccountSection'
 import { AdvancedSection } from '@/pages/SettingsPage/AdvancedSection'
@@ -17,6 +18,7 @@ import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { HostSettings } from '@/pages/SettingsPage/HostSettings'
 import { useIsDesktop } from '@/stores/desktop'
+import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
 import styles from '@/pages/SettingsPage/SettingsPage.module.scss'
 import { PageTitle } from '@/components/PageTitle/PageTitle'
@@ -27,8 +29,8 @@ type BrowserPlaybackProps = { isDesktop: boolean }
 
 /**
  * Playback that this browser, or Raven, keeps for itself: autoplay and how
- * long its countdown runs, skipping intros, in a browser Open videos in
- * Raven, and how music sounds. Open videos in Raven is
+ * long its countdown runs, skipping intros, and in a browser Open videos in
+ * Raven. Open videos in Raven is
  * off by default: a page cannot tell whether Raven is installed, and a
  * `raven://` link nothing handles does nothing in Chrome and shows an error
  * in Safari.
@@ -98,7 +100,6 @@ const BrowserPlayback = ({ isDesktop }: BrowserPlaybackProps) => {
           onChange={setOpensInRavenPlayer}
         />
       )}
-      <SoundSettings isDesktop={isDesktop} />
     </section>
   )
 }
@@ -124,41 +125,104 @@ const OfflineSettings = () => {
   )
 }
 
-/** The viewer's own preferences: playback, the account, scrobbling, this host and the advanced. */
-const ViewerPreferences = () => {
-  const isDesktop = useIsDesktop()
-  const access = useAccessState()
-  return (
-    <div className={styles.panel}>
-      <section className={styles.section} aria-label={SETTINGS_COPY.playback}>
-        <h2 className={styles.heading}>{SETTINGS_COPY.playback}</h2>
-        <CaptionSettings />
-        <BrowserPlayback isDesktop={isDesktop} />
-      </section>
-      {access.kind === ACCESS_KINDS.approved && <AccountSection account={access.account} />}
-      <ServerSection />
-      {(access.kind === ACCESS_KINDS.approved || access.kind === ACCESS_KINDS.disabled) && (
-        <ScrobblingSection />
-      )}
-      <HostSettings />
-      <AdvancedSection />
-    </div>
-  )
-}
+type PanelProps = { access: AccessState; isDesktop: boolean }
 
-/** Settings' tabs: the viewer's preferences, and the titles they asked Coming soon for. */
-const SETTINGS_TABS = { preferences: 'preferences', requests: 'requests' } as const
+/** The account, for an approved one, and its scrobbling, which a server without accounts keeps too. */
+const AccountPanel = ({ access }: PanelProps) => (
+  <>
+    {access.kind === ACCESS_KINDS.approved && <AccountSection account={access.account} />}
+    <ScrobblingSection />
+  </>
+)
+
+/** Settings' tabs, each a group of related settings, and the titles asked Coming soon for. */
+const SETTINGS_TABS = {
+  playback: 'playback',
+  subtitles: 'subtitles',
+  audio: 'audio',
+  servers: 'servers',
+  account: 'account',
+  host: 'host',
+  advanced: 'advanced',
+  requests: 'requests',
+} as const
+
 type SettingsTab = (typeof SETTINGS_TABS)[keyof typeof SETTINGS_TABS]
 
+/** The address's key for the tab open, so a reload or a link opens the same one. */
+const SETTINGS_TAB_PARAM = 'tab'
+
 const SETTINGS_PANELS = {
-  [SETTINGS_TABS.preferences]: ViewerPreferences,
+  [SETTINGS_TABS.playback]: BrowserPlayback,
+  [SETTINGS_TABS.subtitles]: CaptionSettings,
+  [SETTINGS_TABS.audio]: SoundSettings,
+  [SETTINGS_TABS.servers]: ServerSection,
+  [SETTINGS_TABS.account]: AccountPanel,
+  [SETTINGS_TABS.host]: HostSettings,
+  [SETTINGS_TABS.advanced]: AdvancedSection,
   [SETTINGS_TABS.requests]: RequestsTab,
-} as const satisfies Record<SettingsTab, ComponentType>
+} as const satisfies Record<SettingsTab, ComponentType<PanelProps>>
+
+const isSettingsTab = (value: unknown): value is SettingsTab =>
+  Object.values(SETTINGS_TABS).some((tab) => tab === value)
+
+type TabsShownProps = {
+  access: AccessState
+  hasHost: boolean
+  isDesktop: boolean
+  requestCount: number | undefined
+}
+
+/**
+ * The tabs this viewer has: Account while there is an account or scrobbling to show, and the
+ * downloads host's own (Raven's sections, or a browser's Downloads) where there is one.
+ */
+const tabsShown = ({ access, hasHost, isDesktop, requestCount }: TabsShownProps) => {
+  const hasAccount = access.kind === ACCESS_KINDS.approved || access.kind === ACCESS_KINDS.disabled
+  const copy = SETTINGS_COPY.tabs
+  const hostLabel = isDesktop ? copy.thisApp : copy.downloads
+  return [
+    { value: SETTINGS_TABS.playback, label: copy.playback },
+    { value: SETTINGS_TABS.subtitles, label: copy.subtitles },
+    { value: SETTINGS_TABS.audio, label: copy.audio },
+    { value: SETTINGS_TABS.servers, label: copy.servers },
+    ...(hasAccount ? [{ value: SETTINGS_TABS.account, label: copy.account }] : []),
+    ...(hasHost ? [{ value: SETTINGS_TABS.host, label: hostLabel }] : []),
+    { value: SETTINGS_TABS.advanced, label: copy.advanced },
+    {
+      value: SETTINGS_TABS.requests,
+      label: copy.requests,
+      ...(requestCount === undefined ? {} : { count: requestCount }),
+    },
+  ]
+}
 
 const ViewerSettings = () => {
   const titleId = useId()
-  const [tab, setTab] = useState<SettingsTab>(SETTINGS_TABS.preferences)
+  const isDesktop = useIsDesktop()
+  const access = useAccessState()
+  const hasHost = useDownloadsHostOrNone() !== null
+  const [params, setParams] = useSearchParams()
   const { data: requests } = useQuery(requestsQuery)
+  const tabs = tabsShown({
+    access,
+    hasHost,
+    isDesktop,
+    requestCount: requests === undefined ? undefined : myRequestsOf(requests).length,
+  })
+  const asked = params.get(SETTINGS_TAB_PARAM)
+  const tab =
+    tabs.find((shown) => isSettingsTab(asked) && shown.value === asked)?.value ??
+    SETTINGS_TABS.playback
+  const choose = (chosen: SettingsTab) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.set(SETTINGS_TAB_PARAM, chosen)
+        return next
+      },
+      { replace: true },
+    )
   const Panel = SETTINGS_PANELS[tab]
   return (
     <section className={styles.page} aria-labelledby={titleId}>
@@ -168,20 +232,10 @@ const ViewerSettings = () => {
           {COMMON_COPY.settings}
         </PageTitle>
       </header>
-      <Tabs
-        label={SETTINGS_COPY.tabs.label}
-        tabs={[
-          { value: SETTINGS_TABS.preferences, label: SETTINGS_COPY.tabs.preferences },
-          {
-            value: SETTINGS_TABS.requests,
-            label: SETTINGS_COPY.tabs.requests,
-            ...(requests === undefined ? {} : { count: myRequestsOf(requests).length }),
-          },
-        ]}
-        chosen={tab}
-        onChoose={setTab}
-      >
-        <Panel />
+      <Tabs label={SETTINGS_COPY.tabs.label} tabs={tabs} chosen={tab} onChoose={choose}>
+        <div className={styles.panel}>
+          <Panel access={access} isDesktop={isDesktop} />
+        </div>
       </Tabs>
     </section>
   )

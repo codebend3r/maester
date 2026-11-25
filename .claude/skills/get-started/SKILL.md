@@ -66,7 +66,7 @@ Run `uv python install 3.12` even when some Python is on the PATH. uv only accep
 Env files: copy `apps/raven/.env.example` and `apps/sparrow/.env.example` to `.env` beside them when you run that product's dev server, without overwriting an existing one (`cp -n`). Never put a `.env` at the repo root.
 
 - sparrow: `sandbox:sparrow` is the local way to test it. It needs no keys and calls the model through `claude -p` on your own sign-in, so keep `ANTHROPIC_API_KEY` empty for it. `dev:sparrow` runs the real server, which refuses to boot (`MissingConfig`) without `ANTHROPIC_API_KEY`, `SEERR_API_KEY`, `RAVEN_URL` and the API key of every Radarr, Sonarr, SABnzbd and Lidarr instance the file configures with a URL. Those are the user's credentials: report `dev:sparrow` as blocked on them, never fill them in.
-- raven: a `.env` usually exists already. `dev:raven` moves Vite to the next free port (5174) when another checkout already holds 5173.
+- raven: a `.env` usually exists already. `dev:raven` serves Vite on 5175 strictly: a second checkout's `dev:raven` fails to start while another holds it.
 
 ## 2. Install and verify
 

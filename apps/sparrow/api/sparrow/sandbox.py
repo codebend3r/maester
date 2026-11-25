@@ -4,7 +4,7 @@
 service is a fake seeded from one eval case (or none, a blank world, where the
 eval user starts as an admin) except
 raven, which is the real library at `RAVEN_URL` (from the environment or
-`.env`, http://localhost:5174 when unset), so "is it on the server?" is
+`.env`, http://localhost:5175 when unset), so "is it on the server?" is
 answered from real titles. The deployed server reads the same variable. The store is in memory, and there is no sign-in: every request is the eval user,
 at the tier the page picks. The model is Claude Sonnet 5.5 at medium effort unless `--model`
 names another, reached through headless Claude Code on the developer's own
@@ -71,7 +71,7 @@ CHOICES = {
 }
 # raven's web dev server on this machine, which proxies its API: where the sandbox looks
 # when `RAVEN_URL` is unset.
-LOCAL_RAVEN = "http://localhost:5174"
+LOCAL_RAVEN = "http://localhost:5175"
 SANDBOX_NAME = "Sandbox user"
 HOST = "127.0.0.1"
 

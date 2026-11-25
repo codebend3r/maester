@@ -31,26 +31,26 @@ Run everything from the repo root, each server with `run_in_background`, logs in
    curl -s -m 2 -o /dev/null -w '%{http_code}\n' http://localhost:5190
    ```
 
-   Anything but `000` means a sparrow is already up. `curl -s http://127.0.0.1:8020/api/sandbox` answers JSON whose `raven` field is the raven it searches. If that is not the raven this mode wants (the other mode, or a local port no raven answers on, such as the sandbox's fallback `http://localhost:5174` when Vite took 5173), stop it: find the PIDs with `pgrep -fl sparrow-sandbox` and `pgrep -fl 'sparrow/web'` and kill those PIDs (`kill -9` if uvicorn's reloader ignores SIGTERM). Never `pkill -f` a pattern; it takes the user's own servers with it. If it is the right raven, skip to step 5, which still starts the page if only the API is up (`bunx nx run @sparrow/web:sandbox`).
+   Anything but `000` means a sparrow is already up. `curl -s http://127.0.0.1:8020/api/sandbox` answers JSON whose `raven` field is the raven it searches. If that is not the raven this mode wants (the other mode, or a local port no raven answers on, such as the sandbox's fallback `http://localhost:5175` when no raven Vite runs), stop it: find the PIDs with `pgrep -fl sparrow-sandbox` and `pgrep -fl 'sparrow/web'` and kill those PIDs (`kill -9` if uvicorn's reloader ignores SIGTERM). Never `pkill -f` a pattern; it takes the user's own servers with it. If it is the right raven, skip to step 5, which still starts the page if only the API is up (`bunx nx run @sparrow/web:sandbox`).
 
 3. **raven (`local` only).** Look for a running dev raven first:
 
    ```bash
-   for p in 5173 5174 5175; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
+   for p in 5175; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
    ```
 
-   The first port answering `200` is the raven to use. If none does, start `bun run dev:raven` in the background, then read its log for Vite's `Local:   http://localhost:<port>/` line (5173 unless taken) and wait until `/api/health` there answers `200`. The server takes a while on first start; it migrates `apps/raven/server/data/raven.db`. Use the Vite address, not :8484 directly, because sparrow links friends to raven's pages at `RAVEN_URL` and only Vite serves those in development. The local raven runs open (no `SUPABASE_*` in `apps/raven/.env`), so sparrow needs no sign-in. A local library comes from Vhagar's database: `bun run dev:raven:db` (see the `raven-local-dev-data` memory).
+   A `200` there is the raven to use. If not, start `bun run dev:raven` in the background (Vite holds 5175 strictly) and wait until `http://localhost:5175/api/health` answers `200`. The server takes a while on first start; it migrates `apps/raven/server/data/raven.db`. Use the Vite address, not :8484 directly, because sparrow links friends to raven's pages at `RAVEN_URL` and only Vite serves those in development. The local raven runs open (no `SUPABASE_*` in `apps/raven/.env`), so sparrow needs no sign-in. A local library comes from Vhagar's database: `bun run dev:raven:db` (see the `raven-local-dev-data` memory).
 
 4. **sparrow.** Start it with the raven from step 3, or Vhagar's:
 
    ```bash
    # local
-   RAVEN_URL=http://localhost:<vite port> bun run sandbox:sparrow
+   RAVEN_URL=http://localhost:5175 bun run sandbox:sparrow
    # prod
    RAVEN_URL=http://192.168.50.6:8484 bun run sandbox:sparrow
    ```
 
-   `sandbox:sparrow` runs `@sparrow/api:sandbox` and `@sparrow/web:sandbox` together. Always pass `RAVEN_URL`: without it the sandbox falls back to `http://localhost:5174`, but Vite gives raven 5173 unless that is taken. Its log prints `sparrow sandbox (model claude-sonnet-5-5, raven <url>) on http://127.0.0.1:8020`, and `/api/sandbox`'s `raven` field says the same; check that it is the raven meant. With no `claude`, or to work on the page without model calls, run the API with scripted replies instead: `RAVEN_URL=... uv run --project api sparrow-sandbox --model fake` from `apps/sparrow/`, beside `bunx nx run @sparrow/web:dev`.
+   `sandbox:sparrow` runs `@sparrow/api:sandbox` and `@sparrow/web:sandbox` together. Without `RAVEN_URL` the sandbox falls back to `http://localhost:5175`, raven's Vite; pass it for any other raven. Its log prints `sparrow sandbox (model claude-sonnet-5-5, raven <url>) on http://127.0.0.1:8020`, and `/api/sandbox`'s `raven` field says the same; check that it is the raven meant. With no `claude`, or to work on the page without model calls, run the API with scripted replies instead: `RAVEN_URL=... uv run --project api sparrow-sandbox --model fake` from `apps/sparrow/`, beside `bunx nx run @sparrow/web:dev`.
 
 5. **Wait for both.** Poll until `http://127.0.0.1:8020/api/sandbox` and `http://localhost:5190` both answer `200`.
 
