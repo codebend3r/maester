@@ -12,12 +12,12 @@ import select_native_checks as selector
         (set(), (False, False, False)),
         ({"@sparrow/api"}, (False, False, False)),
         ({"@raven/app"}, (True, False, False)),
-        ({"@raven/music"}, (False, True, False)),
+        ({"@wren/app"}, (False, True, False)),
         ({"@raven/desktop"}, (False, False, True)),
         ({"@raven/mpv"}, (False, False, True)),
         ({"@raven/web"}, (False, False, True)),
         ({"@raven/server"}, (True, True, True)),
-        ({"@raven/app", "@raven/music"}, (True, True, False)),
+        ({"@raven/app", "@wren/app"}, (True, True, False)),
     ],
 )
 def test_project_selection(projects, expected):
@@ -104,8 +104,8 @@ def test_main_passes_explicit_shas_to_nx_and_writes_selection(monkeypatch, tmp_p
         if command[0] == "gh":
             return json.dumps({"workflow_runs": [{"head_sha": "base"}]})
         if command[0] == "bunx":
-            return json.dumps(["@raven/music"])
-        return "apps/raven/music/src/app.tsx"
+            return json.dumps(["@wren/app"])
+        return "apps/wren/wren-app/src/app.tsx"
 
     monkeypatch.setattr(selector, "output", output)
     selector.main()

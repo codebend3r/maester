@@ -17,9 +17,9 @@ on:
       - apps/raven/app/package.json
       - apps/raven/app/app.config.ts
       - apps/raven/app/plugins/**
-      - apps/raven/music/package.json
-      - apps/raven/music/app.config.ts
-      - apps/raven/music/plugins/**
+      - apps/wren/wren-app/package.json
+      - apps/wren/wren-app/app.config.ts
+      - apps/wren/wren-app/plugins/**
       - .github/actions/raven-app-setup/**
       - .github/actions/raven-xcode/**
       - .github/actions/raven-android-avd/**
@@ -67,8 +67,8 @@ jobs:
             target: '@raven/app:build:tvos'
           - name: 🎵 Wren iPhone caches
             id: ios
-            project: apps/raven/music
-            target: '@raven/music:build:ios'
+            project: apps/wren/wren-app
+            target: '@wren/app:build:ios'
     steps: &build-steps
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -130,8 +130,8 @@ jobs:
             target: '@raven/app:build:android-tv'
           - name: 🎵 Wren Android caches
             id: android-tv
-            project: apps/raven/music
-            target: '@raven/music:build:android'
+            project: apps/wren/wren-app
+            target: '@wren/app:build:android'
     steps: *build-steps
 
   android-tv-avd:

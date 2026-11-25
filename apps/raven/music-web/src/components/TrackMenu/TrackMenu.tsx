@@ -1,8 +1,10 @@
 import { type Track, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import {
+  MENU_VIEWS,
   type MenuLike,
   type MenuPlaces,
+  type MenuView,
   TRACK_MENU_COPY,
   factsLineOf,
   menuGroupsOf,
@@ -17,11 +19,6 @@ import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { SheetActions } from '@/ui/SheetActions/SheetActions'
 import { ICONS } from '@/ui/WrenIcon/icons'
 
-/** What the menu shows: its actions, or the listener's playlists to add its tracks to. */
-const MENU_VIEWS = { actions: 'actions', playlists: 'playlists' } as const
-
-type MenuView = (typeof MENU_VIEWS)[keyof typeof MENU_VIEWS]
-
 type SheetHead = ComponentProps<typeof BottomSheet>['head']
 
 type TracksMenuProps = {
@@ -35,6 +32,8 @@ type TracksMenuProps = {
   places: MenuPlaces
   /** A song's Like or Unlike; left out of a menu over more than one. */
   like?: MenuLike
+  /** The view it opens on: its actions, unless a button beside a song asks for its playlists. */
+  startsOn?: MenuView
   onClose: () => void
 }
 
@@ -104,10 +103,11 @@ const headOf = ({ view, head }: HeadOfProps): SheetHead =>
 /**
  * A menu over tracks, as one sheet over the page whichever view it shows, so moving to Add to
  * playlist changes what it holds without it rising again: a track's, or an album's, an
- * artist's or a playlist's More. It is drawn only while open, so each opening starts on its actions.
+ * artist's or a playlist's More. It is drawn only while open, so each opening starts on
+ * `startsOn`, its actions unless told otherwise.
  */
 export function TracksMenu(props: TracksMenuProps) {
-  const [view, setView] = useState<MenuView>(MENU_VIEWS.actions)
+  const [view, setView] = useState<MenuView>(props.startsOn ?? MENU_VIEWS.actions)
   const Body = MENU_BODIES[view]
   return (
     <BottomSheet head={headOf({ view, head: props.head })} isOpen onClose={props.onClose}>
@@ -116,7 +116,7 @@ export function TracksMenu(props: TracksMenuProps) {
   )
 }
 
-type TrackMenuProps = Pick<TracksMenuProps, 'onClose'> & {
+type TrackMenuProps = Pick<TracksMenuProps, 'onClose' | 'startsOn'> & {
   track: Track
   /** The song's Like, from `useTrackLike` where its heart shows too, so both say the same. */
   like: MenuLike
@@ -126,7 +126,7 @@ type TrackMenuProps = Pick<TracksMenuProps, 'onClose'> & {
  * A track's menu, opened from its row's More: like or unlike it, play it next, add it to the
  * queue or to a playlist, or go to its album or artist.
  */
-export function TrackMenu({ track, like, onClose }: TrackMenuProps) {
+export function TrackMenu({ track, like, startsOn, onClose }: TrackMenuProps) {
   const { trackCoverOf } = useCovers()
   const [artist] = track.artists
   return (
@@ -140,6 +140,7 @@ export function TrackMenu({ track, like, onClose }: TrackMenuProps) {
       like={like}
       onClose={onClose}
       places={{ albumId: track.albumId, artist }}
+      startsOn={startsOn}
       tracksOf={async () => [track]}
     />
   )

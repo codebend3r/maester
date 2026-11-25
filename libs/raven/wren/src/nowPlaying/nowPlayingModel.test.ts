@@ -21,6 +21,7 @@ import {
   paneAfter,
   placesToClearOf,
   READING_LYRICS,
+  SIDE_PANE_CHOICES,
   shownLyricsOf,
   sourceIdOf,
   sourceTitleOf,
@@ -62,6 +63,15 @@ describe('paneAfter', () => {
     expect(paneAfter({ current: PANES.lyrics, pressed: PANES.upNext })).toBe(PANES.upNext)
     expect(paneAfter({ current: PANES.lyrics, pressed: PANES.lyrics })).toBe(PANES.player)
     expect(paneAfter({ current: PANES.upNext, pressed: PANES.player })).toBe(PANES.player)
+  })
+})
+
+describe('SIDE_PANE_CHOICES', () => {
+  it('offers Up next, then Lyrics, and never the player itself', () => {
+    expect(SIDE_PANE_CHOICES).toEqual([
+      { key: PANES.upNext, label: PLAYER_COPY.upNext },
+      { key: PANES.lyrics, label: PLAYER_COPY.lyrics },
+    ])
   })
 })
 

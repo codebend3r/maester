@@ -44,12 +44,18 @@
   font: var(--type-body);
 }
 
-.quality {
-  @include mixins.one-line;
+// The song's lines, then its heart and Add to playlist beside its name.
+.titled {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: start;
+  min-inline-size: 0;
+}
 
-  max-inline-size: 100%;
-  color: var(--color-text-3);
-  font: var(--type-meta);
+.actions {
+  display: grid;
+  grid-auto-flow: column;
 }
 
 .error {

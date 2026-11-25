@@ -6,47 +6,15 @@ import {
   placesToClearOf,
   upNextRowsOf,
 } from '@raven/wren'
-import type { ComponentType } from 'react'
-import { RepeatToggle, ShuffleToggle } from '@/player/Transport/Transport'
+import { RepeatToggle, ShuffleToggle } from '@/player/QueueToggles/QueueToggles'
 import { QueueRow } from '@/screens/NowPlaying/QueueRow'
-import { SIZES } from '@/theme/tokens'
 import { TextLink } from '@/ui/TextLink/TextLink'
 import styles from '@/screens/NowPlaying/UpNext.module.scss'
 
-/** Where Up next sits: under the narrow player, or along the foot of the wide one. */
+/** Where Up next sits: under the narrow player, or in the pane beside the wide one. */
 export const UP_NEXT_PLACES = { sheet: 'sheet', panel: 'panel' } as const
 
 export type UpNextPlace = (typeof UP_NEXT_PLACES)[keyof typeof UP_NEXT_PLACES]
-
-type HeadEndProps = { onClear: () => void; hasRows: boolean }
-
-/** The narrow layout's: Shuffle and Repeat, on circles. */
-function SheetToggles() {
-  return (
-    <div className={styles.toggles}>
-      <ShuffleToggle isFilled size={SIZES.toggleCircle} />
-      <RepeatToggle isFilled size={SIZES.toggleCircle} />
-    </div>
-  )
-}
-
-/** The wide layout's: Clear, which lets go of every song still to play. */
-function PanelClear({ onClear, hasRows }: HeadEndProps) {
-  return (
-    hasRows && (
-      <TextLink
-        label={NOW_PLAYING_COPY.clear}
-        onPress={onClear}
-        spoken={NOW_PLAYING_COPY.clearLabel}
-      />
-    )
-  )
-}
-
-const HEAD_ENDS = {
-  [UP_NEXT_PLACES.sheet]: SheetToggles,
-  [UP_NEXT_PLACES.panel]: PanelClear,
-} as const satisfies Record<UpNextPlace, ComponentType<HeadEndProps>>
 
 type UpNextProps = {
   /** The source's name for the line under the heading, or null when it has none. */
@@ -56,7 +24,8 @@ type UpNextProps = {
 
 /**
  * What plays after this song: a heading with where the queue came from and how many songs are
- * left, then the songs, each playable, moved up or down a place, and removed.
+ * left, beside what changes the queue, Shuffle, Repeat and Clear (which lets go of every song
+ * still to play); then the songs, each playable, moved up or down a place, and removed.
  */
 export function UpNext({ sourceName, place }: UpNextProps) {
   const queue = useAudioQueue((store) => store.queue)
@@ -67,7 +36,6 @@ export function UpNext({ sourceName, place }: UpNextProps) {
   const rows = upNextRowsOf({ queue, tracks })
   const first = rows[0]?.place ?? 0
   const last = rows.at(-1)?.place ?? 0
-  const HeadEnd = HEAD_ENDS[place]
   const songs = countsLineOf({ songs: rows.length })
   return (
     <section className={classNames([styles.upNext, styles[place]])}>
@@ -80,10 +48,17 @@ export function UpNext({ sourceName, place }: UpNextProps) {
             </p>
           )}
         </div>
-        <HeadEnd
-          hasRows={rows.length > 0}
-          onClear={() => placesToClearOf(rows).forEach((at) => remove(at))}
-        />
+        <div className={styles.modes}>
+          <ShuffleToggle />
+          <RepeatToggle />
+          {rows.length > 0 && (
+            <TextLink
+              label={NOW_PLAYING_COPY.clear}
+              onPress={() => placesToClearOf(rows).forEach((at) => remove(at))}
+              spoken={NOW_PLAYING_COPY.clearLabel}
+            />
+          )}
+        </div>
       </header>
       {rows.length === 0 && <p className={styles.empty}>{NOW_PLAYING_COPY.nothingNext}</p>}
       {rows.length > 0 && (

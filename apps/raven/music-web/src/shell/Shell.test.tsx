@@ -163,17 +163,18 @@ describe("the shell at 48rem and wider, the apps' tablet layout", () => {
     expect(scrubber()).toBeNull()
   })
 
-  it('sets the player bar along the foot while a track is queued: what plays, the transport, the scrubber, Lyrics, Up next and the volume', async () => {
+  it('sets the player bar along the foot while a track is queued: what plays, the transport, the scrubber, Lyrics, Up next and the volume behind its speaker', async () => {
     await renderShell({ route: WREN_ROUTES.home, formFactor: FORM_FACTORS.tablet, isPlaying: true })
 
     expect(openPlayer()).toBeInTheDocument()
     expect(screen.getByText(`${artistNames(AIRBAG)} · ${AIRBAG.album.title}`)).toBeInTheDocument()
     expect(scrubber()).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: PLAYER_COPY.shuffle })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.shuffle })).toBeNull()
     expect(screen.getByRole('button', { name: PLAYER_COPY.previous })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: PLAYER_COPY.next })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: PLAYER_COPY.lyrics })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: PLAYER_COPY.upNext })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.mute })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: PLAYER_COPY.volume })).toBeInTheDocument()
   })
 

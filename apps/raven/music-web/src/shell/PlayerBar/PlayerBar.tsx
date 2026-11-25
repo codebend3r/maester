@@ -53,8 +53,8 @@ function PlayingBar({ track }: PlayingBarProps) {
 
 /**
  * The wide layout's player bar along the foot of every page while a track is queued: what
- * plays, the transport and the scrubber in the middle, then Lyrics and Up next, which open Now
- * Playing, and the volume.
+ * plays and its format as chips, Previous, Play or Pause and Next over the scrubber in the
+ * middle, then Lyrics and Up next, which open Now Playing, and the volume behind its speaker.
  */
 export function PlayerBar() {
   const track = useAudioQueue(playingTrackOf)

@@ -23,7 +23,7 @@ Read on 2026-11-21 from the suites themselves. A new end to end test, or a new a
 | Android phone | None | | Built only |
 | Android TV | `apps/raven/app/e2e`, the flows not tagged `touch` | Maestro on an Android TV emulator, with the remote's keys | 🎬 E2E Raven Android TV |
 | Apple TV | `apps/raven/app/tvos-e2e` | XCUITest pressing the Siri Remote | 🎬 E2E Raven Apple TV |
-| Wren iPhone | `apps/raven/music/e2e` | Maestro on an iPhone simulator | 🎵 E2E Wren iPhone |
+| Wren iPhone | `apps/wren/wren-app/e2e` | Maestro on an iPhone simulator | 🎵 E2E Wren iPhone |
 | Wren Android | None | | Built only |
 
 ## Coverage

@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test'
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { AUDIO_BITRATES, REPEAT_MODES, artistNames } from '@raven/core'
 import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { KIT_COPY, NOW_PLAYING_COPY, PLAYER_COPY, STATUS_COPY, TRACK_MENU_COPY } from '@raven/wren'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
+import { api } from '@/lib/api'
 import { WREN_ROUTES, artistPath } from '@/routes'
 import { NowPlaying } from '@/screens/NowPlaying/NowPlaying'
 import { AIRBAG, AUDIOBOOKS, PARANOID, RADIOHEAD, mockMusicApiEach, trackFor } from '@/test/music'
@@ -45,6 +46,9 @@ const rowNamed = (title: string) =>
     name: NOW_PLAYING_COPY.entry({ title, line: artistNames(AIRBAG) }),
   })
 
+const qualityNamed = (line: string) =>
+  KIT_COPY.labelled({ label: NOW_PLAYING_COPY.quality, value: line })
+
 type ActionNamedProps = { action: string; title: string }
 
 const actionNamed = ({ action, title }: ActionNamedProps) =>
@@ -76,26 +80,81 @@ describe('Now Playing', () => {
     expect(screen.queryByRole('radio', { name: NOW_PLAYING_COPY.speedOf(1.5) })).toBeNull()
   })
 
-  it("says the file's format and quality once the host has a source for it", async () => {
+  it("draws the file's format and bit depth as chips once the host has a source for it", async () => {
     openNowPlaying()
-    expect(await screen.findByText('FLAC · 16-bit / 44.1 kHz · 900 kbps')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('note', {
+        name: qualityNamed('FLAC · 16-bit / 44.1 kHz · 900 kbps'),
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('FLAC')).toBeInTheDocument()
+    expect(screen.getByText('16-bit')).toBeInTheDocument()
+    expect(screen.getByText('44.1 kHz · 900 kbps')).toBeInTheDocument()
   })
 
   it('says the transcode that plays when the listener picked one', async () => {
     usePlayerPrefs.getState().setMusicQuality(AUDIO_BITRATES.standard)
     openNowPlaying()
-    expect(await screen.findByText('AAC · 256 kbps')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('note', { name: qualityNamed('AAC · 256 kbps') }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('AAC')).toBeInTheDocument()
   })
 
-  it('cycles repeat through its modes, named for each', async () => {
+  it('keeps Previous, Play or Pause and Next alone under the scrubber', async () => {
+    openNowPlaying()
+    expect(await screen.findByRole('button', { name: PLAYER_COPY.previous })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.next })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.shuffle })).toBeNull()
+    expect(screen.queryByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.off] })).toBeNull()
+  })
+
+  it('shows the time played and the time left, with a minus, under the scrubber', async () => {
+    useAudioQueue.setState({ position: 62, duration: 300 })
+    openNowPlaying()
+    expect(await screen.findByText('1:02')).toBeInTheDocument()
+    expect(screen.getByText('-3:58')).toBeInTheDocument()
+  })
+
+  it('turns the song off as a favourite from the heart beside its name', async () => {
+    const user = userEvent.setup()
+    const setFavourite = spyOn(api, 'setFavourite').mockImplementation(
+      () => new Promise(() => undefined),
+    )
+    openNowPlaying()
+    const heart = await screen.findByRole('button', {
+      name: TRACK_MENU_COPY.likeSong(AIRBAG.title),
+      pressed: true,
+    })
+    await user.click(heart)
+    expect(setFavourite).toHaveBeenCalledWith({ id: AIRBAG.id, favourite: false })
+    expect(heart).toHaveAttribute('aria-pressed', 'false')
+    setFavourite.mockRestore()
+  })
+
+  it("opens the listener's playlists from Add to playlist beside the song's name", async () => {
     const user = userEvent.setup()
     openNowPlaying()
-    await user.click(
-      await screen.findByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.off] }),
-    )
+    await user.click(await screen.findByRole('button', { name: NOW_PLAYING_COPY.addToPlaylist }))
+    const picker = await screen.findByRole('dialog', { name: TRACK_MENU_COPY.addToPlaylistTitle })
+    expect(
+      await within(picker).findByRole('list', { name: TRACK_MENU_COPY.pickPlaylist(AIRBAG.title) }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(TRACK_MENU_COPY.playNext)).toBeNull()
+  })
+
+  it('shuffles, repeats and clears the queue from Up next', async () => {
+    const user = userEvent.setup()
+    openNowPlaying()
+    await user.click(await screen.findByRole('button', { name: PLAYER_COPY.upNext }))
+    await user.click(await screen.findByRole('button', { name: PLAYER_COPY.shuffle }))
+    expect(useAudioQueue.getState().queue.isShuffled).toBe(true)
+    await user.click(screen.getByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.off] }))
     expect(
       screen.getByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.all] }),
     ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: NOW_PLAYING_COPY.clearLabel }))
+    expect(remove).toHaveBeenCalledTimes(2)
   })
 
   it('shows the lyrics, and seeks to a synced line that is pressed', async () => {
@@ -161,20 +220,34 @@ describe('Now Playing', () => {
     expect(await screen.findByText(NOW_PLAYING_COPY.nothingNext)).toBeInTheDocument()
   })
 
-  it('lays the player beside the lyrics, over Up next, in a wide window', async () => {
+  it('lays the player beside a pane that opens on Up next, in a wide window', async () => {
     const user = userEvent.setup()
     openNowPlaying({ formFactor: FORM_FACTORS.tablet })
     expect(await screen.findByRole('heading', { name: 'Airbag' })).toBeInTheDocument()
-    expect(
-      await screen.findByRole('button', { name: 'In a jackknifed juggernaut' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: PLAYER_COPY.upNext })).toBeChecked()
     expect(screen.getByRole('heading', { name: PLAYER_COPY.upNext })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'In a jackknifed juggernaut' })).toBeNull()
     expect(
       screen.getByText(NOW_PLAYING_COPY.playingOn(NOW_PLAYING_COPY.devices.browser)),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: OUTPUT })).toBeNull()
+    expect(screen.getByRole('button', { name: PLAYER_COPY.shuffle })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: PLAYER_COPY.repeat[REPEAT_MODES.off] }),
+    ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: NOW_PLAYING_COPY.clearLabel }))
     expect(remove.mock.calls).toEqual([[2], [1]])
+  })
+
+  it("swaps the wide window's pane for the lyrics from its tabs", async () => {
+    const user = userEvent.setup()
+    openNowPlaying({ formFactor: FORM_FACTORS.tablet })
+    await user.click(await screen.findByRole('radio', { name: PLAYER_COPY.lyrics }))
+    expect(
+      await screen.findByRole('button', { name: 'In a jackknifed juggernaut' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: PLAYER_COPY.upNext })).toBeNull()
+    expect(screen.getByRole('slider', { name: PLAYER_COPY.position })).toBeInTheDocument()
   })
 
   it("offers an audiobook's speed, and sets it", async () => {

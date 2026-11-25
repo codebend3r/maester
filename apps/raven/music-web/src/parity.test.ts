@@ -4,7 +4,7 @@ import { Glob } from 'bun'
 import { WREN_ROUTES, WREN_WEB_ONLY_ROUTES } from '@/routes'
 
 /** The phone and tablet apps' expo-router tree, whose every file but a layout is a page. */
-const APP_DIR = fileURLToPath(new URL('../../music/app', import.meta.url))
+const APP_DIR = fileURLToPath(new URL('../../../wren/wren-app/app', import.meta.url))
 
 const ROUTE_FILES = new Glob('**/*.tsx')
 

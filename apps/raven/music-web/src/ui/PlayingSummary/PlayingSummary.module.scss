@@ -30,11 +30,6 @@
   @include mixins.meta-line;
 }
 
-.quality {
-  color: var(--color-text-3);
-  font: var(--type-meta);
-}
-
 .error {
   color: var(--color-accent-text);
   font: var(--type-meta);

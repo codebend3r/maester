@@ -1,73 +1,71 @@
 @use '../../styles/mixins';
 
-// The first row takes three fifths of the height, and the player three tenths of its width.
+// The player takes two fifths of the width, and the pane of Up next and Lyrics the rest.
 .screen {
-  // The player column's gap, between the header, the cover and each control, and its own padding.
-  --column-gap: var(--space-4);
-
-  /*
-   * The height the player column keeps for what is not the cover: the header, the scrubber and
-   * the volume, the transport, the four gaps between the five and the column's own padding.
-   */
-  --controls-room: calc(
-    3 * var(--size-touch-target) + var(--size-play-queue) + 6 * var(--column-gap)
-  );
-
   display: grid;
-  grid-template-areas:
-    'player lyrics'
-    'upNext upNext';
-  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
-  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+  grid-template-areas: 'player side';
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  grid-template-rows: minmax(0, 1fr);
   min-inline-size: 0;
   min-block-size: 0;
   padding-block-start: env(safe-area-inset-top);
 }
 
+// The header over the player, kept together in the middle of a column wider than they need.
 .player {
   display: grid;
   grid-area: player;
-  gap: var(--column-gap);
-  align-content: start;
+  grid-template-areas:
+    'header'
+    'stack';
+  grid-template-columns: minmax(0, var(--size-player-column));
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-content: center;
   min-inline-size: 0;
-  overflow-y: auto;
-  padding: var(--column-gap) var(--size-player-gutter);
+  min-block-size: 0;
+  padding-block: var(--space-2) env(safe-area-inset-bottom);
   border-inline-end: var(--size-hairline) solid var(--color-line);
 }
 
-// What the column's width and the row's height leave beside the controls, never under a small cover's.
-.cover {
-  inline-size: clamp(
-    var(--size-player-compact-art),
-    min(100%, 60dvh - var(--controls-room)),
-    var(--size-player-art-wide)
-  );
+.header {
+  display: grid;
+  grid-area: header;
+  padding-inline: var(--space-3);
 }
 
-.lyrics {
-  display: grid;
-  grid-area: lyrics;
-  grid-template-areas:
-    'head'
-    'words';
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: var(--space-5);
+.stack {
+  grid-area: stack;
   min-inline-size: 0;
   min-block-size: 0;
-  padding: var(--column-gap) var(--size-page-pad-side);
 }
 
-.lyricsHead {
+.side {
+  display: grid;
+  grid-area: side;
+  grid-template-areas:
+    'head'
+    'body';
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: var(--space-4) var(--size-page-pad-side) env(safe-area-inset-bottom);
+  background: var(--color-surface);
+}
+
+// The tabs, as wide as the player's own column at most, then where the music plays.
+.sideHead {
   display: grid;
   grid-area: head;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, var(--size-player-column)) auto;
   gap: var(--space-4);
-  align-items: start;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.words {
+.sideBody {
   display: grid;
-  grid-area: words;
+  grid-area: body;
   grid-template-rows: minmax(0, 1fr);
   min-block-size: 0;
 }
@@ -87,15 +85,4 @@
   @include mixins.one-line;
   color: var(--color-text-2);
   font: var(--type-body);
-}
-
-.upNext {
-  display: grid;
-  grid-area: upNext;
-  grid-template-rows: minmax(0, 1fr);
-  min-inline-size: 0;
-  min-block-size: 0;
-  padding: var(--space-4) var(--size-page-pad-side) env(safe-area-inset-bottom);
-  border-block-start: var(--size-hairline) solid var(--color-line);
-  background: var(--color-surface);
 }

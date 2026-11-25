@@ -34,7 +34,8 @@
 
 .volume {
   display: grid;
-  inline-size: var(--size-bar-volume);
+  // The line's own width, and its speaker's beside it.
+  inline-size: calc(var(--size-bar-volume) + var(--size-touch-target));
 
   // The rail's width leaves the bar's end room for its buttons alone.
   @media (max-width: 64rem) {

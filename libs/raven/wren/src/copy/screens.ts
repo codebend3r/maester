@@ -139,7 +139,7 @@ export const STORAGE_COPY = {
 
 type TrackOfProps = { at: number; count: number }
 
-type ResolutionProps = { bits: number; kilohertz: number }
+type ResolutionProps = { bitDepth: string; sampleRate: string }
 
 type ContinueLineProps = { artists: string; track: string }
 
@@ -366,15 +366,16 @@ const SOURCE_COPY = {
 
 export const NOW_PLAYING_COPY = {
   close: 'Close Now Playing',
-  /** The format a transcode and a download play in. */
-  aac: 'AAC',
-  kbps: (kbps: number) => `${kbps} kbps`,
   /** A lossless file's resolution: "16-bit / 44.1 kHz". */
-  resolution: ({ bits, kilohertz }: ResolutionProps) => `${bits}-bit / ${kilohertz} kHz`,
+  resolution: ({ bitDepth, sampleRate }: ResolutionProps) => `${bitDepth} / ${sampleRate}`,
   downloaded: 'Downloaded',
   /** What the quality line is read out as: "Quality, FLAC · 912 kbps". */
   quality: 'Quality',
   more: 'More options',
+  /** The button beside the song's name that opens its Add to playlist. */
+  addToPlaylist: 'Add to playlist',
+  /** What the wide layout's two tabs, Up next and Lyrics, are called aloud. */
+  sidePanes: 'Up next or lyrics',
   nothing: 'Nothing is playing.',
   clear: 'Clear',
   clearLabel: 'Clear up next',

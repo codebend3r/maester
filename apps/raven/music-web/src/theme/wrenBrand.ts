@@ -1,5 +1,5 @@
 /*
- * Wren's horizontal lockup, from apps/raven/music/assets/brand/wren-lockup-on-dark.svg: the full
+ * Wren's horizontal lockup, from apps/wren/wren-app/assets/brand/wren-lockup-on-dark.svg: the full
  * mark and the outlined Young Serif wordmark in one coordinate space, as the phone and tablet
  * apps' `wrenBrand.ts` holds them. Those SVG files are the source; a change to the mark is made
  * there and copied to both, never redrawn.
@@ -31,7 +31,7 @@ export const LOCKUP_DRAWING = {
 } as const
 
 /*
- * The mark alone, from apps/raven/music/assets/brand/wren-mark-on-dark.svg: the lockup's bird in
+ * The mark alone, from apps/wren/wren-app/assets/brand/wren-mark-on-dark.svg: the lockup's bird in
  * the same coordinates, in a box centred on its weight, not its outline.
  */
 export const MARK_VIEW_BOX = { x: 30, y: 8, width: 460, height: 448 } as const

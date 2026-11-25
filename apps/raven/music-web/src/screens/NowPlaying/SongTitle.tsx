@@ -1,5 +1,5 @@
 import { classNames } from '@raven/ui/headless'
-import { KIT_COPY, NOW_PLAYING_COPY } from '@raven/wren'
+import { NOW_PLAYING_COPY, type SongActions } from '@raven/wren'
 import type { ComponentType } from 'react'
 import {
   ARTIST_KINDS,
@@ -9,7 +9,11 @@ import {
 } from '@/screens/NowPlaying/usePlaying'
 import { RADII, SIZES } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
+import { IconButton } from '@/ui/IconButton/IconButton'
+import { LikeButton } from '@/ui/LikeButton/LikeButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
+import { QualityChips } from '@/ui/QualityChips/QualityChips'
+import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/NowPlaying/SongTitle.module.scss'
 
 type SongProps = { playing: Playing }
@@ -59,22 +63,9 @@ function PlayError({ playing }: SongProps) {
   return playing.error !== null && <output className={styles.error}>{playing.error}</output>
 }
 
-/** The format and quality of what is playing, under the song once its source is made. */
+/** The format and quality of what is playing, as chips under the song once its source is made. */
 function Quality({ playing }: SongProps) {
-  return (
-    playing.quality !== null && (
-      <span
-        aria-label={KIT_COPY.labelled({
-          label: NOW_PLAYING_COPY.quality,
-          value: playing.quality,
-        })}
-        className={styles.quality}
-        role="note"
-      >
-        {playing.quality}
-      </span>
-    )
-  )
+  return playing.quality !== null && <QualityChips quality={playing.quality} />
 }
 
 /** How the song's lines are set: large under the cover, or small beside a small one. */
@@ -108,9 +99,26 @@ function SongLines({ playing, variant }: SongLinesProps) {
   )
 }
 
-/** The player's song: its title large in Young Serif, and its artists as a link. */
-export function SongTitle({ playing }: SongProps) {
-  return <SongLines playing={playing} variant={SONG_VARIANTS.large} />
+type SongTitleProps = SongProps & Pick<SongActions, 'like' | 'onAddToPlaylist'>
+
+/**
+ * The player's song: its title large in Young Serif and its artists as a link, with its heart
+ * and Add to playlist beside its name. Everything else it can do is behind the header's More.
+ */
+export function SongTitle({ playing, like, onAddToPlaylist }: SongTitleProps) {
+  return (
+    <div className={styles.titled}>
+      <SongLines playing={playing} variant={SONG_VARIANTS.large} />
+      <div className={styles.actions}>
+        <LikeButton like={like} title={playing.track.title} />
+        <IconButton
+          icon={ICONS.playlistAdd}
+          label={NOW_PLAYING_COPY.addToPlaylist}
+          onPress={onAddToPlaylist}
+        />
+      </div>
+    </div>
+  )
 }
 
 /** Lyrics' and Up next's head: a small cover beside the song's title and artists. */

@@ -1,7 +1,7 @@
 /*
  * Wren's design tokens and the few true primitives, translated from the redesign handoff
- * (apps/raven/music/design/redesign/tokens/tokens.css) and the phone and tablet apps'
- * apps/raven/music/src/theme/wrenTokens.ts, value for value. Component styles live beside their
+ * (apps/wren/wren-app/design/redesign/tokens/tokens.css) and the phone and tablet apps'
+ * apps/wren/wren-app/src/theme/wrenTokens.ts, value for value. Component styles live beside their
  * component as *.module.scss and use only these values.
  */
 
@@ -296,7 +296,8 @@
   // Now Playing: its gutter, covers, transport and Up next's head (`PLAYER_SIZES`).
   --size-player-gutter: 1.75rem;
   --size-player-art: 20.875rem;
-  --size-player-art-wide: 21.875rem;
+  // The most the wide layout's player column grows, so a wide window keeps the controls together.
+  --size-player-column: 26.25rem;
   --size-player-compact-art: 3.5rem;
   --size-play-large: 4.75rem;
   --size-play-compact: 4rem;

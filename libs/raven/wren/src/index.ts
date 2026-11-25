@@ -91,6 +91,8 @@ export {
   PANES,
   type Pane,
   type SourceTitle,
+  SIDE_PANE_CHOICES,
+  type SidePane,
   type UpNextRow,
   barWordsOf,
   lyricOffsetOf,
@@ -104,16 +106,16 @@ export {
   sourceTitleOf,
   upNextRowsOf,
 } from '@/nowPlaying/nowPlayingModel'
-export { qualityLineOf } from '@/nowPlaying/quality'
+export { type QualityView, qualityViewOf } from '@/nowPlaying/quality'
 export {
   STEPS,
   type Step,
   TRANSPORTS,
   type TransportKind,
-  hasTogglesOf,
   progressOf,
-  remainingTextOf,
+  repeatIconOf,
   scrubTextOf,
+  toggleLookOf,
 } from '@/playerModel'
 export {
   COVER_SIZES,
@@ -163,6 +165,13 @@ export {
 } from '@/search/searchFilters'
 export { signInErrorsOf } from '@/signIn/signInErrors'
 export { TOAST_MS } from '@/toast'
-export { type MenuLike, type MenuPlaces, menuGroupsOf } from '@/menuGroups'
+export {
+  MENU_VIEWS,
+  type MenuLike,
+  type MenuPlaces,
+  type MenuView,
+  type SongActions,
+  menuGroupsOf,
+} from '@/menuGroups'
 export { SONG_LEADS, type ShownLead, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
 export { TOP_RESULT_KINDS, type TopResult, topResultOf } from '@/search/topResult'

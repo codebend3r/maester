@@ -354,7 +354,7 @@ jobs:
       APP_LOGS: raven-app-android-tv-e2e-logs
     steps: *e2e-steps
 
-  # Every flow in `apps/raven/music/e2e`: open on Home, play the fixture's album, and download it,
+  # Every flow in `apps/wren/wren-app/e2e`: open on Home, play the fixture's album, and download it,
   # on a simulator of Wren's own, as `ci:wren` makes one. Wren on Android has no flows yet.
   e2e-wren-iphone:
     name: 🎵 E2E Wren iPhone
@@ -367,7 +367,7 @@ jobs:
       BUILD_MISSING: ${{ needs.select.outputs.music_build }}
       BUILD_SHA: ${{ needs.select.outputs.music_sha }}
       APP_SETUP: ios
-      APP_PROJECT: apps/raven/music
+      APP_PROJECT: apps/wren/wren-app
       APP_ARTIFACT: raven-music-ios-simulator
       APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Wren.app
       APP_SIMULATOR: wren-phone
@@ -375,7 +375,7 @@ jobs:
       APP_RUNTIME: iOS
       APP_DEVICE_TYPE: com.apple.CoreSimulator.SimDeviceType.iPhone-16
       APP_DRIVER: maestro
-      APP_FLOWS: bunx nx run @raven/music:e2e
+      APP_FLOWS: bunx nx run @wren/app:e2e
       APP_LOGS: raven-music-e2e-logs
     steps: *e2e-steps
 

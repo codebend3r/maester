@@ -15,7 +15,7 @@ import { fakeTmdb } from '@/test/fakeTmdb'
 
 /**
  * A real raven server for the device app's and Wren's Maestro flows (`apps/raven/app/e2e`,
- * `apps/raven/music/e2e`): an open film library holding a movie, an open series library holding
+ * `apps/wren/wren-app/e2e`): an open film library holding a movie, an open series library holding
  * two episodes and an open music library holding a three track FLAC album, with media tickets on. The movie and the first episode are MKVs, which an Apple
  * device plays through the server's HLS remux; the second episode is an MP4 with an English
  * and a Spanish sidecar and a chapter naming its intro, which it plays as it is. Both are matched against a fake TMDB, which knows no

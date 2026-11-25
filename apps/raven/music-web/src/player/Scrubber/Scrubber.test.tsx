@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
-import { formatDuration } from '@raven/core'
+import { formatDuration, remainingTimeOf } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, remainingTextOf, scrubTextOf } from '@raven/wren'
+import { PLAYER_COPY, scrubTextOf } from '@raven/wren'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
 import { AIRBAG } from '@/test/music'
@@ -34,23 +34,23 @@ describe('Scrubber', () => {
     render(<Scrubber kind={SCRUBBERS.player} length={LENGTH} />)
 
     expect(screen.getByText(formatDuration(62))).toBeInTheDocument()
-    expect(screen.getByText(remainingTextOf({ position: 62, length: LENGTH }))).toBeInTheDocument()
+    expect(screen.getByText(remainingTimeOf({ position: 62, length: LENGTH }))).toBeInTheDocument()
   })
 
-  it("shows how far in it is and the track's length beside the player bar's line", () => {
+  it("shows how far in it is and how long is left beside the player bar's line", () => {
     playedTo(62)
     render(<Scrubber kind={SCRUBBERS.bar} length={LENGTH} />)
 
     expect(screen.getByText(formatDuration(62))).toBeInTheDocument()
-    expect(screen.getByText(formatDuration(LENGTH))).toBeInTheDocument()
+    expect(screen.getByText(remainingTimeOf({ position: 62, length: LENGTH }))).toBeInTheDocument()
+    expect(screen.queryByText(formatDuration(LENGTH))).toBeNull()
   })
 
-  it('draws the line alone where its place holds no words', () => {
+  it('writes the time left with a minus before it', () => {
     playedTo(62)
-    render(<Scrubber kind={SCRUBBERS.bare} length={LENGTH} />)
+    render(<Scrubber kind={SCRUBBERS.player} length={LENGTH} />)
 
-    expect(line()).toBeInTheDocument()
-    expect(screen.queryByText(formatDuration(62))).toBeNull()
+    expect(screen.getByText('-3:58')).toBeInTheDocument()
   })
 
   it('seeks at once to where a key moves it', () => {

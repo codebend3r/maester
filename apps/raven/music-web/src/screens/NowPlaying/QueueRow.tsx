@@ -17,7 +17,7 @@ type QueueRowProps = {
   /** The first and last places a row may move to: the songs after the one playing. */
   first: number
   last: number
-  /** Where Up next sits; the wide layout's panel has its own ground and margins. */
+  /** Where Up next sits; the wide layout's pane has its own ground and margins. */
   place: UpNextPlace
   onJump: (place: number) => void
   onMove: (move: RowMove) => void
