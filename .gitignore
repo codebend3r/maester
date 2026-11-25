@@ -40,3 +40,6 @@ __pycache__/
 
 # Lighthouse CI's runs and reports
 .lighthouseci/
+
+# Swift Package Manager's build cache, left by Xcode tooling at the root
+.build/

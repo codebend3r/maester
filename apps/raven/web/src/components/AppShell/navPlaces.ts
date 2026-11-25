@@ -40,7 +40,13 @@ export const NAV_PLACES = {
     label: COMING_SOON_COPY.title,
   }),
   favourites: placeAt({ to: APP_PATHS.favourites, icon: 'heart', label: COMMON_COPY.favourites }),
-  music: placeAt({ to: MUSIC_PATHS.root, icon: 'music', label: APP_SHELL_COPY.music }),
+  // Marked on every page of the music mode, whose own row of places shows it.
+  music: {
+    to: MUSIC_PATHS.root,
+    patterns: [MUSIC_PATHS.root, `${MUSIC_PATHS.root}/*`],
+    icon: 'music',
+    label: APP_SHELL_COPY.music,
+  },
   libraries: {
     to: APP_PATHS.libraries,
     patterns: [APP_PATHS.libraries, ...libraryPages(':id')],

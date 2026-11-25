@@ -1,6 +1,9 @@
 import { ravenQueriesFor } from '@raven/ui/headless'
 import { api, homeApi } from '@/lib/api'
 
+/** Every query of the server in use, for the shared hooks that take them whole. */
+export const ravenQueries = ravenQueriesFor(api)
+
 export const {
   librariesQuery,
   libraryQuery,
@@ -71,7 +74,7 @@ export const {
   displaySettingsQuery,
   accountQuery,
   membersQuery,
-} = ravenQueriesFor(api)
+} = ravenQueries
 
 /** The account config is the home server's, whichever server is active: the session is built from it. */
 export const { authConfigQuery } = ravenQueriesFor(homeApi)

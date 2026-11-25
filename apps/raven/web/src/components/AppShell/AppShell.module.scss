@@ -418,7 +418,9 @@
 
   container-type: inline-size;
   --bar-gap: var(--space-5);
-  --page-start: calc(var(--page-top) + var(--field-size) + var(--bar-gap));
+  --bar-row-gap: var(--space-3);
+  --bar-height: calc(2 * var(--field-size) + var(--bar-row-gap));
+  --page-start: calc(var(--page-top) + var(--bar-height) + var(--bar-gap));
 
   grid-area: main;
   display: grid;
@@ -434,15 +436,21 @@
   padding: var(--page-top) var(--gutter) var(--section-gap);
 }
 
-// The search fills the row up to the corner's buttons at the end.
+/*
+ * The browsing places along the top, level with the corner's buttons, and
+ * the search under them, as wide as it was beside the corner.
+ */
 .bar {
   grid-area: bar;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: 'search corner';
+  grid-template-rows: var(--field-size) var(--field-size);
+  grid-template-areas:
+    'places corner'
+    'search .';
   align-items: center;
-  gap: var(--space-4);
-  min-height: var(--field-size);
+  column-gap: var(--space-4);
+  row-gap: var(--bar-row-gap);
 }
 
 /*
@@ -484,12 +492,34 @@
   }
 }
 
+// Out of the server's reach the bar keeps only its corner, on one row.
+.main:not(:has(.search)) {
+  --bar-height: var(--field-size);
+
+  .bar {
+    grid-template-rows: var(--field-size);
+  }
+}
+
 // Over the fade the focused search lays across the page's top.
 .bar:has(.search:focus-within) .corner {
   z-index: 4;
 }
 
+/*
+ * A phone leaves the browsing places to its tab bar, so the search sits
+ * beside the corner again.
+ */
 @media (max-width: 48rem) {
+  .main {
+    --bar-height: var(--field-size);
+  }
+
+  .bar {
+    grid-template-rows: var(--field-size);
+    grid-template-areas: 'search corner';
+  }
+
   .shell {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas: 'main';

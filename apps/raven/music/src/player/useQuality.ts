@@ -1,7 +1,7 @@
 import type { Track } from '@raven/core'
 import { qualityLineOf } from '@raven/wren'
 
-import { usePlayedStreams } from '@/stores/playedStreams'
+import { usePlayedStreams } from '@raven/native/headless'
 
 type UseQualityProps = { track: Track }
 

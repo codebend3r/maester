@@ -78,6 +78,7 @@ export { ADD_OUTCOMES, type AppServer, pinServerIdOf } from '@/servers/serverLis
 export { TICKET_SUPPORT, ticketSupportOf } from '@/servers/tickets'
 export { unlockNow } from '@/stores/cookieSnapshots'
 export { loadPersisted } from '@/stores/persistedStore'
+export { keepPlayedStream, usePlayedQuality, usePlayedStreams } from '@/stores/playedStreams'
 export { useStoresLoaded } from '@/stores/storesLoaded'
 export { bumpCookieVersion, useCookieVersion } from '@/stores/cookieVersion'
 export { nativeTokens, tokenReaderOf } from '@/theme/nativeTokens'

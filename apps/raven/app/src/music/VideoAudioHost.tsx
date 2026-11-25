@@ -1,4 +1,4 @@
-import { PLAYBACK_MODES, type Track } from '@raven/core'
+import { PLAYBACK_MODES, TRACK_STREAM_KINDS, type Track } from '@raven/core'
 import { watchAppHide } from '@raven/native'
 import {
   AUDIO_HOST_COPY,
@@ -18,6 +18,7 @@ import Video, { type VideoRef } from 'react-native-video'
 
 import { mediaSourcesFor } from '@/player/mediaSources'
 import type { AppQueries } from '@/queries/useAppQueries'
+import { usePlayedStreams } from '@raven/native/headless'
 
 /** The cache key a track's ticketed address sits under, with the server and the track. */
 const MUSIC_SOURCE_KEY = 'musicSource'
@@ -61,6 +62,13 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
     if (source.data !== undefined && !source.data.ok) engine.failed(source.data.message)
     if (source.error !== null) engine.failed(AUDIO_HOST_COPY.couldNotPlay)
   }, [source.data, source.error, engine])
+
+  // A TV asks for the file itself, in direct mode, so once its address is made that is the stream.
+  const heard = usePlayedStreams((played) => played.heard)
+  const hasSource = !!source.data?.ok
+  useEffect(() => {
+    if (hasSource) heard({ trackId: track.id, stream: { kind: TRACK_STREAM_KINDS.file } })
+  }, [hasSource, heard, track.id])
 
   useEffect(() => {
     if (seek === null) return

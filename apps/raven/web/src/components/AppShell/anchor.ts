@@ -8,11 +8,3 @@ export const besideOf = ({ element }: BesideProps): SideAnchor => {
   const rect = element.getBoundingClientRect()
   return { top: rect.top + rect.height / 2, left: rect.right }
 }
-
-type CentreProps = { element: Element }
-
-/** The middle of an element, where a glow spreads from. */
-export const centreOf = ({ element }: CentreProps): SideAnchor => {
-  const rect = element.getBoundingClientRect()
-  return { top: rect.top + rect.height / 2, left: rect.left + rect.width / 2 }
-}

@@ -85,7 +85,11 @@ const ravenServer = () => {
 }
 
 /** Wren's plan with nothing downloaded and the device on Wi-Fi: the file itself plays. */
-const ON_WIFI: TrackPlan = { downloadedOf: () => null, streamKbps: async () => null }
+const ON_WIFI: TrackPlan = {
+  downloadedOf: () => null,
+  streamKbps: async () => null,
+  onStream: () => undefined,
+}
 
 const ON_CELLULAR: TrackPlan = { ...ON_WIFI, streamKbps: async () => AUDIO_BITRATES.standard }
 

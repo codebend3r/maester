@@ -1,4 +1,4 @@
-import type { LibraryIconName } from '@raven/core'
+import { type LibraryIconName, REPEAT_MODES, type RepeatMode } from '@raven/core'
 
 /*
  * The icons' drawings alone, on a 24 unit square, with nothing of the web's: the web's `Icon`
@@ -46,9 +46,6 @@ type SmallPlayProps = { x: number; y: number; h: number }
 
 const smallPlay = ({ x, y, h }: SmallPlayProps) =>
   `M${x} ${y + 0.5}v${h - 1}a.6.6 0 0 0 .9.5l${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 0-1l-${h * 0.8} -${h / 2 - 0.5}a.6.6 0 0 0 -.9.5z`
-
-/** Where the nine dots' rows and columns sit. */
-const DOT_LINES = [6, 12, 18] as const
 
 /** The popcorn bucket: its rim wider than its foot, the kernels heaped over the rim. */
 const POPCORN_BUCKET = 'M4.5 10.5h15l-1.4 10.5H5.9z'
@@ -199,11 +196,6 @@ export const DRAWINGS = {
     stroke: `${PANEL}M3.5 16l4.6-4.6a1.5 1.5 0 0 1 2.1 0L15 16.2M13.5 14.7l1.6-1.6a1.5 1.5 0 0 1 2.1 0l3.3 3.3`,
     fill: PANEL,
     marks: circle({ cx: 15.5, cy: 9, r: 1.5 }),
-  },
-  // Nine dots, three by three: the button that holds a group of places.
-  apps: {
-    stroke: '',
-    marks: DOT_LINES.flatMap((cy) => DOT_LINES.map((cx) => circle({ cx, cy, r: 1.7 }))).join(''),
   },
   grid: {
     stroke: `${roundRect({ x: 4, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 4, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 4, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}${roundRect({ x: 13.5, y: 13.5, w: 6.5, h: 6.5, r: 1.5 })}`,
@@ -400,3 +392,18 @@ export const DRAWINGS = {
 
 /** Every icon a library can wear, and the app's own. */
 export type IconName = keyof typeof DRAWINGS
+
+/** Under this much of full volume the speaker shows one wave instead of two. */
+const QUIET_BELOW = 0.5
+
+type VolumeIconOfProps = { volume: number; isMuted: boolean }
+
+/** The speaker as the volume stands: crossed out while silent, one wave while quiet. */
+export const volumeIconOf = ({ volume, isMuted }: VolumeIconOfProps): IconName => {
+  if (isMuted || volume === 0) return 'muted'
+  return volume < QUIET_BELOW ? 'volumeLow' : 'volume'
+}
+
+/** The repeat button's icon: the loop, with a one inside while one track repeats. */
+export const repeatIconOf = (repeat: RepeatMode): IconName =>
+  repeat === REPEAT_MODES.one ? 'repeatOne' : 'repeat'

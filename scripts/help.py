@@ -149,7 +149,6 @@ GROUPS: tuple[Group, ...] = (
             Command("build:wren:web", "Builds Wren on the web, as Netlify does."),
             Command("dev:sparrow", "sparrow's API and chat page."),
             Command("sandbox:sparrow", "sparrow's sandbox for testing its answers."),
-            Command("dev:rookery", "rookery's sign-in server and its login pages."),
         ),
     ),
     Group(
@@ -281,7 +280,7 @@ GROUPS: tuple[Group, ...] = (
             Command("ci:docker", "The ✅ Checks job inside an Ubuntu 24.04 container.", "Docker"),
             Command(
                 "ci:app:ios",
-                "The 🏗️ Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.",
+                "The 🎬 Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.",
                 "macOS + Xcode",
             ),
             Command(
@@ -310,7 +309,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:tvos",
-                "The 🏗️ Build Raven Apple TV job and its end to end job.",
+                "The 🎬 Build Raven Apple TV job and its end to end job.",
                 "macOS + Xcode",
             ),
             Command(
@@ -320,7 +319,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:android-tv",
-                "The 🏗️ Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order.",
+                "The 🎬 Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order.",
                 "Android SDK",
             ),
             Command(

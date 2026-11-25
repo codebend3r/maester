@@ -5,6 +5,7 @@ import { useEffect } from 'react'
 
 import { NowPlayingStrip } from '@/layouts'
 import { trackCoverOf } from '@/music/musicCards'
+import { usePlayingQuality } from '@/music/usePlayingQuality'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
@@ -43,12 +44,14 @@ const useCountMusicStarts = (): void => {
 /**
  * The strip while a track plays, each platform's own, under the screens by the thumb and across
  * the top of a TV: its cover, title and artists, play or pause and next, and under the thumb an
- * X that stops the music; pressed, it opens Now Playing.
+ * X that stops the music; pressed, it opens Now Playing. Where there is room, a tablet and a TV,
+ * it also says the format and quality of what plays.
  */
 export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) => {
   const router = useRouter()
   const pictures = usePictures({ server, api })
   const track = useAudioQueue(playingTrackOf)
+  const quality = usePlayingQuality({ track })
   const state = useAudioQueue((store) => store.state)
   const toggle = useAudioQueue((store) => store.toggle)
   const next = useAudioQueue((store) => store.next)
@@ -68,6 +71,7 @@ export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) 
         onNext={next}
         onOpen={() => router.push(APP_ROUTES.nowPlaying)}
         onToggle={toggle}
+        quality={quality}
         title={track.title}
       />
     )

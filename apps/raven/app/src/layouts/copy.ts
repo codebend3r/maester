@@ -118,6 +118,10 @@ export const MUSIC_COPY = {
   nowPlaying: 'Now Playing',
   nothingPlaying: 'Nothing is playing.',
   upNext: 'Up next',
+  /** The two tabs of Now Playing's pane, as they are read out together. */
+  panes: 'Up next and lyrics',
+  /** The format and quality line, read as one sentence: "Playing in FLAC, 16-bit, 44.1 kHz." */
+  qualityLabel: (facts: readonly string[]) => `Playing in ${facts.join(', ')}.`,
   clear: 'Clear',
   remove: 'Remove',
   removeTrack: (title: string) => `Remove ${title}`,
@@ -125,6 +129,7 @@ export const MUSIC_COPY = {
   closePlayer: 'Stop the music and close the player',
   goTo: (name: string) => `Go to ${name}`,
   favourite: 'Favourite',
+  favouriteFailed: 'Could not change the favourite.',
   playlist: 'Playlist',
   newPlaylist: 'New playlist',
   create: 'Make',

@@ -18,6 +18,7 @@ import { Icon } from '@raven/native'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { Cover, useMusicStyles } from '@/layouts/MusicParts.focus'
+import { FocusQualityLine } from '@/layouts/QualityLine'
 import { Text } from '@/layouts/Text'
 import { REMOTE_KEYS, pressedKeyOf } from '@/layouts/remoteKeys'
 import { requestTVFocus } from '@/layouts/tvFocus'
@@ -135,14 +136,15 @@ const StripButton = ({ label, icon, canFocus, onPress, onFocus, onBlur }: StripB
 /**
  * The strip across the top of a TV while a track plays, outside every screen, so it stays put
  * however far down a page the remote goes: the cover, the title and artists, pressed to open Now
- * Playing, beside Play or Pause and Next. Up from a screen's top row reaches it, and so does Left
- * from a screen's leftmost control. Back from Now Playing lands on it again, as a card's screen
- * lands on the card.
+ * Playing, with the format and quality of what plays, beside Play or Pause and Next. Up from a
+ * screen's top row reaches it, and so does Left from a screen's leftmost control. Back from Now
+ * Playing lands on it again, as a card's screen lands on the card.
  */
 export const NowPlayingStrip = ({
   title,
   artists,
   cover,
+  quality,
   isPlaying,
   onOpen,
   onToggle,
@@ -216,6 +218,7 @@ export const NowPlayingStrip = ({
               {artists}
             </Text>
           </View>
+          {quality !== null && <FocusQualityLine quality={quality} />}
         </Pressable>
         <StripButton
           {...heard}

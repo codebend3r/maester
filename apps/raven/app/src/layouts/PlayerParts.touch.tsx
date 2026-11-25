@@ -1,7 +1,7 @@
 import { type SkipStep, formatDuration } from '@raven/core'
 import { Icon } from '@raven/native'
 import { useClock, usePlayerPrefs } from '@raven/ui/headless'
-import type { IconName } from '@raven/ui/iconDrawings'
+import { type IconName, volumeIconOf } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
 import {
   type AccessibilityActionInfo,
@@ -30,7 +30,7 @@ import type { IntroOffer } from '@/layouts/introOffer'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TitleArt } from '@/layouts/TitleArt'
 import { useScrub } from '@/layouts/useScrub'
-import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
+import { VOLUME_ACTION_LIST, volumeAfterAction, volumeAtY } from '@/layouts/volumeKit'
 import { SIZES } from '@/theme/appTheme'
 import { useTheme } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'

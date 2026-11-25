@@ -3,7 +3,7 @@ import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { SITE_SEARCH_COPY } from '@/components/SiteSearch/copy'
 import { LIBRARY_COPY } from '@/pages/LibraryPage/copy'
 import { HOME_COPY } from '@/pages/HomePage/copy'
-import { sideLink } from '@/e2e/shell'
+import { openLibraryFromHome } from '@/e2e/shell'
 
 const { movie, show } = FIXTURE_SERVER
 
@@ -29,8 +29,7 @@ test.describe('Search', () => {
   })
 
   test('searches one library from its own box', async ({ page }) => {
-    await page.goto('/')
-    await sideLink({ page, name: movie.library }).click()
+    await openLibraryFromHome({ page, name: movie.library })
     const box = page.getByRole('searchbox', { name: LIBRARY_COPY.searchLibrary(movie.library) })
     await box.fill(movie.title)
     await expect(page.getByRole('link', { name: movie.title, exact: true })).toBeVisible()

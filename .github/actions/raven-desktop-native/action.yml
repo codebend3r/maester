@@ -4,7 +4,7 @@ description: >-
   toolchain, the install, the Nx cached libmpv and MoltenVK source build and the N-API
   addon. The caller audits them.
 
-# Shared by the 🏗️ Build Raven Mac native job (the raven-mac-native action, on pull requests and
+# Shared by the 🎬 Build Raven Mac native job (the raven-mac-native action, on pull requests and
 # main) and the release build (desktop-release.yml), so a release builds exactly as the checks
 # did. It selects Xcode for the rest of the job. A composite action reads no secrets: the calling
 # workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.

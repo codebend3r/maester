@@ -58,6 +58,17 @@ def test_base_skips_current_commit_and_non_ancestors(monkeypatch):
     assert selector.successful_base([], "head") is None
 
 
+def test_base_skips_release_runs(monkeypatch):
+    monkeypatch.setattr(
+        selector.subprocess, "run", lambda *_args, **_kwargs: SimpleNamespace(returncode=0)
+    )
+    runs = [
+        {"head_sha": "release", "head_commit": {"message": "Release v0.9.2"}},
+        {"head_sha": "merge", "head_commit": {"message": "MAE: a merge (#477)"}},
+    ]
+    assert selector.successful_base(runs, "head") == "merge"
+
+
 @pytest.mark.parametrize("event", ["push", "workflow_dispatch"])
 def test_no_base_runs_everything(monkeypatch, tmp_path, event):
     destination = tmp_path / "outputs"

@@ -1,16 +1,7 @@
-import type { IconName } from '@raven/ui/iconDrawings'
 import type { AccessibilityActionInfo } from 'react-native'
 
 /** How far a screen reader's swipe moves the volume, as a share of full. */
 const VOLUME_STEP = 0.1
-
-type VolumeIconOfProps = { volume: number; isMuted: boolean }
-
-/** The speaker the web draws for a volume: crossed out when silent, one wave when low. */
-export const volumeIconOf = ({ volume, isMuted }: VolumeIconOfProps): IconName => {
-  if (isMuted || volume === 0) return 'muted'
-  return volume < 0.5 ? 'volumeLow' : 'volume'
-}
 
 type VolumeAtYProps = { y: number; height: number }
 

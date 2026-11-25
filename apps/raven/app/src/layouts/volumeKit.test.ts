@@ -1,18 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { steppedVolume, volumeAfterAction, volumeAtY, volumeIconOf } from '@/layouts/volumeKit'
-
-describe('volumeIconOf', () => {
-  it('crosses the speaker out when muted or silent', () => {
-    expect(volumeIconOf({ volume: 0.8, isMuted: true })).toBe('muted')
-    expect(volumeIconOf({ volume: 0, isMuted: false })).toBe('muted')
-  })
-
-  it('draws one wave when low and two otherwise', () => {
-    expect(volumeIconOf({ volume: 0.3, isMuted: false })).toBe('volumeLow')
-    expect(volumeIconOf({ volume: 0.5, isMuted: false })).toBe('volume')
-  })
-})
+import { steppedVolume, volumeAfterAction, volumeAtY } from '@/layouts/volumeKit'
 
 describe('volumeAtY', () => {
   it('reads the finger down the slider as full at the top and silent at the foot', () => {

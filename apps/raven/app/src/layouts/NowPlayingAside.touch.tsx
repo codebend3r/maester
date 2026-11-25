@@ -44,37 +44,44 @@ const useStyles = themedStyles((colours) =>
   }),
 )
 
-type BookProps = { book: BookControls }
+type BookSkipsProps = { aside: Aside }
 
-/** An audiobook's controls: the chapter before and after, the speed, and the chapters to jump to. */
-const Book = ({ book }: BookProps) => {
+/** An audiobook's own controls, under the transport: the chapter before and after, and the speed. */
+export const BookSkips = ({ aside }: BookSkipsProps) => {
   const styles = useMusicStyles()
-  const { onNextChapter } = book
   return (
-    <View style={styles.section}>
+    aside.kind === NOW_PLAYING_ASIDES.book && (
       <View style={styles.controls}>
         <FormButton
           label={MUSIC_COPY.previousChapter}
-          onPress={book.onPreviousChapter}
+          onPress={aside.book.onPreviousChapter}
           tone={BUTTON_TONES.quiet}
         />
         <FormButton
-          isDisabled={onNextChapter === null}
+          isDisabled={aside.book.onNextChapter === null}
           label={MUSIC_COPY.nextChapter}
-          onPress={() => onNextChapter?.()}
+          onPress={() => aside.book.onNextChapter?.()}
           tone={BUTTON_TONES.quiet}
         />
         <Picker
           icon={APP_ICONS.gauge}
           label={MUSIC_COPY.speed}
-          onChoose={speedChooserOf(book.onSpeed)}
+          onChoose={speedChooserOf(aside.book.onSpeed)}
           options={SPEED_OPTIONS}
-          value={String(book.speed)}
+          value={String(aside.book.speed)}
         />
       </View>
-      <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-        {MUSIC_COPY.chapters}
-      </Text>
+    )
+  )
+}
+
+type ChaptersProps = { book: BookControls }
+
+/** An audiobook's chapters to jump to, the one playing marked. */
+const Chapters = ({ book }: ChaptersProps) => {
+  const styles = useMusicStyles()
+  return (
+    <View style={styles.section}>
       {book.chapters.length === 0 && <Text style={styles.muted}>{MUSIC_COPY.noChapters}</Text>}
       {book.chapters.map((chapter) => (
         <Pressable
@@ -171,19 +178,19 @@ const LyricsBody = ({ lyrics, isWide }: LyricsBodyProps) => {
 
 type NowPlayingAsideProps = {
   aside: Aside
-  /** Whether it stands in its own column beside the player, filling the column's height. */
+  /** Whether it stands in the pane's column beside the player, filling the column's height. */
   isWide: boolean
 }
 
 type BookAsideProps = NowPlayingAsideProps
 
-/** A book's controls, scrolled in their own column on a wide screen. */
+/** A book's chapters, scrolled in their own column on a wide screen. */
 const BookAside = ({ aside, isWide }: BookAsideProps) => {
   const own = useStyles()
   return (
     aside.kind === NOW_PLAYING_ASIDES.book && (
       <ScrollView nestedScrollEnabled style={isWide && own.wideBox}>
-        <Book book={aside.book} />
+        <Chapters book={aside.book} />
       </ScrollView>
     )
   )
@@ -197,9 +204,6 @@ const LyricsAside = ({ aside, isWide }: LyricsAsideProps) => {
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
       <View style={[styles.section, isWide && own.wideBox]}>
-        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-          {MUSIC_COPY.lyrics}
-        </Text>
         <LyricsBody isWide={isWide} lyrics={aside.lyrics} />
       </View>
     )
@@ -216,8 +220,8 @@ const ASIDES = {
 } as const satisfies Record<Aside['kind'], ComponentType<NowPlayingAsideProps>>
 
 /**
- * A book's controls, or the lyrics under a heading: below Now Playing's controls on a phone,
- * in their own column beside the player on a wide screen.
+ * What the pane's second tab holds, a book's chapters or the lyrics: under the tabs on a phone,
+ * filling the pane's column beside the player on a wide screen.
  */
 export const NowPlayingAside = ({ aside, isWide }: NowPlayingAsideProps) => {
   const AsideView = ASIDES[aside.kind]

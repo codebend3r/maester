@@ -58,7 +58,11 @@ const AlbumTrackControls = ({ track }: AlbumTrackControlsProps) => {
 
 type AlbumViewProps = { details: AlbumDetails }
 
-/** The page once its album is known: cover, title, artists and facts, Play and the rest, then the tracks by disc. */
+/*
+ * The page once its album is known: cover, title, artists and facts, then the
+ * actions by what they do (play it now, queue it, keep it, and a manager's
+ * Fix match at the end), then the tracks by disc.
+ */
 const AlbumView = ({ details }: AlbumViewProps) => {
   const titleId = useId()
   const queryClient = useQueryClient()
@@ -112,39 +116,54 @@ const AlbumView = ({ details }: AlbumViewProps) => {
           <p className={styles.facts}>{albumFacts({ album }).join(COMMON_COPY.separator)}</p>
           {details.label !== null && <p className={styles.label}>{details.label}</p>}
           <div className={styles.actions}>
-            <Button
-              tone={BUTTON_TONES.primary}
-              icon="play"
-              disabled={tracks.length === 0}
-              onClick={() => play(0)}
-            >
-              {COMMON_COPY.play}
-            </Button>
-            <Button
-              icon="shuffle"
-              disabled={tracks.length === 0}
-              onClick={() => playTracks({ tracks, source, isShuffled: true })}
-            >
-              {COMMON_COPY.shuffle}
-            </Button>
-            <Button icon="skipNext" disabled={tracks.length === 0} onClick={() => playNext(tracks)}>
-              {ALBUM_COPY.playNext}
-            </Button>
-            <Button icon="plus" disabled={tracks.length === 0} onClick={() => addToQueue(tracks)}>
-              {ALBUM_COPY.addToQueue}
-            </Button>
-            <Button icon="list" disabled={tracks.length === 0} onClick={() => setAdding(true)}>
-              {COMMON_COPY.addToPlaylist}
-            </Button>
-            <StartRadio seed={{ kind: RADIO_SEED_KINDS.album, id: album.id }} title={album.title} />
-            <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
-            {tracks.length > 0 && (
-              <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.album, albumId: album.id }} />
-            )}
-            <AdminOnly>
-              <Button icon="wand" onClick={() => setFixing(true)}>
-                {album.match === MATCH_STATES.unmatched ? ALBUM_COPY.match : COMMON_COPY.fixMatch}
+            <div className={`${styles.group} ${styles.play}`}>
+              <Button
+                tone={BUTTON_TONES.primary}
+                icon="play"
+                disabled={tracks.length === 0}
+                onClick={() => play(0)}
+              >
+                {COMMON_COPY.play}
               </Button>
+              <Button
+                icon="shuffle"
+                disabled={tracks.length === 0}
+                onClick={() => playTracks({ tracks, source, isShuffled: true })}
+              >
+                {COMMON_COPY.shuffle}
+              </Button>
+              <StartRadio
+                seed={{ kind: RADIO_SEED_KINDS.album, id: album.id }}
+                title={album.title}
+              />
+            </div>
+            <div className={`${styles.group} ${styles.queue}`}>
+              <Button
+                icon="skipNext"
+                disabled={tracks.length === 0}
+                onClick={() => playNext(tracks)}
+              >
+                {ALBUM_COPY.playNext}
+              </Button>
+              <Button icon="plus" disabled={tracks.length === 0} onClick={() => addToQueue(tracks)}>
+                {ALBUM_COPY.addToQueue}
+              </Button>
+            </div>
+            <div className={`${styles.group} ${styles.keep}`}>
+              <FavouriteButton isFavourite={details.isFavourite} onToggle={favourite.mutate} />
+              <Button icon="list" disabled={tracks.length === 0} onClick={() => setAdding(true)}>
+                {COMMON_COPY.addToPlaylist}
+              </Button>
+              {tracks.length > 0 && (
+                <DownloadButton target={{ kind: DOWNLOAD_TARGET_KINDS.album, albumId: album.id }} />
+              )}
+            </div>
+            <AdminOnly>
+              <div className={`${styles.group} ${styles.manage}`}>
+                <Button tone={BUTTON_TONES.ghost} icon="wand" onClick={() => setFixing(true)}>
+                  {album.match === MATCH_STATES.unmatched ? ALBUM_COPY.match : COMMON_COPY.fixMatch}
+                </Button>
+              </div>
             </AdminOnly>
           </div>
         </div>

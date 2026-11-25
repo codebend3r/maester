@@ -12,6 +12,7 @@ import {
   ITEM_TYPES,
   CAPTION_PATHS,
   LIBRARY_KINDS,
+  LIVE_STREAM_PATHS,
   MEDIA_TICKET_PARAM,
   NOTIFICATION_PATHS,
   type MediaOrigin,
@@ -243,8 +244,9 @@ export const ROUTES = {
   remoteAccess: { method: GET, path: REMOTE_ACCESS_PATHS.settings, account: owner },
   saveRemoteAccess: { method: PUT, path: REMOTE_ACCESS_PATHS.settings, account: owner },
   remoteAccessEcho: { method: GET, path: REMOTE_ACCESS_PATHS.echo, account: anyone },
-  streams: { method: GET, path: '/api/streams', account: owner },
-  stopStream: { method: POST, path: '/api/streams/:id/stop', account: owner },
+  streams: { method: GET, path: LIVE_STREAM_PATHS.everyone, account: owner },
+  myStreams: { method: GET, path: LIVE_STREAM_PATHS.mine, account: approved },
+  stopStream: { method: POST, path: LIVE_STREAM_PATHS.stop, account: owner },
   watched: { method: PUT, path: '/api/watched', account: approved },
 } as const
 

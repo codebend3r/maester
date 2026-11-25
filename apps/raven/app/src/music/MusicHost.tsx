@@ -9,6 +9,7 @@ import { INPUT_KINDS, type InputKind } from '@/platform/platform'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import type { AppQueries } from '@/queries/useAppQueries'
 import { useDownloads } from '@/stores/downloads'
+import { keepPlayedStream } from '@raven/native/headless'
 
 /** What a music host reads of the active server. */
 type MusicSession = Pick<AppQueries, 'server' | 'api'>
@@ -18,7 +19,8 @@ type NativeAudioHostProps = { session: MusicSession }
 /**
  * Music on an iPhone or iPad, through `@raven/native`'s host over `@raven/audio`: a track
  * downloaded to this device plays from its file, with the cover saved beside it. The plan
- * reads the downloads and the unlock as each track plays, so neither is ever stale.
+ * reads the downloads and the unlock as each track plays, so neither is ever stale, and tells
+ * `usePlayedStreams` what each track plays from as its source is made.
  */
 const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => {
   const plan = useMemo(
@@ -29,6 +31,7 @@ const NativeAudioHost = ({ session: { server, api } }: NativeAudioHostProps) => 
           const { entries, device } = useDownloads.getState()
           return { entries, isUnlocked: unlockNow(server.id), uriOf: device.disk.uriOf }
         },
+        onStream: keepPlayedStream,
       }),
     [server.id],
   )

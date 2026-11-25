@@ -1,0 +1,81 @@
+// The browsing places' row, level with the corner's buttons.
+.bar {
+  grid-area: places;
+  display: grid;
+  min-width: 0;
+}
+
+.places {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.place {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: var(--control-size);
+  min-height: var(--control-size);
+  padding: var(--space-0) var(--space-3);
+  border-radius: var(--radius-pill);
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--color-hover);
+    color: var(--color-bark);
+  }
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+  }
+
+  &[aria-current='page'] {
+    --icon-tint: 0.4;
+
+    background: var(--color-moss);
+    color: var(--color-bark);
+  }
+
+  &[aria-current='page']:hover {
+    background: var(--color-moss-hi);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .place {
+    transition:
+      background-color 150ms ease,
+      color 150ms ease;
+  }
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Down to its icons on a medium screen, as the side menu is.
+@media (max-width: 64rem) {
+  .place {
+    justify-content: center;
+    padding: 0;
+  }
+}
+
+// A phone's tab bar holds these places.
+@media (max-width: 48rem) {
+  .bar {
+    display: none;
+  }
+}

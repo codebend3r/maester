@@ -1,6 +1,6 @@
 # raven authentication database
 
-Supabase Auth and membership approval, owned by raven. This project holds the database; raven's server enforces it. Once raven runs with accounts `ready` (see `apps/raven/README.md`, "Accounts"), every protected route needs an approved account and management is the owner's. rookery and sparrow keep their current sign-in.
+Supabase Auth and membership approval, owned by raven. This project holds the database; raven's server enforces it. Once raven runs with accounts `ready` (see `apps/raven/README.md`, "Accounts"), every protected route needs an approved account and management is the owner's.
 
 ## Local development
 
@@ -52,6 +52,8 @@ A PR never creates a paid project, sends production email or changes the running
 
 4. Export `SUPABASE_PROJECT_REF`, `RAVEN_AUTH_SITE_URL` (the HTTPS raven origin, no trailing slash), `SUPABASE_AUTH_SMTP_HOST`, `SUPABASE_AUTH_SMTP_USER`, `SUPABASE_AUTH_SMTP_PASS` and `SUPABASE_AUTH_SMTP_FROM` in your operator shell. Keep saved secrets under `apps/raven/`, never in a root `.env` or a committed file. Supply the database password securely when the CLI requests it.
 5. Run `bunx nx run @raven/supabase:deploy`. It validates the linked ref and displays a configuration diff before applying database migrations, then prompts before pushing auth configuration. Check that the diff names the production raven origin, not localhost. Database push does not include the seed. The config script renders from the local config in a temporary workdir, replacing the origin, omitting the local signing key path and adding SMTP via environment references. It leaves the checked-in local config untouched.
+   After the first deploy, a merge into main that adds a migration pushes it for you: `.github/workflows/supabase-migrations.yml` links the project and runs `deploy:db`, once the owner approves the run in the `supabase-production` environment, which holds the `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` secrets. It pushes migrations only; the auth config and the Edge Function stay with `deploy`. A merge ships before the next release, so a migration must keep the running clients working.
+
 6. Check the Auth dashboard and real email delivery. Email templates use the configured `SiteURL` plus `/auth/confirm`, not a client-supplied redirect. The handler will call `verifyOtp` with the hash and the email type and immediately strip it from the URL. Recovery and email changes have their own token types. Never log hashes.
 7. Sign up and confirm your owner account. Sign up through raven's own `/sign-up` page (or the Supabase Auth signup API) and confirm the email. Find that account's UUID in Auth, then run the following as the database operator in the SQL editor, replacing the UUID:
 

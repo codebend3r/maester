@@ -8,7 +8,7 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { trackPlanFor } from '@/music/trackPlan'
-import { usePlayedStreams } from '@/stores/playedStreams'
+import { usePlayedStreams } from '@raven/native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 
 const SERVER_ID = 'raven'

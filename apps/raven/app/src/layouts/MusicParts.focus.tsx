@@ -206,16 +206,25 @@ export const ActionPlate = ({
   )
 }
 
+type TogglePlateProps = Omit<ActionPlateProps, 'tone' | 'isOn'> & {
+  /** Whether what it switches is on, which fills it in the primary tone and says it selected. */
+  isOn: boolean
+}
+
+/** A plate that switches something on or off: filled in the primary tone while on, quiet while off. */
+export const TogglePlate = ({ isOn, ...plate }: TogglePlateProps) => (
+  <ActionPlate {...plate} isOn={isOn} tone={isOn ? BUTTON_TONES.primary : BUTTON_TONES.quiet} />
+)
+
 /** A favourite mark on a plate: the heart, filled in the primary tone while it is on. */
 export const FavouriteButton = ({ isFavourite, onToggle }: FavouriteButtonProps) => (
-  <ActionPlate
+  <TogglePlate
     icon={APP_ICONS.heart}
     isOn={isFavourite}
     isPreferred={false}
     label={MUSIC_COPY.favourite}
     onPress={onToggle}
     text={null}
-    tone={isFavourite ? BUTTON_TONES.primary : BUTTON_TONES.quiet}
   />
 )
 

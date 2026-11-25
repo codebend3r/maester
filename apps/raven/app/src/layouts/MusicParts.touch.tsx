@@ -1,4 +1,4 @@
-import { formatDuration } from '@raven/core'
+import { formatDuration, remainingTimeOf } from '@raven/core'
 import { Icon } from '@raven/native'
 import type { IconName } from '@raven/ui/iconDrawings'
 import type { ComponentType, ReactNode } from 'react'
@@ -101,8 +101,9 @@ type SeekBarProps = {
 }
 
 /**
- * Where the track is, as a line to drag along with the time played and the length under it, as
- * the film player's scrubber: the finger's spot shows as it moves and is sought on letting go.
+ * Where the track is, as a line to drag along with the time played under its start and the time
+ * left, with a minus before it, under its end, as the web's scrubber: the finger's spot shows as
+ * it moves and is sought on letting go.
  */
 export const SeekBar = ({ position, duration, onSeek }: SeekBarProps) => {
   const styles = useMusicStyles()
@@ -127,7 +128,7 @@ export const SeekBar = ({ position, duration, onSeek }: SeekBarProps) => {
       </View>
       <View style={styles.seekTimes}>
         <Text style={styles.seekTime}>{formatDuration(shown)}</Text>
-        <Text style={styles.seekTime}>{formatDuration(duration)}</Text>
+        <Text style={styles.seekTime}>{remainingTimeOf({ position: shown, length })}</Text>
       </View>
     </View>
   )

@@ -21,6 +21,18 @@ export const OWNER_SCAN_ERROR = 'The last scan ran into trouble. Only the owner 
 export const isMovieLibrary = (record: LibraryRecord): boolean =>
   matchTypeFor(record.settings.kind) === ITEM_TYPES.movie
 
+type AnsweredSettings = LibraryRecord['settings'] & { pinned: boolean }
+
+/**
+ * A library's settings as they are answered: with `pinned`, which pins left the server for the
+ * account's own (`library_pins`). Every app built before then checks each library for it and
+ * shows no library at all without it, so it stays in the answer, always on, as it was by default.
+ */
+const answeredSettings = (settings: LibraryRecord['settings']): AnsweredSettings => ({
+  ...settings,
+  pinned: true,
+})
+
 type LibraryViewsWithStatusProps = {
   record: LibraryRecord
   canSee: boolean
@@ -51,7 +63,8 @@ export class LibraryViews {
    * the public ones ask the lock, while the guarded ones, and creating a
    * library, pass true, as whoever reaches them sees it all.
    */
-  withStatus({ record, canSee, isAdmin }: LibraryViewsWithStatusProps): Library {
+  withStatus({ record: stored, canSee, isAdmin }: LibraryViewsWithStatusProps): Library {
+    const record = { ...stored, settings: answeredSettings(stored.settings) }
     const scan = this.scanner.status(record.id)
     const ratingsRefresh = this.ratings.status(record.id)
     if (canSee && isAdmin) {

@@ -1,7 +1,27 @@
-import { type Chapter, LYRICS_KINDS, type Lyrics, formatDuration, activeLineAt } from '@raven/core'
+import {
+  type AudioQuality,
+  type Chapter,
+  FACT_PART_KINDS,
+  LYRICS_KINDS,
+  type Lyrics,
+  type QueueRow,
+  REPEAT_MODES,
+  type RepeatMode,
+  activeLineAt,
+  formatDuration,
+  plural,
+  qualityChipsOf,
+  qualityRestOf,
+} from '@raven/core'
+import { type IconName, repeatIconOf } from '@raven/ui/iconDrawings'
 
 import { MUSIC_COPY } from '@/layouts/copy'
-import { type BookControls, NOW_PLAYING_ASIDES, type NowPlayingAside } from '@/layouts/musicKit'
+import {
+  type BookControls,
+  NOW_PLAYING_ASIDES,
+  type NowPlayingAside,
+  type PlayingQuality,
+} from '@/layouts/musicKit'
 
 /** One line of synced lyrics as both layouts draw it, a line with no words as a note. */
 type LyricRow = { key: string; text: string; isCurrent: boolean }
@@ -101,3 +121,54 @@ export const chapterRowsOf = ({ chapters, current }: ChapterRowsOfProps): Chapte
       isCurrent: place === current,
     }
   })
+
+/**
+ * The format and quality of what plays, from the stream the host chose: the format and bit
+ * depth as chips, then the sample rate, the bitrate and Downloaded as one quiet line.
+ */
+export const playingQualityOf = (quality: AudioQuality): PlayingQuality => {
+  const chips = qualityChipsOf(quality)
+  const facts = qualityRestOf(quality)
+  return {
+    chips: chips.map((text) => ({ kind: FACT_PART_KINDS.text, text })),
+    facts: facts.length === 0 ? null : MUSIC_COPY.facts(facts),
+    label: MUSIC_COPY.qualityLabel([...chips, ...facts]),
+  }
+}
+
+/** How much is queued, over Up next: "12 tracks · 53:21". */
+export const queueFactsOf = (queue: readonly QueueRow[]): string =>
+  MUSIC_COPY.facts([
+    plural({ n: queue.length, ...MUSIC_COPY.tracks }),
+    formatDuration(queue.reduce((total, row) => total + (row.track.duration ?? 0), 0)),
+  ])
+
+type QueueLineOfProps = Pick<QueueRow, 'line' | 'length'>
+
+/** What a queue row says under its title: "Radiohead · 4:44". */
+export const queueLineOf = ({ line, length }: QueueLineOfProps): string =>
+  MUSIC_COPY.facts([line, length])
+
+/** How the queue plays, as both layouts' Shuffle and Repeat controls draw it. */
+type PlayModes = {
+  shuffle: { isOn: boolean; label: string }
+  repeat: { isOn: boolean; label: string; icon: IconName }
+}
+
+type PlayModesOfProps = { isShuffled: boolean; repeat: RepeatMode }
+
+/**
+ * Shuffle and Repeat, ready to draw: whether each is on, what it says ("Shuffle on", "Repeat
+ * one"), and Repeat's icon, the loop with a one inside while one track repeats.
+ */
+export const playModesOf = ({ isShuffled, repeat }: PlayModesOfProps): PlayModes => ({
+  shuffle: {
+    isOn: isShuffled,
+    label: isShuffled ? MUSIC_COPY.shuffleOn : MUSIC_COPY.shuffleOff,
+  },
+  repeat: {
+    isOn: repeat !== REPEAT_MODES.off,
+    label: MUSIC_COPY.repeat[repeat],
+    icon: repeatIconOf(repeat),
+  },
+})

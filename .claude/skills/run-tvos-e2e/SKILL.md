@@ -1,12 +1,12 @@
 ---
 name: run-tvos-e2e
 description: >-
-  Use when running the `🏗️ Build Raven Apple TV` and `🎬 E2E Raven Apple TV` CI jobs locally on a Mac, or `app:e2e:tvos`: "run the Apple TV CI locally", "run the tvOS e2e", "run the Siri Remote test", "reproduce the Apple TV build and E2E jobs", "the Apple TV check failed, run it here", "run ci:app:tvos". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
+  Use when running the `🎬 Build Raven Apple TV` and `🎬 E2E Raven Apple TV` CI jobs locally on a Mac, or `app:e2e:tvos`: "run the Apple TV CI locally", "run the tvOS e2e", "run the Siri Remote test", "reproduce the Apple TV build and E2E jobs", "the Apple TV check failed, run it here", "run ci:app:tvos". Covers the one command that runs the whole job, what it installs, its Nx caching, and what appears on screen.
 ---
 
 # Run the Apple TV check locally
 
-The `🏗️ Build Raven Apple TV` and `🎬 E2E Raven Apple TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flow in `native-checks.yml` alone, on main; CI builds on one runner and runs the flow on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🎬 Build Raven Apple TV` and `🎬 E2E Raven Apple TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flow in `native-checks.yml` alone, on main; CI builds on one runner and runs the flow on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:app:tvos

@@ -1,9 +1,9 @@
 import {
   NO_LYRICS,
+  type Track,
   artistNames,
   chapterAt,
   nextChapterStart,
-  playTimeOf,
   previousChapterStart,
   queueRowsOf,
 } from '@raven/core'
@@ -13,17 +13,34 @@ import {
   useAudioQueue,
   useAudiobookChapters,
   usePlayerPrefs,
+  useTrackFavourite,
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import { useState } from 'react'
 
-import { NowPlayingLayout } from '@/layouts'
+import { FavouriteButton, NowPlayingLayout } from '@/layouts'
+import { MUSIC_COPY } from '@/layouts/copy'
 import type { BookControls } from '@/layouts/musicKit'
-import { chapterRowsOf, nowPlayingAsideOf } from '@/layouts/musicRows'
+import { chapterRowsOf, nowPlayingAsideOf, queueFactsOf } from '@/layouts/musicRows'
 import { trackCoverOf } from '@/music/musicCards'
+import { usePlayingQuality } from '@/music/usePlayingQuality'
 import { usePlaylistAdd } from '@/music/usePlaylistAdd'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
+
+type TrackHeartProps = {
+  session: Pick<AppQueries, 'api' | 'queries'>
+  track: Track
+  /** Told when the server refuses the mark, so the page can say so. */
+  onFailure: () => void
+}
+
+/** The playing track's heart: filled for a favourite, and pressing it marks or unmarks one. */
+const TrackHeart = ({ session: { api, queries }, track, onFailure }: TrackHeartProps) => {
+  const { isLiked, onToggle } = useTrackFavourite({ api, queries, track, onFailure })
+  return <FavouriteButton isFavourite={isLiked} onToggle={onToggle} />
+}
 
 type NowPlayingPageProps = { session: AppQueries }
 
@@ -53,6 +70,9 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
   // A book has chapters in place of lyrics, so its words are never looked for.
   const lyrics = useQuery(queries.lyricsQuery(track === null || isAudiobook ? null : track.id))
   const { playlists, addToPlaylist, note } = usePlaylistAdd({ session })
+  const [heartNote, setHeartNote] = useState<string | null>(null)
+  const quality = usePlayingQuality({ track })
+  const rows = queueRowsOf({ queue, tracks })
   const cover =
     track === null || pictures === null
       ? null
@@ -79,9 +99,19 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
     <NowPlayingLayout
       aside={nowPlayingAsideOf({ book, lyrics: shownLyrics, at: position })}
       error={error}
+      heart={
+        track !== null && (
+          <TrackHeart
+            key={track.id}
+            onFailure={() => setHeartNote(MUSIC_COPY.favouriteFailed)}
+            session={session}
+            track={track}
+          />
+        )
+      }
       isPlaying={state === AUDIO_STATES.playing || state === AUDIO_STATES.loading}
       isShuffled={queue.isShuffled}
-      note={note}
+      note={note ?? heartNote}
       onAddToPlaylist={(pick) => {
         if (track !== null) addToPlaylist({ pick, tracks: [track] })
       }}
@@ -96,19 +126,22 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
       onShuffle={toggleShuffle}
       onToggle={toggle}
       playlists={playlists}
-      queue={queueRowsOf({ queue, tracks })}
+      quality={quality}
+      queue={rows}
+      queueFacts={queueFactsOf(rows)}
       repeat={queue.repeat}
       duration={duration}
       position={position}
-      time={playTimeOf({ position, duration })}
       track={playing}
     />
   )
 }
 
 /**
- * `/now-playing`: the cover large, the controls, the lyrics or an audiobook's chapters and
- * speed, and the queue, each track playable or removable.
+ * `/now-playing`: the cover large, the track with its heart and Add to playlist and the format
+ * and quality of what plays, the transport, and a pane of two tabs: the queue under its
+ * shuffle, repeat and Clear, each track playable or removable, and the lyrics or an
+ * audiobook's chapters.
  */
 export const NowPlaying = () => {
   const session = useAppQueries()

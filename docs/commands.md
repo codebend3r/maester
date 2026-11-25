@@ -66,7 +66,6 @@ Run a product locally; each reads the .env beside its compose file.
 | `build:wren:web`       | Builds Wren on the web, as Netlify does.                                                                                         |        |
 | `dev:sparrow`          | sparrow's API and chat page.                                                                                                     |        |
 | `sandbox:sparrow`      | sparrow's sandbox for testing its answers.                                                                                       |        |
-| `dev:rookery`          | rookery's sign-in server and its login pages.                                                                                    |        |
 
 ## raven device app
 
@@ -120,16 +119,16 @@ Each runs one CI job from pull-request-checks.yml on this machine.
 | Command                           | What it does                                                                                            | Needs                       |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------- |
 | `ci:docker`                       | The ✅ Checks job inside an Ubuntu 24.04 container.                                                     | Docker                      |
-| `ci:app:ios`                      | The 🏗️ Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.            | macOS + Xcode               |
+| `ci:app:ios`                      | The 🎬 Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.            | macOS + Xcode               |
 | `ci:app:ios:tools`                | Its tools: Homebrew's, Maestro and the iOS simulator runtime.                                           | macOS + Xcode               |
 | `ci:app:ios:simulator`            | Boots the raven-phone iPhone simulator, making it when there is none.                                   | macOS + Xcode               |
 | `ci:app:ios:build`                | The fixture's Release build for the iPhone simulator.                                                   | macOS + Xcode               |
 | `ci:app:ios:pods`                 | Checks the build's pod install finished.                                                                | macOS + Xcode               |
 | `ci:app:ios:install`              | Installs the build on the iPhone simulator.                                                             | macOS + Xcode               |
 | `ci:app:ios:e2e`                  | The touch Maestro flows on the iPhone simulator.                                                        | macOS + Xcode               |
-| `ci:app:tvos`                     | The 🏗️ Build Raven Apple TV job and its end to end job.                                                 | macOS + Xcode               |
+| `ci:app:tvos`                     | The 🎬 Build Raven Apple TV job and its end to end job.                                                 | macOS + Xcode               |
 | `ci:app:tvos:build`               | The Apple TV job's Release build for the simulator, with a brief log.                                   | macOS + Xcode               |
-| `ci:app:android-tv`               | The 🏗️ Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order. | Android SDK                 |
+| `ci:app:android-tv`               | The 🎬 Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order. | Android SDK                 |
 | `ci:app:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                    | Android SDK                 |
 | `ci:app:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                                             | Android SDK                 |
 | `ci:app:android-tv:build`         | The fixture's Release APK for the emulator.                                                             | Android SDK                 |

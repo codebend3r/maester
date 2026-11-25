@@ -11,7 +11,7 @@ import {
 import { useEffect, useEffectEvent, useMemo } from 'react'
 import { Platform } from 'react-native'
 
-import { SERVER_FILE_PLAN, type TrackPlan, audioItemOf } from '@/music/audioItem'
+import { type TrackPlan, audioItemOf } from '@/music/audioItem'
 import { type CarBrowse, NO_CAR_BROWSE } from '@/music/carBrowse'
 import { nativePlayerOf } from '@/music/nativePlayer'
 import { watchAppHide } from '@/player/watchAppHide'
@@ -32,8 +32,8 @@ type UseNativeAudioHostProps = {
    * as a track is, so nothing watches the network before music plays.
    */
   sourcesFor: (server: AppServer) => Pick<MediaSources, 'trackSource'>
-  /** What a track plays from before the server's file; the file alone when the app downloads nothing. */
-  plan?: TrackPlan
+  /** What a track plays from before the server's file, and who is told which it was. */
+  plan: TrackPlan
   /** Answers CarPlay and Android Auto; the device app, with no car, answers nothing. */
   car?: CarBrowse
 }
@@ -49,7 +49,7 @@ export const useNativeAudioHost = ({
   api,
   server,
   sourcesFor,
-  plan = SERVER_FILE_PLAN,
+  plan,
   car = NO_CAR_BROWSE,
 }: UseNativeAudioHostProps): void => {
   const engine = useAudioQueue((store) => store.engine)

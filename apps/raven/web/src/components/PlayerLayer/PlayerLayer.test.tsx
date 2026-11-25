@@ -59,9 +59,7 @@ describe('PlayerLayer', () => {
     const [playing] = audioElements()
     expect(playing).toBeDefined()
 
-    const raven = screen.getByRole('navigation', { name: 'Main' })
-    fireEvent.pointerEnter(await within(raven).findByRole('button', { name: 'Browse' }))
-    const places = await screen.findByRole('list', { name: 'Browse' })
+    const places = await screen.findByRole('navigation', { name: 'Browse' })
     fireEvent.click(within(places).getByRole('link', { name: 'Music' }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Music' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull()

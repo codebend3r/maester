@@ -2,15 +2,13 @@ import {
   type ArtistCredit,
   CROSSFADE_SECONDS,
   type CrossfadeSeconds,
-  LYRICS_KINDS,
+  type FactPart,
   type PlaylistSummary,
-  REPEAT_MODES,
   type RepeatMode,
   type AlbumDisc,
   type PlaylistTrack,
   type QueueRow,
 } from '@raven/core'
-import type { IconName } from '@raven/ui/iconDrawings'
 import { AUDIOBOOK_SPEEDS, type AudiobookSpeed } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
 
@@ -63,14 +61,6 @@ export const crossfadeChooserOf =
     const seconds = CROSSFADE_SECONDS.find((each) => String(each) === key)
     if (seconds !== undefined) onCrossfade(seconds)
   }
-
-/** The repeat plate's icon: the loop, with a one inside while one track repeats. */
-export const repeatIconOf = (repeat: RepeatMode): IconName =>
-  repeat === REPEAT_MODES.one ? 'repeatOne' : 'repeat'
-
-/** What the shuffle button says: "Shuffle on" or "Shuffle off". */
-export const shuffleLabelOf = (isShuffled: boolean): string =>
-  isShuffled ? MUSIC_COPY.shuffleOn : MUSIC_COPY.shuffleOff
 
 /** What Play or Pause says: what a press does now. */
 export const toggleLabelOf = (isPlaying: boolean): string =>
@@ -130,8 +120,10 @@ export type NowPlayingLayoutProps = {
   /** The track playing, or null when nothing is. */
   track: PlayingTrack | null
   error: string | null
-  /** "1:02 / 4:44". */
-  time: string
+  /** The format and quality of what plays, or null until its source is made. */
+  quality: PlayingQuality | null
+  /** The playing track's favourite mark, drawn beside its name; nothing while nothing plays. */
+  heart: ReactNode
   /** Where the track is, in seconds, for the seek bar. */
   position: number
   /** How long the track is, in seconds, or null until the player knows. */
@@ -141,6 +133,8 @@ export type NowPlayingLayoutProps = {
   isShuffled: boolean
   repeat: RepeatMode
   queue: QueueRow[]
+  /** How much is queued: "12 tracks · 53:21". */
+  queueFacts: string
   onToggle: () => void
   onPrevious: () => void
   onNext: () => void
@@ -149,7 +143,7 @@ export type NowPlayingLayoutProps = {
   onClear: () => void
   onJump: (place: number) => void
   onRemove: (place: number) => void
-  /** What sits below the controls: a book's controls, the lyrics, or nothing yet. */
+  /** What the pane's second tab holds: a book's controls, the lyrics, or nothing yet. */
   aside: NowPlayingAside
   playlists: readonly PlaylistChoice[]
   /** Adds the playing track to the playlist picked. */
@@ -158,7 +152,24 @@ export type NowPlayingLayoutProps = {
   onBack: () => void
 }
 
-/** What Now Playing draws below the controls. */
+/**
+ * The format and quality of what plays, as every layout draws it: the chips (the format, then
+ * a lossless file's bit depth), the rest as one quiet line, and the whole as one sentence.
+ */
+export type PlayingQuality = {
+  chips: FactPart[]
+  /** "44.1 kHz · 912 kbps · Downloaded", or null when the chips say it all. */
+  facts: string | null
+  /** "Playing in FLAC, 16-bit, 44.1 kHz, 912 kbps." */
+  label: string
+}
+
+/** The two tabs of Now Playing's pane: the queue, and the lyrics or a book's chapters. */
+export const PLAYING_PANES = { queue: 'queue', extras: 'extras' } as const
+
+export type PlayingPane = (typeof PLAYING_PANES)[keyof typeof PLAYING_PANES]
+
+/** What the pane's second tab holds. */
 export const NOW_PLAYING_ASIDES = { book: 'book', lyrics: 'lyrics', none: 'none' } as const
 
 /**
@@ -170,13 +181,21 @@ export type NowPlayingAside =
   | { kind: typeof NOW_PLAYING_ASIDES.lyrics; lyrics: LyricsView }
   | { kind: typeof NOW_PLAYING_ASIDES.none }
 
-/**
- * Whether Now Playing puts the player dead centre, with no column beside it: only once the
- * lyrics are known and there are none. A book's controls stand beside it, and while the lyrics
- * are still being read the columns stand, so the player never jumps.
- */
-export const isCentredFor = (aside: NowPlayingAside): boolean =>
-  aside.kind === NOW_PLAYING_ASIDES.lyrics && aside.lyrics.kind === LYRICS_KINDS.none
+/** What the pane's second tab is called: Chapters for a book, Lyrics for anything else. */
+const EXTRAS_LABELS = {
+  [NOW_PLAYING_ASIDES.book]: MUSIC_COPY.chapters,
+  [NOW_PLAYING_ASIDES.lyrics]: MUSIC_COPY.lyrics,
+  [NOW_PLAYING_ASIDES.none]: MUSIC_COPY.lyrics,
+} as const satisfies Record<NowPlayingAside['kind'], string>
+
+/** One of the pane's tabs: the pane it shows, and what it is called. */
+type PaneTab = { pane: PlayingPane; label: string }
+
+/** The pane's two tabs in their order: Up next, then the lyrics or a book's chapters. */
+export const paneTabsOf = (aside: NowPlayingAside): readonly PaneTab[] => [
+  { pane: PLAYING_PANES.queue, label: MUSIC_COPY.upNext },
+  { pane: PLAYING_PANES.extras, label: EXTRAS_LABELS[aside.kind] },
+]
 
 /** What Now Playing offers an audiobook: its chapters, a press between them, and its speed. */
 export type BookControls = {
@@ -221,6 +240,8 @@ export type NowPlayingStripProps = {
   cover: Picture | null
   isPlaying: boolean
   onOpen: () => void
+  /** The format and quality of what plays, drawn where there is room: a tablet's strip and a TV's. */
+  quality: PlayingQuality | null
   onToggle: () => void
   onNext: () => void
   /** Stops the music and empties the queue, which takes the strip away; the touch strip's X. */

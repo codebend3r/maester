@@ -1,6 +1,7 @@
 import { type Chapter, formatDuration, chapterAt } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType } from 'react'
+import { PANE_COPY } from '@/lib/nowPlayingPanes'
 import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
 import styles from '@/pages/NowPlayingPage/ChaptersPanel.module.scss'
 
@@ -18,7 +19,7 @@ const ChapterList = ({ chapters }: ChapterListProps) => {
   const current = useAudioQueue((store) => chapterAt({ chapters, at: store.position }))
   const seekTo = useAudioQueue((store) => store.seekTo)
   return (
-    <ol className={styles.chapters} aria-label={NOW_PLAYING_COPY.chapters}>
+    <ol className={styles.chapters} aria-label={PANE_COPY.chapters}>
       {chapters.map((chapter, index) => (
         <li key={chapter.start}>
           <button

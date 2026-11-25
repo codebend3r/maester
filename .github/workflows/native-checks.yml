@@ -8,6 +8,8 @@ name: 🧱 Native checks
 # a group the pull request never built) fails its end to end job, saying so. An end to end failure
 # shows here, after the merge, and emails the pusher, as any failed run on main does.
 # The device apps' screen tests (`test:screens`) run here too, and on no pull request.
+# A "Release vX.Y.Z" commit (the version-bump skill) runs none of it: it changes only versions,
+# its own pull request builds nothing to test, and the merge before it already ran the flows.
 #
 # Every job is listed here: no workflow is called and no job is a matrix row. A pull request
 # selects nothing and builds every group; the selection here picks the flows a push runs. What a
@@ -40,6 +42,7 @@ jobs:
   # commit hold its builds. The action says how it decides.
   select:
     name: 🔎 Select affected native checks
+    if: &not-a-release ${{ !startsWith(github.event.head_commit.message, 'Release v') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -418,6 +421,7 @@ jobs:
   # restores it from the cache when neither changed.
   web-e2e:
     name: 🌐 E2E Raven web
+    if: *not-a-release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -460,6 +464,7 @@ jobs:
   # changed.
   screen-tests:
     name: 📸 Screen tests
+    if: *not-a-release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

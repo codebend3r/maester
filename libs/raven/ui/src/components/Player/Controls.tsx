@@ -1,7 +1,7 @@
 import { formatDuration } from '@raven/core'
 import { type ComponentPropsWithRef, type ReactNode, type RefObject, useId, useState } from 'react'
 import { Icon } from '@/components/Icon/Icon'
-import type { IconName } from '@/components/Icon/drawings'
+import { type IconName, volumeIconOf } from '@/components/Icon/drawings'
 import { CountdownRing } from '@/components/Player/CountdownRing'
 import styles from '@/components/Player/Controls.module.scss'
 import { CONTROLS_COPY } from '@/components/Player/copy'
@@ -9,13 +9,6 @@ import { MENU_SECTIONS, MENU_TITLES, type MenuSection } from '@/components/Playe
 import { Scrubber } from '@/components/Player/Scrubber'
 import { FIXED_VOLUME_NOTE } from '@/lib/fixedVolume'
 import { classNames } from '@/lib/classNames'
-
-type VolumeIconProps = { volume: number; muted: boolean }
-
-const volumeIcon = ({ volume, muted }: VolumeIconProps): IconName => {
-  if (muted || volume === 0) return 'muted'
-  return volume < 0.5 ? 'volumeLow' : 'volume'
-}
 
 type MuteLabelProps = { isVolumeFixed: boolean; muted: boolean }
 
@@ -308,7 +301,7 @@ export const Controls = ({
           onClick={onToggleMute}
           disabled={isVolumeFixed}
         >
-          <Icon name={volumeIcon({ volume, muted })} size={22} />
+          <Icon name={volumeIconOf({ volume, isMuted: muted })} size={22} />
         </ControlButton>
         <input
           className={styles.volumeSlider}

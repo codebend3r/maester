@@ -1,4 +1,8 @@
 import { REPEAT_MODES } from '@raven/core'
+import { COMMON_COPY } from '@/lib/copy'
+
+type QueueFacts = { count: number; length: string }
+
 export const NOW_PLAYING_COPY = {
   moveUp: 'Move up',
   removeFromQueue: 'Remove from queue',
@@ -7,17 +11,15 @@ export const NOW_PLAYING_COPY = {
   position: 'Position',
   shuffleOn: 'Shuffle on',
   shuffleOff: 'Shuffle off',
-  previousTrack: 'Previous track',
-  nextTrack: 'Next track',
-  repeatOne: '1',
   clear: 'Clear',
   queue: 'Queue',
+  panes: 'Up next and lyrics',
+  queueFacts: ({ count, length }: QueueFacts) =>
+    [COMMON_COPY.tracks(count), length].join(COMMON_COPY.separator),
   previousChapter: 'Previous chapter',
   nextChapter: 'Next chapter',
   speed: 'Speed',
   speedOption: (speed: number) => `${speed}×`,
-  chapters: 'Chapters',
-  lyrics: 'Lyrics',
   instrumental: '♪',
   noLyrics: 'No lyrics for this track.',
   findingLyrics: 'Looking for lyrics…',

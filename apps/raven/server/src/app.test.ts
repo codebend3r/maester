@@ -234,6 +234,14 @@ describe('the media server', () => {
       })
     })
 
+    it('still says each library is pinned, which an app from before account pins will not list it without', async () => {
+      const [listed] = await api().listLibraries()
+      expect(listed).toMatchObject({ settings: { pinned: true } })
+      expect(await api().getLibrary(library.id)).toMatchObject({
+        settings: { pinned: true },
+      })
+    })
+
     it('compresses a listing for a browser that takes it, and sends it plain to one that does not', async () => {
       const url = `/api/libraries/${library.id}/media`
       const [packed, plain] = await Promise.all([
@@ -352,6 +360,7 @@ describe('the media server', () => {
       it("starts a library with progress saved, watched at 95%, of no particular type and wearing its type's icon", async () => {
         expect((await api().getLibrary(library.id)).settings).toEqual({
           saveProgress: true,
+          pinned: true,
           inHero: true,
           sort: 'year-new',
           view: 'grid',
@@ -432,6 +441,7 @@ describe('the media server', () => {
         const updated = await putLibrary({ inHero: false })
         expect(updated.settings).toEqual({
           saveProgress: true,
+          pinned: true,
           inHero: false,
           sort: 'title',
           view: 'grid',

@@ -1,9 +1,10 @@
 import { LYRICS_KINDS } from '@raven/core'
-import type { ComponentType } from 'react'
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
+import { type ComponentRef, type ComponentType, useRef } from 'react'
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { BUTTON_TONES } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
+import { useOpeningFocus } from '@/layouts/focus'
 import { MUSIC_COPY } from '@/layouts/copy'
 import {
   type BookControls,
@@ -18,6 +19,7 @@ import { focusPicker } from '@/layouts/Picker.focus'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { useLineInView } from '@/layouts/useLineInView'
 import { LINE_RATIO } from '@/layouts/textHeights'
+import { useLastFocus } from '@/stores/lastFocus'
 import { TV_SIZES } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
@@ -26,9 +28,9 @@ const { Picker } = focusPicker
 
 /**
  * How much of the screen's height the synced lyrics' box takes, so the line sung keeps to the
- * middle of it beside the cover and the controls.
+ * middle of it under the pane's tabs.
  */
-const LYRICS_SHARE = 0.72
+const LYRICS_SHARE = 0.64
 
 /** How large the lyrics are drawn: beside the player, or large once the remote has opened them. */
 export const LYRIC_SIZES = { normal: 'normal', large: 'large' } as const
@@ -54,54 +56,72 @@ const useStyles = themedStyles((colours) =>
       lineHeight: LYRIC_POINTS.large * LINE_RATIO,
     },
     lyricOn: { color: colours.text },
+    fill: { flex: 1 },
+    // The lyrics as one plate the remote reaches from the tabs, ringed while it has them.
+    lyricsPlate: {
+      flex: 1,
+      borderRadius: TV_SIZES.radius,
+      borderWidth: TV_SIZES.tvFocusRing,
+      borderColor: 'transparent',
+      padding: TV_SIZES.space4,
+    },
+    lyricsFocused: { borderColor: colours.text, backgroundColor: colours.raised },
   }),
 )
 
-type BookProps = { book: BookControls }
+type BookSkipsProps = { aside: Aside }
 
 /**
- * An audiobook's controls on a TV, a band below the player's: the chapter before and after and
- * the speed's list, then the chapters to move down through and play from.
+ * An audiobook's own controls on a TV, a band under the transport: the chapter before and
+ * after, and the speed's list. The last chapter has none after it, so it draws no Next.
  */
-const Book = ({ book }: BookProps) => {
+export const BookSkips = ({ aside }: BookSkipsProps) => {
   const styles = useMusicStyles()
-  const { onNextChapter } = book
   return (
-    <>
+    aside.kind === NOW_PLAYING_ASIDES.book && (
       <FocusBand>
         <View style={styles.actions}>
           <ActionPlate
             icon={APP_ICONS.rewind}
             isPreferred={false}
             label={MUSIC_COPY.previousChapter}
-            onPress={book.onPreviousChapter}
-            text={MUSIC_COPY.previousChapter}
+            onPress={aside.book.onPreviousChapter}
+            text={null}
             tone={BUTTON_TONES.quiet}
           />
-          {onNextChapter !== null && (
+          {aside.book.onNextChapter !== null && (
             <ActionPlate
               icon={APP_ICONS.forward}
               isPreferred={false}
               label={MUSIC_COPY.nextChapter}
-              onPress={onNextChapter}
-              text={MUSIC_COPY.nextChapter}
+              onPress={aside.book.onNextChapter}
+              text={null}
               tone={BUTTON_TONES.quiet}
             />
           )}
           <Picker
             icon={APP_ICONS.gauge}
             label={MUSIC_COPY.speed}
-            onChoose={speedChooserOf(book.onSpeed)}
+            onChoose={speedChooserOf(aside.book.onSpeed)}
             options={SPEED_OPTIONS}
-            value={String(book.speed)}
+            value={String(aside.book.speed)}
           />
         </View>
       </FocusBand>
+    )
+  )
+}
+
+type ChaptersProps = { book: BookControls }
+
+/** An audiobook's chapters, to move down through and play from, scrolled in the pane. */
+const Chapters = ({ book }: ChaptersProps) => {
+  const styles = useMusicStyles()
+  const own = useStyles()
+  return (
+    <ScrollView style={own.fill}>
       <FocusBand>
         <View style={styles.section}>
-          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-            {MUSIC_COPY.chapters}
-          </Text>
           {book.chapters.length === 0 && <Text style={styles.muted}>{MUSIC_COPY.noChapters}</Text>}
           {book.chapters.map((chapter) => (
             <FocusRow
@@ -118,7 +138,7 @@ const Book = ({ book }: BookProps) => {
           ))}
         </View>
       </FocusBand>
-    </>
+    </ScrollView>
   )
 }
 
@@ -194,25 +214,54 @@ const LyricsBody = ({ lyrics, size }: LyricsBodyProps) => {
   return <Body lyrics={lyrics} size={size} />
 }
 
-type NowPlayingAsideProps = { aside: Aside; size: LyricSize }
+type NowPlayingAsideProps = {
+  aside: Aside
+  /** How large the lyrics are drawn; a select on their plate switches between the two. */
+  size: LyricSize
+  onLyricSize: () => void
+}
 
 type BookAsideProps = NowPlayingAsideProps
 
+/** A book's chapters stand in the pane as they are; the remote moves down through them. */
 const BookAside = ({ aside }: BookAsideProps) =>
-  aside.kind === NOW_PLAYING_ASIDES.book && <Book book={aside.book} />
+  aside.kind === NOW_PLAYING_ASIDES.book && <Chapters book={aside.book} />
 
 type LyricsAsideProps = NowPlayingAsideProps
 
-const LyricsAside = ({ aside, size }: LyricsAsideProps) => {
+/*
+ * The lyrics as one plate the remote reaches with Down from the tabs: ringed while it has the
+ * focus, a select makes them large and the player small, another select puts them back. Its
+ * band fills the column, since a band sized by its content gives the plate's `flex: 1` no
+ * height, and Android, which clips a view's children to it, then draws no lyrics at all.
+ */
+const LyricsAside = ({ aside, size, onLyricSize }: LyricsAsideProps) => {
+  const view = useRef<ComponentRef<typeof Pressable>>(null)
+  const { settle } = useOpeningFocus()
+  const note = useLastFocus((state) => state.note)
   const styles = useMusicStyles()
+  const own = useStyles()
+  const isLarge = size === LYRIC_SIZES.large
   return (
     aside.kind === NOW_PLAYING_ASIDES.lyrics && (
-      <View style={styles.section}>
-        <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-          {MUSIC_COPY.lyrics}
-        </Text>
-        <LyricsBody lyrics={aside.lyrics} size={size} />
-      </View>
+      <FocusBand isFilling>
+        <Pressable
+          ref={view}
+          accessibilityLabel={isLarge ? MUSIC_COPY.lyricsShrink : MUSIC_COPY.lyricsEnlarge}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: isLarge }}
+          onFocus={() => {
+            note(view.current)
+            settle()
+          }}
+          onPress={onLyricSize}
+          style={({ focused }) => [own.lyricsPlate, focused && own.lyricsFocused]}
+        >
+          <View style={styles.section}>
+            <LyricsBody lyrics={aside.lyrics} size={size} />
+          </View>
+        </Pressable>
+      </FocusBand>
     )
   )
 }
@@ -226,8 +275,11 @@ const ASIDES = {
   [NOW_PLAYING_ASIDES.none]: NoAside,
 } as const satisfies Record<Aside['kind'], ComponentType<NowPlayingAsideProps>>
 
-/** What stands fixed beside Now Playing's column on a TV: a book's controls, or the lyrics under a heading. */
-export const NowPlayingAside = ({ aside, size }: NowPlayingAsideProps) => {
+/**
+ * What the pane's second tab holds on a TV: a book's chapters, or the lyrics on their plate,
+ * which a select makes large or puts back.
+ */
+export const NowPlayingAside = ({ aside, size, onLyricSize }: NowPlayingAsideProps) => {
   const AsideView = ASIDES[aside.kind]
-  return <AsideView aside={aside} size={size} />
+  return <AsideView aside={aside} onLyricSize={onLyricSize} size={size} />
 }

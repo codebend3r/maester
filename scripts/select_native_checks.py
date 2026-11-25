@@ -7,6 +7,8 @@ from pathlib import Path
 
 GROUPS = ("app", "music", "desktop")
 SHARED_FILES = {"nx.json", "package.json", "bun.lock", "tsconfig.base.json"}
+# The subject of a version-bump commit, whose run skips every job and so tests nothing.
+RELEASE_SUBJECT = "Release v"
 
 
 def output(*command: str) -> str:
@@ -17,6 +19,9 @@ def successful_base(runs: list[dict], head: str) -> str | None:
     for run in runs:
         sha = run["head_sha"]
         if sha == head:
+            continue
+        # A release run is green without running a flow, so it vouches for nothing before it.
+        if ((run.get("head_commit") or {}).get("message") or "").startswith(RELEASE_SUBJECT):
             continue
         if (
             subprocess.run(

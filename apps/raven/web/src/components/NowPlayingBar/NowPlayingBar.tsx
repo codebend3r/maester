@@ -1,15 +1,20 @@
 import { artistNames, formatDuration, type Track } from '@raven/core'
-import { BUTTON_TONES, Button } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink } from '@raven/ui'
 import { AUDIO_STATES, hasPlayingTrackOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { AudioQualityLine } from '@/components/AudioQualityLine/AudioQualityLine'
 import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
+import { TrackHeart } from '@/components/TrackHeart/TrackHeart'
+import { Transport } from '@/components/Transport/Transport'
+import { VolumeControl } from '@/components/VolumeControl/VolumeControl'
+import { PANE_COPY, PANES, paneLink } from '@/lib/nowPlayingPanes'
+import { useAudioQuality } from '@/lib/useAudioQuality'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/NowPlayingBar/NowPlayingBar.module.scss'
-import { COMMON_COPY } from '@/lib/copy'
 
 type PlayingStripProps = { track: Track }
 
@@ -18,65 +23,57 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
   const position = useAudioQueue((store) => store.position)
   const duration = useAudioQueue((store) => store.duration)
   const error = useAudioQueue((store) => store.error)
-  const clear = useAudioQueue((store) => store.clear)
-  const toggle = useAudioQueue((store) => store.toggle)
-  const skipNext = useAudioQueue((store) => store.next)
-  const skipPrevious = useAudioQueue((store) => store.previous)
   const links = useMusicLinks()
   const seekTo = useAudioQueue((store) => store.seekTo)
+  const quality = useAudioQuality({ track })
   const [hoverFraction, setHoverFraction] = useState<number | null>(null)
   const length = duration ?? track.duration ?? 0
-  const isPlaying = state === AUDIO_STATES.playing || state === AUDIO_STATES.loading
   const fraction = length > 0 ? Math.min(position / length, 1) : 0
   return (
     <section className={styles.bar} aria-label={NOW_PLAYING_BAR_COPY.miniPlayer}>
-      <Link
-        to={links.nowPlaying}
-        className={styles.cover}
-        aria-label={NOW_PLAYING_BAR_COPY.nowPlaying}
-      >
-        <AlbumCover
-          album={{
-            id: track.albumId,
-            title: track.album.title,
-            coverVersion: track.album.coverVersion,
-          }}
-          sizes={POSTER_SIZES.bar}
-        />
-      </Link>
-      <Link to={links.nowPlaying} className={styles.words}>
-        <span className={styles.title}>{track.title}</span>
-        <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>
-        <span className={styles.time}>
-          {formatDuration(position)} / {formatDuration(duration ?? track.duration)}
-        </span>
-      </Link>
-      <div className={styles.controls}>
-        <Equalizer isPlaying={state === AUDIO_STATES.playing} />
-        <Button
+      <div className={styles.track}>
+        <Link
+          to={links.nowPlaying}
+          className={styles.cover}
+          aria-label={NOW_PLAYING_BAR_COPY.nowPlaying}
+        >
+          <AlbumCover
+            album={{
+              id: track.albumId,
+              title: track.album.title,
+              coverVersion: track.album.coverVersion,
+            }}
+            sizes={POSTER_SIZES.bar}
+          />
+        </Link>
+        <Link to={links.nowPlaying} className={styles.words}>
+          <span className={styles.title}>{track.title}</span>
+          <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>
+          <span className={styles.time}>
+            {formatDuration(position)} / {formatDuration(duration ?? track.duration)}
+          </span>
+        </Link>
+        <div className={styles.liked}>
+          <Equalizer isPlaying={state === AUDIO_STATES.playing} />
+          <TrackHeart track={track} />
+        </div>
+      </div>
+      <Transport className={styles.controls} />
+      <div className={styles.more}>
+        {quality !== null && <AudioQualityLine quality={quality} className={styles.quality} />}
+        <ButtonLink
           tone={BUTTON_TONES.ghost}
-          icon="skipPrevious"
-          aria-label={NOW_PLAYING_BAR_COPY.previousTrack}
-          onClick={skipPrevious}
+          icon="list"
+          to={paneLink({ nowPlaying: links.nowPlaying, pane: PANES.queue })}
+          aria-label={PANE_COPY.upNext}
         />
-        <Button
+        <ButtonLink
           tone={BUTTON_TONES.ghost}
-          icon={isPlaying ? 'pause' : 'play'}
-          aria-label={isPlaying ? COMMON_COPY.pause : COMMON_COPY.play}
-          onClick={toggle}
+          icon="captions"
+          to={paneLink({ nowPlaying: links.nowPlaying, pane: PANES.extras })}
+          aria-label={PANE_COPY.lyrics}
         />
-        <Button
-          tone={BUTTON_TONES.ghost}
-          icon="skipNext"
-          aria-label={NOW_PLAYING_BAR_COPY.nextTrack}
-          onClick={skipNext}
-        />
-        <Button
-          tone={BUTTON_TONES.ghost}
-          icon="close"
-          aria-label={NOW_PLAYING_BAR_COPY.close}
-          onClick={clear}
-        />
+        <VolumeControl className={styles.volume} />
       </div>
       <div className={styles.progress}>
         <span
@@ -119,10 +116,13 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
 }
 
 /**
- * The strip under the page while music plays: the cover, the title and
- * artists (a link to Now Playing), previous, play or pause and next, and a
- * thin line of how far through the track it is. Gone when nothing is
- * queued, and on Now Playing itself, which has the controls large.
+ * The strip under the page while music plays, in three parts: the cover, the title and artists
+ * (a link to Now Playing) and the track's heart; previous, play or pause and next; then, on a
+ * wide window, the format and quality it plays in, Up next and Lyrics, which open Now Playing on
+ * that tab, and the volume. A thin line over it shows how far through the track it is. A narrow
+ * window keeps the first two parts. It never stops the
+ * music: Clear, over the queue, does. Gone when nothing is queued, and on Now Playing itself,
+ * which has the controls large.
  */
 export const NowPlayingBar = () => {
   const track = useAudioQueue(playingTrackOf)
