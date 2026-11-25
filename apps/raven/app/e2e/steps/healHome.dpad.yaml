@@ -3,7 +3,8 @@ name: Leave Home as the fixture had it, nothing in progress and no show on Binge
 # A flow that fails part way can leave the film or the first episode with a saved spot, or the show
 # on the binge list, and every flow after it would then find Home, the show library and the show's
 # page changed. So each flow heals both here first, and reopens the app after a heal, so Home
-# opens as it does on a clean install, with the remote on the hero's Play.
+# opens as it does on a clean install, with the remote on the hero's Play. The show's library is
+# reached through Libraries, so Back from it lands there, and Back again on Home.
 ---
 - extendedWaitUntil:
     visible: Home
@@ -19,10 +20,9 @@ name: Leave Home as the fixture had it, nothing in progress and no show on Binge
       visible: 'S\d\dE\d\d · .*'
     commands:
       - runFlow:
-          file: menuRow.dpad.yaml
+          file: openLibrary.dpad.yaml
           env:
-            ROW: Series
-      - pressKey: Remote Dpad Center
+            LIBRARY: Series
       - extendedWaitUntil:
           visible:
             text: Lantern Bay.*
@@ -41,6 +41,12 @@ name: Leave Home as the fixture had it, nothing in progress and no show on Binge
             - extendedWaitUntil:
                 visible: Show In progress
                 timeout: 30000
+      - pressKey: Back
+      - extendedWaitUntil:
+          visible:
+            text: Series
+            focused: true
+          timeout: 30000
       - pressKey: Back
       - runFlow:
           file: openShow.dpad.yaml

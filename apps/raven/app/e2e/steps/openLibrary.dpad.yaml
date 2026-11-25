@@ -1,0 +1,29 @@
+appId: io.github.codebend3r.raven.app
+name: From Home, open the library named LIBRARY through Libraries in the side menu
+# The side menu lists only the account's pins, and the fixture's accountless sign-in pins
+# nothing, so a library is reached through Libraries, whose cards stack every library in the
+# server's order (Films, Music, Series) with the remote on the first. Back from the library
+# lands on its card there, and Back again on Home.
+---
+- runFlow:
+    file: menuRow.dpad.yaml
+    env:
+      ROW: Libraries
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible:
+      text: Films
+      focused: true
+    timeout: 30000
+- repeat:
+    while:
+      notVisible:
+        text: ${LIBRARY}
+        focused: true
+    times: 4
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: ${LIBRARY}
+    focused: true
+- pressKey: Remote Dpad Center

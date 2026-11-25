@@ -336,6 +336,8 @@ jobs:
   # Every flow the remote drives (`e2e:android-tv`, all but the touch ones), which first point the
   # emulator's 127.0.0.1:8490 at the runner's with `adb reverse`, so the app signs in to the address
   # the iPhone uses. The phone's touch flows need a phone emulator of their own, so it has none yet.
+  # The flows drive the device ANDROID_SERIAL names and no other: the runner's one emulator takes
+  # adb's first serial.
   e2e-android-tv:
     name: 🎬 E2E Raven Android TV
     needs: select
@@ -353,6 +355,7 @@ jobs:
       APP_DRIVER: maestro
       APP_FLOWS: bun run app:e2e:android-tv
       APP_LOGS: raven-app-android-tv-e2e-logs
+      ANDROID_SERIAL: emulator-5554
     steps: *e2e-steps
 
   # Every flow in `apps/wren/wren-app/e2e`: open on Home, play the fixture's album, and download it,

@@ -7,7 +7,9 @@ name: Open the fixture server on a clean install
     clearState: true
     clearKeychain: true
 # Home is ready once its shelves are drawn. The hero rotates through the titles, so a title's
-# name says nothing of the shelves.
+# name says nothing of the shelves. On a TV a show left on Binge by a flow that failed part way
+# stands first as a card that pushes the shelves below the screen, so its episode line (S01E01
+# with its name, which no shelf card writes) says Home is drawn too, and healHome takes it off.
 - extendedWaitUntil:
-    visible: Films
+    visible: 'Films|S\d\dE\d\d · .*'
     timeout: 60000

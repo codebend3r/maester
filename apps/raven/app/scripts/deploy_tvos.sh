@@ -66,7 +66,7 @@ xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release
   DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic build -quiet
 
 say "Waiting for the Apple TV ($UDID)"
-until xcrun devicectl list devices 2>/dev/null | grep "$UDID" | grep -qE 'available|connected'; do
+until xcrun devicectl list devices 2>/dev/null | grep "$UDID" | grep -qwE 'available|connected'; do
   sleep 10
 done
 

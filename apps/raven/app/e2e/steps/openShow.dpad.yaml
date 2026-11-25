@@ -1,14 +1,13 @@
 appId: io.github.codebend3r.raven.app
-name: From Home, open the show named SHOW through the Series row of the side menu, onto its page
+name: From Home, open the show named SHOW through the Series library, onto its page
 # The show library opens on its grid, the remote on its toolbar or its first card, and Right along
 # the cards reaches the show. Its page opens with the remote on the episode it plays next, or on
-# Resume while one is part way through.
+# Resume while one is part way through. Back from the library lands on Libraries, not Home.
 ---
 - runFlow:
-    file: menuRow.dpad.yaml
+    file: openLibrary.dpad.yaml
     env:
-      ROW: Series
-- pressKey: Remote Dpad Center
+      LIBRARY: Series
 - extendedWaitUntil:
     visible: ${SHOW}
     timeout: 30000

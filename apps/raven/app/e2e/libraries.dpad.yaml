@@ -1,34 +1,13 @@
 appId: io.github.codebend3r.raven.app
-name: A movie library, a show library and a music library each open from the side menu on a TV
+name: A movie library, a show library and a music library each open from Libraries on a TV
 tags:
   - dpad
 ---
 - runFlow: signIn.yaml
 - runFlow: steps/healHome.dpad.yaml
-# A pinned movie library opens on its grid, its name over the cards, the film among them.
-- runFlow:
-    file: steps/menuRow.dpad.yaml
-    env:
-      ROW: Films
-- pressKey: Remote Dpad Center
-- extendedWaitUntil:
-    visible: Kestrel Point
-    timeout: 30000
-- assertVisible: Sort
-- pressKey: Back
-# A pinned show library opens on its shows.
-- runFlow:
-    file: steps/menuRow.dpad.yaml
-    env:
-      ROW: Series
-- pressKey: Remote Dpad Center
-- extendedWaitUntil:
-    visible: Lantern Bay
-    timeout: 30000
-- pressKey: Back
-# The music library is not pinned, so it is reached through Libraries, whose cards stack every
-# library in the server's order with the remote on the first, Films; Down is Music. It opens
-# on its albums.
+# The side menu lists only pins, and the fixture's accountless sign-in has none, so every library
+# is reached through Libraries, whose cards stack every library in the server's order with the
+# remote on the first, Films; Down is Music, then Series. Back from a library lands on its card.
 - runFlow:
     file: steps/menuRow.dpad.yaml
     env:
@@ -41,13 +20,64 @@ tags:
     timeout: 30000
 # The summary counts the videos too: "3 libraries · 4 videos".
 - assertVisible: 3 libraries · .*
-- pressKey: Remote Dpad Down
+# A movie library opens on its grid, its name over the cards, the film among them.
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Kestrel Point
+    timeout: 30000
+- assertVisible: Sort
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Films
+      focused: true
+    timeout: 30000
+# A music library opens on its albums. A press made while Libraries is still taking the focus
+# back is lost, so Down repeats until the card has it.
+- repeat:
+    while:
+      notVisible:
+        text: Music
+        focused: true
+    times: 3
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: Music
+    focused: true
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
     visible: Morning Chorus
     timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Music
+      focused: true
+    timeout: 30000
+# A show library opens on its shows.
+- repeat:
+    while:
+      notVisible:
+        text: Series
+        focused: true
+    times: 3
+    commands:
+      - pressKey: Remote Dpad Down
+- assertVisible:
+    text: Series
+    focused: true
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Lantern Bay
+    timeout: 30000
 # Back to Libraries, which lists Films too, so Home is known by its hero.
 - pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Series
+      focused: true
+    timeout: 30000
 - pressKey: Back
 - extendedWaitUntil:
     visible: Play Kestrel Point
