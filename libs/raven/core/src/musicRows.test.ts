@@ -5,10 +5,10 @@ import { EMPTY_QUEUE, startQueue } from '@/queue'
 import {
   albumDiscsOf,
   albumFactsOf,
-  playTimeOf,
   playlistFactsOf,
   playlistTracksOf,
   queueRowsOf,
+  remainingTimeOf,
 } from '@/musicRows'
 import { track } from '@/test/fixtures'
 
@@ -131,9 +131,9 @@ describe('queueRowsOf', () => {
   })
 })
 
-describe('playTimeOf', () => {
-  it('says how far the track has played and how long it is', () => {
-    expect(playTimeOf({ position: 62, duration: 284 })).toBe('1:02 / 4:44')
-    expect(playTimeOf({ position: 0, duration: null })).toBe('0:00 / 0:00')
+describe('remainingTimeOf', () => {
+  it('says how long is left, and never less than none', () => {
+    expect(remainingTimeOf({ position: 196, length: 265 })).toBe('-1:09')
+    expect(remainingTimeOf({ position: 300, length: 265 })).toBe('-0:00')
   })
 })

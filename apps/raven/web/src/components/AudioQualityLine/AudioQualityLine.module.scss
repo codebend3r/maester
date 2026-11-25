@@ -1,0 +1,30 @@
+/*
+ * The chips as wide as they are, then the words in what is left: a narrow
+ * container cuts the words short and never the chips.
+ */
+.line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'chips rest';
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.chips {
+  grid-area: chips;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-0);
+}
+
+.rest {
+  grid-area: rest;
+  overflow: hidden;
+  color: var(--color-lichen);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

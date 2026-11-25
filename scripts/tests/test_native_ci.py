@@ -9,6 +9,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github/workflows"
+# Every job main's run starts with, so a "Release vX.Y.Z" commit runs none of them.
+NOT_A_RELEASE = "${{ !startsWith(github.event.head_commit.message, 'Release v') }}"
 ACTIONS = ROOT / ".github/actions"
 PULL_REQUEST = "pull-request-checks.yml"
 MAIN = "native-checks.yml"
@@ -38,8 +40,8 @@ E2E_NAMES = {
     "android-tv": "🎬 E2E Raven Android TV",
     "wren-iphone": "🎵 E2E Wren iPhone",
 }
-# Each group's build job emoji: Wren's jobs wear its musical note.
-BUILD_EMOJI = {"app": "🏗️", "music": "🎵"}
+# Each group's build job emoji: raven's jobs wear the clapperboard, Wren's its musical note.
+BUILD_EMOJI = {"app": "🎬", "music": "🎵"}
 # Each job that builds for a group when the plan says to, and the group.
 BUILD_JOBS = {
     **{f"build-{device}": group for device, (_, group, _) in DEVICES.items()},
@@ -247,12 +249,12 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
     # The web's browser suite runs here too, on every push, and Nx restores an unchanged pass.
     web = workflow["jobs"]["web-e2e"]
     assert "needs" not in web
-    assert "if" not in web
+    assert web["if"] == NOT_A_RELEASE
     assert any("-t e2e:browser" in step.get("run", "") for step in web["steps"])
     # The device apps' screen tests run here alone, on every push, never on a pull request.
     screens = workflow["jobs"]["screen-tests"]
     assert "needs" not in screens
-    assert "if" not in screens
+    assert screens["if"] == NOT_A_RELEASE
     assert any("-t test:screens" in step.get("run", "") for step in screens["steps"])
     assert all(check["target"] != "test:screens" for check in standard_checks())
     # The selection looks its last green run up under this workflow's file name.
@@ -261,7 +263,8 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
 
 def test_native_jobs_select_and_plan_their_groups_once():
     select = load_workflow(MAIN)["jobs"]["select"]
-    assert "if" not in select
+    # The end to end jobs need it, so a release commit skips them with it.
+    assert select["if"] == NOT_A_RELEASE
     # The run's commit (GITHUB_SHA), which the script diffs, with the history to do so.
     checkout = select["steps"][0]
     assert checkout["uses"] == "actions/checkout@v7"

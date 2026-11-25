@@ -59,6 +59,22 @@ describe('MusicShell', () => {
     expect(namesOf(tabs())).toEqual(['Home', 'Library', 'Search', 'raven'])
   })
 
+  it("shows raven's browsing places along the top, Music marked on every music page", () => {
+    renderShell('/music/albums/7')
+    const browse = screen.getByRole('navigation', { name: 'Browse' })
+    expect(namesOf(browse)).toEqual([
+      'Continue watching',
+      'Binge',
+      'Coming soon',
+      'Favourites',
+      'Music',
+    ])
+    expect(within(browse).getByRole('link', { name: 'Music' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
   it('marks Library on an album of the library, and goes back to raven', () => {
     renderShell('/music/albums/7')
     expect(within(side()).getByRole('link', { name: 'Library' })).toHaveAttribute(

@@ -23,7 +23,7 @@
     "test:functions": "deno test --config functions/signup-alert/deno.json functions/signup-alert",
     "deploy": "bun run --sequential deploy:check deploy:db deploy:config deploy:functions",
     "deploy:check": "bash scripts/production.sh diff",
-    "deploy:db": "supabase db push --workdir ..",
+    "deploy:db": "supabase db push --remote --workdir ..",
     "deploy:config": "bash scripts/production.sh push",
     "deploy:functions": "supabase functions deploy signup-alert --use-api --workdir ..",
     "format": "oxfmt .",
@@ -57,6 +57,7 @@
       "check:functions",
       "test:functions",
       "deploy",
+      "deploy:db",
       "format",
       "format:check"
     ],

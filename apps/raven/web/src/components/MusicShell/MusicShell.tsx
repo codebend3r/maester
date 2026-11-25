@@ -2,6 +2,7 @@ import { Icon, classNames } from '@raven/ui'
 import { Link, useLocation } from 'react-router-dom'
 import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
+import { BrowseBar } from '@/components/AppShell/BrowseBar'
 import { FollowServer } from '@/components/AppShell/FollowServer'
 import { useIsCurrent } from '@/components/AppShell/currentPage'
 import { HOME } from '@/components/BackButton/BackButton'
@@ -76,7 +77,8 @@ const PlaceLink = ({ place }: PlaceLinkProps) => {
 /**
  * The music mode's frame, over the same player as raven's own: a side menu
  * of Home, Library, Search and, in Raven, Downloads, with Back to raven at
- * its foot; the theme and account buttons over the page; and on a phone a
+ * its foot; over the page, raven's row of browsing places (Music marked)
+ * level with the theme and account buttons; and on a phone a
  * tab bar along the foot of the screen in the side menu's place. While
  * Raven cannot reach its server, only Downloads and the way back stay.
  */
@@ -114,9 +116,12 @@ export const MusicShell = () => {
         </Link>
       </nav>
       <main className={styles.main}>
-        <div className={styles.corner}>
-          <ThemePicker />
-          {!isOffline && <AccountMenu />}
+        <div className={styles.bar}>
+          {!isOffline && <BrowseBar hasMusic />}
+          <div className={styles.corner}>
+            <ThemePicker />
+            {!isOffline && <AccountMenu />}
+          </div>
         </div>
         <div className={styles.page}>
           <ShellOutlet pageKey={key} />

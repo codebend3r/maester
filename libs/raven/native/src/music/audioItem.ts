@@ -34,13 +34,7 @@ export type TrackPlan = {
   /** The bitrate the listener chose for this network (a transcode on cellular), or null for none. */
   streamKbps: () => Promise<AudioBitrate | null>
   /** Told what each track plays from as its source is made, for a player that shows it. */
-  onStream?: (props: OnStreamProps) => void
-}
-
-/** A device that downloads nothing and always streams the file itself: the device app. */
-export const SERVER_FILE_PLAN: TrackPlan = {
-  downloadedOf: () => null,
-  streamKbps: async () => null,
+  onStream: (props: OnStreamProps) => void
 }
 
 type AudioItemOfProps = {
@@ -76,7 +70,7 @@ export const audioItemOf = async ({
   }
   const downloaded = plan.downloadedOf(track)
   if (downloaded !== null) {
-    plan.onStream?.({
+    plan.onStream({
       track,
       stream: { kind: TRACK_STREAM_KINDS.download, kbps: downloaded.kbps },
     })
@@ -94,7 +88,7 @@ export const audioItemOf = async ({
   const kbps = (await plan.streamKbps()) ?? (canDecode ? null : AUDIO_BITRATES.standard)
   const outcome = await server.sources.trackSource({ mediaId: track.id, kbps })
   if (!outcome.ok) throw new Error(outcome.message)
-  plan.onStream?.({
+  plan.onStream({
     track,
     stream:
       kbps === null

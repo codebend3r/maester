@@ -3,7 +3,7 @@
   position: relative;
   display: grid;
   gap: var(--space-2);
-  max-block-size: 22rem;
+  max-block-size: var(--pane-block);
   overflow-y: auto;
   list-style: none;
   padding: var(--space-4) var(--space-2);
@@ -31,7 +31,7 @@
 }
 
 .plain {
-  max-block-size: 22rem;
+  max-block-size: var(--pane-block);
   overflow-y: auto;
   padding: var(--space-2);
   border-radius: var(--radius-md);

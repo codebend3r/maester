@@ -3,6 +3,7 @@ import { LYRICS_KINDS, type LyricLine, type Lyrics, activeLineAt } from '@raven/
 import { useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType } from 'react'
 import { lyricsQuery } from '@/lib/queries'
+import { PANE_COPY } from '@/lib/nowPlayingPanes'
 import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
 import styles from '@/pages/NowPlayingPage/LyricsPanel.module.scss'
 
@@ -26,7 +27,7 @@ type SyncedLinesProps = { lines: readonly LyricLine[] }
 const SyncedLines = ({ lines }: SyncedLinesProps) => {
   const active = useAudioQueue((store) => activeLineAt({ lines, at: store.position }))
   return (
-    <ol className={styles.synced} aria-label={NOW_PLAYING_COPY.lyrics}>
+    <ol className={styles.synced} aria-label={PANE_COPY.lyrics}>
       {lines.map((line, index) => (
         <li
           // A song repeats lines, so a line is known by its time and words.
@@ -55,7 +56,7 @@ const PlainLyrics = ({ lyrics }: PlainLyricsProps) =>
   lyrics.kind === LYRICS_KINDS.plain && (
     // A scrolling region a keyboard can reach.
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-    <section className={styles.plain} tabIndex={0} aria-label={NOW_PLAYING_COPY.lyrics}>
+    <section className={styles.plain} tabIndex={0} aria-label={PANE_COPY.lyrics}>
       {lyrics.text}
     </section>
   )

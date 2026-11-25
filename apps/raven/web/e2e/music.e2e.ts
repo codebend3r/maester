@@ -3,14 +3,18 @@ import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
+import { PANE_COPY } from '@/lib/nowPlayingPanes'
 import { ALBUM_COPY } from '@/pages/AlbumPage/copy'
+import { NOW_PLAYING_COPY } from '@/pages/NowPlayingPage/copy'
 import { openFromBrowse } from '@/e2e/shell'
 
 const { album } = FIXTURE_SERVER
 const [firstTrack] = album.tracks
 
 test.describe('Music', () => {
-  test('plays a track from its album under the mini-player, and stops', async ({ page }) => {
+  test('plays a track from its album under the mini-player, and clears the queue from Up next', async ({
+    page,
+  }) => {
     await page.goto('/')
     await openFromBrowse({ page, name: APP_SHELL_COPY.music })
     await page.getByRole('link', { name: album.title, exact: true }).click()
@@ -32,7 +36,9 @@ test.describe('Music', () => {
       )
       .toBeGreaterThan(1)
 
-    await bar.getByRole('button', { name: NOW_PLAYING_BAR_COPY.close }).click()
-    await expect(bar).toHaveCount(0)
+    await bar.getByRole('link', { name: PANE_COPY.upNext }).click()
+    await expect(page.getByRole('list', { name: NOW_PLAYING_COPY.queue })).toBeVisible()
+    await page.getByRole('button', { name: NOW_PLAYING_COPY.clear }).click()
+    await expect(page.getByText(NOW_PLAYING_COPY.empty)).toBeVisible()
   })
 })

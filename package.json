@@ -82,7 +82,6 @@
     "dev:raven:prod": "RAVEN_DEV_API_ORIGIN=https://raven.maester.tv nx run-many -t dev -p @raven/ui @raven/web",
     "dev:raven:splash": "nx run @raven/splash:dev",
     "dev:raven:vhagar": "RAVEN_DEV_API_ORIGIN=https://192-168-50-6.vhagar2.direct.quickconnect.to nx run-many -t dev -p @raven/ui @raven/web",
-    "dev:rookery": "nx run-many -t dev -p @rookery/server @rookery/web",
     "dev:sparrow": "nx run-many -t dev -p @sparrow/api @sparrow/web",
     "dev:wren:web": "nx run-many -t dev -p @raven/server @raven/music-web",
     "e2e": "bun run --sequential web:e2e ci:desktop:e2e ci:app:ios ci:wren ci:app:tvos ci:app:android-tv ci:app:android",

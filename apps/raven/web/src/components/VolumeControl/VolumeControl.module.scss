@@ -1,0 +1,17 @@
+// The speaker, then the slider filling what room its container gives.
+.volume {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.range {
+  inline-size: 100%;
+  accent-color: var(--color-lichen);
+
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 2px;
+  }
+}

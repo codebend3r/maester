@@ -1,19 +1,32 @@
 /*
- * Along the foot of the page, glass over it, clear of a phone's tab bar:
- * the cover, the words, the controls, and a hairline of progress on top.
+ * Along the foot of the page, glass over it, clear of a phone's tab bar, in
+ * three parts: the track, the transport in the middle, then the queue, the
+ * lyrics and the volume. A hairline of progress runs along the top.
  */
 .bar {
   display: grid;
-  grid-template-columns: var(--control-size-tall) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-areas:
     'progress progress progress'
-    'cover words controls';
+    'track controls more';
   align-items: center;
   gap: var(--space-1) var(--space-3);
   padding: 0 var(--space-3) var(--space-1);
   border-top: 1px solid var(--color-line);
   background: var(--color-night-haze);
   backdrop-filter: var(--filter-glass);
+}
+
+// The cover, the words as wide as they need, and the heart straight after them.
+.track {
+  grid-area: track;
+  display: grid;
+  grid-template-columns: var(--control-size-tall) minmax(0, auto) auto;
+  grid-template-areas: 'cover words liked';
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .cover {
@@ -65,25 +78,56 @@
   font-variant-numeric: tabular-nums;
 }
 
+// The equalizer and the track's heart, at the end of its words.
+.liked {
+  grid-area: liked;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .controls {
   grid-area: controls;
   display: grid;
   grid-auto-flow: column;
-  gap: var(--space-0);
+  gap: var(--space-1);
   align-items: center;
 }
 
-@media (max-width: 30rem) {
+// Up next, Lyrics and the volume, against the bar's far edge.
+.more {
+  grid-area: more;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: end;
+  align-items: center;
+  gap: var(--space-0);
+}
+
+.volume {
+  inline-size: 9rem;
+}
+
+// Under 64rem the third part has room for its controls alone.
+@media (max-width: 64rem) {
+  .more .quality {
+    display: none;
+  }
+}
+
+// A narrow window keeps the track and the transport.
+@media (max-width: 48rem) {
   .bar {
-    grid-template-columns: var(--control-size-tall) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'progress progress'
-      'cover words'
-      'controls controls';
+      'track controls';
   }
 
-  .controls {
-    justify-self: end;
+  .liked,
+  .more {
+    display: none;
   }
 }
 

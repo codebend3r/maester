@@ -8,13 +8,15 @@ import {
 import { useToasts } from '@raven/ui'
 import {
   type QueryClient,
+  queryOptions,
+  skipToken,
   useQuery,
   useQueryClient,
   type UseQueryResult,
 } from '@tanstack/react-query'
 import { askMain, readMain } from '@/desktop/client'
 import { DESKTOP_QUERY_KEYS } from '@/desktop/queryKeys'
-import type { DownloadsChange } from '@/downloads/host'
+import type { DownloadsChange, DownloadsHost } from '@/downloads/host'
 import { useDownloadsHost } from '@/stores/downloadsHost'
 import { useDownloadSpeeds } from '@/stores/downloadSpeeds'
 
@@ -23,23 +25,31 @@ const NO_SPACE = 'Raven could not read its disk space.'
 
 export type DownloadsData = { downloads: DownloadView[]; shouldAutoDelete: boolean }
 
-/** The downloads the host keeps, and whether a new one starts out deleting once watched. */
-export const useDownloads = (): UseQueryResult<DownloadsData> => {
-  const host = useDownloadsHost()
-  return useQuery({
+/** The read of the downloads `host` keeps; it asks nothing where there is no host. */
+export const downloadsQueryOf = (host: DownloadsHost | null) =>
+  queryOptions({
     queryKey: DESKTOP_QUERY_KEYS.downloads,
-    queryFn: async () => {
-      const reply = await readMain({
-        client: host,
-        request: { type: DESKTOP_REQUESTS.listDownloads },
-        fallback: NO_DOWNLOADS,
-      })
-      useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
-      return { downloads: reply.downloads, shouldAutoDelete: reply.shouldAutoDeleteByDefault }
-    },
+    queryFn:
+      host === null
+        ? skipToken
+        : async (): Promise<DownloadsData> => {
+            const reply = await readMain({
+              client: host,
+              request: { type: DESKTOP_REQUESTS.listDownloads },
+              fallback: NO_DOWNLOADS,
+            })
+            useDownloadSpeeds.getState().observe({ downloads: reply.downloads, now: Date.now() })
+            return {
+              downloads: reply.downloads,
+              shouldAutoDelete: reply.shouldAutoDeleteByDefault,
+            }
+          },
     retry: false,
   })
-}
+
+/** The downloads the host keeps, and whether a new one starts out deleting once watched. */
+export const useDownloads = (): UseQueryResult<DownloadsData> =>
+  useQuery(downloadsQueryOf(useDownloadsHost()))
 
 type ListChange = {
   queryClient: QueryClient

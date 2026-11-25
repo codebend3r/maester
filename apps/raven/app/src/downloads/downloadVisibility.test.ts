@@ -75,6 +75,7 @@ describe('the downloads as the players read them', () => {
     const plan = trackPlanFor({
       serverId: DOWNLOADS_SERVER_ID,
       read: () => ({ entries, isUnlocked: false, uriOf: (path) => `file:///${path}` }),
+      onStream: () => undefined,
     })
     expect(plan.downloadedOf(AIRBAG)).toEqual({
       uri: `file:///downloads/raven/${AIRBAG.id}/media.flac`,
@@ -95,6 +96,7 @@ describe('the downloads as the players read them', () => {
       trackPlanFor({
         serverId: DOWNLOADS_SERVER_ID,
         read: () => ({ entries: vaulted, isUnlocked, uriOf: (path) => `file:///${path}` }),
+        onStream: () => undefined,
       })
     expect(planOf(false).downloadedOf(AIRBAG)).toBeNull()
     expect(planOf(true).downloadedOf(AIRBAG)).not.toBeNull()

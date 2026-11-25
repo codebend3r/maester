@@ -1,22 +1,22 @@
-import { REPEAT_MODES } from '@raven/core'
-import type { ComponentType } from 'react'
+import type { IconName } from '@raven/ui/iconDrawings'
+import { type ComponentType, useState } from 'react'
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Chip } from '@/layouts/Chip.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
 import {
-  type NowPlayingAside as Aside,
   type NowPlayingLayoutProps,
+  PLAYING_PANES,
   PLAYING_STATES,
+  type PlayingPane,
   type PlayingState,
-  isCentredFor,
+  paneTabsOf,
   playingStateOf,
-  repeatIconOf,
-  shuffleLabelOf,
   toggleLabelOf,
 } from '@/layouts/musicKit'
-import { NowPlayingAside } from '@/layouts/NowPlayingAside.touch'
+import { playModesOf, queueLineOf } from '@/layouts/musicRows'
+import { BookSkips, NowPlayingAside } from '@/layouts/NowPlayingAside.touch'
 import {
   IconPlate,
   ListEntry,
@@ -26,6 +26,7 @@ import {
 } from '@/layouts/MusicParts.touch'
 import { PlayingCover } from '@/layouts/PlayingCover.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
+import { TouchQualityLine } from '@/layouts/QualityLine'
 import { isTablet } from '@/layouts/screenSizes'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { TouchNav } from '@/layouts/TouchNav'
@@ -33,41 +34,26 @@ import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
 
-/**
- * How much of the screen the cover takes in each layout, as the TV sizes it: beside the lyrics,
- * large and centred for a track with no lyrics, and across a phone.
- */
-const COVER_SHARES = { columns: 0.36, centred: 0.5 } as const
+/** How much of a wide screen the cover takes, beside the pane. */
+const COVER_SHARE = 0.36
 
 /** The most a cover stands, so it never crowds the controls under it. */
-const COVER_MOST = { columns: 420, centred: 560, stacked: 360 } as const
+const COVER_MOST = { columns: 420, stacked: 360 } as const
 
-/** Which of the three layouts Now Playing takes. */
-const PLAYING_LAYOUTS = { columns: 'columns', centred: 'centred', stacked: 'stacked' } as const
+/** Which of the two layouts Now Playing takes. */
+const PLAYING_LAYOUTS = { columns: 'columns', stacked: 'stacked' } as const
 
 type PlayingLayout = (typeof PLAYING_LAYOUTS)[keyof typeof PLAYING_LAYOUTS]
 
-type LayoutOfProps = { aside: Aside; isWide: boolean }
+/** On a wide screen the pane stands beside the player; a phone stacks it under. */
+const layoutOf = (isWide: boolean): PlayingLayout =>
+  isWide ? PLAYING_LAYOUTS.columns : PLAYING_LAYOUTS.stacked
 
-/**
- * As the TV lays it out: on a wide screen the lyrics or a book's controls stand beside the
- * player, and a track with no lyrics puts the player dead centre; a phone stacks it all.
- */
-const layoutOf = ({ aside, isWide }: LayoutOfProps): PlayingLayout => {
-  if (!isWide) return PLAYING_LAYOUTS.stacked
-  return isCentredFor(aside) ? PLAYING_LAYOUTS.centred : PLAYING_LAYOUTS.columns
-}
+type CoverSizeOfProps = { layout: PlayingLayout; width: number }
 
-type CoverSizeOfProps = { layout: PlayingLayout; width: number; height: number }
-
-const coverSizeOf = ({ layout, width, height }: CoverSizeOfProps): number => {
+const coverSizeOf = ({ layout, width }: CoverSizeOfProps): number => {
   const sizes = {
-    [PLAYING_LAYOUTS.columns]: Math.min(width * COVER_SHARES.columns, COVER_MOST.columns),
-    [PLAYING_LAYOUTS.centred]: Math.min(
-      width * COVER_SHARES.centred,
-      height * COVER_SHARES.centred,
-      COVER_MOST.centred,
-    ),
+    [PLAYING_LAYOUTS.columns]: Math.min(width * COVER_SHARE, COVER_MOST.columns),
     [PLAYING_LAYOUTS.stacked]: Math.min(width - SIZES.space4 * 2, COVER_MOST.stacked),
   } as const satisfies Record<PlayingLayout, number>
   return Math.round(sizes[layout])
@@ -76,53 +62,54 @@ const coverSizeOf = ({ layout, width, height }: CoverSizeOfProps): number => {
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     trackTitle: { color: colours.text, fontSize: SIZES.textLg, fontWeight: '600' },
-    queueHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    // What plays on the left, the lyrics or a book's controls taking the rest of the width.
+    // The track's name with its own actions beside it: the heart and Add to playlist.
+    heading: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
+    words: { flex: 1, gap: SIZES.space1 },
+    transport: { flexDirection: 'row', justifyContent: 'center', gap: SIZES.space4 },
+    tabs: { flexDirection: 'row', gap: SIZES.space2 },
+    queueHead: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
+    queueFacts: { flex: 1 },
+    // What plays on the left, the pane taking the rest of the width.
     columns: { flex: 1, flexDirection: 'row', gap: SIZES.space8, paddingHorizontal: SIZES.space6 },
     left: { flexGrow: 0 },
     leftPage: { gap: SIZES.space5, paddingBottom: SIZES.space8 },
     right: { flex: 1, paddingBottom: SIZES.space4 },
+    fill: { flex: 1 },
     player: { gap: SIZES.space3 },
-    words: { gap: SIZES.space1 },
-    controls: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space2 },
     centred: { alignItems: 'center' },
-    centredText: { textAlign: 'center' },
-    centredControls: { justifyContent: 'center' },
   }),
 )
 
-type PlayerProps = NowPlayingLayoutProps & { size: number; isCentred: boolean }
+type PlayerProps = NowPlayingLayoutProps & { size: number }
 
 /**
- * What plays, as on the TV: the cover with the equalizer over it, its words under it, the seek
- * bar, always, then the controls as icons only: Previous, Play or Pause and Next, then Shuffle,
- * Repeat and Add to playlist.
+ * What plays, in groups: the cover with the equalizer over it; the track's name with its heart
+ * and Add to playlist beside it, and its format and quality under it; the seek bar, always;
+ * then Previous, Play or Pause and Next alone in their row, and under them a book's own skips.
  */
 const Player = ({
   track,
   error,
+  quality,
+  heart,
   position,
   duration,
   onSeek,
   isPlaying,
-  isShuffled,
-  repeat,
   onToggle,
   onPrevious,
   onNext,
-  onShuffle,
-  onRepeat,
+  aside,
   playlists,
   onAddToPlaylist,
   note,
   size,
-  isCentred,
 }: PlayerProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
   return (
     track !== null && (
-      <View style={[own.player, { width: size }, isCentred && own.centred]}>
+      <View style={[own.player, { width: size }]}>
         <PlayingCover
           cover={track.cover}
           isPlaying={isPlaying}
@@ -131,24 +118,37 @@ const Player = ({
           size={size}
           title={track.title}
         />
-        <View style={[own.words, isCentred && own.centred]}>
-          <Text
-            variant={TEXT_VARIANTS.display}
-            numberOfLines={2}
-            style={[own.trackTitle, isCentred && own.centredText]}
-          >
-            {track.title}
-          </Text>
-          <Text numberOfLines={1} style={[styles.muted, isCentred && own.centredText]}>
-            {track.artists}
-          </Text>
-          <Text numberOfLines={1} style={[styles.muted, isCentred && own.centredText]}>
-            {track.album}
-          </Text>
-          {error !== null && <Text style={styles.error}>{error}</Text>}
+        <View style={own.heading}>
+          <View style={own.words}>
+            <Text variant={TEXT_VARIANTS.display} numberOfLines={2} style={own.trackTitle}>
+              {track.title}
+            </Text>
+            <Text numberOfLines={1} style={styles.muted}>
+              {track.artists}
+            </Text>
+            <Text numberOfLines={1} style={styles.muted}>
+              {track.album}
+            </Text>
+          </View>
+          {heart}
+          <IconPlate
+            icon={APP_ICONS.list}
+            isOn={false}
+            label={MUSIC_COPY.addToPlaylist}
+            onPress={() =>
+              openAddToPlaylistSheet({
+                title: MUSIC_COPY.addTrackToPlaylist(track.title),
+                playlists,
+                onPick: onAddToPlaylist,
+              })
+            }
+          />
         </View>
+        {quality !== null && <TouchQualityLine quality={quality} />}
+        {error !== null && <Text style={styles.error}>{error}</Text>}
+        {note !== null && <Text style={styles.muted}>{note}</Text>}
         <SeekBar duration={duration} onSeek={onSeek} position={position} />
-        <View style={[own.controls, isCentred && own.centredControls]}>
+        <View style={own.transport}>
           <IconPlate
             icon={APP_ICONS.skipPrevious}
             isOn={false}
@@ -167,32 +167,8 @@ const Player = ({
             label={MUSIC_COPY.next}
             onPress={onNext}
           />
-          <IconPlate
-            icon={APP_ICONS.shuffle}
-            isOn={isShuffled}
-            label={shuffleLabelOf(isShuffled)}
-            onPress={onShuffle}
-          />
-          <IconPlate
-            icon={repeatIconOf(repeat)}
-            isOn={repeat !== REPEAT_MODES.off}
-            label={MUSIC_COPY.repeat[repeat]}
-            onPress={onRepeat}
-          />
-          <IconPlate
-            icon={APP_ICONS.list}
-            isOn={false}
-            label={MUSIC_COPY.addToPlaylist}
-            onPress={() =>
-              openAddToPlaylistSheet({
-                title: MUSIC_COPY.addTrackToPlaylist(track.title),
-                playlists,
-                onPick: onAddToPlaylist,
-              })
-            }
-          />
         </View>
-        {note !== null && <Text style={styles.muted}>{note}</Text>}
+        <BookSkips aside={aside} />
       </View>
     )
   )
@@ -209,32 +185,64 @@ const PLAYING_VIEWS = {
   [PLAYING_STATES.playing]: Player,
 } as const satisfies Record<PlayingState, ComponentType<PlayerProps>>
 
-type QueueProps = Pick<NowPlayingLayoutProps, 'queue' | 'onClear' | 'onJump' | 'onRemove'>
+type PaneViewProps = NowPlayingLayoutProps & {
+  /** Whether the pane stands in its own column beside the player, scrolling by itself. */
+  isWide: boolean
+}
 
-/** Up next, to play from or take tracks out of, with Clear beside its heading. */
-const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
+/*
+ * Up next: how much is queued, with what changes the play order beside it, Shuffle and Repeat,
+ * and Clear; then the queue, to play from or take tracks out of.
+ */
+const QueuePane = ({
+  queue,
+  queueFacts,
+  isShuffled,
+  repeat,
+  onShuffle,
+  onRepeat,
+  onClear,
+  onJump,
+  onRemove,
+  isWide,
+}: PaneViewProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
+  const modes = playModesOf({ isShuffled, repeat })
   return (
-    queue.length > 0 && (
-      <View style={styles.section}>
-        <View style={own.queueHead}>
-          <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
-            {MUSIC_COPY.upNext}
-          </Text>
-          <Chip
-            icon={APP_ICONS.close}
-            label={MUSIC_COPY.clear}
-            onPress={onClear}
-            text={MUSIC_COPY.clear}
-          />
-        </View>
+    <View style={[styles.section, isWide && own.fill]}>
+      <View style={own.queueHead}>
+        <Text numberOfLines={1} style={[styles.muted, own.queueFacts]}>
+          {queueFacts}
+        </Text>
+        <Chip
+          icon={APP_ICONS.shuffle}
+          isOn={modes.shuffle.isOn}
+          label={modes.shuffle.label}
+          onPress={onShuffle}
+          text={null}
+        />
+        <Chip
+          icon={modes.repeat.icon}
+          isOn={modes.repeat.isOn}
+          label={modes.repeat.label}
+          onPress={onRepeat}
+          text={null}
+        />
+        <Chip
+          icon={APP_ICONS.close}
+          label={MUSIC_COPY.clear}
+          onPress={onClear}
+          text={MUSIC_COPY.clear}
+        />
+      </View>
+      <ScrollView nestedScrollEnabled scrollEnabled={isWide} style={isWide && own.fill}>
         {queue.map((row) => (
           <ListEntry
             key={row.key}
             isSelected={row.isCurrent}
             label={row.title}
-            line={MUSIC_COPY.facts([row.line, row.length])}
+            line={queueLineOf(row)}
             onPress={() => onJump(row.place)}
             title={row.title}
           >
@@ -246,6 +254,52 @@ const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
             />
           </ListEntry>
         ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+/** The other tab: the lyrics, or a book's chapters. */
+const ExtrasPane = ({ aside, isWide }: PaneViewProps) => (
+  <NowPlayingAside aside={aside} isWide={isWide} />
+)
+
+const PANE_VIEWS = {
+  [PLAYING_PANES.queue]: QueuePane,
+  [PLAYING_PANES.extras]: ExtrasPane,
+} as const satisfies Record<PlayingPane, ComponentType<PaneViewProps>>
+
+/** The icon each of the pane's tabs wears. */
+const TAB_ICONS = {
+  [PLAYING_PANES.queue]: APP_ICONS.music,
+  [PLAYING_PANES.extras]: APP_ICONS.captions,
+} as const satisfies Record<PlayingPane, IconName>
+
+/*
+ * The pane of two tabs, switched in place: Up next, the queue under its own controls, and the
+ * lyrics or a book's chapters. Nothing while nothing plays.
+ */
+const Pane = (props: PaneViewProps) => {
+  const [pane, setPane] = useState<PlayingPane>(PLAYING_PANES.queue)
+  const styles = useMusicStyles()
+  const own = useStyles()
+  const PaneView = PANE_VIEWS[pane]
+  return (
+    props.track !== null && (
+      <View style={[styles.section, props.isWide && own.fill]}>
+        <View accessibilityLabel={MUSIC_COPY.panes} accessibilityRole="tablist" style={own.tabs}>
+          {paneTabsOf(props.aside).map((tab) => (
+            <Chip
+              key={tab.pane}
+              icon={TAB_ICONS[tab.pane]}
+              isOn={pane === tab.pane}
+              label={tab.label}
+              onPress={() => setPane(tab.pane)}
+              text={tab.label}
+            />
+          ))}
+        </View>
+        <PaneView {...props} />
       </View>
     )
   )
@@ -254,12 +308,11 @@ const Queue = ({ queue, onClear, onJump, onRemove }: QueueProps) => {
 type LayoutViewProps = NowPlayingLayoutProps & { size: number }
 
 /**
- * Beside the lyrics, on a wide screen: on the left, the player and the queue, the one column
- * that scrolls, as wide as the cover; on the right, fixed, the lyrics with room to read them,
- * or a book's controls.
+ * On a wide screen: on the left, the player, as wide as the cover, scrolled where it stands
+ * taller than the screen; on the right, the pane, its queue or its lyrics filling the column.
  */
 const Columns = (props: LayoutViewProps) => {
-  const { aside, size, onBack } = props
+  const { size, onBack } = props
   const insets = useSafeAreaInsets()
   const styles = useMusicStyles()
   const own = useStyles()
@@ -272,39 +325,16 @@ const Columns = (props: LayoutViewProps) => {
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.heading}>
           {MUSIC_COPY.nowPlaying}
         </Text>
-        <Playing {...props} isCentred={false} />
-        <Queue {...props} />
+        <Playing {...props} />
       </ScrollView>
       <View style={own.right}>
-        <NowPlayingAside aside={aside} isWide />
+        <Pane {...props} isWide />
       </View>
     </View>
   )
 }
 
-/** A track with no lyrics on a wide screen: the player large, dead centre, the queue under it. */
-const Centred = (props: LayoutViewProps) => {
-  const styles = useMusicStyles()
-  const own = useStyles()
-  const Playing = PLAYING_VIEWS[playingStateOf(props.track)]
-  return (
-    <TouchPage onBack={props.onBack}>
-      <Text
-        variant={TEXT_VARIANTS.display}
-        accessibilityRole="header"
-        style={[styles.heading, own.centredText]}
-      >
-        {MUSIC_COPY.nowPlaying}
-      </Text>
-      <View style={own.centred}>
-        <Playing {...props} isCentred />
-      </View>
-      <Queue {...props} />
-    </TouchPage>
-  )
-}
-
-/** A phone: the player across the screen, then the lyrics or a book's controls, then the queue. */
+/** A phone: the player across the screen, then the pane, its tabs switched in place. */
 const Stacked = (props: LayoutViewProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
@@ -315,28 +345,28 @@ const Stacked = (props: LayoutViewProps) => {
         {MUSIC_COPY.nowPlaying}
       </Text>
       <View style={own.centred}>
-        <Playing {...props} isCentred />
+        <Playing {...props} />
       </View>
-      <NowPlayingAside aside={props.aside} isWide={false} />
-      <Queue {...props} />
+      <Pane {...props} isWide={false} />
     </TouchPage>
   )
 }
 
 const LAYOUT_VIEWS = {
   [PLAYING_LAYOUTS.columns]: Columns,
-  [PLAYING_LAYOUTS.centred]: Centred,
   [PLAYING_LAYOUTS.stacked]: Stacked,
 } as const satisfies Record<PlayingLayout, ComponentType<LayoutViewProps>>
 
 /**
- * Now Playing under the thumb, laid out as the TV's: on an iPad, the cover with the equalizer
- * over it and the icon controls on the left and the lyrics on the right; for a track with no
- * lyrics, the player large and centred; on a phone, one column to scroll.
+ * Now Playing under the thumb, its controls grouped by what they do: the player (the cover, the
+ * track with its heart and Add to playlist, its quality, the seek bar and the transport) and a
+ * pane of two tabs, Up next with Shuffle, Repeat and Clear, and the lyrics or a book's
+ * chapters. On an iPad the pane stands beside the player; on a phone it follows it in one
+ * column to scroll. No volume: the device's own buttons set it.
  */
 export const NowPlayingLayout = (props: NowPlayingLayoutProps) => {
   const { width, height } = useWindowDimensions()
-  const layout = layoutOf({ aside: props.aside, isWide: isTablet({ width, height }) })
+  const layout = layoutOf(isTablet({ width, height }))
   const Layout = LAYOUT_VIEWS[layout]
-  return <Layout {...props} size={coverSizeOf({ layout, width, height })} />
+  return <Layout {...props} size={coverSizeOf({ layout, width })} />
 }

@@ -248,6 +248,9 @@ export const playbackCalls = ({ url, mediaUrl, sendForText, askMedia, ask, tell 
   /** What the server is sending to whom right now. Admin only. */
   listLiveStreams: (): Promise<LiveStream[]> => ask({ route: ROUTES.listLiveStreams }),
 
+  /** What the server is sending the signed-in account right now; none without accounts. */
+  listMyLiveStreams: (): Promise<LiveStream[]> => ask({ route: ROUTES.listMyLiveStreams }),
+
   /** Ends one stream's connections; the player may ask again. Admin only. */
   stopStream: async (id: string): Promise<void> => {
     await tell({ route: ROUTES.stopStream, params: { id } })

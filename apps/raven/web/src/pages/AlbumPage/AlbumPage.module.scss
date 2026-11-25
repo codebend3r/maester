@@ -42,6 +42,7 @@
 
 .heading {
   grid-area: heading;
+  container-type: inline-size;
   display: grid;
   gap: var(--space-2);
   min-width: 0;
@@ -84,17 +85,58 @@
   font-size: var(--font-size-sm);
 }
 
+/*
+ * The actions by what they do: playing the album now in the first row, then
+ * queueing it, keeping it, and a manager's Fix match at the row's end. The
+ * heading is the container, so the groups stack where it is narrow.
+ */
 .actions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9rem, max-content));
-  gap: var(--space-2);
-  justify-content: start;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-areas:
+    'play play play'
+    'queue keep manage';
+  gap: var(--space-2) var(--space-5);
   padding-top: var(--space-2);
 }
 
-@media (max-width: 40rem) {
+.group {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+}
+
+.play {
+  grid-area: play;
+}
+
+.queue {
+  grid-area: queue;
+}
+
+.keep {
+  grid-area: keep;
+}
+
+.manage {
+  grid-area: manage;
+  justify-content: end;
+}
+
+@container (max-width: 48rem) {
   .actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'play'
+      'queue'
+      'keep'
+      'manage';
+  }
+
+  .group {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, max-content));
   }
 }
 
@@ -147,9 +189,15 @@
 
   .actions {
     grid-template-columns: repeat(auto-fill, var(--control-size-tall));
+    grid-template-areas: none;
     justify-content: center;
     justify-self: stretch;
     gap: var(--space-2);
+  }
+
+  // The groups step aside, so every plate sits in the one centred run.
+  .group {
+    display: contents;
   }
 
   .actions :is(button, a) {

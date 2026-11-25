@@ -26,6 +26,7 @@ export const COMMON_COPY = {
   loading: 'Loading',
   watched: 'Watched',
   favourite: 'Favourite',
+  favouriteFailed: 'Could not change the favourite. Try again.',
   notMatched: 'Not matched',
   home: 'Home',
   library: 'Library',

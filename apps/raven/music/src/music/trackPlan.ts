@@ -1,8 +1,7 @@
-import type { TrackPlan } from '@raven/native/headless'
+import { type TrackPlan, keepPlayedStream } from '@raven/native/headless'
 
 import { useDownloads } from '@/downloads/downloadStore'
 import { downloadedOf } from '@/downloads/downloadViews'
-import { usePlayedStreams } from '@/stores/playedStreams'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 
 type TrackPlanForProps = {
@@ -37,5 +36,5 @@ export const trackPlanFor = ({ serverId, isOnCellular, uriOf }: TrackPlanForProp
     const isCellular = await isOnCellular().catch(() => false)
     return isCellular ? useWrenPrefs.getState().cellularKbps : null
   },
-  onStream: ({ track, stream }) => usePlayedStreams.getState().heard({ trackId: track.id, stream }),
+  onStream: keepPlayedStream,
 })

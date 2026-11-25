@@ -763,9 +763,11 @@ type Past = {
 }
 
 describe("the owner's Streams page", () => {
-  it('names the account watching, and the audio track its player reports', async () => {
+  const browser = { [HEADERS.userAgent]: 'Friend Browser' }
+
+  /** The friend opens the video with an account ticket and reports a spot, as a player does. */
+  const playAsFriend = async (): Promise<void> => {
     const token = await fixture.mint({ id: AUTH_TEST_IDS.friend })
-    const browser = { [HEADERS.userAgent]: 'Friend Browser' }
     const minted: unknown = (
       await enforced.app.inject({
         method: ROUTES.accountTicket.method,
@@ -790,10 +792,18 @@ describe("the owner's Streams page", () => {
       payload: { position: SPOT, audio: 0 },
     })
     expect(reported.statusCode).toBe(204)
+  }
 
+  const stopAll = async (): Promise<void> => {
     const owner = await clientFor({ id: AUTH_TEST_IDS.owner })
     const streams = await owner.listLiveStreams()
-    expect(streams).toEqual([
+    await Promise.all(streams.map(({ id }) => owner.stopStream(id)))
+  }
+
+  it('names the account watching, and the audio track its player reports', async () => {
+    await playAsFriend()
+    const owner = await clientFor({ id: AUTH_TEST_IDS.owner })
+    expect(await owner.listLiveStreams()).toEqual([
       expect.objectContaining({
         viewer: 'friend@maester.test',
         position: SPOT,
@@ -801,7 +811,24 @@ describe("the owner's Streams page", () => {
         quality: null,
       }),
     ])
-    await Promise.all(streams.map(({ id }) => owner.stopStream(id)))
+    await stopAll()
+  })
+
+  it("shows an account its own streams and no one else's", async () => {
+    await playAsFriend()
+    const [friend, guest, owner] = await Promise.all(
+      [AUTH_TEST_IDS.friend, AUTH_TEST_IDS.guest, AUTH_TEST_IDS.owner].map((id) =>
+        clientFor({ id }),
+      ),
+    )
+    expect(await friend.listMyLiveStreams()).toEqual([
+      expect.objectContaining({ viewer: 'friend@maester.test', position: SPOT }),
+    ])
+    expect(await guest.listMyLiveStreams()).toEqual([])
+    expect(await owner.listMyLiveStreams()).toEqual([])
+    const anonymous = await enforced.app.inject({ url: ROUTES.myStreams.path })
+    expect(anonymous.statusCode).toBe(401)
+    await stopAll()
   })
 })
 

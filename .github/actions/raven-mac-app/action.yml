@@ -4,7 +4,7 @@ description: >-
   Mac native job uploaded, and uploads the unsigned app as an artifact named for the commit. The
   caller checks out that commit first.
 
-# The 🏗️ Build Raven Mac app job of pull-request-checks.yml. Forge
+# The 🎬 Build Raven Mac app job of pull-request-checks.yml. Forge
 # bundles the addon and libmpv (stage:mpv), so the job waits for the native build. It selects
 # the native job's Xcode for the tools the make and the audit run.
 inputs:

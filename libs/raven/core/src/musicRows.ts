@@ -5,8 +5,6 @@ import { type Queue, orderedOf } from '@/queue'
 
 type NumberedProps = { place: number; title: string }
 
-type PlayTimeProps = { at: string; length: string }
-
 /** The words the shared music rows say, in every app. */
 export const MUSIC_ROWS_COPY = {
   /** A disc's heading on an album of several. */
@@ -18,8 +16,8 @@ export const MUSIC_ROWS_COPY = {
   facts: (facts: readonly string[]) => facts.join(' · '),
   /** A track as it is read out: "1. Airbag". */
   numbered: ({ place, title }: NumberedProps) => `${place}. ${title}`,
-  /** How far the track has played and how long it is: "1:02 / 4:44". */
-  playTime: ({ at, length }: PlayTimeProps) => `${at} / ${length}`,
+  /** How long is left of the track, as a scrubber's end says it: "-3:42". */
+  remaining: (left: string) => `-${left}`,
 } as const
 
 type PlaylistFactsOfProps = { playlist: PlaylistSummary }
@@ -156,8 +154,8 @@ export const queueRowsOf = ({ queue, tracks }: QueueRowsOfProps): QueueRow[] =>
         ]
   })
 
-type PlayTimeOfProps = { position: number; duration: number | null }
+type RemainingTimeOfProps = { position: number; length: number }
 
-/** How far the track has played and how long it is: "1:02 / 4:44". */
-export const playTimeOf = ({ position, duration }: PlayTimeOfProps): string =>
-  MUSIC_ROWS_COPY.playTime({ at: formatDuration(position), length: formatDuration(duration) })
+/** How long is left of the track, never less than none: "-3:42". */
+export const remainingTimeOf = ({ position, length }: RemainingTimeOfProps): string =>
+  MUSIC_ROWS_COPY.remaining(formatDuration(Math.max(length - position, 0)))

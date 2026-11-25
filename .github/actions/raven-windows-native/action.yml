@@ -4,7 +4,7 @@ description: >-
   the DLL, builds the N-API addon against it with MSVC, runs the headless libmpv tests and
   uploads the resources as an artifact named for the commit.
 
-# The 🏗️ Build Raven Windows native job of pull-request-checks.yml.
+# The 🎬 Build Raven Windows native job of pull-request-checks.yml.
 # The workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 inputs:
   sha:

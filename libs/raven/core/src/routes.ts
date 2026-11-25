@@ -1,6 +1,7 @@
 import {
   AUTH_PATHS,
   BUG_REPORT_PATHS,
+  LIVE_STREAM_PATHS,
   CAPTION_PATHS,
   DEVICE_DOWNLOAD_PATHS,
   DISCOVERY_PATHS,
@@ -379,8 +380,9 @@ export const ROUTES = {
   deleteBugReport: { method: remove, path: BUG_REPORT_PATHS.report, reply: null },
   listNotifications: { method: get, path: NOTIFICATION_PATHS.own, reply: isNotificationList },
   logNotification: { method: post, path: NOTIFICATION_PATHS.own, reply: isNotification },
-  listLiveStreams: { method: get, path: '/api/streams', reply: isLiveStreamList },
-  stopStream: { method: post, path: '/api/streams/:id/stop', reply: null },
+  listLiveStreams: { method: get, path: LIVE_STREAM_PATHS.everyone, reply: isLiveStreamList },
+  listMyLiveStreams: { method: get, path: LIVE_STREAM_PATHS.mine, reply: isLiveStreamList },
+  stopStream: { method: post, path: LIVE_STREAM_PATHS.stop, reply: null },
 
   // What a player, a picture or the event stream fetches by address rather than as JSON.
   events: { method: get, path: '/api/events', reply: null },

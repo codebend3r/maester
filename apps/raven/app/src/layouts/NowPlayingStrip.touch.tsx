@@ -1,10 +1,12 @@
 import { Icon } from '@raven/native'
-import { Image, Pressable, StyleSheet, View } from 'react-native'
+import { Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { useMusicStyles } from '@/layouts/MusicParts.touch'
+import { TouchQualityLine } from '@/layouts/QualityLine'
+import { isTablet } from '@/layouts/screenSizes'
 import { Text } from '@/layouts/Text'
 import { SIZES } from '@/theme/appTheme'
 import { APP_ICONS } from '@/theme/icons'
@@ -70,11 +72,13 @@ const BarButton = ({ label, onPress }: BarButtonProps) => {
 /**
  * The strip under the screens while a track plays: its cover, title and artists, play or pause,
  * next, and an X at the right that stops the music and closes it; pressed, it opens Now Playing.
+ * A tablet's strip has room for the format and quality beside the words; a phone's has none.
  */
 export const NowPlayingStrip = ({
   title,
   artists,
   cover,
+  quality,
   isPlaying,
   onOpen,
   onToggle,
@@ -82,6 +86,7 @@ export const NowPlayingStrip = ({
   onClose,
 }: NowPlayingStripProps) => {
   const insets = useSafeAreaInsets()
+  const hasRoom = isTablet(useWindowDimensions())
   const muted = useTheme((theme) => theme.palette.muted)
   const music = useMusicStyles()
   const styles = useStyles()
@@ -104,6 +109,7 @@ export const NowPlayingStrip = ({
             {artists}
           </Text>
         </View>
+        {hasRoom && quality !== null && <TouchQualityLine quality={quality} />}
       </Pressable>
       <BarButton label={toggleLabelOf(isPlaying)} onPress={onToggle} />
       <BarButton label={MUSIC_COPY.next} onPress={onNext} />

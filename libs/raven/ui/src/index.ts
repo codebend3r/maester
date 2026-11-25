@@ -5,7 +5,7 @@ export { classNames } from '@/lib/classNames'
 export { Player } from '@/components/Player/Player'
 export { ICON_NAMES, Icon } from '@/components/Icon/Icon'
 export type { IconSize } from '@/components/Icon/Icon'
-export type { IconName } from '@/components/Icon/drawings'
+export { type IconName, repeatIconOf, volumeIconOf } from '@/components/Icon/drawings'
 export { useLeaveFullscreen } from '@/components/Player/useStageChrome'
 export { mediaOriginOf, startMediaOrigin, useMediaOrigin } from '@/stores/mediaOrigin'
 export { followActiveServer } from '@/lib/followActiveServer'
@@ -25,6 +25,7 @@ export { type Toast, useToasts } from '@/stores/toasts'
 export {
   FactParts,
   FactText,
+  PictureChip,
   PictureChips,
   RangeChip,
   ResolutionChip,

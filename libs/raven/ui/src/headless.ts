@@ -126,6 +126,7 @@ export {
 export { playlistMutationsFor, useServerPlaylistMutations } from '@/query/usePlaylistMutations'
 export {
   useAudiobookChapters,
+  useBrowserStream,
   useIsAudiobook,
   useTrackBitrate,
   useTrackRate,

@@ -208,7 +208,7 @@ jobs:
 
   # The pinned prebuilt libmpv, the addon built against it with MSVC, their audit and tests.
   windows-native:
-    name: 🏗️ Build Raven Windows native
+    name: 🎬 Build Raven Windows native
     needs: [standard-checks, install-windows]
     runs-on: windows-2025
     timeout-minutes: 15
@@ -226,7 +226,7 @@ jobs:
 
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the Windows native build.
   windows-app:
-    name: 🏗️ Build Raven Windows app
+    name: 🎬 Build Raven Windows app
     needs: windows-native
     runs-on: windows-2025
     timeout-minutes: 30
@@ -253,7 +253,7 @@ jobs:
   # The iPhone's build runs `prebuild:ios` first (bun runs it before `build:ios`), which
   # regenerates ios/ and installs the pods; Nx caches only the app and the two lockfiles.
   build-iphone:
-    name: 🏗️ Build Raven iPhone
+    name: 🎬 Build Raven iPhone
     needs: [standard-checks, install-macos]
     runs-on: macos-26
     timeout-minutes: 60
@@ -284,7 +284,7 @@ jobs:
   # remote test target and the pods' support files. Pods/ and DerivedData are left out, since
   # they ran Nx Cloud's upload out of open files (EMFILE).
   build-apple-tv:
-    name: 🏗️ Build Raven Apple TV
+    name: 🎬 Build Raven Apple TV
     needs: [standard-checks, install-macos]
     runs-on: macos-26
     timeout-minutes: 60
@@ -304,7 +304,7 @@ jobs:
   # launcher, then Gradle's Release APK. Android builds on Linux (Ruling 20): GitHub's macOS arm64
   # runners cannot run the Android emulator.
   build-android-tv:
-    name: 🏗️ Build Raven Android TV
+    name: 🎬 Build Raven Android TV
     needs: standard-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -320,7 +320,7 @@ jobs:
   # The phone prebuild (no leanback launcher, the music service kept) on the Android TV setup, its
   # caches and its x86_64-only build among them.
   build-android-phone:
-    name: 🏗️ Build Raven Android phone
+    name: 🎬 Build Raven Android phone
     needs: standard-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -366,7 +366,7 @@ jobs:
 
   # One native build feeds packaging, the player's tests and main's suite through an artifact.
   desktop-native:
-    name: 🏗️ Build Raven Mac native
+    name: 🎬 Build Raven Mac native
     needs: [standard-checks, install-macos]
     # Standard macos-26 is arm64; macos-26-intel is explicitly not supported.
     runs-on: macos-26
@@ -387,7 +387,7 @@ jobs:
 
   # Forge bundles the addon and libmpv (stage:mpv), so this waits for the native build.
   desktop-app:
-    name: 🏗️ Build Raven Mac app
+    name: 🎬 Build Raven Mac app
     needs: desktop-native
     runs-on: macos-26
     timeout-minutes: 30

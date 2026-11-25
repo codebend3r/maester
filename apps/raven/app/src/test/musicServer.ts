@@ -29,6 +29,7 @@ import {
   type HeardRequest,
   NOT_FOUND,
   STATUSES,
+  mediaItemFor,
   pathWithId,
   responseOf,
 } from '@raven/native/testing'
@@ -217,6 +218,8 @@ const ANSWERS: Record<string, unknown> = {
   [pathWithId({ path: APP_CLIENT_CALLS.listArtists.path, id: MUSIC.id })]: [PORTISHEAD, RADIOHEAD],
   [pathWithId({ path: APP_CLIENT_CALLS.getAlbum.path, id: OK_COMPUTER.id })]: OK_COMPUTER_PAGE,
   [pathWithId({ path: APP_CLIENT_CALLS.getArtist.path, id: RADIOHEAD.id })]: RADIOHEAD_PAGE,
+  [pathWithId({ path: APP_CLIENT_CALLS.listLibraryFavourites.path, id: MUSIC.id })]: [],
+  [pathWithId({ path: APP_CLIENT_CALLS.listLibraryFavourites.path, id: BOOKS.id })]: [],
 }
 
 type WriteKeyOfProps = { method: string; path: string }
@@ -236,6 +239,18 @@ const mixtapeWith = (body: unknown): Answer => {
 const { put, post, delete: remove } = HTTP_METHODS
 
 const WRITES: Record<string, (body: unknown) => Answer> = {
+  [writeKeyOf({
+    method: put,
+    path: pathWithId({ path: APP_CLIENT_CALLS.setFavourite.path, id: AIRBAG.id }),
+  })]: (body) =>
+    ok(
+      mediaItemFor({
+        id: AIRBAG.id,
+        libraryId: MUSIC.id,
+        title: AIRBAG.title,
+        favourite: isFavouriteChange(body) && body.favourite,
+      }),
+    ),
   [writeKeyOf({
     method: put,
     path: pathWithId({ path: APP_CLIENT_CALLS.setAlbumFavourite.path, id: OK_COMPUTER.id }),
@@ -323,8 +338,9 @@ type MusicApiProps = {
 /**
  * The test server's music, behind the app's allowlist so an unlisted call fails the test: the
  * music and books libraries, the albums and artists whatever the search, OK Computer's page and
- * Radiohead's, each favourite mark, the account's Mixtape and its edits, another account's shared
- * mix, the tracks' lyrics and a book's chapters. Each path is answered by itself, its query aside, and keeps no edit.
+ * Radiohead's, each favourite mark (Airbag's own too), the account's Mixtape and its edits,
+ * another account's shared mix, the tracks' lyrics and a book's chapters. Each path is answered
+ * by itself, its query aside, and keeps no edit.
  */
 export const musicApi = ({
   hear = () => undefined,

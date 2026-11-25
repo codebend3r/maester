@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'bun:test'
-import { LYRICS_KINDS } from '@raven/core'
+import {
+  AUDIO_BITRATES,
+  LYRICS_KINDS,
+  REPEAT_MODES,
+  TRACK_STREAM_KINDS,
+  audioQualityOf,
+  queueRowsOf,
+  startQueue,
+} from '@raven/core'
 
 import { type BookControls, NOW_PLAYING_ASIDES } from '@/layouts/musicKit'
-import { chapterRowsOf, nowPlayingAsideOf } from '@/layouts/musicRows'
-import { AIRBAG_LYRICS, PARANOID_LYRICS } from '@/test/musicServer'
+import {
+  chapterRowsOf,
+  nowPlayingAsideOf,
+  playModesOf,
+  playingQualityOf,
+  queueFactsOf,
+  queueLineOf,
+} from '@/layouts/musicRows'
+import { AIRBAG, AIRBAG_LYRICS, PARANOID, PARANOID_LYRICS } from '@/test/musicServer'
 
 describe('nowPlayingAsideOf', () => {
   const book: BookControls = {
@@ -59,5 +74,71 @@ describe('audiobooks', () => {
       ['Opening, 0:00', false],
       ['Chapter 2, 10:00', true],
     ])
+  })
+})
+
+describe('playingQualityOf', () => {
+  it("draws the file's format and bit depth as chips, then its rate and bitrate", () => {
+    const quality = playingQualityOf(
+      audioQualityOf({ track: AIRBAG, stream: { kind: TRACK_STREAM_KINDS.file } }),
+    )
+    expect(quality.chips.map(({ text }) => text)).toEqual(['FLAC', '16-bit'])
+    expect(quality.facts).toBe('44.1 kHz \u00B7 900 kbps')
+    expect(quality.label).toBe('Playing in FLAC, 16-bit, 44.1 kHz, 900 kbps.')
+  })
+
+  it("names the transcode a lossless file plays through, and a download's own", () => {
+    const transcode = playingQualityOf(
+      audioQualityOf({
+        track: AIRBAG,
+        stream: { kind: TRACK_STREAM_KINDS.transcode, kbps: AUDIO_BITRATES.standard },
+      }),
+    )
+    expect(transcode.chips.map(({ text }) => text)).toEqual(['AAC'])
+    expect(transcode.facts).toBe(`${AUDIO_BITRATES.standard} kbps`)
+    const download = playingQualityOf(
+      audioQualityOf({
+        track: AIRBAG,
+        stream: { kind: TRACK_STREAM_KINDS.download, kbps: null },
+      }),
+    )
+    expect(download.facts).toBe('Downloaded')
+    expect(download.label).toBe('Playing in AAC, Downloaded.')
+  })
+})
+
+describe('queueFactsOf', () => {
+  it('counts the queue and adds up how long it runs', () => {
+    const tracks = { [AIRBAG.id]: AIRBAG, [PARANOID.id]: PARANOID }
+    const queue = startQueue({ items: [AIRBAG.id, PARANOID.id] })
+    expect(queueFactsOf(queueRowsOf({ queue, tracks }))).toBe('2 tracks \u00B7 10:00')
+    expect(queueFactsOf([])).toBe('0 tracks \u00B7 0:00')
+  })
+})
+
+describe('queueLineOf', () => {
+  it("puts a row's artists and its length on one line", () => {
+    const tracks = { [AIRBAG.id]: AIRBAG }
+    const [row] = queueRowsOf({ queue: startQueue({ items: [AIRBAG.id] }), tracks })
+    if (row === undefined) throw new Error('Expected a queue row')
+    expect(queueLineOf(row)).toBe(`${row.line} \u00B7 ${row.length}`)
+  })
+})
+
+describe('playModesOf', () => {
+  it('says whether shuffle is on, and how the queue repeats, with the icon for it', () => {
+    expect(playModesOf({ isShuffled: true, repeat: REPEAT_MODES.off })).toEqual({
+      shuffle: { isOn: true, label: 'Shuffle on' },
+      repeat: { isOn: false, label: 'Repeat off', icon: 'repeat' },
+    })
+    expect(playModesOf({ isShuffled: false, repeat: REPEAT_MODES.all })).toEqual({
+      shuffle: { isOn: false, label: 'Shuffle off' },
+      repeat: { isOn: true, label: 'Repeat all', icon: 'repeat' },
+    })
+    expect(playModesOf({ isShuffled: false, repeat: REPEAT_MODES.one }).repeat).toEqual({
+      isOn: true,
+      label: 'Repeat one',
+      icon: 'repeatOne',
+    })
   })
 })

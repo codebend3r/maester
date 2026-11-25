@@ -69,10 +69,15 @@ type TrackPlanReading = {
   uriOf: (path: string) => string
 }
 
-type TrackPlanForProps = { serverId: string; read: () => TrackPlanReading }
+type TrackPlanForProps = {
+  serverId: string
+  read: () => TrackPlanReading
+  /** Told what each track really plays from as its source is made, for Now Playing to say. */
+  onStream: TrackPlan['onStream']
+}
 
 /** What a track plays from before the server's file: its download, with the cover saved beside it. */
-export const trackPlanFor = ({ serverId, read }: TrackPlanForProps): TrackPlan => ({
+export const trackPlanFor = ({ serverId, read, onStream }: TrackPlanForProps): TrackPlan => ({
   downloadedOf: (track: Track) => {
     const { entries, isUnlocked, uriOf } = read()
     const entry = downloadedOf({ entries, serverId, mediaId: track.id, isUnlocked })
@@ -84,4 +89,5 @@ export const trackPlanFor = ({ serverId, read }: TrackPlanForProps): TrackPlan =
     }
   },
   streamKbps: async () => null,
+  onStream,
 })

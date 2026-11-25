@@ -219,6 +219,13 @@ export type LiveDownload = Extract<LiveStream, { purpose: typeof STREAM_PURPOSES
 
 export const isLiveStreamList = listOf(isLiveStream)
 
+/** The live streams' routes: everyone's for the admin, the caller's own, and stopping one. */
+export const LIVE_STREAM_PATHS = {
+  everyone: '/api/streams',
+  mine: '/api/streams/mine',
+  stop: '/api/streams/:id/stop',
+} as const
+
 /** The player fetches a new ticket this long before the old one expires. */
 export const MEDIA_TICKET_REFRESH_SECONDS = 600
 

@@ -7,7 +7,7 @@ import { AccountMenu } from '@/components/AccountMenu/AccountMenu'
 import { ShellOutlet } from '@/components/ShellOutlet/ShellOutlet'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { isAnyOf, pinnedPages, useIsCurrent } from '@/components/AppShell/currentPage'
-import { BrowseFan } from '@/components/AppShell/BrowseFan'
+import { BrowseBar } from '@/components/AppShell/BrowseBar'
 import { FollowServer } from '@/components/AppShell/FollowServer'
 import { NavTip } from '@/components/AppShell/NavTip'
 import { TabBar } from '@/components/AppShell/TabBar'
@@ -140,14 +140,6 @@ const NavItems = ({ places, isIconsOnly }: NavItemsProps) =>
       isIconsOnly={isIconsOnly}
     />
   ))
-
-/** The browsing places the nine-dot button fans out, under Home, while the server is in reach. */
-const BROWSE_PLACES = [
-  NAV_PLACES.continueWatching,
-  NAV_PLACES.binge,
-  NAV_PLACES.comingSoon,
-  NAV_PLACES.favourites,
-] as const satisfies readonly TabTarget[]
 
 /** Libraries while a pinned library is open, which that library's own row marks instead. */
 const PINNED_LIBRARIES = {
@@ -284,10 +276,8 @@ const PINNED_MARKS = {
 
 /**
  * The frame around every browsing page. Beside the page, the side menu
- * holds still as the page scrolls: the logo, Home, then a nine-dot button
- * that fans out Continue watching, Binge, Coming soon (what TMDB says is on
- * its way), Favourites and, while a music library exists, Music (the music
- * mode at `/music`), then under a Pinned heading the account's pinned libraries
+ * holds still as the page scrolls: the logo, Home, then under a Pinned
+ * heading the account's pinned libraries
  * on every server it keeps, each with its type's icon
  * (with a lock on it for a locked one, whatever its type) and, while the
  * account keeps more than one server, that server's name in very small type,
@@ -299,9 +289,13 @@ const PINNED_MARKS = {
  * the toggle and stays that way across visits; on a medium screen it is
  * down to its icons whatever the toggle says, so there the toggle and B
  * step aside. A phone has no side menu but a tab bar along the foot of the
- * screen. Over every page, a bar holds the search through every library
- * and, in its corner, the theme button and, for whoever is signed in, the
- * account button with Sign out; on a phone, as in the phone app, only Home
+ * screen. Over every page, a bar holds a row of the browsing places,
+ * Continue watching, Binge, Coming soon (what TMDB says is on its way),
+ * Favourites and, while a music library exists, Music (the music mode at
+ * `/music`), down to their icons on a medium screen and left to the tab bar
+ * on a phone; level with them in its corner, the theme button and, for
+ * whoever is signed in, the account button with Sign out; under them the
+ * search through every library; on a phone, as in the phone app, only Home
  * keeps the search, and elsewhere the corner sits level with the page's way
  * back. While a card's picture is behind the page,
  * the menu frosts over it. While the frame is open, what the pages show
@@ -325,7 +319,6 @@ export const AppShell = () => {
   const servers = useServers()
   const hasServers = servers.length > 1
   const hasMusic = !isOffline && musicLibrariesOf(libraries.data ?? []).length > 0
-  const browsePlaces = hasMusic ? [...BROWSE_PLACES, NAV_PLACES.music] : BROWSE_PLACES
   const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
   const isPinnedOpen = pinned.some((entry) => isAnyOf({ patterns: pinnedPages(entry), pathname }))
 
@@ -345,12 +338,7 @@ export const AppShell = () => {
           <Logo isMarkOnly={isIconsOnly} />
         </Link>
         <div className={styles.links}>
-          {!isOffline && (
-            <>
-              <NavItems places={[NAV_PLACES.home]} isIconsOnly={isIconsOnly} />
-              <BrowseFan places={browsePlaces} isIconsOnly={isIconsOnly} />
-            </>
-          )}
+          {!isOffline && <NavItems places={[NAV_PLACES.home]} isIconsOnly={isIconsOnly} />}
           {pinned.length > 0 && (
             <>
               <PinnedMark />
@@ -418,6 +406,7 @@ export const AppShell = () => {
         className={classNames([styles.main, pathname !== APP_PATHS.home && styles.awayFromHome])}
       >
         <div className={styles.bar}>
+          {!isOffline && <BrowseBar hasMusic={hasMusic} />}
           {!isOffline && <SiteSearch className={styles.search} />}
           <div className={styles.corner}>
             <ThemePicker />

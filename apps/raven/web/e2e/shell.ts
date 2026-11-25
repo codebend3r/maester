@@ -8,14 +8,13 @@ const sideMenu = ({ page }: PageProps): Locator =>
   page.getByRole('navigation', { name: APP_SHELL_COPY.main })
 
 /** A link in the side menu, which every page but the player draws. */
-export const sideLink = ({ page, name }: SideLinkProps): Locator =>
+const sideLink = ({ page, name }: SideLinkProps): Locator =>
   sideMenu({ page }).getByRole('link', { name, exact: true })
 
-/** Opens a place the side menu's nine-dot button holds, by pointing at the button and pressing the place in its fan. */
+/** Opens one of the browsing places in the row along the top of the page. */
 export const openFromBrowse = async ({ page, name }: SideLinkProps) => {
-  await sideMenu({ page }).getByRole('button', { name: APP_SHELL_COPY.browse, exact: true }).hover()
   await page
-    .getByRole('list', { name: APP_SHELL_COPY.browse })
+    .getByRole('navigation', { name: APP_SHELL_COPY.browse })
     .getByRole('link', { name, exact: true })
     .click()
 }
@@ -34,6 +33,13 @@ export const openFromManage = async ({ page, name }: SideLinkProps) => {
     await manage.click()
   }
   await sideLink({ page, name }).click()
+}
+
+/** Opens a library from its shelf's heading on Home, which shelves every library while none is pinned. */
+export const openLibraryFromHome = async ({ page, name }: SideLinkProps) => {
+  await page.goto('/')
+  await page.getByRole('region', { name }).getByRole('link', { name, exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name })).toBeVisible()
 }
 
 type OpenFromShelfProps = { page: Page; library: string; title: string }

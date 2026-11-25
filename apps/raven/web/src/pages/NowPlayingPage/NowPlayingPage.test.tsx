@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { LIBRARY_KINDS, REPEAT_MODES, LYRICS_KINDS, LYRICS_SOURCES } from '@raven/core'
-import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import { AUDIO_STATES, MUSIC_QUALITIES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { api } from '@/lib/api'
 import { NowPlayingBar } from '@/components/NowPlayingBar/NowPlayingBar'
 import { NowPlayingPage } from '@/pages/NowPlayingPage/NowPlayingPage'
@@ -22,6 +22,7 @@ describe('NowPlayingPage', () => {
   afterEach(() => {
     cleanup()
     store().clear()
+    usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.original)
   })
 
   it('says when nothing plays', () => {
@@ -49,6 +50,75 @@ describe('NowPlayingPage', () => {
     expect(store().queue.isShuffled).toBe(true)
     const queue = screen.getByRole('list', { name: 'Queue' })
     expect(queue).toHaveTextContent('Subterranean Homesick Alien')
+  })
+
+  it('says the format and quality the track plays in, under its artists and album', async () => {
+    store().playTracks({ tracks: TRACKS })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing',
+      libraries: [
+        library({ id: 3, settings: { ...library().settings, kind: LIBRARY_KINDS.music } }),
+      ],
+    })
+    const line = await screen.findByText('Quality, FLAC, 16-bit, 44.1 kHz, 900 kbps')
+    const album = screen.getByRole('link', { name: 'OK Computer' })
+    expect(album.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(line.parentElement?.textContent).toContain('44.1 kHz · 900 kbps')
+  })
+
+  it('says the transcode once the prefs ask for one', async () => {
+    usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.standard)
+    store().playTracks({ tracks: TRACKS })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing',
+      libraries: [
+        library({ id: 3, settings: { ...library().settings, kind: LIBRARY_KINDS.music } }),
+      ],
+    })
+    expect(await screen.findByText('Quality, AAC, 256 kbps')).toBeTruthy()
+  })
+
+  it('keeps the transport to previous, play and next, with the queue modes over the queue', () => {
+    store().playTracks({ tracks: TRACKS })
+    act(() => store().engine.time({ position: 61, duration: 200 }))
+    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing' })
+    expect(screen.getByText('-2:19')).toBeTruthy()
+    const pane = within(screen.getByRole('tabpanel', { name: /Up next/u }))
+    expect(pane.getByRole('button', { name: 'Shuffle off' })).toBeTruthy()
+    expect(pane.getByRole('button', { name: 'Clear' })).toBeTruthy()
+    expect(pane.getByText('3 tracks · 10:00')).toBeTruthy()
+    // Repeat outlives a cleared queue, so it is stepped to one from wherever the last test left it.
+    Object.values(REPEAT_MODES).forEach(() => {
+      if (store().queue.repeat !== REPEAT_MODES.one) act(() => store().cycleRepeat())
+    })
+    expect(
+      pane.getByRole('button', { name: 'Repeat one' }).querySelector('svg')?.dataset.icon,
+    ).toBe('repeatOne')
+  })
+
+  it('swaps the pane between Up next and the lyrics by its tabs, as the address says', async () => {
+    spyOn(api, 'getLyrics').mockResolvedValue({ kind: LYRICS_KINDS.none })
+    store().playTracks({ tracks: TRACKS })
+    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing' })
+    expect(screen.getByRole('tab', { name: /Up next/u })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /Up next/u })).toHaveTextContent('3')
+    fireEvent.click(screen.getByRole('tab', { name: 'Lyrics' }))
+    expect(await screen.findByText('No lyrics for this track.')).toBeTruthy()
+    expect(screen.queryByRole('list', { name: 'Queue' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy()
+    mock.restore()
+  })
+
+  it('marks the playing track a favourite from its heart', async () => {
+    spyOn(api, 'listLibraryFavourites').mockResolvedValue([])
+    const set = spyOn(api, 'setFavourite')
+    store().playTracks({ tracks: TRACKS })
+    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing' })
+    fireEvent.click(screen.getByRole('button', { name: 'Favourite' }))
+    await waitFor(() => expect(set).toHaveBeenCalledWith({ id: 101, favourite: true }))
+    mock.restore()
   })
 
   it('removes, moves and clears from the queue', () => {
@@ -98,7 +168,11 @@ describe('NowPlayingPage lyrics', () => {
     })
     store().playTracks({ tracks: TRACKS })
     act(() => store().engine.time({ position: 11, duration: 200 }))
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [MUSIC] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [MUSIC],
+    })
     const sung = await screen.findByText('In the next world war')
     expect(sung).toHaveAttribute('aria-current', 'true')
     act(() => store().engine.time({ position: 15, duration: 200 }))
@@ -113,8 +187,14 @@ describe('NowPlayingPage lyrics', () => {
         : { kind: LYRICS_KINDS.none },
     )
     store().playTracks({ tracks: TRACKS })
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [MUSIC] })
-    expect(await screen.findByRole('region', { name: 'Lyrics' })).toHaveTextContent('Airbag words')
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [MUSIC],
+    })
+    expect(await screen.findByRole('tabpanel', { name: 'Lyrics' })).toHaveTextContent(
+      'Airbag words',
+    )
     act(() => store().next())
     expect(await screen.findByText('No lyrics for this track.')).toBeTruthy()
   })
@@ -124,7 +204,11 @@ describe('NowPlayingPage lyrics', () => {
     spyOn(api, 'listPlaylists').mockResolvedValue([playlistSummary()])
     const append = spyOn(api, 'appendPlaylistTracks').mockResolvedValue(playlistDetails())
     store().playTracks({ tracks: TRACKS })
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [MUSIC] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [MUSIC],
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Add to playlist' }))
     fireEvent.click(await screen.findByRole('button', { name: /Evening/ }))
     await waitFor(() => expect(append).toHaveBeenCalledWith({ id: 5, mediaIds: [101] }))
@@ -155,7 +239,11 @@ describe('NowPlayingPage for an audiobook', () => {
     const lyrics = spyOn(api, 'getLyrics')
     store().playTracks({ tracks: [BOOK] })
     act(() => store().engine.time({ position: 100, duration: 3000 }))
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [BOOKS] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [BOOKS],
+    })
     const chapters = await screen.findByRole('list', { name: 'Chapters' })
     expect(chapters).toHaveTextContent('Opening')
     expect(chapters).toHaveTextContent('Chapter 3')
@@ -171,7 +259,11 @@ describe('NowPlayingPage for an audiobook', () => {
   it('skips between chapters and plays from a chapter picked', async () => {
     store().playTracks({ tracks: [BOOK] })
     act(() => store().engine.time({ position: 100, duration: 3000 }))
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [BOOKS] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [BOOKS],
+    })
     await screen.findByRole('list', { name: 'Chapters' })
     fireEvent.click(screen.getByRole('button', { name: 'Next chapter' }))
     expect(store().seek?.seconds ?? null).toBe(900)
@@ -183,14 +275,22 @@ describe('NowPlayingPage for an audiobook', () => {
 
   it('reads at the speed picked, which music never offers', async () => {
     store().playTracks({ tracks: [BOOK] })
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [BOOKS] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [BOOKS],
+    })
     const speed = await screen.findByRole('combobox', { name: 'Speed' })
     fireEvent.change(speed, { target: { value: '1.5' } })
     expect(usePlayerPrefs.getState().audiobookSpeed).toBe(1.5)
     cleanup()
     spyOn(api, 'getLyrics').mockResolvedValue({ kind: LYRICS_KINDS.none })
     store().playTracks({ tracks: TRACKS })
-    renderWithProviders({ ui: <NowPlayingPage />, route: '/now-playing', libraries: [MUSIC] })
+    renderWithProviders({
+      ui: <NowPlayingPage />,
+      route: '/now-playing?show=extras',
+      libraries: [MUSIC],
+    })
     await screen.findByText('No lyrics for this track.')
     expect(screen.queryByRole('combobox', { name: 'Speed' })).toBeNull()
   })

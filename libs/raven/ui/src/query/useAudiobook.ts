@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ApiClient, AudioBitrate, Chapter, Track } from '@raven/core'
+import type { ApiClient, AudioBitrate, Chapter, Track, TrackStream } from '@raven/core'
 import { useMemo } from 'react'
-import { isAudiobookTrack } from '@raven/core'
+import { isAudiobookTrack, trackStreamOf } from '@raven/core'
 import { ravenQueriesFor } from '@/query/ravenQueries'
 import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
 
@@ -53,6 +53,20 @@ export const useTrackBitrate = ({ api, track }: UseTrackBitrateProps): AudioBitr
     return null
   }
   return isAudiobookTrack({ track, libraries }) ? null : quality
+}
+
+type UseBrowserStreamProps = { api: ApiClient; track: Track }
+
+/**
+ * What a browser's host plays `track` from, by the decision it plays by: nothing while the
+ * libraries that tell a book from music are read, which the host waits out before it sets a
+ * source, then the file, or the transcode at the bitrate the prefs pick.
+ */
+export const useBrowserStream = ({ api, track }: UseBrowserStreamProps): TrackStream | null => {
+  const queries = useMemo(() => ravenQueriesFor(api), [api])
+  const libraries = useQuery(queries.librariesQuery)
+  const kbps = useTrackBitrate({ api, track })
+  return libraries.isPending ? null : trackStreamOf(kbps)
 }
 
 type UseAudiobookChaptersProps = { api: ApiClient; track: Track | null }

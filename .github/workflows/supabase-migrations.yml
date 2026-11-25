@@ -1,0 +1,52 @@
+name: 🗄️ Supabase migrations
+
+# Applies raven's new database migrations to the cloud Supabase project once
+# they merge into main, so the tables a release reads are there before it
+# ships. Only the migrations: the auth config and the Edge Function stay with
+# the operator's `bunx nx run @raven/supabase:deploy` (apps/raven/supabase/README.md).
+#
+# The job runs in the `supabase-production` environment, which holds the two
+# secrets and waits for the owner's approval: a migration has no down
+# migration, so none reaches production unseen. A merge ships before the next
+# release, so a migration must leave the running clients working.
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/raven/supabase/migrations/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two pushes must never run at once, and neither may be cancelled halfway.
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: 🗄️ Push migrations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: supabase-production
+    env:
+      SUPABASE_PROJECT_REF: vivskxurcsejkgtzuxsm
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+      - name: 🥟 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: 📦 Install
+        uses: ./.github/actions/bun-install
+      - name: 🔗 Link the cloud project
+        run: bunx nx run @raven/supabase:db:link -- --project-ref "$SUPABASE_PROJECT_REF"
+      # Lists what is about to run, so the log says which migrations went out.
+      - name: 📋 List pending migrations
+        run: bunx nx run @raven/supabase:deploy:db -- --dry-run
+      - name: 🗄️ Push migrations
+        run: bunx nx run @raven/supabase:deploy:db

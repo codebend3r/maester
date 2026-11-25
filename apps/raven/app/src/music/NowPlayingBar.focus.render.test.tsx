@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { TRACK_STREAM_KINDS } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import { act, fireEvent, screen } from '@testing-library/react-native'
 
 import { NowPlayingBar } from '@/music/NowPlayingBar'
 import { APP_ROUTES, APP_SCREENS } from '@/routes'
+import { usePlayedStreams } from '@raven/native/headless'
 import { settleScreen } from '@/stores/screenFocus'
 import { NAS, homeApi } from '@/test/homeServer'
 import { AIRBAG } from '@/test/musicServer'
@@ -47,6 +49,7 @@ describe('NowPlayingBar on a TV', () => {
     resetTestScreen()
     mockSegments.mockReturnValue([])
     useAudioQueue.getState().clear()
+    usePlayedStreams.setState({ streams: {} })
   })
 
   it('shows the playing track across the top, with Play or Pause and Next', async () => {
@@ -84,5 +87,19 @@ describe('NowPlayingBar on a TV', () => {
     mockSegments.mockReturnValue(screenName.split('/'))
     await renderBar()
     expect(screen.queryByText('Airbag')).toBeNull()
+  })
+
+  it('says the format and quality of what plays once the host has chosen its stream', async () => {
+    useAudioQueue.getState().playTracks({ tracks: [AIRBAG] })
+    await renderBar()
+    expect(screen.queryByText('FLAC')).toBeNull()
+    await act(() =>
+      usePlayedStreams
+        .getState()
+        .heard({ trackId: AIRBAG.id, stream: { kind: TRACK_STREAM_KINDS.file } }),
+    )
+    expect(screen.getByText('FLAC')).toBeTruthy()
+    expect(screen.getByText('44.1 kHz \u00B7 900 kbps')).toBeTruthy()
+    expect(reach()).toEqual([false, false, false])
   })
 })

@@ -9,18 +9,26 @@
 }
 
 /*
- * The page while something plays. On the widest screens the track, its
- * lyrics and the queue stand side by side; under 160rem the lyrics drop
- * under the track and the queue keeps the right; under 64rem all three stack.
+ * The page while something plays: the player, and beside it the pane of
+ * tabs (the queue, the lyrics). Under 64rem the pane drops under the player.
  */
 .playing {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 5fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-areas:
-    'back back back'
-    'stage extras queue';
+    'back back'
+    'stage context';
   align-items: start;
   gap: var(--space-6);
+
+  /*
+   * How tall the lyrics or the chapters may stand: the screen less the bar
+   * over the page, Back, the tabs and what PlayerLayer keeps under the shell.
+   */
+  --pane-shell: calc(var(--player-room, 0px) + var(--page-start, 0px) + var(--section-gap));
+  --pane-head: calc(2 * var(--field-size) + 2 * var(--space-6));
+  --pane-min: 22rem;
+  --pane-block: max(var(--pane-min), calc(100dvh - var(--pane-shell) - var(--pane-head)));
 
   > .back {
     grid-area: back;
@@ -36,20 +44,25 @@
   color: var(--color-lichen);
 }
 
-// The cover large and centred, the words under it, then the scrubber and the controls.
+/*
+ * The cover large, the words with the track's own actions beside them, the
+ * format and quality it plays in, then the scrubber, the transport alone in its row, and the volume.
+ */
 .stage {
   grid-area: stage;
   display: grid;
-  grid-template-columns: minmax(0, 24rem);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    'cover'
-    'words'
-    'scrubber'
-    'controls'
-    'book';
-  justify-content: center;
-  gap: var(--space-4);
-  text-align: center;
+    'cover cover'
+    'words actions'
+    'quality quality'
+    'scrubber scrubber'
+    'controls controls'
+    'volume volume'
+    'book book';
+  justify-self: center;
+  inline-size: min(100%, 22rem);
+  gap: var(--space-3);
 }
 
 .cover {
@@ -100,6 +113,10 @@
   color: var(--color-leaf-bright);
 }
 
+.quality {
+  grid-area: quality;
+}
+
 .scrubber {
   grid-area: scrubber;
   display: grid;
@@ -129,13 +146,27 @@
   accent-color: var(--color-leaf-bright);
 }
 
+// The heart and Add to playlist, level with the track's name.
+.actions {
+  grid-area: actions;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: start;
+  gap: var(--space-0);
+}
+
+// Previous, play or pause, next: nothing else shares the row.
 .controls {
   grid-area: controls;
   display: grid;
   grid-auto-flow: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-4);
+}
+
+.volume {
+  grid-area: volume;
 }
 
 // An audiobook's chapter skips and speed, in a run under the transport.
@@ -157,38 +188,50 @@
   font-size: var(--font-size-sm);
 }
 
-.extras {
-  grid-area: extras;
+// The tabs and the chosen tab's pane.
+.context {
+  grid-area: context;
   display: grid;
-  gap: var(--space-3);
+  min-width: 0;
 }
 
 .queue {
-  grid-area: queue;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
-@media (max-width: 160rem) {
-  .playing {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    // A long queue's extra height goes under the lyrics, not between them and the track.
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-      'back back'
-      'stage queue'
-      'extras queue';
-  }
+// How much is queued, then the modes that change what plays next and Clear.
+.queueHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'facts modes';
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.queueFacts {
+  grid-area: facts;
+  color: var(--color-lichen);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.modes {
+  grid-area: modes;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-0);
 }
 
 @media (max-width: 64rem) {
   .playing {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
     grid-template-areas:
       'back'
       'stage'
-      'extras'
-      'queue';
+      'context';
+
+    --pane-block: var(--pane-min);
   }
 }

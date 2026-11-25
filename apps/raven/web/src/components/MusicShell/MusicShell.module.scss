@@ -125,7 +125,7 @@
   white-space: nowrap;
 }
 
-// The theme and account buttons over the page, then the page.
+// The browsing places and the theme and account buttons over the page, then the page.
 .main {
   --page-top: var(--side-top);
   --bar-gap: var(--space-4);
@@ -136,13 +136,24 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    'corner'
+    'bar'
     'page';
   align-content: start;
   justify-content: center;
   row-gap: var(--bar-gap);
   min-width: 0;
   padding: var(--page-top) var(--gutter) var(--section-gap);
+}
+
+// The browsing places, then the corner's buttons at the end.
+.bar {
+  grid-area: bar;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'places corner';
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--field-size);
 }
 
 .corner {

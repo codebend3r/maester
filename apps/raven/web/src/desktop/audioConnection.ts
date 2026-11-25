@@ -12,7 +12,7 @@ import {
   listenForPort,
   type Remote,
 } from '@/desktop/portConnection'
-import { useDesktop } from '@/stores/desktop'
+import { useDesktop, useDesktopBridge } from '@/stores/desktop'
 
 /** The page's end of main's music engine. */
 export type NativeAudio = Remote<AudioCommand, AudioEvent>
@@ -48,4 +48,18 @@ export const listenForAudio = ({
 export const useAudioConnection = (): AudioConnection => {
   const { audio } = useDesktop()
   return useSyncExternalStore(audio.subscribe, audio.read)
+}
+
+const subscribeToNothing = () => () => undefined
+
+/**
+ * How the connection to the music engine stands, for what renders in a browser too: null there,
+ * since a browser has no engine but its own.
+ */
+export const useAudioConnectionStatus = (): AudioConnection['status'] | null => {
+  const audio = useDesktopBridge((state) => state.desktop?.audio ?? null)
+  return useSyncExternalStore(
+    audio?.subscribe ?? subscribeToNothing,
+    () => audio?.read().status ?? null,
+  )
 }
