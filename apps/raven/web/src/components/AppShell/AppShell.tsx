@@ -21,7 +21,7 @@ import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
 import { type PinnedLibrary, followPin, usePinnedLibraries } from '@/lib/pins'
 import { librariesQuery } from '@/lib/queries'
-import { useServers } from '@/lib/servers'
+import { keepsSeveralServers, useServers } from '@/lib/servers'
 import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
@@ -102,16 +102,14 @@ const NavItem = ({
 type PinnedNavItemProps = {
   pinned: PinnedLibrary
   isIconsOnly: boolean
-  /** Whether the account keeps more than one server, so each pin names its own. */
-  hasServers: boolean
 }
 
 /**
  * A pinned library's row: its type's icon, a lock on a locked one, and its server's name under
- * it while the account keeps several. One on another server switches to it as it opens.
+ * it while the account keeps several and has not turned that off. One on another server switches to it as it opens.
  */
-const PinnedNavItem = ({ pinned, isIconsOnly, hasServers }: PinnedNavItemProps) => {
-  const { library, server } = pinned
+const PinnedNavItem = ({ pinned, isIconsOnly }: PinnedNavItemProps) => {
+  const { library, serverNote } = pinned
   return (
     <NavItem
       to={libraryPath(library.id)}
@@ -120,7 +118,7 @@ const PinnedNavItem = ({ pinned, isIconsOnly, hasServers }: PinnedNavItemProps) 
       label={library.name}
       isIconsOnly={isIconsOnly}
       note={library.settings.locked ? APP_SHELL_COPY.locked : undefined}
-      detail={hasServers ? server.name : undefined}
+      detail={serverNote}
       onClick={() => followPin(pinned)}
     />
   )
@@ -317,7 +315,7 @@ export const AppShell = () => {
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
   const pinned = usePinnedLibraries()
   const servers = useServers()
-  const hasServers = servers.length > 1
+  const hasServers = keepsSeveralServers(servers)
   const hasMusic = !isOffline && musicLibrariesOf(libraries.data ?? []).length > 0
   const PinnedMark = PINNED_MARKS[isIconsOnly ? MENU_WIDTHS.icons : MENU_WIDTHS.open]
   const isPinnedOpen = pinned.some((entry) => isAnyOf({ patterns: pinnedPages(entry), pathname }))
@@ -345,11 +343,7 @@ export const AppShell = () => {
               <ul className={styles.pinned} aria-label={APP_SHELL_COPY.pinned}>
                 {pinned.map((entry) => (
                   <li key={entry.key} className={styles.pinnedItem}>
-                    <PinnedNavItem
-                      pinned={entry}
-                      isIconsOnly={isIconsOnly}
-                      hasServers={hasServers}
-                    />
+                    <PinnedNavItem pinned={entry} isIconsOnly={isIconsOnly} />
                   </li>
                 ))}
               </ul>

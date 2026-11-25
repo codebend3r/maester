@@ -172,6 +172,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
+    // Its own port, off Vite's default 5173, which other projects on the machine take.
+    port: 5175,
+    strictPort: true,
     // In Docker the server serves this app itself and nothing is proxied.
     proxy: apiProxy({ mode, ravenDir: RAVEN_DIR, example: DEV_API_ORIGIN_EXAMPLE }),
   },

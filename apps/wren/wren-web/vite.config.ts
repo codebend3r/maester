@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
-    // Its own port, beside raven's web app (5173) and sparrow's (5190).
+    // Its own port, beside raven's web app (5175) and sparrow's (5190).
     port: 5185,
     strictPort: true,
     proxy: apiProxy({ mode, ravenDir: RAVEN_DIR, example: DEV_API_ORIGIN_EXAMPLE }),

@@ -47,7 +47,12 @@ const renderBar = ({
           element={
             <TabBar
               hasMusic={hasMusic}
-              pinned={[...pinned.map((entry) => pinnedOf({ library: entry })), ...pinnedElsewhere]}
+              pinned={[
+                ...pinned.map((entry) =>
+                  pinnedOf({ library: entry, isServerNamed: servers.length > 1 }),
+                ),
+                ...pinnedElsewhere,
+              ]}
               servers={servers}
             />
           }
@@ -180,6 +185,7 @@ describe('TabBar', () => {
           library: library({ id: 2, name: 'Films' }),
           server: meleysEntry(),
           isOnActiveServer: false,
+          isServerNamed: true,
         }),
       ],
       servers: [homeEntry(), meleysEntry()],

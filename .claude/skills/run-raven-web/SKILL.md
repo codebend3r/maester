@@ -1,13 +1,13 @@
 ---
 name: run-raven-web
-description: Use when running raven's web app locally against a local backend to try a change in the browser: "run raven web", "run raven locally", "start the raven dev server", "run the web app with a local backend", "start raven's server and Vite", "get started on this worktree", a local Home that says "Nothing to show yet" because the database is empty, or http://localhost:5173 answering 502 on /api because nothing listens on :8484.
+description: Use when running raven's web app locally against a local backend to try a change in the browser: "run raven web", "run raven locally", "start the raven dev server", "run the web app with a local backend", "start raven's server and Vite", "get started on this worktree", a local Home that says "Nothing to show yet" because the database is empty, or http://localhost:5175 answering 502 on /api because nothing listens on :8484.
 ---
 
 # Run raven web with a local backend
 
 Imports production's database from Vhagar, then starts raven's server (`@raven/server`, http://localhost:8484) and the web app's Vite dev server (`@raven/web`, with `@raven/ui` rebuilding in watch mode). Vite proxies `/api` to :8484, so open the Vite address, never :8484.
 
-The server reads `apps/raven/.env`. With `SUPABASE_*` there (the usual case) it enforces accounts and the page asks for a real sign-in; without it, it runs open. It migrates `apps/raven/server/data/raven.db` on start, skips the library scan (`SCAN_ON_START=false`) and logs a line for every request it answers (`RAVEN_LOG_REQUESTS=true`, both set by the server's `dev` script). To point the web app at Vhagar's raven instead of a local one, skip the steps below. At home, use `bun run dev:raven:vhagar`: Vite proxies `/api` to Vhagar's LAN origin and the player streams straight from Vhagar, which is the fastest way to load and play (Vhagar's `RAVEN_WEB_ORIGINS` lists `http://localhost:5173` and `http://localhost:5174` for it). Away from home, use `bun run dev:raven:prod`, which goes through Netlify. Both write real watch progress to the signed-in account, and neither runs server code from the checkout.
+The server reads `apps/raven/.env`. With `SUPABASE_*` there (the usual case) it enforces accounts and the page asks for a real sign-in; without it, it runs open. It migrates `apps/raven/server/data/raven.db` on start, skips the library scan (`SCAN_ON_START=false`) and logs a line for every request it answers (`RAVEN_LOG_REQUESTS=true`, both set by the server's `dev` script). To point the web app at Vhagar's raven instead of a local one, skip the steps below. At home, use `bun run dev:raven:vhagar`: Vite proxies `/api` to Vhagar's LAN origin and the player streams straight from Vhagar, which is the fastest way to load and play (Vhagar's `RAVEN_WEB_ORIGINS` must list `http://localhost:5175` for it). Away from home, use `bun run dev:raven:prod`, which goes through Netlify. Both write real watch progress to the signed-in account, and neither runs server code from the checkout.
 
 ## Steps
 
@@ -18,7 +18,7 @@ Run everything from the repo root (the worktree's root in a worktree), each serv
 2. **See what already runs.**
 
    ```bash
-   for p in 5173 5174 5175 8484; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
+   for p in 5175 8484; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
    pgrep -fl 'tsx watch|vite|nx run-many'
    ```
 
@@ -32,7 +32,7 @@ Run everything from the repo root (the worktree's root in a worktree), each serv
 
    If ssh to `vhagar` fails, fall back to the main checkout's copy: stop the servers, `sqlite3 <main>/apps/raven/server/data/raven.db ".backup apps/raven/server/data/raven.db"` (after removing this checkout's `raven.db`, `-wal` and `-shm`), then `cp -cR` its `images`, `thumbnails` and `subtitles` folders, and say so in the report.
 
-4. **Start both servers.** `bun run dev:raven` (the server, `@raven/ui` in watch mode and Vite). Wait until `http://localhost:8484/api/health` answers `200`; the first start takes a few seconds, more when a branch's migrations run on the imported database. Vite takes 5173, or the next free port when another Vite holds it: read the log for the `Local:   http://localhost:<port>/` line (strip the colour codes first), then check `http://localhost:<port>/api/health` answers `200`, which proves the proxy reaches the backend. `http proxy error ... ECONNREFUSED` lines from the first seconds are an open tab polling before the server listened; they stop once it does.
+4. **Start both servers.** `bun run dev:raven` (the server, `@raven/ui` in watch mode and Vite). Wait until `http://localhost:8484/api/health` answers `200`; the first start takes a few seconds, more when a branch's migrations run on the imported database. Vite holds 5175 strictly (5173 belongs to other projects) and fails to start when something else has it; check `http://localhost:5175/api/health` answers `200`, which proves the proxy reaches the backend. `http proxy error ... ECONNREFUSED` lines from the first seconds are an open tab polling before the server listened; they stop once it does.
 
 5. **Report**: the Vite URL, which checkout's code it serves, the library and video counts the import brought, where the log is (each request shows in it as `[registerRequestLog] GET /api/... 200 12ms`), the PIDs started (`pgrep -fl 'tsx watch|vite|nx run-many'`) and how to stop them (kill those PIDs).
 
@@ -42,4 +42,5 @@ Run everything from the repo root (the worktree's root in a worktree), each serv
 - **Never start the server with `RAVEN_ACCOUNTS=off` while `apps/raven/.env` has `SUPABASE_*`**: the override conflicts with them and every protected route answers 503. Check the file first.
 - **"raven is temporarily unavailable / raven could not reach its accounts"** with no `SUPABASE_*` in `apps/raven/.env`: the imported database remembers that production enforced accounts, and a server that once enforced never falls back to open by itself. Either add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` to `apps/raven/.env` for a real sign-in, or start with `RAVEN_ACCOUNTS=off bun run dev:raven` (in the shell, never in `.env`) to clear the record in the local copy and open raven to anonymous viewers; without the variable the 503 returns.
 - The import runs only with no server on :8484, and a later import needs the servers stopped again. Editing server code or rebuilding `@raven/core` restarts `tsx watch`, which runs the branch's migrations on the local copy only.
-- A Vite already holding :5173 pushes this checkout's to :5174, and the two proxy to the same :8484 server.
+- Only one checkout's raven Vite runs at a time, on :5175; stop the other checkout's before starting this one.
+- `RAVEN_DEV_API_ORIGIN` in `apps/raven/.env` overrides the proxy's :8484. If it names another origin, start with `RAVEN_DEV_API_ORIGIN=http://localhost:8484 bun run dev:raven` (the shell's value wins over the file).

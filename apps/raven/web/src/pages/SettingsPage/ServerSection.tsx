@@ -1,7 +1,13 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CHECK_OUTCOMES, renamedServers, serverNameFor } from '@raven/core'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  CHECK_OUTCOMES,
+  DEFAULT_ACCOUNT_PREFERENCES,
+  type ServerId,
+  cleanName,
+  serverNameFor,
+} from '@raven/core'
 import { BUTTON_TONES, Button, classNames } from '@raven/ui'
-import { afterServersChanged, useActiveServer } from '@raven/ui/headless'
+import { accountPreferencesQuery, afterServersChanged, useActiveServer } from '@raven/ui/headless'
 import { type FormEvent, useId, useState } from 'react'
 import { type AccountKeeping, useAccountKeeping } from '@/lib/accountData'
 import { COMMON_COPY } from '@/lib/copy'
@@ -17,6 +23,7 @@ import {
   useServers,
 } from '@/lib/servers'
 import { Section } from '@/pages/SettingsPage/Section'
+import { ToggleChoice } from '@/pages/SettingsPage/ToggleChoice'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import settings from '@/pages/SettingsPage/SettingsPage.module.scss'
 import styles from '@/pages/SettingsPage/ServerSection.module.scss'
@@ -28,34 +35,40 @@ const PROBLEM_COPY = COPY.problems satisfies Record<AddProblem, string>
 /** One of the account's own servers, where the viewer may change the list. */
 type KeptServer = { server: AccountEntry; keeping: AccountKeeping }
 
-type RenameFormProps = {
-  server: AccountEntry
-  servers: readonly ServerEntry[]
-  keeping: AccountKeeping
-  onDone: () => void
+/** A server the viewer may rename: one the account added, or the home one by its id. */
+type RenamableServer = { server: ServerEntry; keeping: AccountKeeping; serverId: ServerId }
+
+type RenameProps = RenamableServer & { name: string }
+
+/**
+ * Writes a server's new name where the account keeps it: the account's row for one it added,
+ * the account's name for the home one, which has no row.
+ */
+const renameServer = ({ server, keeping, serverId, name }: RenameProps): Promise<unknown> => {
+  if (server.kind === SERVER_KINDS.account) {
+    return keeping.client.renameServer({ id: server.rowId, name })
+  }
+  return keeping.client.nameServer({ serverId, name })
 }
 
-/** A server's new name, tidied and checked as every client's list renames (`renamedServers`). */
-const RenameForm = ({ server, servers, keeping, onDone }: RenameFormProps) => {
+type RenameFormProps = RenamableServer & { onDone: () => void }
+
+/** A server's new name, tidied and checked as every client's names are (`cleanName`). */
+const RenameForm = ({ server, keeping, serverId, onDone }: RenameFormProps) => {
   const id = useId()
   const [name, setName] = useState(server.name)
   const [isBadName, setBadName] = useState(false)
   const queryClient = useQueryClient()
   const rename = useMutation({
-    mutationFn: (newName: string) =>
-      keeping.client.renameServer({ id: server.rowId, name: newName }),
+    mutationFn: (newName: string) => renameServer({ server, keeping, serverId, name: newName }),
     onSuccess: async () => {
       await afterServersChanged({ queryClient, userId: keeping.userId })
       onDone()
     },
   })
-  const rows = servers.flatMap((entry) =>
-    entry.kind === SERVER_KINDS.account ? [{ id: entry.rowId, name: entry.name }] : [],
-  )
   const save = (event: FormEvent) => {
     event.preventDefault()
-    const renamed = renamedServers({ servers: rows, id: server.rowId, name })
-    const cleaned = renamed?.find((row) => row.id === server.rowId)?.name ?? null
+    const cleaned = cleanName(name)
     setBadName(cleaned === null)
     if (cleaned !== null) rename.mutate(cleaned)
   }
@@ -93,17 +106,17 @@ const RenameForm = ({ server, servers, keeping, onDone }: RenameFormProps) => {
 
 type ServerRowProps = {
   server: ServerEntry
-  servers: readonly ServerEntry[]
   /** Set where the viewer may change the list: signed in, with accounts on. */
   keeping: AccountKeeping | null
 }
 
 /**
  * One server: its name, its address, and what it is (home, in use, or out of this page's reach
- * at an http address), with Use for another one in reach and, for one the account added,
- * Rename and Remove. Removing the one in use goes home first.
+ * at an http address), with Use for another one in reach, Rename for any the account can name
+ * (the home one too, once its id is read) and Remove for one the account added. Removing the
+ * one in use goes home first.
  */
-const ServerRow = ({ server, servers, keeping }: ServerRowProps) => {
+const ServerRow = ({ server, keeping }: ServerRowProps) => {
   const [isRenaming, setRenaming] = useState(false)
   const queryClient = useQueryClient()
   const open = useOpenServer()
@@ -118,6 +131,10 @@ const ServerRow = ({ server, servers, keeping }: ServerRowProps) => {
   })
   const kept: KeptServer | null =
     server.kind === SERVER_KINDS.account && keeping !== null ? { server, keeping } : null
+  const renamable: RenamableServer | null =
+    keeping !== null && server.serverId !== null
+      ? { server, keeping, serverId: server.serverId }
+      : null
   return (
     <li className={classNames([styles.server, isActive && styles.active])}>
       <span className={styles.facts}>
@@ -137,33 +154,28 @@ const ServerRow = ({ server, servers, keeping }: ServerRowProps) => {
             {COPY.use}
           </Button>
         )}
+        {renamable !== null && !isRenaming && (
+          <Button
+            icon="edit"
+            aria-label={COPY.renameName(server.name)}
+            onClick={() => setRenaming(true)}
+          >
+            {COPY.rename}
+          </Button>
+        )}
         {kept !== null && !isRenaming && (
-          <>
-            <Button
-              icon="edit"
-              aria-label={COPY.renameName(server.name)}
-              onClick={() => setRenaming(true)}
-            >
-              {COPY.rename}
-            </Button>
-            <Button
-              icon="trash"
-              aria-label={COPY.removeName(server.name)}
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(kept)}
-            >
-              {COPY.remove}
-            </Button>
-          </>
+          <Button
+            icon="trash"
+            aria-label={COPY.removeName(server.name)}
+            disabled={remove.isPending}
+            onClick={() => remove.mutate(kept)}
+          >
+            {COPY.remove}
+          </Button>
         )}
       </span>
-      {kept !== null && isRenaming && (
-        <RenameForm
-          server={kept.server}
-          servers={servers}
-          keeping={kept.keeping}
-          onDone={() => setRenaming(false)}
-        />
+      {renamable !== null && isRenaming && (
+        <RenameForm {...renamable} onDone={() => setRenaming(false)} />
       )}
       {remove.isError && (
         <p className={settings.error} role="alert">
@@ -171,6 +183,41 @@ const ServerRow = ({ server, servers, keeping }: ServerRowProps) => {
         </p>
       )}
     </li>
+  )
+}
+
+type PinServersChoiceProps = { keeping: AccountKeeping }
+
+/**
+ * Whether each pinned library names its server while the account keeps several: the account's
+ * choice, so it follows it to every app. The Libraries page names the server whatever it says.
+ */
+const PinServersChoice = ({ keeping }: PinServersChoiceProps) => {
+  const queryClient = useQueryClient()
+  const preferences = useQuery(accountPreferencesQuery(keeping))
+  const change = useMutation({
+    mutationFn: (showPinServers: boolean) => keeping.client.setPreferences({ showPinServers }),
+    onSuccess: (written) =>
+      queryClient.setQueryData(accountPreferencesQuery(keeping).queryKey, written),
+  })
+  const isKeptOn = preferences.data?.showPinServers ?? DEFAULT_ACCOUNT_PREFERENCES.showPinServers
+  // While the change saves it shows at once; a refused change goes back to what is kept.
+  const isChecked = change.isPending ? change.variables : isKeptOn
+  return (
+    <>
+      <ToggleChoice
+        label={COPY.showPinServers}
+        hint={COPY.showPinServersHint}
+        isChecked={isChecked}
+        disabled={change.isPending || preferences.isPlaceholderData}
+        onChange={(checked) => change.mutate(checked)}
+      />
+      {change.isError && (
+        <p className={settings.error} role="alert">
+          {COPY.failed(change.error.message)}
+        </p>
+      )}
+    </>
   )
 }
 
@@ -254,8 +301,8 @@ const AddServer = ({ servers, keeping }: AddServerProps) => {
 
 /**
  * Where the media comes from: the home server (the one this page came from) first, then the
- * account's others, the one in use marked, each to switch to; the account's own can be renamed
- * and removed, and a new one added by its address. With accounts off, or no one signed in,
+ * account's others, the one in use marked, each to switch to and to rename; the account's own
+ * can be removed, a new one added by its address, and the pins' server names turned off. With accounts off, or no one signed in,
  * there is only the home server. In Raven, main reads a new server's health and switches its
  * own reach to the one in use (`desktop/servers.ts`).
  */
@@ -266,10 +313,11 @@ export const ServerSection = () => {
     <Section icon="globe" title={COPY.heading} help={COPY.help}>
       <ul className={styles.servers} aria-label={COPY.list}>
         {servers.map((server) => (
-          <ServerRow key={server.key} server={server} servers={servers} keeping={keeping} />
+          <ServerRow key={server.key} server={server} keeping={keeping} />
         ))}
       </ul>
       {keeping !== null && <AddServer servers={servers} keeping={keeping} />}
+      {keeping !== null && <PinServersChoice keeping={keeping} />}
       {keeping === null && <p className={settings.hint}>{COPY.signInToAdd}</p>}
     </Section>
   )

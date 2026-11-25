@@ -1,5 +1,10 @@
 import { queryOptions, skipToken } from '@tanstack/react-query'
-import type { AccountDataClient, ApiClient, ServerId } from '@raven/core'
+import {
+  type AccountDataClient,
+  type ApiClient,
+  DEFAULT_ACCOUNT_PREFERENCES,
+  type ServerId,
+} from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 
 type AccountDataQueryProps<TRead extends keyof AccountDataClient> = {
@@ -14,6 +19,24 @@ export const accountServersQuery = ({ client, userId }: AccountDataQueryProps<'l
   queryOptions({
     queryKey: queryKeys.accountServers(userId),
     queryFn: client === null || userId === null ? skipToken : () => client.listServers(),
+  })
+
+/** The names the account gave servers it keeps no row for: its home one. */
+export const serverNamesQuery = ({ client, userId }: AccountDataQueryProps<'listServerNames'>) =>
+  queryOptions({
+    queryKey: queryKeys.serverNames(userId),
+    queryFn: client === null || userId === null ? skipToken : () => client.listServerNames(),
+  })
+
+/** The account's choices; the defaults stand while there is no client or no one signed in. */
+export const accountPreferencesQuery = ({
+  client,
+  userId,
+}: AccountDataQueryProps<'readPreferences'>) =>
+  queryOptions({
+    queryKey: queryKeys.accountPreferences(userId),
+    queryFn: client === null || userId === null ? skipToken : () => client.readPreferences(),
+    placeholderData: DEFAULT_ACCOUNT_PREFERENCES,
   })
 
 /** The libraries the account pinned, on every server, oldest pin first. */

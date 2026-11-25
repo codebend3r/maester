@@ -91,6 +91,15 @@ type QueryKeysItemImagesInProps = { id: number; libraryId: number }
 /** The prefix of every key the account's own database rows are cached under. */
 const ACCOUNT_DATA_KEY = 'account-data'
 
+/** What each of the account's own queries holds, under `ACCOUNT_DATA_KEY`. */
+const ACCOUNT_DATA_PARTS = {
+  servers: 'servers',
+  serverNames: 'server-names',
+  preferences: 'preferences',
+  pins: 'pins',
+  serverLibraries: 'server-libraries',
+} as const
+
 /**
  * Every cache key, in one place. An id may be null for a query that waits on
  * it (`skipToken`); the key still names what it would hold.
@@ -106,13 +115,29 @@ export const queryKeys = {
   /** The account's own rows in its Supabase database, which stay as they are when the app changes server. */
   accountData: [ACCOUNT_DATA_KEY],
   /** The account's extra servers, beside the home one. */
-  accountServers: (userId: string | null) => [ACCOUNT_DATA_KEY, 'servers', userId],
+  accountServers: (userId: string | null) => [ACCOUNT_DATA_KEY, ACCOUNT_DATA_PARTS.servers, userId],
+  /** The names the account gave servers it keeps no row for: its home one. */
+  serverNames: (userId: string | null) => [
+    ACCOUNT_DATA_KEY,
+    ACCOUNT_DATA_PARTS.serverNames,
+    userId,
+  ],
+  /** The account's choices that follow it to every app. */
+  accountPreferences: (userId: string | null) => [
+    ACCOUNT_DATA_KEY,
+    ACCOUNT_DATA_PARTS.preferences,
+    userId,
+  ],
   /** The prefix the account's pins share, whoever is signed in. */
-  accountPins: [ACCOUNT_DATA_KEY, 'pins'],
+  accountPins: [ACCOUNT_DATA_KEY, ACCOUNT_DATA_PARTS.pins],
   /** The libraries the account pinned, on every server. */
-  libraryPins: (userId: string | null) => [ACCOUNT_DATA_KEY, 'pins', userId],
+  libraryPins: (userId: string | null) => [ACCOUNT_DATA_KEY, ACCOUNT_DATA_PARTS.pins, userId],
   /** Another server's libraries, read for the pins the account keeps on it. */
-  serverLibraries: (serverId: string) => [ACCOUNT_DATA_KEY, 'server-libraries', serverId],
+  serverLibraries: (serverId: string) => [
+    ACCOUNT_DATA_KEY,
+    ACCOUNT_DATA_PARTS.serverLibraries,
+    serverId,
+  ],
   libraries: ['libraries'],
   library: (id: number | null) => ['libraries', id],
   media: ({ libraryId, search, sort, seed }: QueryKeysMediaProps) => [

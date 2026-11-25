@@ -162,6 +162,61 @@ describe('createAccountDataClient', () => {
     expect(calls[0]!.init?.method).toBe(HTTP_METHODS.delete)
   })
 
+  it('names a server by upserting on the account and the server', async () => {
+    const named = { serverId: SERVER_ID, name: 'Vhagar' }
+    const { client, calls } = clientWith({ response: respond({ body: [named] }) })
+    expect(await client.nameServer({ serverId: SERVER_ID, name: ' Vhagar ' })).toEqual(named)
+    expect(decoded(calls[0]!.url)).toBe(
+      'https://project.supabase.co/rest/v1/server_names?on_conflict=user_id,server_id&select=serverId:server_id,name',
+    )
+    expect(calls[0]!.init?.method).toBe(HTTP_METHODS.post)
+    expect(calls[0]!.init?.headers).toHaveProperty(
+      HEADERS.prefer,
+      'resolution=merge-duplicates,return=representation',
+    )
+    expect(JSON.parse(calls[0]!.init?.body ?? '')).toEqual({ server_id: SERVER_ID, name: 'Vhagar' })
+  })
+
+  it('refuses a blank server name before sending', async () => {
+    const { client, calls } = clientWith({ response: respond({ body: [] }) })
+    await expect(client.nameServer({ serverId: SERVER_ID, name: ' ' })).rejects.toMatchObject({
+      status: HTTP_STATUSES.badRequest,
+    })
+    expect(calls).toEqual([])
+  })
+
+  it('lists the server names', async () => {
+    const named = { serverId: SERVER_ID, name: 'Vhagar' }
+    const { client, calls } = clientWith({ response: respond({ body: [named] }) })
+    expect(await client.listServerNames()).toEqual([named])
+    expect(decoded(calls[0]!.url)).toBe(
+      'https://project.supabase.co/rest/v1/server_names?select=serverId:server_id,name&order=named_at.asc',
+    )
+  })
+
+  it('reads the defaults for an account with no preferences row', async () => {
+    const { client } = clientWith({ response: respond({ body: [] }) })
+    expect(await client.readPreferences()).toEqual({ showPinServers: true })
+  })
+
+  it('reads the preferences the account kept', async () => {
+    const { client } = clientWith({ response: respond({ body: [{ showPinServers: false }] }) })
+    expect(await client.readPreferences()).toEqual({ showPinServers: false })
+  })
+
+  it('writes the preferences by upserting on the account', async () => {
+    const { client, calls } = clientWith({
+      response: respond({ body: [{ showPinServers: false }] }),
+    })
+    expect(await client.setPreferences({ showPinServers: false })).toEqual({
+      showPinServers: false,
+    })
+    expect(decoded(calls[0]!.url)).toBe(
+      'https://project.supabase.co/rest/v1/account_preferences?on_conflict=user_id&select=showPinServers:show_pin_servers',
+    )
+    expect(JSON.parse(calls[0]!.init?.body ?? '')).toEqual({ show_pin_servers: false })
+  })
+
   it('fails with the database message when it refuses', async () => {
     const { client } = clientWith({
       response: respond({

@@ -30,7 +30,7 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/supabase"
 cp -R templates "$tmp/supabase/templates"
-awk '!/^signing_keys_path =/ { gsub("http://localhost:5173", ENVIRON["RAVEN_AUTH_SITE_URL"]); print }' config.toml > "$tmp/supabase/config.toml"
+awk '!/^signing_keys_path =/ { gsub("http://localhost:5175", ENVIRON["RAVEN_AUTH_SITE_URL"]); print }' config.toml > "$tmp/supabase/config.toml"
 printf '\n[auth.email.smtp]\nenabled = true\nhost = "env(SUPABASE_AUTH_SMTP_HOST)"\nport = 587\nuser = "env(SUPABASE_AUTH_SMTP_USER)"\npass = "env(SUPABASE_AUTH_SMTP_PASS)"\nadmin_email = "env(SUPABASE_AUTH_SMTP_FROM)"\nsender_name = "raven"\n' >> "$tmp/supabase/config.toml"
 case "${1:-}" in
   diff|push) supabase config "$1" --project-ref "$SUPABASE_PROJECT_REF" --workdir "$tmp" ;;

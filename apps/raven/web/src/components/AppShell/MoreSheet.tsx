@@ -86,18 +86,16 @@ const SearchTile = ({ onChoose }: SearchTileProps) => (
 
 type PinnedTileProps = {
   pinned: PinnedLibrary
-  /** Whether the account keeps more than one server, so each pin names its own. */
-  hasServers: boolean
   onChoose: () => void
 }
 
 /**
  * A pinned library: its type's icon over its name, and its server's under that while the
- * account keeps several, marked while one of its pages is open. One on another server switches
+ * account keeps several and has not turned that off, marked while one of its pages is open. One on another server switches
  * to it as it opens.
  */
-const PinnedTile = ({ pinned, hasServers, onChoose }: PinnedTileProps) => {
-  const { library, server } = pinned
+const PinnedTile = ({ pinned, onChoose }: PinnedTileProps) => {
+  const { library, serverNote } = pinned
   const isCurrent = useIsCurrent(pinnedPages(pinned))
   const choose = () => {
     followPin(pinned)
@@ -108,7 +106,7 @@ const PinnedTile = ({ pinned, hasServers, onChoose }: PinnedTileProps) => {
       to={libraryPath(library.id)}
       icon={<LibraryIcon settings={library.settings} size={24} />}
       label={library.name}
-      detail={hasServers ? server.name : undefined}
+      detail={serverNote}
       isCurrent={isCurrent}
       onChoose={choose}
     />
@@ -217,12 +215,7 @@ export const MoreSheet = ({
             </h3>
             <ul className={styles.tiles} aria-labelledby={pinnedId}>
               {pinned.map((entry) => (
-                <PinnedTile
-                  key={entry.key}
-                  pinned={entry}
-                  hasServers={hasServers}
-                  onChoose={onChoose}
-                />
+                <PinnedTile key={entry.key} pinned={entry} onChoose={onChoose} />
               ))}
             </ul>
           </>

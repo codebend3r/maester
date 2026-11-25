@@ -64,6 +64,9 @@ export const SETTINGS_COPY = {
     address: 'Server address',
     addressHint: 'Its https address, as https://raven.example.com:8443.',
     signInToAdd: 'Sign in to keep more servers on your account.',
+    showPinServers: 'Show the server on pinned libraries',
+    showPinServersHint:
+      'While you keep more than one server, each pinned library names its server under it. The Libraries page always names it.',
     failed: (message: string) => `That did not work: ${message}`,
     problems: {
       address:
@@ -172,7 +175,14 @@ export const SETTINGS_COPY = {
   },
   tabs: {
     label: 'Settings',
-    preferences: 'Preferences',
+    playback: 'Playback',
+    subtitles: 'Subtitles',
+    audio: 'Audio',
+    servers: 'Servers',
+    account: 'Account',
+    thisApp: 'This app',
+    downloads: 'Downloads',
+    advanced: 'Advanced',
     requests: 'Requests',
   },
   requests: {

@@ -329,7 +329,7 @@ describe('Open videos in Raven on SettingsPage', () => {
 
   it('sits in Playback, off until this browser turns it on', async () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
-    const playback = screen.getByRole('region', { name: 'Playback' })
+    const playback = screen.getByRole('tabpanel', { name: 'Playback' })
     expect(within(playback).queryByRole('radio', { name: /Remux only/ })).toBeNull()
     expect(within(playback).getByRole('heading', { name: 'This browser' })).toBeInTheDocument()
     expect(toggle()).not.toBeChecked()
@@ -386,7 +386,7 @@ describe('Autoplay on SettingsPage', () => {
 
   it('sets how long the countdown runs, from 5 to 60 seconds, 15 at first', () => {
     renderWithProviders({ ui: <SettingsPage />, playback: null })
-    const playback = screen.getByRole('region', { name: 'Playback' })
+    const playback = screen.getByRole('tabpanel', { name: 'Playback' })
     expect(
       within(playback).getByRole('slider', { name: 'Count down to what is up next for' }),
     ).toBe(slider())
@@ -424,7 +424,7 @@ describe('Advanced on SettingsPage', () => {
   const slider = () => screen.getByRole('slider', { name: "Hide the player's controls after" })
 
   it("sets how long the player's controls linger, from three to ten seconds, five at first", () => {
-    renderWithProviders({ ui: <SettingsPage />, playback: null })
+    renderWithProviders({ ui: <SettingsPage />, playback: null, route: '/?tab=advanced' })
     const advanced = screen.getByRole('region', { name: 'Advanced' })
     expect(within(advanced).getByRole('slider')).toBe(slider())
     expect(slider()).toHaveValue('5')
@@ -436,15 +436,14 @@ describe('Advanced on SettingsPage', () => {
     expect(within(advanced).getByText('8 seconds')).toBeInTheDocument()
   })
 
-  it('sits before the admin lock and stays open while the lock is on', () => {
+  it('has a tab of its own, after the others, and stays open while the lock is on', () => {
     renderWithProviders({
       ui: <SettingsPage />,
       playback: null,
       adminLock: { state: 'on', available: true },
+      route: '/?tab=advanced',
     })
-    expect(
-      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
-    ).toEqual(['Playback', 'Servers', 'Scrobbling', 'Advanced'])
+    expect(screen.getByRole('tab', { name: 'Advanced' })).toHaveAttribute('aria-selected', 'true')
     expect(slider()).toBeEnabled()
   })
 })
@@ -466,8 +465,8 @@ describe('accounts on SettingsPage', () => {
     useAuthSession.setState({ client: null, session: null })
   })
 
-  const headings = () =>
-    screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+  const tabs = () =>
+    screen.getAllByRole('tab').map((tab) => (tab.textContent ?? '').replace(/\d+$/u, ''))
 
   const renderSignedIn = (account: Account) => {
     useAuthSession.setState({
@@ -480,7 +479,15 @@ describe('accounts on SettingsPage', () => {
 
   it('shows neither Account nor Users while accounts are off', () => {
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(headings()).toEqual(['Playback', 'Servers', 'Scrobbling', 'Advanced'])
+    expect(tabs()).toEqual([
+      'Playback',
+      'Subtitles',
+      'Audio',
+      'Servers',
+      'Account',
+      'Advanced',
+      'Requests',
+    ])
     expect(spies.me).not.toHaveBeenCalled()
     expect(spies.members).not.toHaveBeenCalled()
   })
@@ -490,28 +497,50 @@ describe('accounts on SettingsPage', () => {
       ui: <SettingsPage />,
       authConfig: { state: AUTH_CONFIG_STATES.unavailable },
     })
-    expect(headings()).toEqual(['Playback', 'Servers', 'Advanced'])
+    expect(tabs()).toEqual(['Playback', 'Subtitles', 'Audio', 'Servers', 'Advanced', 'Requests'])
     expect(spies.me).not.toHaveBeenCalled()
   })
 
   it('shows neither to an account that is not approved', async () => {
     renderSignedIn(fakeAccount({ status: MEMBER_STATUSES.pending, isOwner: true }))
     await waitFor(() => expect(spies.me).toHaveBeenCalled())
-    expect(headings()).toEqual(['Playback', 'Servers', 'Advanced'])
+    expect(tabs()).toEqual(['Playback', 'Subtitles', 'Audio', 'Servers', 'Advanced', 'Requests'])
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('shows Account but not Users to a member', async () => {
     renderSignedIn(fakeAccount())
-    await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Servers', 'Scrobbling', 'Advanced'])
+    await screen.findByRole('tab', { name: 'Account' })
+    expect(tabs()).toEqual([
+      'Playback',
+      'Subtitles',
+      'Audio',
+      'Servers',
+      'Account',
+      'Advanced',
+      'Requests',
+    ])
+    await userEvent.click(screen.getByRole('tab', { name: 'Account' }))
+    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Scrobbling' })).toBeInTheDocument()
     expect(spies.members).not.toHaveBeenCalled()
   })
 
   it('keeps admin settings and Users off the personal settings page for the owner too', async () => {
     renderSignedIn(fakeAccount({ isOwner: true }))
-    await screen.findByRole('heading', { name: 'Account' })
-    expect(headings()).toEqual(['Playback', 'Account', 'Servers', 'Scrobbling', 'Advanced'])
+    await screen.findByRole('tab', { name: 'Account' })
+    expect(tabs()).toEqual([
+      'Playback',
+      'Subtitles',
+      'Audio',
+      'Servers',
+      'Account',
+      'Advanced',
+      'Requests',
+    ])
+    await userEvent.click(screen.getByRole('tab', { name: 'Account' }))
+    expect(await screen.findByRole('heading', { name: 'Account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Scrobbling' })).toBeInTheDocument()
     expect(spies.members).not.toHaveBeenCalled()
   })
 
@@ -539,7 +568,7 @@ describe('accounts on SettingsPage', () => {
 
     it('holds them for a member, who is told only the owner can change them', async () => {
       renderSignedIn(fakeAccount())
-      await screen.findByRole('heading', { name: 'Account' })
+      await screen.findByRole('tab', { name: 'Account' })
       expect(screen.queryByRole('radio', { name: /Remux only/ })).toBeNull()
       cleanup()
       renderWithProviders({ ui: <AdminPage />, account: fakeAccount() })
@@ -569,6 +598,7 @@ describe('SettingsPage inside Raven', () => {
     expect(screen.queryByRole('checkbox', { name: /^Open videos in Raven/ })).toBeNull()
     expect(screen.getByRole('heading', { name: 'This app' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /^Autoplay/ })).toBeChecked()
+    await userEvent.click(screen.getByRole('tab', { name: 'This app' }))
     expect(screen.getByRole('region', { name: 'Downloads' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'This computer' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Updates' })).toBeInTheDocument()

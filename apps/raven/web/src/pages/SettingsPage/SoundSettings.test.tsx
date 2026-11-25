@@ -26,14 +26,14 @@ const LATER = "Crossfade plays in the browser and in Wren; Raven's player joins 
 
 const prefs = () => usePlayerPrefs.getState()
 
-const music = () => screen.getByRole('region', { name: 'Playback' })
+const music = () => screen.getByRole('tabpanel', { name: 'Audio' })
 
 /** A music engine that is there and takes every command. */
 const nativeEngine: NativeAudio = { send: async () => {}, subscribe: () => () => undefined }
 
 describe('music on SettingsPage', () => {
   it('picks the music quality and the volume levelling for this browser', async () => {
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     const quality = within(music()).getByRole('group', { name: 'Music quality' })
     expect(within(quality).getByRole('radio', { name: /^Original/ })).toBeChecked()
     await userEvent.click(within(quality).getByRole('radio', { name: /^256 kbps/ }))
@@ -45,7 +45,7 @@ describe('music on SettingsPage', () => {
   })
 
   it('crossfades by one of its steps, off at first', () => {
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     const crossfade = screen.getByRole('slider', { name: 'Crossfade' })
     expect(crossfade).toHaveAttribute('aria-valuetext', 'Off')
     fireEvent.change(crossfade, { target: { value: '5' } })
@@ -54,7 +54,7 @@ describe('music on SettingsPage', () => {
   })
 
   it('labels the equalizer bands from 32 Hz to 16 kHz, flat at first', () => {
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     const bands = screen.getByRole('list', { name: 'Equalizer bands' })
     expect(within(bands).getAllByRole('slider')).toHaveLength(10)
     BAND_NAMES.forEach((name) => {
@@ -67,7 +67,7 @@ describe('music on SettingsPage', () => {
   })
 
   it('sets a preset, and turns custom once a band is moved by hand', async () => {
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     await userEvent.click(screen.getByRole('radio', { name: /^Bass boost/ }))
     expect(prefs().equalizer).toEqual({
       preset: EQ_PRESET_NAMES.bassBoost,
@@ -88,7 +88,7 @@ describe('music on SettingsPage', () => {
     asPlayingDesktop({
       audio: audioConnectionsOf({ status: CONNECTION_STATUSES.native, player: nativeEngine }),
     })
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     expect(screen.queryByRole('slider', { name: 'Crossfade' })).toBeNull()
     expect(screen.getByText(LATER)).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: '32 Hz' })).toBeInTheDocument()
@@ -100,7 +100,7 @@ describe('music on SettingsPage', () => {
     ['was lost', { status: CONNECTION_STATUSES.lost, message: 'Gone.' }],
   ])('offers crossfade inside Raven while its music engine %s', (_when, connection) => {
     asPlayingDesktop({ audio: audioConnectionsOf(connection) })
-    renderWithProviders({ ui: <SettingsPage /> })
+    renderWithProviders({ ui: <SettingsPage />, route: '/?tab=audio' })
     expect(screen.getByRole('slider', { name: 'Crossfade' })).toBeInTheDocument()
     expect(screen.queryByText(LATER)).toBeNull()
   })

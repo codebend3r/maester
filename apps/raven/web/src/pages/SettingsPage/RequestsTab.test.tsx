@@ -63,15 +63,12 @@ describe("Settings' Requests tab", () => {
     captionStyle.mockReset()
   })
 
-  it('opens on Preferences, with the requests a tab away and counted', async () => {
+  it('opens on Playback, with the requests a tab away and counted', async () => {
     listRequests.mockImplementation(async () => REQUESTS)
     renderWithProviders({ ui: <SettingsPage /> })
-    expect(screen.getByRole('tab', { name: 'Preferences' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    expect(screen.getByRole('tab', { name: 'Playback' })).toHaveAttribute('aria-selected', 'true')
     expect(await screen.findByRole('tab', { name: 'Requests 2' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Playback' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /^Autoplay/ })).toBeInTheDocument()
   })
 
   it("lists only the caller's own requests, each with its kind, time and status", async () => {

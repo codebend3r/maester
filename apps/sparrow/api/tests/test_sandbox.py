@@ -22,7 +22,7 @@ def test_it_opens_a_blank_world_as_an_admin_with_no_sign_in(client):
         "tier": "admin",
     }
     state = web.get("/api/sandbox").json()
-    assert state["model"] == "fake" and state["raven"] == "http://localhost:5174"
+    assert state["model"] == "fake" and state["raven"] == "http://localhost:5175"
     assert state["case"] == {"id": BLANK, "name": "Blank world", "turns": []}
     ids = [c["id"] for c in state["cases"]]
     assert ids[0] == BLANK and "simple_request" in ids
@@ -95,7 +95,7 @@ def test_it_runs_sonnet_through_claude_code_and_needs_it_installed(monkeypatch, 
     monkeypatch.delenv("RAVEN_URL", raising=False)
     assert sandbox_module.main([]) == 0
     assert os.environ[sandbox_module.CHOICES["model"]] == "claude-sonnet-5-5"
-    assert os.environ[sandbox_module.CHOICES["raven"]] == "http://localhost:5174"
+    assert os.environ[sandbox_module.CHOICES["raven"]] == "http://localhost:5175"
     sandbox = Sandbox("claude-sonnet-5-5")
     assert isinstance(sandbox.client, ClaudeCodeModel)
     assert sandbox.world.chat.agent.client is sandbox.client
@@ -103,8 +103,8 @@ def test_it_runs_sonnet_through_claude_code_and_needs_it_installed(monkeypatch, 
 
 
 def test_the_real_raven_stands_in_for_every_case_fake():
-    sandbox = Sandbox("fake", raven_url="http://localhost:5174")
-    assert sandbox.state()["raven"] == "http://localhost:5174"
+    sandbox = Sandbox("fake", raven_url="http://localhost:5175")
+    assert sandbox.state()["raven"] == "http://localhost:5175"
     sandbox.open("simple_request")
     assert sandbox.world.chat.agent.services.raven is sandbox.raven
 

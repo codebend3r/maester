@@ -1,5 +1,5 @@
 import { isMediaId, isUuid } from '@/contract/ids'
-import { type Infer, isString, object } from '@/schema'
+import { type Infer, isBoolean, isString, object } from '@/schema'
 import { isServerOrigin } from '@/serverOrigin'
 
 /**
@@ -33,3 +33,24 @@ export const isLibraryPin = object({
 })
 
 export type LibraryPin = Infer<typeof isLibraryPin>
+
+/** The name the account gave a server it keeps no row for: the home server an app came with. */
+export const isServerName = object({
+  serverId: isServerId,
+  name: isString,
+})
+
+export type ServerName = Infer<typeof isServerName>
+
+/** The account's choices that follow it to every app. */
+export const isAccountPreferences = object({
+  /** Whether a pinned library shows its server's name beside it while the account keeps several servers. */
+  showPinServers: isBoolean,
+})
+
+export type AccountPreferences = Infer<typeof isAccountPreferences>
+
+/** What an account that never changed a preference reads. */
+export const DEFAULT_ACCOUNT_PREFERENCES = {
+  showPinServers: true,
+} as const satisfies AccountPreferences

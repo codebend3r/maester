@@ -10,7 +10,12 @@ import {
   serverNameFor,
   serverOriginOf,
 } from '@raven/core'
-import { type ActiveServer, accountServersQuery, useActiveServer } from '@raven/ui/headless'
+import {
+  type ActiveServer,
+  accountServersQuery,
+  serverNamesQuery,
+  useActiveServer,
+} from '@raven/ui/headless'
 import { useNavigate } from 'react-router-dom'
 import { DESKTOP_HOST_COPY } from '@/desktop/copy'
 import { useAccountData } from '@/lib/accountData'
@@ -33,7 +38,8 @@ type ServerFacts = {
   apiBase: string
 }
 
-type HomeEntry = ServerFacts & {
+/** The server the page came from. */
+export type HomeEntry = ServerFacts & {
   kind: typeof SERVER_KINDS.home
   /** Left out by a server older than multi-server support, which no pin or row can name. */
   serverId: ServerId | null
@@ -69,17 +75,20 @@ export const isReachableFromPage = ({
 
 /**
  * The server the page came from: its origin as `serverOrigin` names it, and its id once read.
- * Inside Raven the page's origin is main's loopback host, so the home server goes by raven's name.
+ * It goes by the name the account gave it, else by its address; inside Raven the page's origin
+ * is main's loopback host, so there it goes by raven's name instead.
  */
-export const useHomeServer = (): ServerEntry => {
+export const useHomeServer = (): HomeEntry => {
   const serverId = useQuery(authConfigQuery).data?.serverId ?? null
+  const names = useQuery(serverNamesQuery(useAccountData())).data ?? []
   const isDesktop = useIsDesktop()
   const origin = serverOrigin()
+  const fallback = isDesktop ? DESKTOP_HOST_COPY.homeServer : serverNameFor(origin)
   return {
     kind: SERVER_KINDS.home,
     key: serverId ?? SERVER_KINDS.home,
     serverId,
-    name: isDesktop ? DESKTOP_HOST_COPY.homeServer : serverNameFor(origin),
+    name: names.find((named) => named.serverId === serverId)?.name ?? fallback,
     origin,
     apiBase: '',
   }
@@ -103,6 +112,20 @@ export const useServers = (): ServerEntry[] => {
   const home = useHomeServer()
   const rows = useQuery(accountServersQuery(useAccountData())).data ?? []
   return [home, ...rows.filter((row) => row.serverId !== home.serverId).map(accountEntryOf)]
+}
+
+/** Whether the account keeps more than the home server, so each place names which one it means. */
+export const keepsSeveralServers = (servers: readonly ServerEntry[]): boolean => servers.length > 1
+
+/**
+ * The name of the server in use while the account keeps several, which the Libraries page shows
+ * on every library whatever the pins' choice; null while there is only the one.
+ */
+export const useActiveServerName = (): string | null => {
+  const servers = useServers()
+  const active = useActiveServer((state) => state.active)
+  if (!keepsSeveralServers(servers)) return null
+  return servers.find((server) => isActiveEntry({ server, active }))?.name ?? null
 }
 
 /** The active server's id: the home one's (null for one too old to have one) or the one chosen. */

@@ -20,6 +20,7 @@ export const LIBRARIES_COPY = {
   locked: ' · Locked',
   unlocked: ' · Unlocked',
   notMatched: (n: number) => ` · ${count.format(n)} not matched`,
+  onServer: (name: string) => ` · on ${name}`,
   collapse: (name: string) => `Collapse ${name}`,
   expand: (name: string) => `Expand ${name}`,
   showLess: 'Show less',

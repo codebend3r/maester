@@ -35,6 +35,7 @@ rewrite() {
   "
 }
 rewrite vhagar Vhagar
+rewrite balerion Media
 rewrite caraxes Caraxes
 rewrite meleys Meleys
 rewrite syrax Syrax

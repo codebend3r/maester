@@ -2,11 +2,16 @@ import { HTTP_STATUSES } from '@shared/http'
 import { type CreatePostgrestProps, type RowsRead, createPostgrest } from '@/accountData/postgrest'
 import { ApiError } from '@/apiClient/transport'
 import {
+  type AccountPreferences,
   type AccountServer,
+  DEFAULT_ACCOUNT_PREFERENCES,
   type LibraryPin,
   type ServerId,
+  type ServerName,
+  isAccountPreferences,
   isAccountServer,
   isLibraryPin,
+  isServerName,
 } from '@/contract'
 import { cleanName } from '@/names'
 import { serverOriginOf } from '@/serverOrigin'
@@ -17,6 +22,8 @@ export { ACCOUNT_REST_PATH, POSTGREST } from '@/accountData/postgrest'
 export const ACCOUNT_TABLES = {
   servers: 'account_servers',
   pins: 'library_pins',
+  serverNames: 'server_names',
+  preferences: 'account_preferences',
 } as const
 
 /** The columns the clients send and filter on, as the tables name them. */
@@ -28,6 +35,9 @@ export const ACCOUNT_COLUMNS = {
   origin: 'origin',
   addedAt: 'added_at',
   pinnedAt: 'pinned_at',
+  userId: 'user_id',
+  namedAt: 'named_at',
+  showPinServers: 'show_pin_servers',
 } as const
 
 /** A server row read back in the contract's names: PostgREST renames `alias:column`. */
@@ -52,11 +62,23 @@ const PIN_ROWS = {
   guard: isLibraryPin,
 } as const satisfies RowsRead<LibraryPin>
 
-/** Why a server's write was refused: before it was sent, or for matching no row of the account's. */
+/** A server name row read back in the contract's names. */
+const SERVER_NAME_ROWS = {
+  select: [`serverId:${ACCOUNT_COLUMNS.serverId}`, ACCOUNT_COLUMNS.name].join(','),
+  guard: isServerName,
+} as const satisfies RowsRead<ServerName>
+
+/** The account's preferences row read back in the contract's names. */
+const PREFERENCES_ROWS = {
+  select: `showPinServers:${ACCOUNT_COLUMNS.showPinServers}`,
+  guard: isAccountPreferences,
+} as const satisfies RowsRead<AccountPreferences>
+
+/** Why a write to the account's rows was refused: before it was sent, or for matching no row of the account's. */
 const ACCOUNT_DATA_PROBLEMS = {
   name: 'A server name must be 1 to 80 characters with no hidden characters.',
   origin: 'A server address must be an http or https origin.',
-  notFound: 'That server is not on this account.',
+  notFound: 'That is not on this account.',
 } as const
 
 type AddServerProps = { serverId: ServerId; name: string; origin: string }
@@ -66,6 +88,10 @@ type RenameServerProps = { id: string; name: string }
 type RemoveServerProps = { id: string }
 
 type PinProps = { serverId: ServerId; libraryId: number }
+
+type NameServerProps = { serverId: ServerId; name: string }
+
+type SetPreferencesProps = AccountPreferences
 
 /** `name` as `cleanName` tidies it, refused before it is sent when it will not do. */
 const cleanNameOrThrow = (name: string): string => {
@@ -85,8 +111,8 @@ const cleanOriginOrThrow = (origin: string): string => {
   return cleaned
 }
 
-/** The one server row a write answered with, or a 404 when no row of the caller's matched. */
-const writtenServer = ([row]: readonly AccountServer[]): AccountServer => {
+/** The one row a write answered with, or a 404 when no row of the caller's matched. */
+const writtenRow = <T>([row]: readonly T[]): T => {
   if (row === undefined) {
     throw new ApiError({ status: HTTP_STATUSES.notFound, message: ACCOUNT_DATA_PROBLEMS.notFound })
   }
@@ -114,7 +140,7 @@ export const createAccountDataClient = (props: CreatePostgrestProps) => {
     /** Adds a server by its id, with its name tidied and its address read as `serverOriginOf` reads it. */
     addServer: async ({ serverId, name, origin }: AddServerProps): Promise<AccountServer> => {
       const cleanedOrigin = cleanOriginOrThrow(origin)
-      return writtenServer(
+      return writtenRow(
         await rest.insert({
           table: ACCOUNT_TABLES.servers,
           row: {
@@ -129,7 +155,7 @@ export const createAccountDataClient = (props: CreatePostgrestProps) => {
 
     /** Gives one of the account's servers a new name. */
     renameServer: async ({ id, name }: RenameServerProps): Promise<AccountServer> =>
-      writtenServer(
+      writtenRow(
         await rest.update({
           table: ACCOUNT_TABLES.servers,
           where: { [ACCOUNT_COLUMNS.id]: id },
@@ -141,6 +167,49 @@ export const createAccountDataClient = (props: CreatePostgrestProps) => {
     /** Takes a server off the account, and with it every pin on that server. */
     removeServer: ({ id }: RemoveServerProps): Promise<void> =>
       rest.remove({ table: ACCOUNT_TABLES.servers, where: { [ACCOUNT_COLUMNS.id]: id } }),
+
+    /** The names the account gave servers it keeps no row for, oldest first. */
+    listServerNames: (): Promise<ServerName[]> =>
+      rest.list({
+        table: ACCOUNT_TABLES.serverNames,
+        ...SERVER_NAME_ROWS,
+        orderBy: ACCOUNT_COLUMNS.namedAt,
+      }),
+
+    /** Names a server the account keeps no row for (its home one), or names it again. */
+    nameServer: async ({ serverId, name }: NameServerProps): Promise<ServerName> =>
+      writtenRow(
+        await rest.upsert({
+          table: ACCOUNT_TABLES.serverNames,
+          row: {
+            [ACCOUNT_COLUMNS.serverId]: serverId,
+            [ACCOUNT_COLUMNS.name]: cleanNameOrThrow(name),
+          },
+          returning: SERVER_NAME_ROWS,
+          onConflict: [ACCOUNT_COLUMNS.userId, ACCOUNT_COLUMNS.serverId],
+        }),
+      ),
+
+    /** The account's preferences, or the defaults for one that never changed them. */
+    readPreferences: async (): Promise<AccountPreferences> => {
+      const [row] = await rest.list({
+        table: ACCOUNT_TABLES.preferences,
+        ...PREFERENCES_ROWS,
+        orderBy: ACCOUNT_COLUMNS.userId,
+      })
+      return row ?? DEFAULT_ACCOUNT_PREFERENCES
+    },
+
+    /** Writes the account's preferences, making its row the first time. */
+    setPreferences: async ({ showPinServers }: SetPreferencesProps): Promise<AccountPreferences> =>
+      writtenRow(
+        await rest.upsert({
+          table: ACCOUNT_TABLES.preferences,
+          row: { [ACCOUNT_COLUMNS.showPinServers]: showPinServers },
+          returning: PREFERENCES_ROWS,
+          onConflict: [ACCOUNT_COLUMNS.userId],
+        }),
+      ),
 
     /** The account's pinned libraries on every server, in the order they were pinned. */
     listPins: (): Promise<LibraryPin[]> =>

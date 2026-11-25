@@ -16,7 +16,7 @@ Run from the repo root, each server with `run_in_background`, logs in the scratc
 1. **See what already runs.**
 
    ```bash
-   for p in 5173 5185 8484 8490; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
+   for p in 5175 5185 8484 8490; do echo "$p $(curl -s -m 2 -o /dev/null -w '%{http_code}' http://localhost:$p/api/health)"; done
    pgrep -fl 'tsx watch|vite|nx run-many'
    ```
 

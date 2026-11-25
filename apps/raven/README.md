@@ -11,7 +11,7 @@ raven is the `apps/raven/` folder of an Nx workspace; the [root README](../../RE
 
 ## Accounts
 
-Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` in `apps/raven/.env` and raven runs with accounts `ready`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5173`. See the [database runbook](supabase/README.md) for setup, owner bootstrap and the cutover steps.
+Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `RAVEN_WEB_URL` in `apps/raven/.env` and raven runs with accounts `ready`. Both URLs are origins, with HTTPS required except on loopback. No service-role key is used or accepted. Compose already passes the product env file to the server. For a local stack, use `http://127.0.0.1:54321`, the local publishable key and `http://localhost:5175`. See the [database runbook](supabase/README.md) for setup, owner bootstrap and the cutover steps.
 
 With none of the three set, raven runs `off`: open to anyone who reaches it, with the [admin lock](#admin-lock) and the per-browser PIN, exactly as before accounts. With only some set, or set badly, it runs `unavailable`.
 
@@ -81,7 +81,7 @@ The index and thumbnails live in `./data` (mounted at `/config`). The image runs
 
 ### Running on Vhagar
 
-raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other four through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/`. Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
+raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other five through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/` (Balerion's is its `Media` share). Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
 
 Merges to `main` deploy themselves:
 
@@ -419,7 +419,7 @@ From the repo root:
 
 ```bash
 bun install
-bun run dev:raven   # shared player build watcher, server on :8484 (watch mode, no scan on start) and Vite on :5173, proxying /api
+bun run dev:raven   # shared player build watcher, server on :8484 (watch mode, no scan on start) and Vite on :5175, proxying /api
 bun run dev:raven:prod   # same, but no local server: Vite proxies /api to the Netlify site, which proxies it to Vhagar's public origin (a terminal without macOS Local Network access cannot reach the LAN one), so it reads and writes the production database
 bun run dev:raven:db   # stop the local server first: replaces data/raven.db with a copy of Vhagar's (old one kept in data/backups), rewrites media paths to /Volumes and refreshes posters and thumbnails
 bun run verify         # spellcheck, one command per script, lint (gale for the SCSS), format check, typecheck, tests and build for every project

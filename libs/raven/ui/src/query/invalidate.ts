@@ -125,7 +125,11 @@ export const afterServersChanged = ({
 }: AfterServersChangedProps): Promise<unknown> =>
   refetch({
     queryClient,
-    filters: [{ queryKey: queryKeys.accountServers(userId) }, { queryKey: queryKeys.accountPins }],
+    filters: [
+      { queryKey: queryKeys.accountServers(userId) },
+      { queryKey: queryKeys.serverNames(userId) },
+      { queryKey: queryKeys.accountPins },
+    ],
   })
 
 /** The libraries were put in a new order: every library, and home, whose shelves follow it. */
