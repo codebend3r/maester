@@ -1,6 +1,6 @@
 {
   "name": "@raven/native",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "description": "raven's sign-in and media access on React Native, shared by the device app and Wren",
   "type": "module",
