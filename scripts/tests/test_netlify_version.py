@@ -111,6 +111,6 @@ def test_failed_version_lookup_does_not_build(repo: Path):
 def test_builds_the_project_named(repo: Path):
     raven = build(repo)
     assert "@raven/web:build" in raven.stdout
-    wren = build(repo, project=["@raven/music-web"])
+    wren = build(repo, project=["@wren/web"])
     assert wren.returncode == 0, wren.stderr
-    assert "BUILT=0.6.2.2 @raven/music-web:build" in wren.stdout
+    assert "BUILT=0.6.2.2 @wren/web:build" in wren.stdout

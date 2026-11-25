@@ -408,6 +408,11 @@ GROUPS: tuple[Group, ...] = (
                 "Chrome + ffmpeg",
             ),
             Command(
+                "wren:web:e2e",
+                "The 🎵 E2E Wren web job: Playwright drives Wren on the web against a fixture server.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
                 "raven:web:lighthouse",
                 "The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.",
                 "Chrome + ffmpeg",
@@ -419,7 +424,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "e2e",
-                "Every end to end job, one after another: web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.",
+                "Every end to end job, one after another: web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.",
                 "macOS + Xcode + Android SDK",
             ),
         ),

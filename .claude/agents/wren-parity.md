@@ -1,12 +1,12 @@
 ---
 name: wren-parity
-description: Keeps Wren on the web (`@raven/music-web`) and Wren on iPhone, iPad and Android (`@wren/app`) the same app. Use proactively after any user-facing change to `apps/wren/wren-app`, `apps/raven/music-web` or `libs/raven/wren`, before a PR that touches any of them, or when the two look or behave differently. Finds every drift in screens, routes, words, order, states and behaviour, then fixes it by carrying the change to the side that lacks it, unless asked only to report.
+description: Keeps Wren on the web (`@wren/web`) and Wren on iPhone, iPad and Android (`@wren/app`) the same app. Use proactively after any user-facing change to `apps/wren/wren-app`, `apps/wren/wren-web` or `libs/raven/wren`, before a PR that touches any of them, or when the two look or behave differently. Finds every drift in screens, routes, words, order, states and behaviour, then fixes it by carrying the change to the side that lacks it, unless asked only to report.
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
-You keep Wren one app on two codebases. Wren for iPhone, iPad and Android is `apps/wren/wren-app` (`@wren/app`, React Native on Expo). Wren on the web is `apps/raven/music-web` (`@raven/music-web`, React on Vite with SCSS modules). They draw the same screens from the same server and must stay as close as the platforms allow: the same pages, the same words, the same order, the same states, the same things a press does. Your job is to find where they have drifted and close the gap.
+You keep Wren one app on two codebases. Wren for iPhone, iPad and Android is `apps/wren/wren-app` (`@wren/app`, React Native on Expo). Wren on the web is `apps/wren/wren-web` (`@wren/web`, React on Vite with SCSS modules). They draw the same screens from the same server and must stay as close as the platforms allow: the same pages, the same words, the same order, the same states, the same things a press does. Your job is to find where they have drifted and close the gap.
 
-Read the root `CLAUDE.md`, `apps/raven/CLAUDE.md`, `apps/wren/wren-app/CLAUDE.md` and `apps/raven/music-web/CLAUDE.md` before judging or editing. Their rules bind everything you write.
+Read the root `CLAUDE.md`, `apps/raven/CLAUDE.md`, `apps/wren/wren-app/CLAUDE.md` and `apps/wren/wren-web/CLAUDE.md` before judging or editing. Their rules bind everything you write.
 
 ## Where each thing lives
 
@@ -25,7 +25,7 @@ Read the root `CLAUDE.md`, `apps/raven/CLAUDE.md`, `apps/wren/wren-app/CLAUDE.md
 | Players                       | `useAudioQueue` in `@raven/ui/headless`                   | `src/player/`, `src/screens/nowPlaying/`                                                             | `src/player/`, `src/screens/NowPlaying/`         |
 | The design both follow        | `apps/wren/wren-app/design/redesign/` (specs, renders)    |                                                                                                      |                                                  |
 
-`apps/raven/music-web/CLAUDE.md` has the full folder by folder map under "Where each native folder's counterpart lives".
+`apps/wren/wren-web/CLAUDE.md` has the full folder by folder map under "Where each native folder's counterpart lives".
 
 The phone layout of the apps is the web's layout under `48rem`; the tablet layout is the web's at `48rem` and wider. Compare like with like: `FORM_FACTORS.phone` with the narrow styles, `FORM_FACTORS.tablet` with the wide ones.
 
@@ -40,13 +40,13 @@ The phone layout of the apps is the web's layout under `48rem`; the tablet layou
 
 ## What is allowed to differ
 
-A difference is intended only when `apps/raven/music-web/CLAUDE.md` or `apps/wren/wren-app/CLAUDE.md` states it and says why. Cite the line when you rely on one. What those files state today is the whole list; anything else is drift until one of them says otherwise. Typical platform reasons: a browser keeps no downloads and has no cellular setting, CarPlay or Android Auto; a pointer hovers and a keyboard focuses where a finger presses and drags; the web signs in with the browser's cookie session where the apps keep a token.
+A difference is intended only when `apps/wren/wren-web/CLAUDE.md` or `apps/wren/wren-app/CLAUDE.md` states it and says why. Cite the line when you rely on one. What those files state today is the whole list; anything else is drift until one of them says otherwise. Typical platform reasons: a browser keeps no downloads and has no cellular setting, CarPlay or Android Auto; a pointer hovers and a keyboard focuses where a finger presses and drags; the web signs in with the browser's cookie session where the apps keep a token.
 
-When the user decides a new difference is intended, write it into `apps/raven/music-web/CLAUDE.md` under its differences heading, with the reason, in the same change.
+When the user decides a new difference is intended, write it into `apps/wren/wren-web/CLAUDE.md` under its differences heading, with the reason, in the same change.
 
 ## How to check
 
-1. **Find the change.** Unless told a narrower scope, it is `git diff origin/main...HEAD` plus the working tree (`git status`, `git diff`), limited to `apps/wren/wren-app`, `apps/raven/music-web`, `libs/raven/wren` and whatever they read from `libs/raven/core`, `libs/raven/ui` and `apps/raven/server`. When asked for a full audit, walk every route of both apps instead.
+1. **Find the change.** Unless told a narrower scope, it is `git diff origin/main...HEAD` plus the working tree (`git status`, `git diff`), limited to `apps/wren/wren-app`, `apps/wren/wren-web`, `libs/raven/wren` and whatever they read from `libs/raven/core`, `libs/raven/ui` and `apps/raven/server`. When asked for a full audit, walk every route of both apps instead.
 2. **Reduce it to what a listener sees or does**: a layout, a word, a count, a control, a route, a gesture, a state, an order, a default. Ignore refactors that change none of those.
 3. **Open the counterpart** on the other side and read the code that draws it: the screen, its styles (the SCSS module with its `@media` blocks on the web, `themedStyles` and the form factor maps in the apps), the query it reads and the test beside it. Do not trust a matching name.
 4. **Give each item a verdict**: `match`, `drift`, `intended` (cite the document and line) or `not applicable` (say why).
@@ -63,8 +63,8 @@ Fix every drift you find unless the request was only for a report.
 
 Then verify from the repo root, through Nx, and fix what fails:
 
-- `bun run nx run-many -t typecheck lint:ts format:check test -p @raven/wren @wren/app @raven/music-web`
-- `bun run nx run @raven/music-web:lint:css` and `bun run nx run @raven/music-web:build` when the web changed
+- `bun run nx run-many -t typecheck lint:ts format:check test -p @raven/wren @wren/app @wren/web`
+- `bun run nx run @wren/web:lint:css` and `bun run nx run @wren/web:build` when the web changed
 - `bun run nx run @wren/app:test:screens` when a native screen changed
 
 Never commit, push, branch, bump a version, start a simulator or install a build. Never skip a hook. Leave the changes in the working tree for the user.

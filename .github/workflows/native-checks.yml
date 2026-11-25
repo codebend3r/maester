@@ -1,12 +1,13 @@
 name: 🧱 Native checks
 
-# The end to end suites, which run here and nowhere else: raven's web app in Chrome, and the
-# affected desktop, device app and Wren flows. Every push to main runs it, against the last green
-# ancestor. Nothing is built here: a pull request builds the native apps (pull-request-checks.yml)
-# and uploads them, and this run downloads the merged pull request's builds and runs the flows on
-# them. A selected group with no build to find (a push with no pull request, an expired artifact,
-# a group the pull request never built) fails its end to end job, saying so. An end to end failure
-# shows here, after the merge, and emails the pusher, as any failed run on main does.
+# The end to end suites, which run here and nowhere else: raven's web app and Wren on the web in
+# Chrome, and the affected desktop, device app and Wren flows. Every push to main runs it, against
+# the last green ancestor. Nothing is built here: a pull request builds the native apps
+# (pull-request-checks.yml) and uploads them, and this run downloads the merged pull request's
+# builds and runs the flows on them. A selected group with no build to find (a push with no pull
+# request, an expired artifact, a group the pull request never built) fails its end to end job,
+# saying so. An end to end failure shows here, after the merge, and emails the pusher, as any failed
+# run on main does.
 # The device apps' screen tests (`test:screens`) run here too, and on no pull request.
 # A "Release vX.Y.Z" commit (the version-bump skill) runs none of it: it changes only versions,
 # its own pull request builds nothing to test, and the merge before it already ran the flows.
@@ -418,13 +419,18 @@ jobs:
   # fixture, which encodes its clips with ffmpeg. Run on every push, not only where
   # `@raven/web` is affected: the suite drives the server too, which the web does not depend
   # on in the project graph, and the target's inputs name the server's sources, so Nx
-  # restores it from the cache when neither changed.
+  # restores it from the cache when neither changed. What an app needs is its job's `WEB_*`
+  # variables, and the two browser jobs share one list of steps.
   web-e2e:
     name: 🌐 E2E Raven web
     if: *not-a-release
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    steps:
+    env:
+      WEB_PROJECT: '@raven/web'
+      WEB_DIR: apps/raven/web
+      WEB_TRACES: e2e-traces
+    steps: &web-e2e-steps
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
@@ -446,17 +452,32 @@ jobs:
         run: bun install --frozen-lockfile
 
       # `static` keeps every test's output; Nx's CI default collapses passing tasks.
-      - name: 🌐 E2E Raven web
-        run: bunx nx run-many --outputStyle=static -t e2e:browser
+      - name: 🌐 End to end in Chrome
+        run: bunx nx run-many --outputStyle=static -t e2e:browser -p "$WEB_PROJECT"
 
       # Playwright keeps a failed test's trace, which shows each step's page.
       - name: 📤 Upload the traces
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-traces-${{ github.sha }}
-          path: apps/raven/web/test-results
+          name: ${{ env.WEB_TRACES }}-${{ github.sha }}
+          path: ${{ env.WEB_DIR }}/test-results
           if-no-files-found: ignore
+
+  # Wren on the web in Google Chrome, against a fixture server of its own, on its own port: the
+  # album played from its page, the bar, Now Playing, Search, Library, favourites, playlists,
+  # Settings and the phone layout. Run on every push, as raven's web suite is, and restored from
+  # the cache while Wren on the web, its libraries and the server are unchanged.
+  wren-web-e2e:
+    name: 🎵 E2E Wren web
+    if: *not-a-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      WEB_PROJECT: '@wren/web'
+      WEB_DIR: apps/wren/wren-web
+      WEB_TRACES: wren-e2e-traces
+    steps: *web-e2e-steps
 
   # The device apps' render tests under jest-expo (`test:screens`, raven's device app and Wren),
   # on main only so a pull request hears back sooner. Run on every push, as the web's suite is:

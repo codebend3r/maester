@@ -1,14 +1,17 @@
 /**
  * What `@raven/server`'s `serve:fixture` holds and how it is started, shared by the server that
- * builds it and the web's browser end to end suite that reads it. `serve:lighthouse` is the
- * larger library the web's Lighthouse run scores Home against, on a port of its own. The device
- * app's and Wren's Maestro flows name the same titles in YAML, which can import nothing.
+ * builds it and the browser end to end suites that read it, raven's web app's and Wren on the
+ * web's. `serve:lighthouse` is the larger library the web's Lighthouse run scores Home against,
+ * on a port of its own. The device app's and Wren's Maestro flows name the same titles in YAML,
+ * which can import nothing.
  */
 export const FIXTURE_SERVER = {
   /** The device apps' fixture listens here, the port their builds name. */
   appPort: 8490,
-  /** The web suite's listens here, so it never meets a device fixture left running. */
+  /** raven's web suite's listens here, so it never meets a device fixture left running. */
   webPort: 8491,
+  /** Wren on the web's suite listens here, so it runs beside raven's web suite. */
+  wrenWebPort: 8493,
   /** The Lighthouse fixture's, which the web's Lighthouse server starts and sends `/api` to. */
   lighthousePort: 8492,
   host: '127.0.0.1',

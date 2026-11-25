@@ -1,5 +1,5 @@
 {
-  "name": "@raven/music-web",
+  "name": "@wren/web",
   "version": "0.9.2",
   "private": true,
   "description": "Wren on the web: raven's music app in a browser",
@@ -9,9 +9,10 @@
   },
   "scripts": {
     "build": "vite build",
-    "dead-code": "knip --no-progress --directory ../../.. --workspace apps/raven/music-web",
+    "dead-code": "knip --no-progress --directory ../../.. --workspace apps/wren/wren-web",
     "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
     "dev": "vite",
+    "e2e:browser": "playwright test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lighthouse": "bun run --sequential lighthouse:mobile lighthouse:desktop",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@codebend3r/gale": "0.4.1",
     "@lhci/cli": "0.16.0",
+    "@playwright/test": "1.65.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
@@ -72,6 +74,7 @@
       "dev",
       "build",
       "preview",
+      "e2e:browser",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -96,6 +99,24 @@
           {
             "env": "NETLIFY"
           }
+        ]
+      },
+      "e2e:browser": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
         ]
       },
       "dead-code": {

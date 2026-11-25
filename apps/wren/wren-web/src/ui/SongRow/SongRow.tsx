@@ -3,7 +3,6 @@ import {
   KIT_COPY,
   type MenuLike,
   SONG_LEADS,
-  TRACK_MENU_COPY,
   type ShownLead,
   type SongLead,
   type SongLeadOf,
@@ -15,6 +14,7 @@ import { COLORS, RADII, SIZES } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton/IconButton'
+import { LikeButton } from '@/ui/LikeButton/LikeButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
 import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/ui/SongRow/SongRow.module.scss'
@@ -119,14 +119,7 @@ export function SongRow({
       </Pressable>
       {like !== undefined && (
         <span className={classNames([styles.like, like.isLiked && styles.liked])}>
-          <IconButton
-            color={like.isLiked ? COLORS.accentText : COLORS.text3}
-            icon={like.isLiked ? ICONS.heartFilled : ICONS.heart}
-            isSelected={like.isLiked}
-            label={TRACK_MENU_COPY.likeSong(title)}
-            onPress={like.onToggle}
-            size={SIZES.smallButton}
-          />
+          <LikeButton idleColor={COLORS.text3} like={like} size={SIZES.smallButton} title={title} />
         </span>
       )}
       {onMore !== undefined && (

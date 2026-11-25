@@ -175,7 +175,7 @@ export const useFavouriteTracks = () => {
 
 const NO_ENTRIES: readonly never[] = []
 
-/**
+/*
  * A list the account keeps across every music library: its entries, none while it is read, and
  * where it stands beside the libraries.
  */
