@@ -4,9 +4,22 @@ search_people tools."""
 import pytest
 import respx
 
-from sparrow.agent.tools import Failed, Refused, Tier, Title, TitleLink, ToolContext
+from sparrow.agent.tools import Failed, Tier, Title, TitleLink, ToolContext
 from sparrow.clients import ClientError, FakeRavenClient, RavenClient
-from sparrow.clients.raven import Part, PersonMatch, RavenPerson, RavenTitle, Work, quality_of
+from sparrow.clients.raven import (
+    LiveStream,
+    MemberStatus,
+    Part,
+    PersonMatch,
+    PlaybackMode,
+    Played,
+    RavenAccount,
+    RavenFile,
+    RavenPerson,
+    RavenTitle,
+    Work,
+    quality_of,
+)
 from sparrow.config import Settings
 from sparrow.memo import Memo
 from sparrow.tools import raven as raven_tool
@@ -129,11 +142,6 @@ async def test_search_library_answers_with_each_copy_and_its_link(services):
     assert "isn't on the server" in missing.content["note"]
 
 
-async def test_search_library_refuses_without_raven(services):
-    reply = await search_library(ctx_with(services, None), "dune")
-    assert isinstance(reply, Refused) and "RAVEN_URL" in reply.content
-
-
 async def test_a_plural_finds_what_the_singular_does(services):
     raven = FakeRavenClient(titles=[RavenTitle(4, "4K Movies", "movie", "The Terminator", 1984, 9)])
     reply = await search_library(ctx_with(services, raven), "Terminators")
@@ -252,9 +260,7 @@ async def test_newest_in_library_lists_released_titles_once_newest_first(service
     assert [t["title"] for t in shows.content["titles"]] == ["Severance"]
 
 
-async def test_newest_in_library_says_when_raven_is_missing_or_down(services):
-    reply = await newest_in_library(ctx_with(services, None), "movie")
-    assert isinstance(reply, Refused) and "RAVEN_URL" in reply.content
+async def test_newest_in_library_says_when_raven_is_down(services):
     raven = FakeRavenClient()
     raven.down = True
     down = await newest_in_library(ctx_with(services, raven), "show")
@@ -428,8 +434,91 @@ async def test_search_people_says_no_one_is_found_and_when_raven_is_down(service
     reply = await search_people(ctx_with(services, FakeRavenClient()), "Bob Odenkirk")
     assert reply.content["people"] == [] and reply.titles == ()
     assert "No one by that name" in reply.content["note"]
-    assert isinstance(await search_people(ctx_with(services, None), "Bob"), Refused)
     raven = FakeRavenClient()
     raven.down = True
     down = await search_people(ctx_with(services, raven), "Bob")
     assert isinstance(down, Failed) and "Don't call search_people again" in down.content
+
+
+FILE = {
+    "id": 401,
+    "title": "Dune.2021.2160p",
+    "width": 3840,
+    "videoCodec": "hevc",
+    "hdr": True,
+    "dolbyVisionProfile": 8,
+    "bitrate": 62_100_000,
+    "size": 72_600_000_000,
+    "variant": None,
+    "item": {"id": 277, "type": "movie", "title": "Dune"},
+}
+
+
+@respx.mock
+async def test_a_viewer_reads_raven_with_their_own_bearer_and_me_names_the_account():
+    raven = RavenClient(BASE)
+    me = respx.get(f"{BASE}/api/me").respond(
+        json={"id": "a-1", "email": "dany@example.com", "status": "approved", "isOwner": False}
+    )
+    assert await raven.me("tok") == RavenAccount(
+        "a-1", "dany@example.com", MemberStatus.APPROVED, False
+    )
+    assert me.calls.last.request.headers["Authorization"] == "Bearer tok"
+    me.respond(401, json={"reason": "signed_out"})
+    assert await raven.me("old") is None
+    me.respond(503)
+    with pytest.raises(ClientError):
+        await raven.me("tok")
+
+    route = respx.get(f"{BASE}/api/items/277").respond(
+        json={"id": 277, "type": "movie", "title": "Dune", "year": 2021, "tmdbId": "438631",
+              "versions": [FILE]}
+    )  # fmt: skip
+    item = await raven.as_viewer("dany-token").item(277)
+    assert route.calls.last.request.headers["Authorization"] == "Bearer dany-token"
+    assert (item.tmdb_id, item.kind) == (438631, "movie")
+    (file,) = item.files
+    assert file == RavenFile(401, "Dune", 3840, "hevc", True, 8, 62_100, 72_600_000_000)
+    assert file.name == "4K Dolby Vision (HEVC)" and file.is_4k
+    # Without a token a request is the browser's, as the sandbox's are.
+    await raven.as_viewer(None).item(277)
+    assert "Authorization" not in route.calls.last.request.headers
+
+
+@respx.mock
+async def test_history_keeps_videos_and_streams_keep_plays():
+    raven = RavenClient(BASE).as_viewer("t")
+    played = {"mediaId": 401, "lastPlayedAt": "2026-11-20T20:00:00Z", "libraryName": "TV"}
+    respx.get(f"{BASE}/api/history", params={"show": "video", "limit": "5"}).respond(
+        json={
+            "entries": [
+                {**played, "played": {"kind": "episode", "show": "The Bear", "season": 2,
+                                      "episode": 7, "title": "Forks", "itemId": 9, "showId": 8}},
+                {**played, "played": {"kind": "track", "title": "Song", "album": "A"}},
+            ],
+            "next": None,
+        }
+    )  # fmt: skip
+    (forks,) = await raven.history(5)
+    assert forks == Played(401, "2026-11-20T20:00:00Z", "TV", "Forks", 9, "The Bear", 8, 2, 7)
+    stream = {
+        "media": FILE, "libraryName": "4K Movies", "mode": "transcode", "device": "Mac",
+        "browser": "Chrome 141", "address": "203.0.113.9", "sendRate": 8_000_000,
+        "quality": "high720",
+    }  # fmt: skip
+    respx.get(f"{BASE}/api/streams/mine").respond(
+        json=[{**stream, "purpose": "play"}, {**stream, "purpose": "download", "received": 1}]
+    )
+    (live,) = await raven.my_streams()
+    assert isinstance(live, LiveStream) and live.mode == PlaybackMode.TRANSCODE
+    assert (live.item_id, live.send_kbps, live.quality, live.remote) == (277, 8000, "high720", True)
+    assert live.player == "Chrome 141 on Mac"
+
+
+def test_a_home_address_is_at_home_and_anything_unreadable_is_away():
+    def at(address):
+        file = RavenFile(1, "x", None, None, False, None, None, 0)
+        return LiveStream(file, None, "", PlaybackMode.DIRECT, "", "", address, None, None)
+
+    assert not at("192.168.50.20").remote and not at("10.0.0.4").remote
+    assert at("203.0.113.9").remote and at("").remote

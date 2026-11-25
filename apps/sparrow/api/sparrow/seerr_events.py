@@ -1,7 +1,7 @@
 """What sparrow does with each Seerr notification type.
 
 `seerr_routes()` is the dispatch table the webhook serves, keyed by Seerr's
-notification type. A handler reads what it needs from Seerr, Plex and the
+notification type. A handler reads what it needs from Seerr and the
 store and returns the notices to send; delivering them is the webhook's
 job. A route opts into deduplication when a repeat would reach a person
 twice: Seerr can send the same event again within minutes (a library
@@ -22,7 +22,6 @@ template carries more than this reads and an admin may extend it.
 from __future__ import annotations
 
 import enum
-import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
@@ -31,13 +30,11 @@ from typing import Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from sparrow.clients import ClientError, Services
+from sparrow.clients import Services
 from sparrow.clients.seerr import MediaRequest, int_or_none
 from sparrow.media import Copy, Titled, version_label
 from sparrow.notify import DirectMessage, Notice
 from sparrow.store import Store
-
-log = logging.getLogger("sparrow.seerr")
 
 
 class NotificationType(enum.StrEnum):
@@ -205,7 +202,7 @@ def _what(notification: SeerrNotification, request: MediaRequest) -> str:
 async def ready_to_watch(
     services: Services, store: Store, notification: SeerrNotification
 ) -> list[Notice]:
-    """DM the requester that their request can be watched: title, version, Plex link."""
+    """DM the requester that their request can be watched: title, version, and raven."""
     if notification.request_id is None:
         return []
     request = await services.seerr.get_request(notification.request_id)
@@ -213,19 +210,7 @@ async def ready_to_watch(
     if user is None:  # requested in Seerr by someone not linked here
         return []
     version = version_label(request.is_4k)
-    link = await _plex_link(services, request)
-    where = f"\nOpen it in Plex: {link}" if link else " Look for it in Plex."
+    where = f"\nWatch it in raven: {services.raven.base_url}"
     text = f"{_what(notification, request)} is ready to watch in {version}.{where}"
     about = Titled(Copy(request.media_type, request.tmdb_id, request.is_4k), notification.subject)
     return [DirectMessage(user.user_id, text, about)]
-
-
-async def _plex_link(services: Services, request: MediaRequest) -> str | None:
-    if request.rating_key is None:
-        return None
-    try:
-        machine = await services.plex.machine_identifier()
-    except ClientError as exc:  # the news matters more than the link
-        log.warning("no Plex link for request %s: %s", request.id, exc)
-        return None
-    return services.plex.deep_link(machine, request.rating_key)

@@ -1,7 +1,7 @@
-# Web browser (a computer)
+# raven in a web browser
 
-1. Go to **app.plex.tv** and sign in with your Plex account.
-2. The server's libraries show up in the sidebar once you've accepted the invite; if not, look under **More**.
-3. Settings are under your account icon, top right: **Settings → Quality** (in the web app's own section).
+1. Open raven's address (the one sparrow's links open) and choose **Sign up**: your email and a password, twice. raven emails you a link to confirm the address.
+2. Once you've confirmed it, **sign in** with that email and password. Until raven's owner approves your account, raven shows **Waiting for approval**; **Check again** looks once they have.
+3. **Settings, Account** shows the email you're signed in with, and **Sign out**. Forgot your password? **Forgot password** on the sign-in page emails you a link to set a new one.
 
-Browsers can't play many files as they are (HEVC, 4K HDR, TrueHD and DTS audio, picture subtitles), so the server converts them, and big files may stutter. For 4K and remuxes, use the Plex app on a TV. The **Plex desktop app** (Windows, Mac) plays more files directly than a browser.
+raven plays a file straight from disk when your browser can, and converts on the fly only what it can't. Audio is the usual blocker: Chrome and Firefox play no Dolby (AC3, E-AC3), DTS or TrueHD soundtracks, so raven repackages those files with the audio converted, and Safari plays Dolby. HEVC needs a hardware decoder in Chrome. A card that says **Won't play in this browser** has nothing that works there.

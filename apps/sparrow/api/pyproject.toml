@@ -1,7 +1,7 @@
 [project]
 name = "sparrow"
 version = "0.9.2"
-description = "AI concierge for a private Plex server"
+description = "AI concierge of the maester suite, for raven's friends and its admin"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "pyyaml>=6.0",

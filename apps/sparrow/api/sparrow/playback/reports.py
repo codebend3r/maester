@@ -2,16 +2,13 @@
 
 A report is about one copy's file (`items.py`) and has a kind. The kind's
 policy (`POLICIES`, data rather than branches) names how it is diagnosed
-(`diagnosis.py`) and whether a new copy fixes it. A friend who already got
-a player fix for this file is diagnosed with the policy's `after_advice`
-strategy instead, so a fix can't shield a broken file for good.
+(`diagnosis.py`) and whether a new copy fixes it.
 
 The report is filed with its `Decision`, written once and made from stored
 evidence only (`Evidence`): a replaceable kind whose file failed a health
 check, or that two or more people reported, may be replaced (`replace.py`);
 a replaceable kind short of that is recorded; anything else goes to the
-admin. A report the player explains doesn't testify, nor does one whose
-Seerr issue was resolved. How each decision reads, to the Seerr issue and
+admin. A report whose Seerr issue was resolved doesn't testify. How each decision reads, to the Seerr issue and
 to the model, is data (`WORDING`).
 
 A report is `open` until its file is replaced (`ReportStatus`), when the
@@ -39,10 +36,8 @@ from sparrow.playback.diagnosis import (
     Case,
     Diagnose,
     Diagnosis,
-    PlayerLimit,
     by_their_word,
-    file_only,
-    player_then_file,
+    file_check,
     track_listing,
 )
 from sparrow.playback.health import Health
@@ -62,34 +57,25 @@ class KindPolicy:
     # A new copy fixes it, so it goes through the replace flow; otherwise the
     # admin is asked, since nothing fixes it automatically.
     replaceable: bool
-    after_advice: Diagnose  # for a friend who already had a player fix for this file
-
-
-def _kind(
-    label: str,
-    issue_type: IssueType,
-    diagnose: Diagnose,
-    replaceable: bool,
-    after_advice: Diagnose | None = None,
-) -> KindPolicy:
-    return KindPolicy(label, issue_type, diagnose, replaceable, after_advice or diagnose)
 
 
 POLICIES: dict[ReportKind, KindPolicy] = {
-    ReportKind.WONT_PLAY: _kind("won't play", IssueType.VIDEO, player_then_file, True, file_only),
-    ReportKind.WRONG_TITLE: _kind("the wrong movie or show", IssueType.OTHER, by_their_word, True),
-    ReportKind.WRONG_EPISODE: _kind("the wrong episode", IssueType.OTHER, by_their_word, True),
-    ReportKind.CAM: _kind("a cam or screener copy", IssueType.VIDEO, by_their_word, True),
-    ReportKind.HARDCODED_SUBS: _kind(
+    ReportKind.WONT_PLAY: KindPolicy("won't play", IssueType.VIDEO, file_check, True),
+    ReportKind.WRONG_TITLE: KindPolicy(
+        "the wrong movie or show", IssueType.OTHER, by_their_word, True
+    ),
+    ReportKind.WRONG_EPISODE: KindPolicy("the wrong episode", IssueType.OTHER, by_their_word, True),
+    ReportKind.CAM: KindPolicy("a cam or screener copy", IssueType.VIDEO, by_their_word, True),
+    ReportKind.HARDCODED_SUBS: KindPolicy(
         "hardcoded foreign subtitles", IssueType.SUBTITLE, by_their_word, True
     ),
-    ReportKind.SUBTITLES: _kind(
+    ReportKind.SUBTITLES: KindPolicy(
         "subtitles missing or out of sync", IssueType.SUBTITLE, track_listing, False
     ),
-    ReportKind.AUDIO: _kind(
+    ReportKind.AUDIO: KindPolicy(
         "audio out of sync or a missing dub", IssueType.AUDIO, track_listing, False
     ),
-    ReportKind.OTHER: _kind("another problem", IssueType.OTHER, by_their_word, True),
+    ReportKind.OTHER: KindPolicy("another problem", IssueType.OTHER, by_their_word, True),
 }
 
 
@@ -105,7 +91,7 @@ class Testimony:
         """A stored report's testimony. One whose Seerr issue was resolved is spent."""
         if report.resolved_at is not None:
             return cls(None, None)
-        counts = POLICIES[report.kind].replaceable and report.decision is not Decision.ADVISED
+        counts = POLICIES[report.kind].replaceable
         check = Health.from_dict(report.diagnosis["file_check"]) if report.health else None
         return cls(
             report.user_id if counts else None,
@@ -114,10 +100,7 @@ class Testimony:
 
     @classmethod
     def new(cls, reporter: str, policy: KindPolicy, diagnosis: Diagnosis) -> Testimony:
-        """A report being filed. One the player explains says nothing about the file."""
-        match diagnosis:
-            case PlayerLimit():
-                return cls(None, None)
+        """A report being filed."""
         failed = diagnosis.health if diagnosis.health and diagnosis.health.verdict.failed else None
         return cls(reporter if policy.replaceable else None, failed)
 
@@ -154,16 +137,10 @@ class Evidence:
         return f"{people} report{'' if people == 1 else 's'} and no failed file check"
 
 
-def decide(policy: KindPolicy, diagnosis: Diagnosis, evidence: Evidence) -> Decision:
-    match diagnosis:
-        case PlayerLimit():
-            return Decision.ADVISED
-        case _ if not policy.replaceable:
-            return Decision.FOR_ADMIN
-        case _ if evidence.proven:
-            return Decision.REPLACEABLE
-        case _:
-            return Decision.RECORDED
+def decide(policy: KindPolicy, evidence: Evidence) -> Decision:
+    if not policy.replaceable:
+        return Decision.FOR_ADMIN
+    return Decision.REPLACEABLE if evidence.proven else Decision.RECORDED
 
 
 @dataclass(frozen=True)
@@ -178,11 +155,6 @@ class Wording:
 
 
 WORDING: dict[Decision, Wording] = {
-    Decision.ADVISED: Wording(
-        "a player limit explains it; the friend was given the fix",
-        "Give them the player fix. If it still fails after, report it again: the file is "
-        "checked then.",
-    ),
     Decision.REPLACEABLE: Wording(
         "a replacement was offered to the friend ({evidence})",
         "The evidence allows a new copy ({evidence}). Offer it: replace_media with report_id "
@@ -315,12 +287,7 @@ async def file_report(
     policy, file = POLICIES[kind], located.file
     host, media_type = located.owner.host, located.copy.media_type
     before = store.reports_for_file(host, media_type, file.id)
-    advised = any(
-        r.user_id == link.user_id and r.decision is Decision.ADVISED and not r.resolved_at
-        for r in before
-    )
-    strategy = policy.after_advice if advised else policy.diagnose
-    diagnosis = await strategy(Case(services, link, located, at))
+    diagnosis = await policy.diagnose(Case(services, located, at))
     said = [*map(Testimony.of, before), Testimony.new(link.user_id, policy, diagnosis)]
     evidence = Evidence.of(said)
     report = store.add_report(
@@ -328,7 +295,6 @@ async def file_report(
         kind=kind,
         copy=located.copy,
         title=located.title,
-        rating_key=located.details.rating_key_for(located.copy.is_4k),
         host=host,
         file_id=file.id,
         file_path=file.path,
@@ -336,7 +302,7 @@ async def file_report(
         health=diagnosis.health.verdict if diagnosis.health else None,
         diagnosis=diagnosis.as_dict(),
         description=description,
-        decision=decide(policy, diagnosis, evidence),
+        decision=decide(policy, evidence),
     )
     filed = Filed(report, located, diagnosis, evidence)
     try:

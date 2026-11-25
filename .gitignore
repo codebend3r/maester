@@ -4,7 +4,7 @@
 *.pem
 
 # runtime data: sparrow's SQLite file, raven's index and thumbnail cache
-luwin-data/
+sparrow-data/
 data/
 *.db
 *.db-shm

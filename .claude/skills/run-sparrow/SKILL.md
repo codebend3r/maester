@@ -16,7 +16,7 @@ Starts sparrow's sandbox API (`sparrow-sandbox`, :8020) and its chat page (`@spa
 
 No argument means `local`. Anything else: stop and say the argument must be `local` or `prod`.
 
-The sandbox is the only way to run sparrow on this Mac without the NAS: the real server (`bun run dev:sparrow`) needs a filled `apps/sparrow/.env`, a running rookery and every service's key, and there is no deployed sparrow to point the page at (nothing answers on :8020 on Meleys or Vhagar). The sandbox fakes Seerr, Plex and the arrs from an eval case, needs no sign-in, and calls the model through `claude -p` on the user's own Claude Code sign-in (Sonnet 5.5 at medium effort). raven is the one real service, chosen by `RAVEN_URL`, which the shell sets ahead of any `apps/sparrow/.env` (python-dotenv never overrides).
+The sandbox is the only way to run sparrow on this Mac without the NAS: the real server (`bun run dev:sparrow`) needs a filled `apps/sparrow/.env` and every service's key, and there is no deployed sparrow to point the page at (nothing answers on :8020 on Meleys or Vhagar). The sandbox fakes Seerr and the arrs from an eval case, needs no sign-in, and calls the model through `claude -p` on the user's own Claude Code sign-in (Sonnet 5.5 at medium effort). raven is the one real service, chosen by `RAVEN_URL`, which the shell sets ahead of any `apps/sparrow/.env` (python-dotenv never overrides).
 
 ## Steps
 
@@ -66,6 +66,6 @@ Run everything from the repo root, each server with `run_in_background`, logs in
 
 ## Known limits
 
-- **`prod` and raven's sign-in.** raven on Vhagar has Supabase accounts on, and answers every API call without a session with `401 {"reason":"signed_out"}`. sparrow's `RavenClient` sends no credentials, so in `prod` every `search_library` call fails with `raven GET /api/home/search failed (401)`, and the sandbox shows that error under the reply. The rest of the sandbox works (the fakes, the model, the page). Say so when step 6 returns `401`; sparrow needs a way to sign in to raven (a service token, like the one rookery gives it) before `prod` can answer library questions.
+- **`prod` and raven's sign-in.** raven on Vhagar has Supabase accounts on, and answers every API call without a session with `401 {"reason":"signed_out"}`. The deployed sparrow reads raven with each viewer's own Supabase token, but the sandbox signs no one in and sends none, so in `prod` every `search_library` call fails with `raven GET /api/home/search failed (401)`, and the sandbox shows that error under the reply. The rest of the sandbox works (the fakes, the model, the page). Say so when step 6 returns `401`; library questions against `prod` need the deployed server or a signed-in session.
 - **Local Network privacy.** The sandbox reaches raven through `curl` (`sparrow/clients/curl.py`) on a Mac, so `prod` works from Claude Code's shell. Bun, Python and Chrome launched from that shell cannot reach `192.168.50.x`; use `curl` for any other check against Vhagar.
 - The sandbox keeps everything in memory and restarts itself, starting the conversation fresh, whenever a file under `apps/sparrow/api/sparrow/` changes.

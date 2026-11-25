@@ -30,13 +30,6 @@ from sparrow.store import PendingAction, Store
 
 log = logging.getLogger("sparrow.chat")
 
-UNLINKED_HELP = (
-    "Hi! I'm sparrow, the concierge for this Plex server. Your Plex account doesn't have "
-    "access to it yet.\n\n"
-    "Ask the admin or the friend who invited you for an invite. Once you're in, I'll know "
-    "you the next time you write.\n\n"
-    "Setting Plex up on a TV, stick or phone? There's a setup guide for each."
-)
 ERROR_REPLY = "Sorry, something went wrong on my end (ref `{ref}`). The admin can look it up."
 NOT_WAITING = "That's no longer waiting."
 STALE = "That action is no longer waiting."
@@ -52,8 +45,11 @@ OUTCOME_CHARS = 1500
 
 @dataclass(frozen=True)
 class ChatUser:
+    """Who a turn is for, and the raven token their tools read raven with (never stored)."""
+
     id: str
     name: str
+    raven_token: str | None = None
 
 
 @dataclass
@@ -115,12 +111,12 @@ class ChatService:
         """A turn: `user`'s message, answered at their tier. `on_tool` hears each tool call as
         it finishes."""
         tier = self.tier_for(user)
-        if tier == Tier.UNLINKED:
-            return ChatResponse(chunks=split_reply(UNLINKED_HELP))
         user_id = user.id
         failure = None
         try:
-            reply = await self.agent.respond(user_id, tier, text, on_tool=on_tool)
+            reply = await self.agent.respond(
+                user_id, tier, text, on_tool=on_tool, raven_token=user.raven_token
+            )
         except TurnFailed as failed:
             ref = secrets.token_hex(3)
             log.exception("agent failed for user %s (ref %s)", user_id, ref)
@@ -163,7 +159,7 @@ class ChatService:
         if decided is None:
             return Decision(EXPIRED)
         outcome = await self.agent.run_decision(
-            decided, presser.id, self.tier_for(presser), approve
+            decided, presser.id, self.tier_for(presser), approve, raven_token=presser.raven_token
         )
         said = outcome.text[:OUTCOME_CHARS]
         match outcome.status:

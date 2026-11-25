@@ -1,28 +1,24 @@
 """Which version of a movie will stream well on a friend's connection.
 
-`pick_version` lists every version of the movie on Plex with its bitrate
-(the listing `check_availability` gives, `sparrow/plex_versions.py`) and
+`pick_version` lists every file of the movie in raven with its bitrate and
 recommends the best one the friend's connection carries
-(`sparrow/perf/versions.py`): the tightest of the speed they give, Plex's
-relay on their last play away from home, and the servers' free upload at the
-last speed test. With none of those, a typical connection away from home is
-assumed, and the reply says so. It only reads.
+(`sparrow/perf/versions.py`): the tightest of the speed they give and the
+servers' free upload at the last speed test. With neither, a typical
+connection away from home is assumed, and the reply says so. It only reads.
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import Refused, Result, Tier, ToolContext, tool
-from sparrow.clients.seerr import MediaDetails
+from sparrow.agent.tools import Failed, Refused, Result, Tier, ToolContext, tool
+from sparrow.clients import ClientError
 from sparrow.formatting import mbps
 from sparrow.media import MediaType
 from sparrow.perf.uplink import recent
-from sparrow.perf.versions import Connection, last_away, recommend
-from sparrow.plex_versions import TitleVersion, title_versions
+from sparrow.perf.versions import Connection, item_for, probed, recommend
 
 GUESSED = (
     "Nothing about their connection is known, so this assumes a typical connection away from "
@@ -33,11 +29,11 @@ GUESSED = (
 @tool(
     "pick_version",
     "Which version of a movie to play on the user's connection ('I'm on hotel wifi, which "
-    "Dune should I watch?'): every version on the server with its bitrate, and the one "
-    "recommended, with the remote quality to set when even the lightest is too heavy. The "
-    "connection is the tightest of what's known: the speed they give (connection_mbps, from "
-    "fast.com say), their last play away from home, and the servers' free upload at the last "
-    "speed test. Movies only.",
+    "Dune should I watch?'): every file of it in raven with its bitrate, and the one "
+    "recommended, with what to pick in the player's Quality menu when even the lightest is "
+    "too heavy. The connection is the tightest of what's known: the speed they give "
+    "(connection_mbps, from fast.com say) and the servers' free upload at the last speed "
+    "test. Movies only.",
     tier=Tier.FRIEND,
 )
 async def pick_version(
@@ -49,32 +45,26 @@ async def pick_version(
 ) -> dict[str, Any] | Result:
     if connection_mbps is not None and connection_mbps <= 0:
         return Refused("connection_mbps must be a speed above 0.")
-    services, link = ctx.services, ctx.linked_user()
-    (details, versions), away = await asyncio.gather(
-        _title(ctx, tmdb_id), last_away(services, link.tautulli_user_id)
-    )
-    uplink = recent(ctx.memo)
-    connection = Connection.of(said_mbps=connection_mbps, away=away.playback, uplink=uplink)
-    pick = recommend(versions, connection.limit())
+    details = await ctx.services.seerr.media_details(MediaType.MOVIE, tmdb_id)
+    try:
+        item = await item_for(ctx.raven, details)
+    except ClientError as exc:
+        return Failed(f"raven couldn't be searched for {details.display}: {exc}", retryable=True)
+    files = probed(item.files) if item else []
+    connection = Connection.of(said_mbps=connection_mbps, uplink=recent(ctx.memo))
+    pick = recommend(files, connection.limit())
     if pick is None:
-        return {"title": details.display, "versions": [], "note": "No version of it is on Plex."}
+        return {"title": details.display, "versions": [], "note": "No version of it is in raven."}
     reply: dict[str, Any] = {
         "title": details.display,
-        "versions": [v.as_dict() for v in versions],
+        "versions": [{"version": f.name, "bitrate_mbps": mbps(f.bitrate_kbps or 0)} for f in files],
         "recommended": {
-            "version": pick.version.name,
+            "version": pick.file.name,
             "fits": pick.fits,
-            "remote_quality": pick.quality,
+            "quality_menu": pick.quality,
             "connection": f"about {mbps(pick.limit.kbps):g} Mbps: {pick.limit.source}",
         },
     }
     if not connection.limits:
         reply["note"] = GUESSED
-    if away.unreachable:
-        reply["plays_not_read"] = f"couldn't read their plays on {', '.join(away.unreachable)}"
     return reply
-
-
-async def _title(ctx: ToolContext, tmdb_id: int) -> tuple[MediaDetails, list[TitleVersion]]:
-    details = await ctx.services.seerr.media_details(MediaType.MOVIE, tmdb_id)
-    return details, await title_versions(ctx.services.plex, details)

@@ -3,7 +3,6 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from sparrow.agent.tools import Tier, registry
-from sparrow.clients import FakeRavenClient
 from sparrow.memo import Memo
 from sparrow.tools import service_health as health
 from sparrow.tools.service_health import service_health
@@ -19,15 +18,13 @@ async def test_everything_up(ctx):
     out = await service_health(ctx)
     assert out["all_up"] and out["down"] == [] and out["checked"] == "just now"
     assert out["up"] == [
-        "Plex", "Seerr", "Wizarr", "Sonarr on meleys", "Sonarr on vermithor", "Radarr on meleys",
-        "Radarr on vermithor", "SABnzbd on meleys", "SABnzbd on vermithor", "Tautulli on meleys",
-        "Tautulli on vermithor",
+        "raven", "Seerr", "Sonarr on meleys", "Sonarr on vermithor", "Radarr on meleys",
+        "Radarr on vermithor", "SABnzbd on meleys", "SABnzbd on vermithor",
     ]  # fmt: skip
 
 
-async def test_raven_is_checked_when_it_is_set_up(ctx):
+async def test_raven_down_is_named(ctx):
     ctx.services.fleet = None
-    ctx.services.raven = FakeRavenClient()
     ctx.services.raven.down = True
     out = await service_health(ctx)
     assert not out["all_up"] and [d["service"] for d in out["down"]] == ["raven"]
@@ -35,31 +32,31 @@ async def test_raven_is_checked_when_it_is_set_up(ctx):
 
 async def test_what_is_down_is_named_with_why_and_a_hung_one_times_out(ctx, monkeypatch):
     monkeypatch.setattr(health, "PING_TIMEOUT", 0.05)
-    ctx.services.plex.down = True
+    ctx.services.raven.down = True
     ctx.services.radarr["vermithor"].down = True
-    ctx.services.tautulli["meleys"] = Hangs()
+    ctx.services.sabnzbd["meleys"] = Hangs()
     ctx.services.fleet.down = True
     out = await service_health(ctx)
     assert not out["all_up"]
     down = {d["service"]: d["why"] for d in out["down"]}
-    assert set(down) == {"Plex", "Radarr on vermithor", "Tautulli on meleys", "the fleet monitor"}
+    assert set(down) == {"raven", "Radarr on vermithor", "SABnzbd on meleys", "the fleet monitor"}
     assert (
-        "connection refused" in down["Plex"]
-        and down["Tautulli on meleys"] == "no answer within 0.05 s"
+        "connection refused" in down["raven"]
+        and down["SABnzbd on meleys"] == "no answer within 0.05 s"
     )
-    assert "Seerr" in out["up"] and "Tautulli on vermithor" in out["up"]
+    assert "Seerr" in out["up"] and "SABnzbd on vermithor" in out["up"]
 
 
 async def test_the_answer_is_kept_for_a_minute(ctx):
     now = [datetime(2026, 9, 27, 23, 59, tzinfo=UTC)]
     ctx = replace(ctx, memo=Memo(lambda: now[0]))
     await service_health(ctx)
-    ctx.services.plex.down = True
+    ctx.services.raven.down = True
     now[0] += timedelta(seconds=59)
     kept = await service_health(ctx)
     assert kept["all_up"] and kept["checked"] == "just now"
     now[0] += timedelta(seconds=1)
-    assert [d["service"] for d in (await service_health(ctx))["down"]] == ["Plex"]
+    assert [d["service"] for d in (await service_health(ctx))["down"]] == ["raven"]
 
 
 def test_tool_is_registered_for_friends():

@@ -3,11 +3,13 @@
  * proxies to it, whether the real server or the sandbox is listening. Writes
  * are JSON, which the server requires.
  */
-import { CONTENT_TYPES, HEADERS, HTTP_METHODS, isRecord } from '@shared/http'
+import { AUTH_SCHEMES, CONTENT_TYPES, HEADERS, HTTP_METHODS, isRecord } from '@shared/http'
 import { CHAT_EVENTS, isPresent, toChatEvent, toNotice } from '@/lib/events'
 import { type RawEvent, readEvents } from '@/lib/sse'
+import { useAuthSession } from '@/stores/authSession'
 
 export const ROUTES = {
+  authConfig: '/api/auth/config',
   me: '/api/me',
   sandbox: '/api/sandbox',
   sandboxCase: '/api/sandbox/case',
@@ -28,7 +30,6 @@ export type Turn =
   | { route: typeof ROUTES.pick; body: PickBody }
 
 export const TIERS = {
-  unlinked: 'unlinked',
   friend: 'friend',
   trusted: 'trusted',
   admin: 'admin',
@@ -36,7 +37,7 @@ export const TIERS = {
 
 export type Tier = (typeof TIERS)[keyof typeof TIERS]
 
-/** The tiers the sandbox can put its user at; an unlinked user can't chat at all. */
+/** The tiers the sandbox can put its user at: every one there is. */
 export const SANDBOX_TIERS = [TIERS.friend, TIERS.trusted, TIERS.admin] as const
 
 export type SandboxTier = (typeof SANDBOX_TIERS)[number]
@@ -47,11 +48,74 @@ const isTier = (value: unknown): value is Tier =>
 export const isSandboxTier = (value: unknown): value is SandboxTier =>
   SANDBOX_TIERS.some((tier) => tier === value)
 
-export const SIGN_IN_STATES = { signedIn: 'signed_in', signedOut: 'signed_out' } as const
+export const SIGN_IN_STATES = {
+  signedIn: 'signed_in',
+  signedOut: 'signed_out',
+  notApproved: 'not_approved',
+  unavailable: 'unavailable',
+} as const
 
 export type Me =
-  | { state: typeof SIGN_IN_STATES.signedIn; id: string; name: string; tier: Tier }
-  | { state: typeof SIGN_IN_STATES.signedOut; signIn: string }
+  | { state: typeof SIGN_IN_STATES.signedIn; id: string; email: string; tier: Tier }
+  | { state: typeof SIGN_IN_STATES.signedOut }
+  | { state: typeof SIGN_IN_STATES.notApproved }
+  | { state: typeof SIGN_IN_STATES.unavailable }
+
+/** Why sparrow turned a request away, as its body's `reason` says. */
+export const REFUSALS = {
+  signedOut: 'signed_out',
+  signInUnavailable: 'sign_in_unavailable',
+  notApproved: 'not_approved',
+} as const
+
+/** The refusals that say who may not chat, each as the page's sign-in state. */
+const REFUSED_STATES = {
+  [REFUSALS.signedOut]: { state: SIGN_IN_STATES.signedOut },
+  [REFUSALS.signInUnavailable]: { state: SIGN_IN_STATES.unavailable },
+  [REFUSALS.notApproved]: { state: SIGN_IN_STATES.notApproved },
+} as const satisfies Record<(typeof REFUSALS)[keyof typeof REFUSALS], Me>
+
+type Refusal = keyof typeof REFUSED_STATES
+
+const isRefusal = (value: unknown): value is Refusal =>
+  Object.values(REFUSALS).some((reason) => reason === value)
+
+/** raven's sign-in setup, as sparrow relays it from raven's `/api/auth/config`. */
+export const AUTH_CONFIG_STATES = {
+  off: 'off',
+  unavailable: 'unavailable',
+  ready: 'ready',
+} as const
+
+export type ReadyAuthConfig = {
+  state: typeof AUTH_CONFIG_STATES.ready
+  supabaseUrl: string
+  publishableKey: string
+}
+
+export type AuthConfig =
+  | { state: typeof AUTH_CONFIG_STATES.off }
+  | { state: typeof AUTH_CONFIG_STATES.unavailable }
+  | ReadyAuthConfig
+
+const UNAVAILABLE_CONFIG = { state: AUTH_CONFIG_STATES.unavailable } as const
+
+const toAuthConfig = (value: unknown): AuthConfig => {
+  if (!isRecord(value)) return UNAVAILABLE_CONFIG
+  if (value.state === AUTH_CONFIG_STATES.off) return { state: AUTH_CONFIG_STATES.off }
+  if (
+    value.state === AUTH_CONFIG_STATES.ready &&
+    typeof value.supabaseUrl === 'string' &&
+    typeof value.publishableKey === 'string'
+  ) {
+    return {
+      state: AUTH_CONFIG_STATES.ready,
+      supabaseUrl: value.supabaseUrl,
+      publishableKey: value.publishableKey,
+    }
+  }
+  return UNAVAILABLE_CONFIG
+}
 
 /** One message of an eval case, with what the case expects of sparrow's answer. */
 export type CaseTurn = {
@@ -89,12 +153,21 @@ class ApiError extends Error {
   }
 }
 
+/** The signed-in account's access token as every call's bearer; none for the sandbox, which asks for no sign-in. */
+const authorized = (headers: Record<string, string> = {}): Record<string, string> => {
+  const token = useAuthSession.getState().session?.accessToken ?? null
+  if (token === null) return headers
+  return { ...headers, [HEADERS.authorization]: `${AUTH_SCHEMES.bearer} ${token}` }
+}
+
+const get = (url: string): Promise<Response> => fetch(url, { headers: authorized() })
+
 type PostProps = { url: string; body: unknown }
 
 const post = async ({ url, body }: PostProps): Promise<Response> => {
   const response = await fetch(url, {
     method: HTTP_METHODS.post,
-    headers: { [HEADERS.contentType]: CONTENT_TYPES.json },
+    headers: authorized({ [HEADERS.contentType]: CONTENT_TYPES.json }),
     body: JSON.stringify(body),
   })
   if (!response.ok) throw new ApiError(response.status)
@@ -150,30 +223,35 @@ const toSandboxState = (value: unknown): SandboxState => {
   }
 }
 
-/** Who is signed in, or where to sign in when nobody is. */
+/** Who is signed in, or why nobody may chat: signed out, not approved in raven, or sign-in down. */
 export const fetchMe = async (): Promise<Me> => {
-  const response = await fetch(ROUTES.me)
+  const response = await get(ROUTES.me)
   const body = await readJson(response)
-  if (response.status === 401 && isRecord(body) && typeof body.sign_in === 'string') {
-    return { state: SIGN_IN_STATES.signedOut, signIn: body.sign_in }
-  }
+  if (!response.ok && isRecord(body) && isRefusal(body.reason)) return REFUSED_STATES[body.reason]
   const user = isRecord(body) ? body.user : null
   if (
     !response.ok ||
     !isRecord(body) ||
     !isRecord(user) ||
     typeof user.id !== 'string' ||
+    typeof user.email !== 'string' ||
     !isTier(body.tier)
   ) {
     throw new ApiError(response.status)
   }
-  const name = typeof user.display_name === 'string' ? user.display_name : ''
-  return { state: SIGN_IN_STATES.signedIn, id: user.id, name, tier: body.tier }
+  return { state: SIGN_IN_STATES.signedIn, id: user.id, email: user.email, tier: body.tier }
+}
+
+/** raven's sign-in setup; `unavailable` whenever it can't be read. */
+export const fetchAuthConfig = async (): Promise<AuthConfig> => {
+  const response = await fetch(ROUTES.authConfig).catch(() => null)
+  if (response === null || !response.ok) return UNAVAILABLE_CONFIG
+  return toAuthConfig(await readJson(response))
 }
 
 /** The sandbox's world, or null when the real server is listening instead. */
 export const fetchSandbox = async (): Promise<SandboxState | null> => {
-  const response = await fetch(ROUTES.sandbox)
+  const response = await get(ROUTES.sandbox)
   if (response.status === 404) return null
   if (!response.ok) throw new ApiError(response.status)
   return toSandboxState(await readJson(response))
@@ -237,7 +315,7 @@ const isCount = (value: unknown): value is number =>
 
 /** The model, and the signed-in user's tokens today against the daily budget. */
 export const fetchUsage = async (): Promise<Usage> => {
-  const response = await fetch(ROUTES.usage)
+  const response = await get(ROUTES.usage)
   const body = await readJson(response)
   if (!response.ok || !isRecord(body) || typeof body.model !== 'string') {
     throw new ApiError(response.status)

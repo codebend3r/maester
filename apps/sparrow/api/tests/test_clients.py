@@ -1,7 +1,6 @@
 """One recorded call per real client through respx, plus the fakes' behavior."""
 
 import json
-from datetime import UTC, datetime
 
 import pytest
 import respx
@@ -11,14 +10,10 @@ from sparrow.clients import (
     FakeSeerrClient,
     FakeSonarrClient,
     FleetMonitorClient,
-    PlexClient,
-    PlexTvClient,
     RadarrClient,
-    RookeryClient,
     SabnzbdClient,
     SeerrClient,
     SonarrClient,
-    TautulliClient,
 )
 from sparrow.clients.base import gather_each
 from sparrow.clients.seerr import (
@@ -62,7 +57,7 @@ async def test_seerr_create_request_impersonates_and_sends_seasons(fixture):
     assert body["seasons"] == [2, 3] and "serverId" not in body and "tags" not in body
     assert req.id == 77 and req.seasons == (2, 3) and req.requested_by_id == 4
     assert req.status == RequestStatus.PENDING and req.media_status == MediaStatus.PENDING
-    assert req.tvdb_id == 371980 and req.rating_key is None
+    assert req.tvdb_id == 371980
 
 
 @respx.mock
@@ -108,7 +103,6 @@ async def test_seerr_movie_details(fixture):
     movie = await SeerrClient(BASE, "k").media_details("movie", 438631)
     assert movie.display == "Dune (2021)" and movie.media_type == "movie"
     assert movie.status == MediaStatus.AVAILABLE and movie.status_4k == MediaStatus.UNKNOWN
-    assert movie.rating_key == "4348" and movie.rating_key_for(True) is None
     assert movie.collection_id == 726871 and movie.seasons == () and not movie.anime_by_tmdb
     # Seerr sent the standard copy to its server 0, where the movie's id is 8; no 4K copy.
     assert movie.arr_for(False) == ArrRef(0, 8) and movie.arr_for(True) is None
@@ -243,126 +237,6 @@ async def test_sabnzbd_queue_carries_the_api_key_as_a_param(fixture):
 
 
 @respx.mock
-async def test_tautulli_activity_parses_the_diagnosis_fields(fixture):
-    respx.get(f"{BASE}/api/v2").respond(json=fixture("tautulli_activity"))
-    activity = await TautulliClient("vermithor", BASE, "k").activity()
-    s, episode = activity.sessions
-    assert activity.transcode_count == 1
-    assert s.relayed and s.location == "wan"
-    assert s.subtitle_decision == "burn" and s.tmdb_id == 438631
-    assert s.video_dynamic_range == "Dolby Vision" and s.audio_channels == 8
-    assert (s.dovi_profile, s.device, s.season, s.show_key) == (7, "Roku Ultra", None, "")
-    assert (episode.show_key, episode.season, episode.episode) == ("5120", 2, 7)
-    assert episode.dovi_profile == 0
-    # Relayed, so converted down to fit the relay's 2 Mbps.
-    assert (s.source_bitrate_kbps, s.stream_bitrate_kbps, s.transcode_speed) == (62103, 1840, 0.8)
-    assert (episode.transcode_speed, episode.transcode_throttled) == (0.0, False)
-    # An episode's title is its show, from the show's guids.
-    assert episode.tmdb_id == 136315
-
-
-@respx.mock
-async def test_tautulli_names_its_plex_server_and_an_items_title():
-    respx.get(f"{BASE}/api/v2", params={"cmd": "get_server_identity"}).respond(
-        json={"response": {"result": "success", "message": None, "data": {
-            "machine_identifier": "ds48g4r354a8v9byrrtr697g3g79w", "version": "1.43.4.10007"}}}
-    )  # fmt: skip
-    respx.get(f"{BASE}/api/v2", params={"cmd": "get_metadata", "rating_key": "5188"}).respond(
-        json={"response": {"result": "success", "message": None, "data": {
-            "rating_key": "5188", "media_type": "episode", "guids": ["tmdb://4521583"],
-            "grandparent_guids": ["imdb://tt14452776", "tmdb://136315", "tvdb://403245"]}}}
-    )  # fmt: skip
-    respx.get(f"{BASE}/api/v2", params={"cmd": "get_metadata", "rating_key": "31337"}).respond(
-        json={"response": {"result": "success", "message": None, "data": {}}}
-    )
-    client = TautulliClient("meleys", BASE, "k")
-    assert await client.server_identity() == "ds48g4r354a8v9byrrtr697g3g79w"
-    assert (await client.metadata("5188")).tmdb_id == 136315
-    assert (await client.metadata("31337")).tmdb_id is None  # no match on that server
-
-
-@respx.mock
-async def test_tautulli_history_of_one_plex_item(fixture):
-    route = respx.get(f"{BASE}/api/v2", params={"cmd": "get_history"}).respond(
-        json=fixture("tautulli_history")
-    )
-    await TautulliClient("meleys", BASE, "k").history(rating_key="4348", length=100)
-    params = route.calls.last.request.url.params
-    assert (params["rating_key"], params["length"], "user_id" in params) == ("4348", "100", False)
-
-
-@respx.mock
-async def test_tautulli_history_and_stream_data_of_a_finished_play(fixture):
-    route = respx.get(f"{BASE}/api/v2", params={"cmd": "get_history"}).respond(
-        json=fixture("tautulli_history")
-    )
-    respx.get(f"{BASE}/api/v2", params={"cmd": "get_stream_data"}).respond(
-        json=fixture("tautulli_stream_data")
-    )
-    client = TautulliClient("meleys", BASE, "k")
-    episode, movie = await client.history(user_id=8008135, length=5)
-    assert route.calls.last.request.url.params["user_id"] == "8008135"
-    assert (episode.row_id, episode.show_key, episode.season, episode.episode) == (
-        1124,
-        "5120",
-        2,
-        7,
-    )
-    assert (movie.rating_key, movie.show_key, movie.season, movie.product) == (
-        "4348",
-        "",
-        None,
-        "Plex for Roku",
-    )
-    stream = await client.stream_data(1124)
-    assert (stream.source_bitrate_kbps, stream.stream_bitrate_kbps) == (9200, 9200)
-    assert (stream.container, stream.video_codec, stream.video_decision) == (
-        "mkv",
-        "hevc",
-        "transcode",
-    )
-    assert (stream.audio_codec, stream.audio_decision, stream.subtitle_decision) == (
-        "eac3",
-        "direct play",
-        "",
-    )
-
-
-@respx.mock
-async def test_tautulli_error_result_raises():
-    respx.get(f"{BASE}/api/v2").respond(
-        json={"response": {"result": "error", "message": "Invalid apikey"}}
-    )
-    with pytest.raises(ClientError, match="Invalid apikey"):
-        await TautulliClient("vermithor", BASE, "bad").activity()
-
-
-@respx.mock
-async def test_plex_item_exposes_tmdb_id_and_deep_link(fixture):
-    respx.get(f"{BASE}/library/metadata/4348").respond(json=fixture("plex_metadata"))
-    client = PlexClient(BASE, "tok")
-    item = await client.item("4348")
-    assert item.tmdb_id == 438631
-    assert item.files[0].endswith("2160p.mkv")
-    assert [(v.resolution, v.video_codec, v.bitrate_kbps) for v in item.versions] == [
-        ("4k", "hevc", 62103),
-        ("4k", "hevc", 18412),
-        ("1080", "h264", 10240),
-    ]
-    assert item.versions[2].size_bytes == 11_980_000_000
-    assert client.deep_link("m1", "4348") == (
-        "https://app.plex.tv/desktop/#!/server/m1/details?key=%2Flibrary%2Fmetadata%2F4348"
-    )
-
-
-@respx.mock
-async def test_plex_seasons_count_episodes_in_the_library(fixture):
-    respx.get(f"{BASE}/library/metadata/5120/children").respond(json=fixture("plex_children"))
-    seasons = await PlexClient(BASE, "tok").seasons("5120")
-    assert [(s.number, s.episodes) for s in seasons] == [(1, 8), (2, 6)]
-
-
-@respx.mock
 async def test_http_errors_become_client_errors():
     respx.get(f"{BASE}/api/v3/rootfolder").respond(status_code=401, text="Unauthorized")
     with pytest.raises(ClientError, match=r"sonarr GET /api/v3/rootfolder failed \(401\)"):
@@ -458,17 +332,6 @@ async def test_sonarr_episode_files_carry_season_and_audio_languages(fixture):
 
 
 @respx.mock
-async def test_plex_answers_none_for_a_key_it_no_longer_has():
-    respx.get(f"{BASE}/library/metadata/999").respond(status_code=404)
-    respx.get(f"{BASE}/library/metadata/999/children").respond(status_code=404)
-    respx.get(f"{BASE}/library/metadata/500").respond(status_code=500)
-    client = PlexClient(BASE, "tok")
-    assert await client.item("999") is None and await client.seasons("999") == []
-    with pytest.raises(ClientError, match="500"):
-        await client.item("500")
-
-
-@respx.mock
 async def test_sabnzbd_history_keeps_the_failure_and_the_steps_that_went_wrong(fixture):
     respx.get(f"{BASE}/api").respond(json=fixture("sabnzbd_history"))
     failed, done = await SabnzbdClient("meleys", BASE, "k").history()
@@ -499,77 +362,9 @@ async def test_the_fleet_view_names_each_hosts_state_temperatures_and_containers
         6175000000000,
     )
     assert vermithor.temperatures == {"coretemp.temp1": 71.0, "coretemp.temp2": 64.5}
-    assert vermithor.containers_down == ("tautulli",)
+    assert vermithor.containers_down == ("bazarr",)
     assert vermithor.containers_unhealthy == ("seerr",) and vermithor.stale is None
     assert not caraxes.collected and caraxes.status == "unknown" and caraxes.stale is None
-
-
-PLEX_TV = "https://plex.test"
-
-
-@respx.mock
-async def test_plex_tv_sees_the_suite_name_in_its_client_headers():
-    # plex.tv tells clients apart by these headers; they carry the suite's name.
-    route = respx.get(f"{PLEX_TV}/api/v2/user").respond(json={"id": 1})
-    await PlexTvClient(PLEX_TV, "owner-token").account()
-    sent = route.calls.last.request.headers
-    assert sent["X-Plex-Product"] == sent["X-Plex-Client-Identifier"] == "maester"
-
-
-@respx.mock
-async def test_plex_tv_names_the_token_s_own_account_as_the_owner():
-    route = respx.get(f"{PLEX_TV}/api/v2/user").respond(
-        json={"id": 1234, "uuid": "abc", "username": "boss", "email": "boss@example.com"}
-    )
-    owner = await PlexTvClient(PLEX_TV, "owner-token").account()
-    assert (owner.id, owner.username, owner.email) == ("1234", "boss", "boss@example.com")
-    sent = route.calls.last.request.headers
-    assert sent["Accept"] == "application/json" and sent["X-Plex-Token"] == "owner-token"
-    respx.get(f"{PLEX_TV}/api/v2/user").respond(json={"username": "nobody"})
-    with pytest.raises(ClientError, match="no account id"):
-        await PlexTvClient(PLEX_TV, "owner-token").account()
-
-
-ROOKERY = "http://rookery.test"
-SESSION = {
-    "user": {"id": "r-1", "display_name": "dany_t", "email": "dany@example.com", "thumb": "t"},
-    "plex": {"id": 44, "username": "dany_t", "email": "dany@example.com"},
-    "expires_at": "2026-11-08T12:00:00.000Z",
-}
-
-
-@respx.mock
-async def test_rookery_names_a_session_s_account_with_the_token_in_the_body():
-    route = respx.post(f"{ROOKERY}/internal/session").respond(json=SESSION)
-    account = await RookeryClient(ROOKERY, "svc-token").session("cookie-value")
-    assert (account.user_id, account.plex_id, account.plex_username) == ("r-1", "44", "dany_t")
-    assert account.expires_at == datetime(2026, 11, 8, 12, 0, tzinfo=UTC)
-    request = route.calls.last.request
-    assert request.headers["Authorization"] == "Bearer svc-token"
-    assert json.loads(request.content) == {"token": "cookie-value"}
-    assert "cookie-value" not in str(request.url)
-
-
-@respx.mock
-async def test_rookery_unknown_session_is_none_and_anything_else_raises():
-    route = respx.post(f"{ROOKERY}/internal/session")
-    client = RookeryClient(ROOKERY, "svc-token")
-    route.respond(404, json={"reason": "expired"})
-    assert await client.session("gone") is None
-    route.respond(401, json={})
-    with pytest.raises(ClientError):
-        await client.session("t")  # the service token was refused
-    route.respond(json={"user": {}})
-    with pytest.raises(ClientError, match="unexpected body"):
-        await client.session("t")
-
-
-@respx.mock
-async def test_rookery_reads_a_time_without_an_offset_as_utc():
-    naive = {**SESSION, "expires_at": "2026-11-08T12:00:00"}
-    respx.post(f"{ROOKERY}/internal/session").respond(json=naive)
-    account = await RookeryClient(ROOKERY, "svc-token").session("t")
-    assert account.expires_at.tzinfo is UTC
 
 
 @respx.mock

@@ -1,7 +1,8 @@
-"""Device setup guides, as markdown, which the model answers from rather than from memory.
+"""Setup guides for raven's apps, as markdown, which the model answers from rather than
+from memory.
 
-One guide per device, each ending with what every device shares
-(`streaming.md`: quality, the relay, Direct Play, subtitles, sound).
+One guide per app, each ending with what every app shares (`streaming.md`: the
+Quality menu, a connection too slow for the file, audio and subtitles).
 """
 
 from __future__ import annotations
@@ -11,20 +12,13 @@ from typing import Literal
 
 GUIDES_DIR = Path(__file__).resolve().parent
 
-# The devices there's a guide for, by the name tools and commands use.
-Device = Literal["android_tv", "apple_tv", "fire_tv", "mobile", "roku", "web"]
-# Each device's guide file.
-DEVICES: dict[Device, str] = {
-    "apple_tv": "apple-tv",
-    "roku": "roku",
-    "fire_tv": "fire-tv",
-    "android_tv": "android-tv",
-    "mobile": "mobile",
-    "web": "web",
-}
+# The apps there's a guide for, by the name tools use.
+Device = Literal["mac", "web"]
+# Each app's guide file.
+DEVICES: dict[Device, str] = {"mac": "mac", "web": "web"}
 
 
 def guide(device: Device) -> str:
-    """A device's guide, then the settings every device shares."""
+    """An app's guide, then what every app shares."""
     own = (GUIDES_DIR / f"{DEVICES[device]}.md").read_text()
     return f"{own.strip()}\n\n{(GUIDES_DIR / 'streaming.md').read_text().strip()}"

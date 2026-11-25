@@ -177,7 +177,6 @@ These are historical design-time findings, before production desktop implementat
 - **`@raven/web` is almost all reusable UI.** 45 component folders, 15 pages, the Player hooks, and the TanStack Query layer (`lib/queries.ts`, `queryClient.ts`, `invalidate.ts`). It also has 4 zustand stores, the MSE engine (`lib/streamSource.ts`) and the styles. Only `main.tsx` (fonts, `QueryClientProvider`, `BrowserRouter`) and `index.html` are specific to the web app.
 - **The one seam is the API client.** `lib/api.ts` builds a same-origin `api` singleton, and 55 files import it.
 - **The player is its own full-page route,** `watch/:id`, outside `AppShell` (`AppRoutes.tsx:41`), so a native video surface can fill the window while it shows.
-- **Nothing depends on rookery**, so a standalone build loses nothing by leaving it out.
 - **At the initial exploration there was no production desktop app**, Electron or Tauri integration, or CI publishing desktop binaries. The completed throwaway spikes are recorded below.
 
 ### Player-specific findings
@@ -209,7 +208,7 @@ apps/raven/desktop  @raven/desktop  NEW: Electron main + preload + a thin render
 apps/raven/server   @raven/server   deployed on Vhagar; embedded `startServer` export deferred
 ```
 
-`@raven/ui` is raven's own library, not a suite-wide one. rookery has different tokens (`--color-parchment` against raven's `--color-bark`) and shares no components.
+`@raven/ui` is raven's own library, not a suite-wide one.
 
 Current `@raven/ui` contains the shared player, primitives, unlock dialog, styles and player/media-plane helpers. Library pages and the API singleton remain in web. D1 extracts the rest; a production `startServer` remains deferred with standalone mode.
 

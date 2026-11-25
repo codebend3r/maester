@@ -1,7 +1,8 @@
-"""Who someone signed in through rookery is on Plex, Seerr and Tautulli, and their tier override.
+"""Who a raven account is here: its email, its standing with raven, its Seerr match, and
+its tier override.
 
-`user_id` is rookery's user id. A user is linked once their Plex account
-matches a Seerr user: that match is what lets sparrow act as them.
+`user_id` is the raven account's id. A user is linked once their email matches a
+Seerr user: that match is what lets sparrow act as them in Seerr.
 """
 
 from __future__ import annotations
@@ -16,41 +17,36 @@ from sparrow.store.base import Database
 @dataclass(frozen=True)
 class UserRow:
     user_id: str
-    plex_id: str | None
-    plex_email: str | None
-    plex_username: str | None
-    thumb: str | None
+    email: str | None
+    raven_status: str | None  # pending | approved | revoked, as raven last said
+    is_owner: bool
     seerr_user_id: int | None
-    tautulli_user_id: int | None
     seerr_checked_at: str | None
     tier_override: str | None
     last_seen_at: str | None
 
 
 class NotLinked(LookupError):
-    """A user whose Plex account matches no Seerr user: nothing can be done as them."""
+    """A user whose email matches no Seerr user: nothing can be done as them in Seerr."""
 
 
 @dataclass(frozen=True)
 class LinkedUser:
-    """A linked user: who they are on Seerr (and Tautulli, when known)."""
+    """A linked user: who they are on Seerr."""
 
     user_id: str
     seerr_user_id: int
-    tautulli_user_id: int | None
-    name: str  # their Plex username, or email, as the admin knows them
+    name: str  # their email, as the admin knows them
 
 
-# The one rule for "linked": the Plex account matched a Seerr user.
+# The one rule for "linked": the email matched a Seerr user.
 _LINKED = "seerr_user_id IS NOT NULL"
 
 _FIELDS = {
-    "plex_id",
-    "plex_email",
-    "plex_username",
-    "thumb",
+    "email",
+    "raven_status",
+    "is_owner",
     "seerr_user_id",
-    "tautulli_user_id",
     "seerr_checked_at",
     "tier_override",
     "last_seen_at",
@@ -100,14 +96,7 @@ class Users(Database):
     def _link(r: sqlite3.Row | None) -> LinkedUser | None:
         if r is None:
             return None
-        name = r["plex_username"] or r["plex_email"] or r["user_id"]
-        return LinkedUser(r["user_id"], r["seerr_user_id"], r["tautulli_user_id"], name)
-
-    def active_users(self) -> list[UserRow]:
-        """Every linked user."""
-        with self._lock:
-            rows = self._conn.execute(f"SELECT * FROM users WHERE {_LINKED}").fetchall()
-        return [u for u in map(self._user, rows) if u is not None]
+        return LinkedUser(r["user_id"], r["seerr_user_id"], r["email"] or r["user_id"])
 
     @staticmethod
     def _user(r: sqlite3.Row | None) -> UserRow | None:
@@ -115,12 +104,10 @@ class Users(Database):
             return None
         return UserRow(
             user_id=r["user_id"],
-            plex_id=r["plex_id"],
-            plex_email=r["plex_email"],
-            plex_username=r["plex_username"],
-            thumb=r["thumb"],
+            email=r["email"],
+            raven_status=r["raven_status"],
+            is_owner=bool(r["is_owner"]),
             seerr_user_id=r["seerr_user_id"],
-            tautulli_user_id=r["tautulli_user_id"],
             seerr_checked_at=r["seerr_checked_at"],
             tier_override=r["tier_override"],
             last_seen_at=r["last_seen_at"],

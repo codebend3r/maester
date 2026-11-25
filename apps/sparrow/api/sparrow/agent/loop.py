@@ -155,7 +155,7 @@ class Agent:
     def forget(self, user_id: str) -> int:
         return self.store.clear_messages(user_id)
 
-    def _context(self, user_id: str, tier: Tier) -> ToolContext:
+    def _context(self, user_id: str, tier: Tier, raven_token: str | None) -> ToolContext:
         return ToolContext(
             user_id=user_id,
             tier=tier,
@@ -163,10 +163,17 @@ class Agent:
             store=self.store,
             settings=self.settings,
             memo=self.memo,
+            raven_token=raven_token,
         )
 
     async def run_decision(
-        self, pending: PendingAction, user_id: str, tier: Tier, approved: bool
+        self,
+        pending: PendingAction,
+        user_id: str,
+        tier: Tier,
+        approved: bool,
+        *,
+        raven_token: str | None = None,
     ) -> ToolOutcome:
         """Run what a Confirm or Cancel press decided, as the presser, and remember it.
 
@@ -174,7 +181,8 @@ class Agent:
         real outcome goes into the requester's conversation as a fresh
         tool_use/tool_result pair; their next turn sees it like any tool.
         """
-        outcome = await self.runner.run_decision(self._context(user_id, tier), pending, approved)
+        ctx = self._context(user_id, tier, raven_token)
+        outcome = await self.runner.run_decision(ctx, pending, approved)
         call_id = f"toolu_button_{pending.id}"
         tool_use = {
             "type": "tool_use",
@@ -193,7 +201,13 @@ class Agent:
         return outcome
 
     async def respond(
-        self, user_id: str, tier: Tier, text: str, *, on_tool: OnTool | None = None
+        self,
+        user_id: str,
+        tier: Tier,
+        text: str,
+        *,
+        on_tool: OnTool | None = None,
+        raven_token: str | None = None,
     ) -> AgentReply:
         if self.limiter:
             try:
@@ -204,7 +218,7 @@ class Agent:
 
         reply = AgentReply(text="")
         try:
-            await self._turn(user_id, tier, text, reply, on_tool)
+            await self._turn(user_id, tier, text, reply, on_tool, raven_token)
         except Exception as exc:
             raise TurnFailed(reply) from exc
         finally:
@@ -213,10 +227,16 @@ class Agent:
         return reply
 
     async def _turn(
-        self, user_id: str, tier: Tier, text: str, reply: AgentReply, on_tool: OnTool | None
+        self,
+        user_id: str,
+        tier: Tier,
+        text: str,
+        reply: AgentReply,
+        on_tool: OnTool | None,
+        raven_token: str | None,
     ) -> None:
         """Run one turn, recording into `reply` as it goes."""
-        ctx = self._context(user_id, tier)
+        ctx = self._context(user_id, tier, raven_token)
         history = self.store.recent_messages(
             user_id, max_tokens=HISTORY_TOKEN_BUDGET, since=self.now() - IDLE_RESET
         )

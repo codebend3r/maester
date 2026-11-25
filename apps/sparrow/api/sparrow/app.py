@@ -2,8 +2,7 @@
 
 `build()` is pure construction and safe to call in tests with fake
 clients; `run()` starts the web server and the scheduled jobs on one
-asyncio loop and returns when either stops. Before serving, it asks plex.tv
-who owns the server, so the owner is the admin from the first request.
+asyncio loop and returns when either stops.
 """
 
 from __future__ import annotations
@@ -28,18 +27,12 @@ from sparrow.chat.service import ChatService
 from sparrow.clients import (
     FileProbe,
     OoklaSpeedTest,
-    PlexClient,
-    PlexTvClient,
     RadarrClient,
     RavenClient,
-    Rookery,
-    RookeryClient,
     SabnzbdClient,
     SeerrClient,
     Services,
     SonarrClient,
-    TautulliClient,
-    WizarrClient,
 )
 from sparrow.clients.arr_library import arr_libraries
 from sparrow.clients.fleet import FleetMonitorClient
@@ -52,7 +45,7 @@ from sparrow.seerr_events import seerr_routes
 from sparrow.store import Store
 from sparrow.web import create_app
 from sparrow.web.api import Api
-from sparrow.web.auth import Auth, SessionVerifier
+from sparrow.web.auth import AccountVerifier, Auth
 from sparrow.web.chat import ChatApi
 from sparrow.web.seerr import SeerrWebhook
 
@@ -68,12 +61,10 @@ def build_services(cfg: Settings, instances: list[Instance]) -> Services:
 
     return Services(
         seerr=SeerrClient(cfg.seerr_url, cfg.seerr_api_key),
-        plex=PlexClient(cfg.plex_url, cfg.plex_token),
-        wizarr=WizarrClient(cfg.wizarr_url, cfg.wizarr_api_key),
+        raven=RavenClient(cfg.raven_url),
         sonarr=per_host("sonarr", SonarrClient),
         radarr=per_host("radarr", RadarrClient),
         sabnzbd=per_host("sabnzbd", SabnzbdClient),
-        tautulli=per_host("tautulli", TautulliClient),
         probe=FileProbe(
             MediaPaths(cfg.media_roots, cfg.media_path_map), timeout=cfg.probe_timeout_seconds
         ),
@@ -83,8 +74,6 @@ def build_services(cfg: Settings, instances: list[Instance]) -> Services:
             else None
         ),
         speedtest=OoklaSpeedTest(cfg.speedtest_host) if cfg.speedtest_host else None,
-        plextv=PlexTvClient(cfg.plex_tv_url, cfg.plex_token) if cfg.plex_token else None,
-        raven=RavenClient(cfg.raven_url) if cfg.raven_url else None,
         arr_libraries=arr_libraries(instances),
     )
 
@@ -107,7 +96,6 @@ def build(
     model_client: ModelClient | None = None,
     tools: ToolRegistry | None = None,
     store: Store | None = None,
-    rookery: Rookery | None = None,
 ) -> App:
     cfg = cfg or settings()
     store = store or Store(cfg.db_path)
@@ -132,16 +120,16 @@ def build(
     notifier = LogNotifier()
     seerr = SeerrWebhook(cfg.seerr_webhook_secret, seerr_routes(services, store), store, notifier)
     scheduler = Scheduler(scheduled(services, store, cfg), store=store, notifier=notifier)
-    rookery = rookery or RookeryClient(cfg.rookery_url, cfg.rookery_service_token)
-    auth = Auth(SessionVerifier(rookery), identity, sign_in=f"{cfg.rookery_public_url}/login")
+    auth = Auth(AccountVerifier(services.raven), identity)
     web = create_app(
-        seerr=seerr, api=Api(auth, identity, store), chat=ChatApi(auth, chat, notifier)
+        seerr=seerr,
+        api=Api(auth, identity, store, services.raven),
+        chat=ChatApi(auth, chat, notifier),
     )
     return App(cfg, store, services, agent, chat, web, scheduler)
 
 
 async def serve(app: App) -> None:
-    await app.chat.identity.load_owner()
     config = uvicorn.Config(app.web, host="0.0.0.0", port=app.settings.web_port, log_level="info")
     server = uvicorn.Server(config)
     web_task = asyncio.create_task(server.serve(), name="web")

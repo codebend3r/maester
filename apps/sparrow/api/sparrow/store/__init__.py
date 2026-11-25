@@ -6,7 +6,7 @@ arrs are. This is sparrow's own memory of who asked for what and what it did.
 
 - `base.py`           the connection, transactions, migrations, timestamps
 - `audit.py`          every tool call
-- `users.py`          who a signed-in user is on Plex/Seerr/Tautulli, and tier overrides
+- `users.py`          who a raven account is here: its standing, Seerr match and tier override
 - `conversations.py`  each user's conversation
 - `pending.py`        confirmations waiting on a button
 - `claims.py`         what's done once a window: webhook deliveries, re-encode flags

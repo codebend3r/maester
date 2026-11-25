@@ -19,7 +19,7 @@ Claude Code account, so the server listens on 127.0.0.1 only. The container runs
 """
 
 # No `from __future__ import annotations`: FastAPI reads each route's
-# `Annotated[..., Depends(...)]` at definition, where `Signed` is in scope.
+# `Annotated[..., Depends(...)]` at definition, where `Approved` is in scope.
 import argparse
 import logging
 import os
@@ -55,6 +55,7 @@ from sparrow.notify import LogNotifier
 from sparrow.registry import instances_from_env
 from sparrow.store import Store
 from sparrow.web import create_app
+from sparrow.web.api import me_body
 from sparrow.web.auth import Auth, Reason, Refused, Viewer, require_json
 from sparrow.web.chat import ChatApi
 
@@ -105,7 +106,7 @@ class SandboxAuth(Auth):
         self.sandbox = sandbox
 
     @property
-    def identity(self) -> IdentityService:  # what `Auth.linked` reads for an unlinked user
+    def identity(self) -> IdentityService:
         return self.sandbox.world.chat.identity
 
     async def signed_in(self, request: Request) -> Viewer:
@@ -120,7 +121,7 @@ class Sandbox:
         self,
         model: str,
         cases_dir: Path = CASES_DIR,
-        raven_url: str = "",
+        raven_url: str = LOCAL_RAVEN,
         arrs: dict[ArrService, dict[str, ArrLibrary]] | None = None,
     ):
         self.model = model
@@ -128,7 +129,7 @@ class Sandbox:
         self.client = None if model == FAKE_MODEL else ClaudeCodeModel()
         # On a Mac, Local Network privacy can keep this Python off a raven on the LAN; curl gets through.
         transport = CurlTransport() if sys.platform == "darwin" else None
-        self.raven = RavenClient(raven_url, transport=transport) if raven_url else None
+        self.raven = RavenClient(raven_url, transport=transport)
         # The real Radarr, Sonarr and Lidarr from `.env`, like raven, stand in for every case's.
         self.arrs = {service: hosts for service, hosts in (arrs or {}).items() if hosts}
         # One meter for every world, counting tokens against the deployed daily budget
@@ -145,8 +146,7 @@ class Sandbox:
     def _open(self, case_id: str) -> World:
         case = self.cases.get(case_id) or Case(name="Blank world", tier=Tier.ADMIN, turns=[])
         registry, services, store = build_world(case.services)
-        if self.raven is not None:
-            services.raven = self.raven
+        services.raven = self.raven
         services.arr_libraries = {**services.arr_libraries, **self.arrs}
         agent = build_agent(self.model, registry, services, store, model_client=self.client)
         agent.limiter = self.limiter
@@ -166,7 +166,7 @@ class Sandbox:
         case = self.world.case
         return {
             "model": self.model,
-            "raven": self.raven.base_url if self.raven else None,
+            "raven": self.raven.base_url,
             "world": self.world.id,
             "case": {
                 "id": self.world.case_id,
@@ -181,14 +181,11 @@ class Sandbox:
 
     def router(self) -> APIRouter:
         router = APIRouter(prefix="/api")
-        Signed = Annotated[Viewer, Depends(self.auth.signed_in)]
+        Approved = Annotated[Viewer, Depends(self.auth.approved)]
 
         @router.get("/me")
-        async def me(viewer: Signed) -> dict[str, Any]:
-            return {
-                "user": {"id": viewer.user.user_id, "display_name": viewer.display_name},
-                "tier": viewer.tier.name.lower(),
-            }
+        async def me(viewer: Approved) -> dict[str, Any]:
+            return me_body(viewer)
 
         @router.get("/sandbox")
         async def state() -> dict[str, Any]:

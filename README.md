@@ -1,12 +1,11 @@
 # maester
 
-maester is a self-hosted media suite: a library and player, an AI assistant for the friends who share the server, and one sign-in for them all. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
+maester is a self-hosted media suite: a library and player, and an AI assistant for the friends who share the server. This repo is its workspace, an [Nx](https://nx.dev) 23 monorepo over [Bun](https://bun.sh) workspaces.
 
-| App     | What it is                                                                                                   |
-| ------- | ------------------------------------------------------------------------------------------------------------ |
-| raven   | A self-hosted media library and direct-play player                                                           |
-| sparrow | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven and rookery |
-| rookery | Sign-in: one sign-in shared by sparrow and the rest of the suite                                             |
+| App     | What it is                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------ |
+| raven   | A self-hosted media library and direct-play player                                               |
+| sparrow | The AI assistant: requests, playback fixes and lag answers, in its own chat app and inside raven |
 
 | Project           | Path                  | What                                                                     |
 | ----------------- | --------------------- | ------------------------------------------------------------------------ |
@@ -15,12 +14,10 @@ maester is a self-hosted media suite: a library and player, an AI assistant for 
 | `@raven/server`   | `apps/raven/server`   | raven's media server: NestJS on Fastify, SQLite index, ffmpeg            |
 | `@raven/web`      | `apps/raven/web`      | raven's library and player: React 19 on Vite                             |
 | `@raven/core`     | `libs/raven/core`     | raven's platform-agnostic core: API types, client, direct-play check     |
-| `@rookery/server` | `apps/rookery/server` | rookery's sign-in server: NestJS on Fastify, SQLite, shared sessions     |
-| `@rookery/web`    | `apps/rookery/web`    | rookery's login and logout pages: React 19 on Vite                       |
-| `@shared/server`  | `libs/shared/server`  | What raven's and rookery's servers share: web app serving, SQLite        |
+| `@shared/server`  | `libs/shared/server`  | Node server scaffolding: web app serving, SQLite migrations, env         |
 | `scripts`         | `scripts`             | Repo tooling: tracker and board sync, NAS deploy, version bump           |
 
-Each app has a README of its own: [sparrow](apps/sparrow/README.md), [raven](apps/raven/README.md), [rookery](apps/rookery/README.md).
+Each app has a README of its own: [sparrow](apps/sparrow/README.md), [raven](apps/raven/README.md).
 
 ## Develop
 
@@ -40,7 +37,7 @@ Every pull request installs the dependencies once per runner OS, runs every chec
 
 ![The pull request checks: one install per runner OS, the standard checks matrix, then the native builds, all gated by Checks](docs/images/pr-checks-workflow.png)
 
-The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps.
+The `ci:*` commands run those jobs on this machine, so a failing check reproduces without a push; [Pull request checks, locally](docs/ci-commands.md) lists them. [CI jobs](docs/ci-jobs.md) lists how long each job runs and what Nx restores from its cache. [raven's end to end coverage](apps/raven/docs/e2e-coverage.md) shows which features each raven app's end to end suite tests, and the gaps, and [Wren's end to end coverage](apps/wren/docs/e2e-coverage.md) does the same for Wren's.
 
 The git hooks are lefthook's (`lefthook.yml`):
 

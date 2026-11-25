@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from sparrow.agent.tools import ToolRegistry
 from sparrow.app import build, build_services, run
+from sparrow.clients import FakeRavenClient
 from sparrow.config import REQUIRED, MissingConfig, RenamedConfig, load_settings
 from sparrow.notify import AdminPost, LogNotifier
 from sparrow.registry import instances_from_env
@@ -16,7 +17,11 @@ def test_build_wires_everything_with_injected_pieces():
     cfg = load_settings({})
     store = Store(":memory:")
     app = build(
-        cfg, services=SimpleNamespace(), model_client=object(), tools=ToolRegistry(), store=store
+        cfg,
+        services=SimpleNamespace(raven=FakeRavenClient()),
+        model_client=object(),
+        tools=ToolRegistry(),
+        store=store,
     )
     assert app.agent.model == "claude-sonnet-5-5" and app.agent.effort == "medium"
     assert app.chat.store is app.store and not hasattr(app, "bot")
@@ -30,8 +35,7 @@ def test_build_services_creates_one_client_per_host():
     cfg = load_settings(
         {
             "SEERR_URL": "http://s",
-            "PLEX_URL": "http://p",
-            "WIZARR_URL": "http://w",
+            "RAVEN_URL": "http://r",
             "MEDIA_ROOTS": "/Meleys",
             "PROBE_TIMEOUT_SECONDS": "30",
         }
@@ -42,8 +46,8 @@ def test_build_services_creates_one_client_per_host():
             "SONARR_MELEYS_API_KEY": "k",
             "SONARR_VERMITHOR_URL": "http://v:1",
             "SONARR_VERMITHOR_API_KEY": "k",
-            "TAUTULLI_VERMITHOR_URL": "http://v:2",
-            "TAUTULLI_VERMITHOR_API_KEY": "k",
+            "SABNZBD_VERMITHOR_URL": "http://v:2",
+            "SABNZBD_VERMITHOR_API_KEY": "k",
         }
     )
     services = build_services(cfg, reg)
@@ -51,7 +55,8 @@ def test_build_services_creates_one_client_per_host():
         set(services.sonarr) == {"meleys", "vermithor"}
         and services.sonarr["meleys"].host == "meleys"
     )
-    assert set(services.tautulli) == {"vermithor"} and services.radarr == {}
+    assert set(services.sabnzbd) == {"vermithor"} and services.radarr == {}
+    assert services.raven.base_url == "http://r"
     assert services.seerr.base_url == "http://s"
     assert services.probe.paths.roots == ("/Meleys",) and services.probe.timeout == 30
     assert services.fleet is None and services.speedtest is None  # neither set up

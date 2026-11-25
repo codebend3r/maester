@@ -101,7 +101,9 @@ async def test_a_proven_report_blocklists_deletes_and_searches_on_the_owning_hos
         f"Deleted {DUNE_4K} (68.5 GB) on vermithor: the 4K copy of Dune (2021).\n"
         "Reason: won't play; a file check found it corrupt: decode errors at 1:12:15-1:12:45"
     )
-    assert "Reported by dany." in notice.text and notice.text.endswith("Seerr issue #1.")
+    assert "Reported by dany@example.com." in notice.text and notice.text.endswith(
+        "Seerr issue #1."
+    )
     stored = library.store.get_report(reported.id)
     assert stored.status is ReportStatus.REPLACED and stored.decision is Decision.REPLACEABLE
     assert library.services.seerr.issues[0]["comments"] == [out.content]

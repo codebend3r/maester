@@ -1,4 +1,4 @@
-"""The FastAPI side: sparrow's own API, webhooks from Seerr (and Tautulli, later), and /health."""
+"""The FastAPI side: sparrow's own API, webhooks from Seerr, and /health."""
 
 from __future__ import annotations
 

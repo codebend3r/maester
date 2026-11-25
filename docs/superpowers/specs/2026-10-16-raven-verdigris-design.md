@@ -4,7 +4,7 @@ A visual redesign of the raven web client, from a design handoff named Verdigris
 
 Decided with the user:
 
-- **Sign in** is built as UI only, at `/sign-in`, outside the shell and linked from nowhere. raven has no accounts (the PIN and the admin lock are all it has), and rookery signs in with Plex, so there is nothing for the form to send yet. Its states (idle, Signing in, error) are real and tested; submitting calls nothing.
+- **Sign in** is built as UI only, at `/sign-in`, outside the shell and linked from nowhere. raven has no accounts (the PIN and the admin lock are all it has), so there is nothing for the form to send yet. Its states (idle, Signing in, error) are real and tested; submitting calls nothing.
 - **Landing** is a route in the web app, `/get`, full screen outside the shell like the player. No release publishes desktop installers yet, so its download buttons point at the GitHub releases page until one does.
 - One PR, in logically grouped commits.
 - No server or API changes. Where a mockup shows data raven does not have (a "New season" eyebrow, a director credit on a card), the page shows what raven has and drops the rest.

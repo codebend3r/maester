@@ -7,13 +7,11 @@ the same methods over in-memory data, so tools and evals run without a stack.
 `Services` is the bag of clients the app hands every tool, real or fake;
 `probe` reads the media files themselves, with ffprobe on the read-only mount.
 `speedtest` measures the internet connection from the container's own host.
-`plextv` says who owns the server, so the owner is the admin.
-`raven` is the suite's own library, searched the way friends browse it.
+`raven` is the suite's own library and player, and its sign-in: it says who
+a token is, and tools read it as the person asking (`ToolContext.raven`).
 `arr_libraries` is each Radarr, Sonarr and Lidarr as a whole, by service and host,
 for the admin's questions about them and the moves they ask for.
-The fleet monitor, the speed test, plex.tv and raven are optional: None where not set up.
-`rookery` (who a session cookie belongs to) is the web app's, not the tools',
-so it sits outside `Services`.
+The fleet monitor and the speed test are optional: None where not set up.
 """
 
 from dataclasses import dataclass, field
@@ -22,17 +20,12 @@ from sparrow.clients.arr_library import ArrLibrary, ArrService
 from sparrow.clients.base import ClientError, HttpClient
 from sparrow.clients.fleet import FakeFleetMonitor, FleetMonitor, FleetMonitorClient
 from sparrow.clients.media import FakeFileProbe, FileProbe, MediaProbe
-from sparrow.clients.plex import FakePlexClient, Plex, PlexClient
-from sparrow.clients.plextv import FakePlexTv, PlexAccount, PlexTv, PlexTvClient
 from sparrow.clients.radarr import FakeRadarrClient, Radarr, RadarrClient
-from sparrow.clients.raven import FakeRavenClient, Raven, RavenClient
-from sparrow.clients.rookery import Account, FakeRookery, Rookery, RookeryClient
+from sparrow.clients.raven import FakeRavenClient, RavenClient, RavenServer
 from sparrow.clients.sabnzbd import FakeSabnzbdClient, Sabnzbd, SabnzbdClient
 from sparrow.clients.seerr import FakeSeerrClient, Seerr, SeerrClient
 from sparrow.clients.sonarr import FakeSonarrClient, Sonarr, SonarrClient
 from sparrow.clients.speedtest import FakeSpeedTest, OoklaSpeedTest, SpeedTester
-from sparrow.clients.tautulli import FakeTautulliClient, Tautulli, TautulliClient
-from sparrow.clients.wizarr import FakeWizarrClient, Wizarr, WizarrClient
 
 
 @dataclass
@@ -40,52 +33,35 @@ class Services:
     """One client per single-instance service, one per host for the rest."""
 
     seerr: Seerr
-    plex: Plex
-    wizarr: Wizarr
+    raven: RavenServer
     sonarr: dict[str, Sonarr]
     radarr: dict[str, Radarr]
     sabnzbd: dict[str, Sabnzbd]
-    tautulli: dict[str, Tautulli]
     probe: MediaProbe
     fleet: FleetMonitor | None  # CPU and memory per NAS; None when not set up
     speedtest: SpeedTester | None  # None when SPEEDTEST_HOST isn't set
-    plextv: PlexTv | None = None  # None without the owner's PLEX_TOKEN
-    raven: Raven | None = None  # None without RAVEN_URL
     # Every Radarr, Sonarr and Lidarr, by service, then host.
     arr_libraries: dict[ArrService, dict[str, ArrLibrary]] = field(default_factory=dict)
 
 
 __all__ = [
-    "Account",
     "ClientError",
     "FakeFileProbe",
     "FakeFleetMonitor",
-    "FakePlexClient",
-    "FakePlexTv",
     "FakeRadarrClient",
     "FakeRavenClient",
-    "FakeRookery",
     "FakeSabnzbdClient",
     "FakeSeerrClient",
     "FakeSonarrClient",
     "FakeSpeedTest",
-    "FakeTautulliClient",
-    "FakeWizarrClient",
     "FileProbe",
     "FleetMonitorClient",
     "HttpClient",
     "OoklaSpeedTest",
-    "PlexAccount",
-    "PlexClient",
-    "PlexTvClient",
     "RadarrClient",
     "RavenClient",
-    "Rookery",
-    "RookeryClient",
     "SabnzbdClient",
     "SeerrClient",
     "Services",
     "SonarrClient",
-    "TautulliClient",
-    "WizarrClient",
 ]

@@ -1,19 +1,19 @@
-"""Who a signed-in user is on Plex/Seerr, and which tier they get.
+"""Who a signed-in raven account is on Seerr, and which tier they get.
 
-rookery says who someone is: their rookery user id and the Plex account they
-signed in with. sparrow decides what they may do. Tier is resolved on every
-request, so a change takes effect immediately: a stored override, which the
-admin sets, wins; then the owner of the Plex server is the admin; then a
-user whose Plex account matches a Seerr user is a friend; anyone else is
-unlinked. Trusted comes only from the override.
+raven says who someone is: their account (a Supabase user), its email, and
+where raven's owner has it (pending, approved or revoked) and whether it is
+the owner. sparrow decides what they may do. Tier is resolved on every
+request, so a change takes effect immediately: an account raven hasn't
+approved (pending or revoked) gets nothing, whatever else is stored; then a
+stored override, which the admin sets, wins; then raven's owner is the admin;
+then any approved member is a friend. Trusted comes only from the override.
 
-The Seerr match, and the Tautulli user id beside it, are cached on the
-user's row and checked again when due: daily once matched, so a friend Seerr
-no longer lists loses access, and at most once a minute while unmatched, so
-a friend invited a minute ago gets in on their next message. Only verified
-Plex facts match: the account's email against a Seerr user's email, and its
-Plex username against a Seerr user's Plex username, never a display name a
-local Seerr user chose.
+The Seerr match is cached on the user's row and checked again when due:
+daily once matched, so someone Seerr no longer lists loses it, and at most
+once a minute while unmatched, so someone added to Seerr a minute ago is
+matched on their next message. Only the account's email matches, against a
+Seerr user's email. A friend without a match still chats; the tools that act
+as them in Seerr refuse (`NotLinked`).
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from sparrow.agent.tools import Tier
-from sparrow.clients import Account, ClientError, PlexAccount, Services
-from sparrow.clients.base import every_host
+from sparrow.clients import ClientError, Services
+from sparrow.clients.raven import MemberStatus, RavenAccount
 from sparrow.store import Store, UserRow
 from sparrow.store.base import stamp
 
@@ -32,17 +32,16 @@ log = logging.getLogger("sparrow.identity")
 
 MATCHED_RECHECK = timedelta(days=1)
 UNMATCHED_RECHECK = timedelta(minutes=1)
-OWNER_RETRY = timedelta(minutes=1)
 
 
-def resolve_tier(override: str | None, *, owner: bool, linked: bool) -> Tier:
-    """The stored override first; then the server's owner is the admin; then a linked user
-    is a friend, and anyone else UNLINKED."""
+def resolve_tier(override: str | None, *, owner: bool, approved: bool) -> Tier:
+    """Nothing for an account raven hasn't approved (its owner aside); then the stored
+    override; then raven's owner is the admin, and an approved member a friend."""
+    if not (owner or approved):
+        return Tier.UNAPPROVED
     if override:
         return Tier.parse(override)
-    if owner:
-        return Tier.ADMIN
-    return Tier.FRIEND if linked else Tier.UNLINKED
+    return Tier.ADMIN if owner else Tier.FRIEND
 
 
 def _utcnow() -> datetime:
@@ -56,43 +55,25 @@ class IdentityService:
         self.store = store
         self.services = services
         self.clock = clock
-        # The Plex server's owner, once plex.tv has said; see `load_owner`.
-        self.owner: PlexAccount | None = None
-        self._owner_asked: datetime | None = None
-
-    async def load_owner(self) -> PlexAccount | None:
-        """The server's owner: `PLEX_TOKEN`'s account on plex.tv. Asked once at boot, and
-        again at most once a minute while plex.tv couldn't say, so a blip at boot doesn't
-        leave sparrow without its admin."""
-        plextv = getattr(self.services, "plextv", None)
-        if self.owner is not None or plextv is None:
-            return self.owner
-        now = self.clock()
-        if self._owner_asked is not None and now - self._owner_asked < OWNER_RETRY:
-            return None
-        self._owner_asked = now
-        try:
-            self.owner = await plextv.account()
-        except ClientError:
-            log.warning("plex.tv couldn't say who owns the server; asking again in a minute")
-        return self.owner
 
     def tier_for(self, user_id: str) -> Tier:
         user = self.store.get_user(user_id)
         if user is None:
-            return Tier.UNLINKED
-        owner = self.owner is not None and user.plex_id == self.owner.id
-        return resolve_tier(user.tier_override, owner=owner, linked=user.seerr_user_id is not None)
+            return Tier.UNAPPROVED
+        return resolve_tier(
+            user.tier_override,
+            owner=user.is_owner,
+            approved=user.raven_status == MemberStatus.APPROVED,
+        )
 
-    async def refresh(self, account: Account) -> UserRow:
+    async def refresh(self, account: RavenAccount) -> UserRow:
         """The user `account` names, upserted from it, with their Seerr match checked when due."""
         now = self.clock()
         user = self.store.upsert_user(
-            account.user_id,
-            plex_id=account.plex_id,
-            plex_email=account.plex_email or None,
-            plex_username=account.plex_username or None,
-            thumb=account.thumb or None,
+            account.id,
+            email=account.email.lower(),
+            raven_status=account.status,
+            is_owner=int(account.is_owner),
             last_seen_at=stamp(now),
         )
         if self._match_due(user, now):
@@ -114,42 +95,12 @@ class IdentityService:
             # Keep whatever match they had; the next check is due as usual.
             log.warning("Seerr couldn't list its users to match %s", user.user_id)
             return self.store.upsert_user(user.user_id, seerr_checked_at=checked)
-        email = (user.plex_email or "").lower()
-        username = (user.plex_username or "").lower()
-        match = next(
-            (
-                u
-                for u in seerr_users
-                if (email and u.email.lower() == email)
-                or (username and u.plex_username.lower() == username)
-            ),
-            None,
-        )
-        if match is None:
-            return self.store.upsert_user(
-                user.user_id, seerr_user_id=None, tautulli_user_id=None, seerr_checked_at=checked
-            )
-        tautulli_id = await self._tautulli_id(email, username)
+        email = user.email or ""
+        match = next((u for u in seerr_users if email and u.email == email), None)
         return self.store.upsert_user(
             user.user_id,
-            seerr_user_id=match.id,
-            tautulli_user_id=tautulli_id,
+            seerr_user_id=match.id if match else None,
             seerr_checked_at=checked,
-        )
-
-    async def _tautulli_id(self, email: str, username: str) -> int | None:
-        """Their Tautulli user id, from the first host that knows them; every host is asked at
-        once, and one that can't answer doesn't block the match."""
-        found = await every_host(self.services.tautulli, lambda t: t.users())
-        return next(
-            (
-                u.user_id
-                for users in found.answered.values()
-                for u in users
-                if (email and u.email.lower() == email)
-                or (username and u.username.lower() == username)
-            ),
-            None,
         )
 
     def set_tier_override(self, user_id: str, tier: Tier | None) -> str:

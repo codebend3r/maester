@@ -5,7 +5,6 @@ from dataclasses import replace
 from sparrow.agent.tools import ToolContext
 from sparrow.clients.arr import MediaFile
 from sparrow.clients.media import Inspection, Track
-from sparrow.clients.plex import PlexItem
 from sparrow.clients.seerr import ArrRef, MediaDetails, MediaStatus
 from sparrow.clients.sonarr import Episode
 from sparrow.media import Copy
@@ -14,15 +13,14 @@ from sparrow.playback.reports import Filed, ReportKind, file_report
 from tests.factories import seerr_server
 
 S = MediaStatus
-DANY = 8008135  # the linked friend's Plex (and Tautulli) user id
 DUNE = MediaDetails(
     438631, "movie", "Dune", 2021, "", S.AVAILABLE, S.AVAILABLE,
-    rating_key="4348", rating_key_4k="9001", arr=ArrRef(0, 8), arr_4k=ArrRef(1, 8),
+    arr=ArrRef(0, 8), arr_4k=ArrRef(1, 8),
     media_id=12, runtime_minutes=155,
 )  # fmt: skip
 BEAR = MediaDetails(
     136315, "tv", "The Bear", 2022, "", S.AVAILABLE, S.UNKNOWN,
-    rating_key="5120", arr=ArrRef(0, 12), tvdb_id=403245, media_id=31, runtime_minutes=30,
+    arr=ArrRef(0, 12), tvdb_id=403245, media_id=31, runtime_minutes=30,
 )  # fmt: skip
 DUNE_4K = "/Vermithor/Movies/Dune (2021)/Dune (2021) Remux-2160p.mkv"
 FORKS = "/Meleys/TV/The Bear/Season 02/The Bear - S02E07 - Forks WEBDL-1080p.mkv"
@@ -57,19 +55,12 @@ def stock(ctx: ToolContext) -> ToolContext:
     sonarr.file_list = [MediaFile(72, FORKS, 1_900_000_000, "WEBDL-1080p", "NTb", 12, 2)]
     services.probe.files[DUNE_4K] = Inspection(DUNE_4K, 9331.0, "hevc", 7, DUNE_4K_TRACKS)
     services.probe.files[FORKS] = Inspection(FORKS, 1980.0, "h264", 0, ())
-    services.plex.items.update(
-        {
-            "9001": PlexItem("9001", "Dune", "movie", 2021, ("tmdb://438631",), ()),
-            "5120": PlexItem("5120", "The Bear", "show", 2022, ("tmdb://136315",), ()),
-        }
-    )
-    ctx.store.upsert_user(ctx.user_id, tautulli_user_id=DANY)
     return ctx
 
 
 def link_pal(ctx: ToolContext) -> None:
     """A second linked friend, user id d2."""
-    ctx.store.upsert_user("d2", seerr_user_id=5, plex_username="pal")
+    ctx.store.upsert_user("d2", seerr_user_id=5, email="pal@example.com")
 
 
 async def report(

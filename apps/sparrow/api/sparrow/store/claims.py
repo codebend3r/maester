@@ -1,9 +1,8 @@
 """Claims: something done once a window, per source and key.
 
 A webhook delivery acted on (a repeat inside the window is acknowledged
-without acting twice), or a heavy remux flagged to the admin for a
-re-encode (once a month per Plex item): each claims its key under its
-source first. The insert is the claim, so two at once can't both act.
+without acting twice), a job's slot, a release group suggested for a
+block: each claims its key under its source first. The insert is the claim, so two at once can't both act.
 """
 
 from __future__ import annotations

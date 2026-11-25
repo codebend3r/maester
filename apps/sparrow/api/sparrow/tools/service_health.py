@@ -1,4 +1,4 @@
-"""Is Plex down? Every service behind the server, asked at once whether it answers.
+"""Is the server down? Every service behind it, asked at once whether it answers.
 
 Each client has one liveness call, `ping`, on the cheapest route that shows
 the service is up (and, where the route needs it, that sparrow's key still
@@ -33,29 +33,22 @@ class Pingable(Protocol):
 
 @dataclass(frozen=True)
 class Check:
-    service: str  # "Plex", "Sonarr on meleys"
+    service: str  # "raven", "Sonarr on meleys"
     down: str  # why it's down; empty when it answered
 
 
 def named(services: Services) -> list[tuple[str, Pingable]]:
     """Every service sparrow uses, by the name people know it by."""
-    found: list[tuple[str, Pingable]] = [
-        ("Plex", services.plex),
-        ("Seerr", services.seerr),
-        ("Wizarr", services.wizarr),
-    ]
+    found: list[tuple[str, Pingable]] = [("raven", services.raven), ("Seerr", services.seerr)]
     per_host: tuple[tuple[str, Mapping[str, Pingable]], ...] = (
         ("Sonarr", services.sonarr),
         ("Radarr", services.radarr),
         ("SABnzbd", services.sabnzbd),
-        ("Tautulli", services.tautulli),
     )
     for label, clients in per_host:
         found += [(f"{label} on {host}", client) for host, client in sorted(clients.items())]
     if services.fleet is not None:
         found.append(("the fleet monitor", services.fleet))
-    if services.raven is not None:
-        found.append(("raven", services.raven))
     return found
 
 
@@ -78,9 +71,9 @@ HEALTH: Key[tuple[Check, ...]] = Key("service_health")
 
 @tool(
     "service_health",
-    "Whether each service behind the server answers right now: Plex, Seerr, Wizarr, and "
-    "Sonarr, Radarr, SABnzbd and Tautulli on every host. Lists what is up and what is down, "
-    "and why. Use it for 'is Plex down?' or when another tool says a service didn't answer. "
+    "Whether each service behind the server answers right now: raven, Seerr, and Sonarr, "
+    "Radarr and SABnzbd on every host. Lists what is up and what is down, and why. Use it "
+    "for 'is raven down?' or when another tool says a service didn't answer. "
     "Checked at most once a minute; `checked` says how long ago.",
     tier=Tier.FRIEND,
 )

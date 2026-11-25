@@ -1,24 +1,24 @@
-"""Who is asking: the `maester_session` cookie rookery set, checked with rookery.
+"""Who is asking: the Supabase access token the page sends, checked with raven.
 
-sparrow runs no sign-in. rookery signs people in with Plex and sets the
-session cookie for the suite; sparrow reads it, asks rookery whose it is, and
-caches the answer for 30 seconds, so a page's burst of requests costs one
-lookup and a short rookery outage goes unnoticed. The cache is keyed by the
-token's hash, so sparrow keeps no live tokens past the request.
+sparrow runs no sign-in. sparrow's page signs in to the suite's Supabase
+project (raven's) and sends the access token as `Authorization: Bearer`;
+sparrow asks raven's `/api/me` whose it is, and caches the answer for 30
+seconds, so a page's burst of requests costs one lookup and a short raven
+outage goes unnoticed. The cache is keyed by the token's hash, so sparrow
+keeps no live tokens past the request; the token itself rides along only as
+the asker's own key to raven for the tools (`Viewer.chat_user`).
 
-`Auth` is the seam: routes depend on `signed_in`, `linked` or `admin` and
-never see the cookie. Should the apps ever live on unrelated domains, a
-verifier speaking signed tokens or OIDC replaces `SessionVerifier`, and the
-routes behind it don't change.
+`Auth` is the seam: routes depend on `signed_in`, `approved` or `admin` and
+never see the header.
 
 What a request is refused with, as JSON:
 
-- 401 `{reason: "signed_out", sign_in}`: no cookie, or rookery doesn't know
-  it; the page sends the browser to `sign_in` with `return_to`
-- 503 `{reason: "sign_in_unavailable"}`: rookery can't be reached and nothing
-  is cached, so the page says to try again instead of looping through sign-in
-- 403 `{reason: "unlinked", admin}`: signed in, but their Plex account has no
-  access; `admin` is the owner's Plex username, whom to ask for an invite
+- 401 `{reason: "signed_out"}`: no token, or raven doesn't accept it; the
+  page signs in again
+- 503 `{reason: "sign_in_unavailable"}`: raven can't be reached and nothing
+  is cached, so the page says to try again instead of signing in again
+- 403 `{reason: "not_approved"}`: signed in, but raven's owner hasn't
+  approved the account (or revoked it); the page says to ask raven's owner
 - 403 `{reason: "not_admin"}`: an admin route, for anyone else
 - 415 `{reason: "json_only"}`: a write that isn't `application/json`, which
   with no CORS headers keeps other sites' forms and scripts out
@@ -38,12 +38,14 @@ from fastapi import Request
 from sparrow.agent.tools import Tier
 from sparrow.chat.identity import IdentityService
 from sparrow.chat.service import ChatUser
-from sparrow.clients import Account, ClientError, Rookery
+from sparrow.clients import ClientError
+from sparrow.clients.raven import RavenAccount, RavenServer
 from sparrow.store import UserRow
 
 log = logging.getLogger("sparrow.web")
 
-COOKIE = "maester_session"
+AUTHORIZATION = "authorization"
+BEARER = "bearer"
 CACHE_TTL = timedelta(seconds=30)
 
 
@@ -52,7 +54,7 @@ class Reason(enum.StrEnum):
 
     SIGNED_OUT = "signed_out"
     SIGN_IN_UNAVAILABLE = "sign_in_unavailable"
-    UNLINKED = "unlinked"
+    NOT_APPROVED = "not_approved"
     NOT_ADMIN = "not_admin"
     JSON_ONLY = "json_only"
     UNKNOWN_USER = "unknown_user"
@@ -60,57 +62,60 @@ class Reason(enum.StrEnum):
 
 
 class Refused(Exception):
-    """A request turned away, with the status to answer with and a body of its `reason`
-    and whatever else the page needs to act on it."""
+    """A request turned away, with the status to answer with and a body of its `reason`."""
 
-    def __init__(self, status: int, reason: Reason, **extra: object):
+    def __init__(self, status: int, reason: Reason):
         super().__init__(reason)
         self.status = status
-        self.body: dict[str, object] = {"reason": reason, **extra}
+        self.body: dict[str, object] = {"reason": reason}
 
 
 class SignInUnavailable(RuntimeError):
-    """rookery couldn't be asked, and no recent answer was cached."""
+    """raven couldn't be asked, and no recent answer was cached."""
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class SessionVerifier:
-    """A session token's account, from rookery, remembered for `ttl`."""
+def bearer_token(request: Request) -> str | None:
+    """The token of an `Authorization: Bearer <token>` header; None without one."""
+    scheme, _, token = request.headers.get(AUTHORIZATION, "").partition(" ")
+    token = token.strip()
+    return token if scheme.lower() == BEARER and token else None
+
+
+class AccountVerifier:
+    """A token's raven account, remembered for `ttl`."""
 
     def __init__(
         self,
-        rookery: Rookery,
+        raven: RavenServer,
         *,
         ttl: timedelta = CACHE_TTL,
         clock: Callable[[], datetime] = _utcnow,
     ):
-        self.rookery = rookery
+        self.raven = raven
         self.ttl = ttl
         self.clock = clock
-        self._cache: dict[str, tuple[Account, datetime]] = {}
+        self._cache: dict[str, tuple[RavenAccount, datetime]] = {}
 
-    async def account(self, token: str) -> Account | None:
-        """Whose `token` is; None when rookery doesn't know it or it has expired."""
+    async def account(self, token: str) -> RavenAccount | None:
+        """Whose `token` is; None when raven doesn't accept it."""
         now = self.clock()
         key = hashlib.sha256(token.encode()).hexdigest()
         cached = self._cache.get(key)
         if cached is not None and now - cached[1] < self.ttl:
-            account: Account | None = cached[0]
+            return cached[0]
+        try:
+            account = await self.raven.me(token)
+        except ClientError as exc:
+            raise SignInUnavailable(str(exc)) from exc
+        self._forget_stale(now)
+        if account is None:
+            self._cache.pop(key, None)
         else:
-            try:
-                account = await self.rookery.session(token)
-            except ClientError as exc:
-                raise SignInUnavailable(str(exc)) from exc
-            self._forget_stale(now)
-            if account is None:
-                self._cache.pop(key, None)
-            else:
-                self._cache[key] = (account, now)
-        if account is None or account.expires_at <= now:
-            return None
+            self._cache[key] = (account, now)
         return account
 
     def _forget_stale(self, now: datetime) -> None:
@@ -121,15 +126,17 @@ class SessionVerifier:
 
 @dataclass(frozen=True)
 class Viewer:
-    """Who a request is from, and their tier right now."""
+    """Who a request is from, their tier right now, and the token they sent (None in the
+    sandbox), for their tools' reads of raven."""
 
     user: UserRow
     tier: Tier
     display_name: str
+    raven_token: str | None = None
 
     @property
     def chat_user(self) -> ChatUser:
-        return ChatUser(self.user.user_id, self.display_name)
+        return ChatUser(self.user.user_id, self.display_name, self.raven_token)
 
 
 def require_json(request: Request) -> None:
@@ -140,42 +147,34 @@ def require_json(request: Request) -> None:
 
 
 class Auth:
-    def __init__(self, verifier: SessionVerifier, identity: IdentityService, sign_in: str):
+    def __init__(self, verifier: AccountVerifier, identity: IdentityService):
         self.verifier = verifier
         self.identity = identity
-        self.sign_in = sign_in  # rookery's login page
 
     async def signed_in(self, request: Request) -> Viewer:
-        """Anyone rookery signed in, linked or not."""
-        token = request.cookies.get(COOKIE)
-        if not token:
-            raise self._signed_out()
+        """Anyone raven knows, approved or not."""
+        token = bearer_token(request)
+        if token is None:
+            raise Refused(401, Reason.SIGNED_OUT)
         try:
             account = await self.verifier.account(token)
         except SignInUnavailable:
-            log.warning("rookery couldn't be asked who a session belongs to", exc_info=True)
+            log.warning("raven couldn't be asked whose a token is", exc_info=True)
             raise Refused(503, Reason.SIGN_IN_UNAVAILABLE) from None
         if account is None:
-            raise self._signed_out()
-        await self.identity.load_owner()
+            raise Refused(401, Reason.SIGNED_OUT)
         user = await self.identity.refresh(account)
-        name = account.display_name or user.plex_username or user.user_id
-        return Viewer(user, self.identity.tier_for(user.user_id), name)
+        return Viewer(user, self.identity.tier_for(user.user_id), account.email, token)
 
-    async def linked(self, request: Request) -> Viewer:
-        """A friend or above: the chat and inbox routes."""
+    async def approved(self, request: Request) -> Viewer:
+        """A friend or above: the chat routes."""
         viewer = await self.signed_in(request)
-        if viewer.tier == Tier.UNLINKED:
-            owner = self.identity.owner
-            admin = owner.username if owner else None
-            raise Refused(403, Reason.UNLINKED, admin=admin)
+        if viewer.tier == Tier.UNAPPROVED:
+            raise Refused(403, Reason.NOT_APPROVED)
         return viewer
 
     async def admin(self, request: Request) -> Viewer:
-        viewer = await self.signed_in(request)
+        viewer = await self.approved(request)
         if viewer.tier != Tier.ADMIN:
             raise Refused(403, Reason.NOT_ADMIN)
         return viewer
-
-    def _signed_out(self) -> Refused:
-        return Refused(401, Reason.SIGNED_OUT, sign_in=self.sign_in)

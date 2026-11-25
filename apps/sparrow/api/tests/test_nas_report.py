@@ -25,7 +25,7 @@ async def test_anything_degraded_comes_first_and_the_rest_is_fine(services):
     services.fleet.health = [
         HEALTHY,
         replace(HEALTHY, name="vermithor", disk_percent=93.5, temperatures={"coretemp.temp1": 84.0},
-                containers_down=("tautulli",), uptime_percent_24h=97.5),
+                containers_down=("bazarr",), uptime_percent_24h=97.5),
         HostHealth("caraxes", False, "unknown"),
     ]  # fmt: skip
     services.radarr["meleys"].disks = [DiskSpace("/Movies", int(0.5 * TB), 16 * TB)]
@@ -35,7 +35,7 @@ async def test_anything_degraded_comes_first_and_the_rest_is_fine(services):
     assert found["Needs a look"][:2] == [
         "caraxes: the fleet monitor hasn't heard from it in a day. (no readings)",
         "vermithor: /volume1 is 93.5% used; coretemp.temp1 is at 84°C; up only 97.5% of the last "
-        "day; container tautulli is down. (/volume1 93.5% used (31.0 TB free), memory 48%, load "
+        "day; container bazarr is down. (/volume1 93.5% used (31.0 TB free), memory 48%, load "
         "0.3 per core, hottest 84°C, up 97.5% of the last day)",
     ]
     assert found["Needs a look"][2].startswith("/Movies (meleys): 500.0 GB free")
@@ -65,7 +65,6 @@ def test_every_job_is_scheduled_from_the_settings(services, store):
         "space_sample",
         "digest",
         "landed",
-        "expiry_reminders",
         "nas_report",
     }
     assert jobs["nas_report"].weekday == 0 and jobs["digest"].weekday is None

@@ -54,7 +54,9 @@ async def test_find_gaps_searches_the_scattered_ones_and_tells_the_admin_about_w
     assert out.content["whole_seasons_missing"] == [{"season": 3, "aired_episodes": 2}]
     assert bear.services.sonarr["meleys"].searched == [[22]]
     (notice,) = out.notices
-    assert notice.text.startswith("dany says The Bear (2022) is missing episodes on meleys.")
+    assert notice.text.startswith(
+        "dany@example.com says The Bear (2022) is missing episodes on meleys."
+    )
     assert "None of season 3 (2 aired) is there, so it wasn't searched" in notice.text
 
 

@@ -4,17 +4,12 @@ import pytest
 
 from sparrow.agent.tools import Refused, Result, Tier
 from sparrow.clients.seerr import IssueType
-from sparrow.clients.tautulli import StreamData
 from sparrow.media import Decision, ReportKind
 from sparrow.notify import AdminPost, DirectMessage
-from sparrow.playback.diagnosis import FileChecked, PlayerLimit, TheirWord
-from sparrow.playback.reports import Evidence
+from sparrow.playback.diagnosis import FileChecked, TheirWord
 from sparrow.seerr_events import SeerrNotification, issue_status
 from sparrow.tools.playback import report_problem
-from tests.factories import history_row, session
 from tests.playback_world import (
-    DANY,
-    DUNE_4K,
     DUNE_4K_ITEM,
     FORKS,
     FORKS_ITEM,
@@ -29,59 +24,12 @@ def library(ctx):
     return stock(ctx)
 
 
-async def test_a_player_limit_is_the_answer_and_the_file_is_left_alone(library):
-    # Played on vermithor's own Plex server: known there by its TMDB id, not Seerr's keys.
-    library.services.tautulli["vermithor"].sessions = [
-        session(user_id=DANY, rating_key="9001", product="Plex for Roku", player="Living Room",
-                dovi_profile=7, video_decision="direct play", tmdb_id=438631)
-    ]  # fmt: skip
-    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple picture")
-    assert filed.report.decision is Decision.ADVISED and filed.notices == ()
-    assert library.services.probe.decoded == []  # the file was never decoded
-    out = filed.as_dict()
-    (cause,) = out["diagnosis"]["player_causes"]
-    assert cause["limit"] == "dolby_vision_profile_7" and "1080p version" in cause["fix"]
-    assert out["diagnosis"]["player_check"] == (
-        "playing now, Plex for Roku on Living Room (Tautulli on vermithor)"
-    )
-    playback = out["diagnosis"]["playback"]
-    assert (playback["platform"], playback["container"], playback["video_decision"]) == (
-        "Roku", "mkv", "direct play",
-    )  # fmt: skip
-    assert out["next"].startswith("Give them the player fix")
-    (issue,) = library.services.seerr.issues
-    assert (issue["mediaId"], issue["issueType"], issue["as_user"]) == (12, IssueType.VIDEO, 4)
-    assert issue["message"].startswith("purple picture\n\nReported through sparrow by dany")
-    assert "Decision: a player limit explains it" in issue["message"]
-    assert filed.report.seerr_issue_id == 1 and out["seerr_issue"] == 1
-    # The player explained it, so it doesn't count toward replacing the file.
-    assert not filed.evidence.proven
-    assert Evidence.for_file(library.store, "vermithor", "movie", 55).reporters == set()
-
-
-async def test_a_finished_play_is_read_from_the_history_with_the_files_profile(library):
-    vermithor = library.services.tautulli["vermithor"]
-    vermithor.history_rows = [
-        history_row(user_id=DANY, rating_key="9001", row_id=77, product="Plex Web", player="Chrome")
-    ]
-    vermithor.titles["9001"] = 438631  # what vermithor's Plex server says the item is
-    vermithor.streams[77] = StreamData("mkv", "hevc", "direct play", "eac3", "direct play", "", "")
-    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY)
-    # Tautulli's history has no Dolby Vision profile; the file says 7.
-    assert isinstance(filed.diagnosis, PlayerLimit)
-    assert filed.diagnosis.check.playback.dovi_profile == 7
-    assert filed.report.decision is Decision.ADVISED
-
-
 async def test_a_failed_file_check_makes_the_copy_replaceable(library):
     library.services.probe.errors[FORKS] = ("[h264 @ 0x1] error while decoding MB 12 40",)
     filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY, "freezes", at=1200.0)
     assert library.services.probe.decoded == [(FORKS, 1185.0, 30.0)]
     assert filed.report.health == "corrupt" and filed.report.decision is Decision.REPLACEABLE
     assert isinstance(filed.diagnosis, FileChecked)
-    assert (
-        filed.diagnosis.check.describe() == "not checked: no recent play of this copy in Tautulli"
-    )
     out = filed.as_dict()
     assert out["next"].startswith(
         "The evidence allows a new copy (a file check found it corrupt: decode errors at 19:45"
@@ -135,7 +83,7 @@ async def test_track_problems_list_the_tracks_and_ask_the_admin(library):
     assert "Decision: recorded for the admin" in issue["message"]
     (notice,) = filed.notices
     assert isinstance(notice, AdminPost) and notice.text.startswith(
-        "dany reports audio out of sync or a missing dub on the 4K copy of Dune (2021) "
+        "dany@example.com reports audio out of sync or a missing dub on the 4K copy of Dune (2021) "
         '(vermithor): "no English dub". Nothing fixes this automatically'
     )
     assert (
@@ -202,22 +150,6 @@ def test_every_report_kind_has_a_policy_and_the_tool_offers_each():
     assert spec.tier == Tier.FRIEND and not spec.destructive
 
 
-async def test_after_a_player_fix_a_second_report_checks_the_file(library):
-    library.services.tautulli["vermithor"].sessions = [
-        session(user_id=DANY, rating_key="9001", dovi_profile=7, player="Living Room",
-                tmdb_id=438631)
-    ]  # fmt: skip
-    library.services.probe.errors[DUNE_4K] = ("[hevc @ 0x1] Invalid NAL unit size",)
-    first = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "purple")
-    assert first.report.decision is Decision.ADVISED and library.services.probe.decoded == []
-    again = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "the 1080p is fine, 4K isn't")
-    assert isinstance(again.diagnosis, FileChecked) and again.report.health == "corrupt"
-    assert again.report.decision is Decision.REPLACEABLE
-    assert again.diagnosis.check.describe().endswith(
-        "already had a player fix for this file, so the file is checked"
-    )
-
-
 async def test_resolved_reports_no_longer_testify(library):
     link_pal(library)
     first = await report(library, DUNE_4K_ITEM, ReportKind.CAM)
@@ -238,25 +170,3 @@ async def test_one_friends_claims_never_make_a_healthy_file_replaceable(library)
         library.services.probe.errors[FORKS] = (line,)
         filed = await report(library, FORKS_ITEM, ReportKind.WONT_PLAY)
         assert filed.report.health == "unreadable" and filed.report.decision is Decision.RECORDED
-
-
-# HEVC converted below the file's bitrate: Tautulli says so, not why.
-SHIELD_HEVC = dict(user_id=DANY, rating_key="9001", tmdb_id=438631, player="SHIELD Android TV",
-                   video_decision="transcode", stream_bitrate_kbps=8000, source_bitrate_kbps=62103)  # fmt: skip
-
-
-async def test_hevc_converted_below_the_file_at_home_is_the_players(library):
-    # Meleys' Tautulli watches the Plex server Seerr's keys are of.
-    library.services.tautulli["meleys"].sessions = [session(**SHIELD_HEVC, location="lan")]
-    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "it stutters")
-    assert isinstance(filed.diagnosis, PlayerLimit) and filed.report.decision is Decision.ADVISED
-    (cause,) = filed.diagnosis.causes
-    assert cause.name == "hevc_unsupported" and "can't play this HEVC file as it is" in cause.cause
-
-
-async def test_hevc_converted_below_the_file_away_from_home_checks_the_file(library):
-    """Away from home it may be the app's remote quality or the connection, not the player."""
-    library.services.tautulli["meleys"].sessions = [session(**SHIELD_HEVC, location="wan")]
-    filed = await report(library, DUNE_4K_ITEM, ReportKind.WONT_PLAY, "it stutters")
-    assert isinstance(filed.diagnosis, FileChecked) and filed.diagnosis.check.causes == ()
-    assert filed.diagnosis.check.play is not None  # the play was found, and read

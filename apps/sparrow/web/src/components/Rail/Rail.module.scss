@@ -18,7 +18,7 @@
   color: var(--color-on-leaf);
 }
 
-.newChat {
+.railButton {
   display: grid;
   place-items: center;
   inline-size: var(--rail-button);
@@ -42,7 +42,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .newChat {
+  .railButton {
     transition: background var(--duration-fast) var(--ease);
   }
 }

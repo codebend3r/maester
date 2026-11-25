@@ -1,7 +1,6 @@
 import pytest
 from pydantic import ValidationError
 
-from sparrow.clients import ClientError
 from sparrow.clients.seerr import MediaRequest, MediaStatus, RequestStatus
 from sparrow.media import Copy, Titled
 from sparrow.notify import DirectMessage
@@ -22,47 +21,30 @@ def notification(request_id="77", subject="Dune (2021)"):
 def ready(services, **kw):
     base = dict(
         id=77, status=RequestStatus.APPROVED, media_type="movie", tmdb_id=438631, is_4k=False,
-        requested_by_id=4, media_status=MediaStatus.AVAILABLE, rating_key="4348",
+        requested_by_id=4, media_status=MediaStatus.AVAILABLE,
     )  # fmt: skip
     services.seerr.requests = [MediaRequest(**{**base, **kw})]
 
 
-async def test_the_linked_requester_gets_title_version_and_plex_link(services, store):
+async def test_the_linked_requester_gets_title_version_and_raven(services, store):
     store.upsert_user("d1", seerr_user_id=4)
     ready(services, is_4k=True)
     (dm,) = await ready_to_watch(services, store, notification())
     assert dm.to == "d1" and dm.about == Titled(Copy("movie", 438631, True), "Dune (2021)")
-    assert dm.text == (
-        "Dune (2021) is ready to watch in 4K.\nOpen it in Plex: "
-        "https://app.plex.tv/desktop/#!/server/fake-machine/details?key=%2Flibrary%2Fmetadata%2F4348"
-    )
+    assert dm.text == "Dune (2021) is ready to watch in 4K.\nWatch it in raven: http://raven.test"
 
 
-async def test_seasons_are_named_and_a_missing_link_is_said_plainly(services, store):
+async def test_seasons_are_named(services, store):
     store.upsert_user("d1", seerr_user_id=4)
-    ready(services, media_type="tv", seasons=(2, 3), rating_key=None)
+    ready(services, media_type="tv", seasons=(2, 3))
     (dm,) = await ready_to_watch(services, store, notification(subject="The Bear (2022)"))
-    assert dm.text == (
-        "The Bear (2022), seasons 2, 3, is ready to watch in 1080p. Look for it in Plex."
-    )
-
-
-async def test_plex_being_down_does_not_hold_back_the_news(services, store):
-    store.upsert_user("d1", seerr_user_id=4)
-    ready(services)
-
-    async def down():
-        raise ClientError("plex", "GET", "/identity", None, "timeout")
-
-    services.plex.machine_identifier = down
-    (dm,) = await ready_to_watch(services, store, notification())
-    assert dm.text.endswith("Look for it in Plex.")
+    assert dm.text.startswith("The Bear (2022), seasons 2, 3, is ready to watch in 1080p.")
 
 
 async def test_nobody_to_tell(services, store):
     ready(services)
     assert await ready_to_watch(services, store, notification()) == []  # not linked here
-    store.upsert_user("d1", plex_username="dany")  # signed in, but matched to no Seerr user
+    store.upsert_user("d1", email="dany@example.com")  # signed in, but matched to no Seerr user
     assert await ready_to_watch(services, store, notification()) == []
     assert await ready_to_watch(services, store, notification(request_id=None)) == []
 
@@ -96,7 +78,7 @@ def seerr_says(type_, request_id="77"):
 
 
 async def test_a_decision_made_in_seerr_tells_the_linked_friend(services, store):
-    store.upsert_user("d1", seerr_user_id=4, plex_username="dany")
+    store.upsert_user("d1", seerr_user_id=4, email="dany@example.com")
     ready(services, status=RequestStatus.DECLINED)
     routes = seerr_routes(services, store)
     (dm,) = await routes["MEDIA_DECLINED"].handle(seerr_says("MEDIA_DECLINED"))

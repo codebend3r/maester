@@ -63,10 +63,9 @@ Run `uv python install 3.12` even when some Python is on the PATH. uv only accep
 
 `verify` and every task run through `bunx nx`, so the global Nx CLI is only for `nx login`. That command opens a browser, so run it yourself rather than through an agent (in Claude Code, `! nx login`). Homebrew's `nx` can be newer than the `nx` pinned in `package.json`; inside the repo it hands off to the pinned one, so `nx --version` printing a newer `Global` than `Local` is expected.
 
-Env files: copy `apps/raven/.env.example`, `apps/sparrow/.env.example` and `apps/rookery/.env.example` to `.env` beside them when you run that product's dev server, without overwriting an existing one (`cp -n`). Never put a `.env` at the repo root.
+Env files: copy `apps/raven/.env.example` and `apps/sparrow/.env.example` to `.env` beside them when you run that product's dev server, without overwriting an existing one (`cp -n`). Never put a `.env` at the repo root.
 
-- rookery: `dev:rookery`'s server exits with `missing required environment: PUBLIC_URL, SERVICE_TOKEN` until both are set. Locally, `PUBLIC_URL=http://localhost:5180` (Vite's address) and `SERVICE_TOKEN` from `openssl rand -hex 32`. Give sparrow the same token as `ROOKERY_SERVICE_TOKEN`.
-- sparrow: `sandbox:sparrow` is the local way to test it. It needs no keys and calls the model through `claude -p` on your own sign-in, so keep `ANTHROPIC_API_KEY` empty for it. `dev:sparrow` runs the real server, which refuses to boot (`MissingConfig`) without `ANTHROPIC_API_KEY`, `SEERR_API_KEY`, `ROOKERY_PUBLIC_URL` and the API key of every Radarr, Sonarr, SABnzbd, Lidarr and Tautulli instance the file configures with a URL. Those are the user's credentials: report `dev:sparrow` as blocked on them, never fill them in.
+- sparrow: `sandbox:sparrow` is the local way to test it. It needs no keys and calls the model through `claude -p` on your own sign-in, so keep `ANTHROPIC_API_KEY` empty for it. `dev:sparrow` runs the real server, which refuses to boot (`MissingConfig`) without `ANTHROPIC_API_KEY`, `SEERR_API_KEY`, `RAVEN_URL` and the API key of every Radarr, Sonarr, SABnzbd and Lidarr instance the file configures with a URL. Those are the user's credentials: report `dev:sparrow` as blocked on them, never fill them in.
 - raven: a `.env` usually exists already. `dev:raven` moves Vite to the next free port (5174) when another checkout already holds 5173.
 
 ## 2. Install and verify
@@ -78,7 +77,7 @@ bun run verify
 
 A first run takes a minute or two. Nx caches results, so `bun run verify:uncached` reruns everything after an environment change.
 
-A few UI and media tests wait on timers (`waitFor` at 5000 ms, a frame-likeness threshold), so they fail when the Mac is busy: other worktrees' test runs, a long-running `dev:raven:prod`, Docker starting up or a large install. Nx then names them as flaky (`@raven/web:test`, `@raven/server:test`, `@raven/music:test:screens`). Check `uptime`, rerun just the failed task, and run `verify` again once the machine is quiet; a test that fails alone with the same message every time is a real failure. Don't start dev servers or `ci:docker` alongside `verify`.
+A few UI and media tests wait on timers (`waitFor` at 5000 ms, a frame-likeness threshold), so they fail when the Mac is busy: other worktrees' test runs, a long-running `dev:raven:prod`, Docker starting up or a large install. Nx then names them as flaky (`@raven/web:test`, `@raven/server:test`, `@wren/app:test:screens`). Check `uptime`, rerun just the failed task, and run `verify` again once the machine is quiet; a test that fails alone with the same message every time is a real failure. Don't start dev servers or `ci:docker` alongside `verify`.
 
 ## 3. Run each kind of command
 
@@ -86,7 +85,7 @@ Everything goes through Nx from the repo root; `bun run <script>` is a wrapper.
 
 | Kind              | Command                                                                                                | Needs                                  |
 | ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| Dev servers       | `bun run dev:raven`, `dev:sparrow`, `dev:rookery`, `sandbox:sparrow`, `app:start`, `desktop:dev`       | core; each product's `.env`            |
+| Dev servers       | `bun run dev:raven`, `dev:sparrow`, `sandbox:sparrow`, `app:start`, `desktop:dev`                      | core; each product's `.env`            |
 | Prebuild          | `bun run app:prebuild:ios`, `app:prebuild:tvos`, `app:prebuild:android-tv`                             | device app tier (Android for the last) |
 | Build             | `bun run build`, `app:build:ios`, `app:build:tvos`, `app:build:android-tv`, `desktop:build`            | as above                               |
 | Unit tests        | `bun run test`, `test:screens` (device app render tests)                                               | core, Node and Xcode for screens       |
@@ -101,7 +100,7 @@ Use an iPhone that the runtime supports (`xcrun simctl list -j runtimes` shows e
 
 The device app's build, prebuild and e2e targets are cached by Nx (their inputs include `APP_VARIANT` and the Xcode version). Add `--skip-nx-cache` to force a real run.
 
-### The 🏗️ Build Raven Mac native job, locally
+### The 🎬 Build Raven Mac native job, locally
 
 `bun run mpv:native` selects `${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}` and runs the audit and real native tests through Nx. Its task dependencies first build or restore pinned libmpv/MoltenVK/FFmpeg, then run the uncached addon build, which refreshes the current HEAD's source bundle and provenance before either check starts. No manual shell export or separate build command is needed for this root command with Xcode at its default path. For a different Xcode installation, supply `DEVELOPER_DIR`. CI also uses `.github/actions/raven-desktop-native/action.yml`; read it and `libs/raven/mpv/README.md` for the current toolchain.
 
@@ -182,7 +181,7 @@ After preparing native resources, install Electron with `bunx nx run @raven/desk
 
 Ask before `desktop:smoke:packaged`: it launches the real app, checks GitHub for updates, writes `updates.checkedAt`, and can migrate the user's `~/Library/Application Support/raven/desktop-config.json` to version 5; its logs go to `~/Library/Logs/raven`. This is not a throwaway test profile. Report it as untested if permission is withheld.
 
-For `dev:raven`, `dev:rookery`, `dev:sparrow` and `sandbox:sparrow`, use product-local env examples, check port availability and required backend sign-ins, and verify startup without disclosing secrets. Do not overwrite existing env files. For `ci:docker`, verify Docker is running and allow space/time for a cold image build; use `PLATFORM=linux/amd64` only when explicitly reproducing CI's architecture on this arm64 Mac. Maintenance commands (`lint:fix`, `format`, `lint-staged`) may modify files; inspect the diff and preserve the user's work. `affected` needs the chosen Git base/head, and `graph` is a long-running viewer rather than a pass/fail check.
+For `dev:raven`, `dev:sparrow` and `sandbox:sparrow`, use product-local env examples, check port availability and required backend sign-ins, and verify startup without disclosing secrets. Do not overwrite existing env files. For `ci:docker`, verify Docker is running and allow space/time for a cold image build; use `PLATFORM=linux/amd64` only when explicitly reproducing CI's architecture on this arm64 Mac. Maintenance commands (`lint:fix`, `format`, `lint-staged`) may modify files; inspect the diff and preserve the user's work. `affected` needs the chosen Git base/head, and `graph` is a long-running viewer rather than a pass/fail check.
 
 ## 4. Read the failure
 

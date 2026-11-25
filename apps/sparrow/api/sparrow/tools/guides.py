@@ -1,4 +1,4 @@
-"""Setting up a TV, stick, phone or browser: answered from sparrow's own guides.
+"""Setting up raven in a browser or on a Mac: answered from sparrow's own guides.
 
 The guides (`sparrow/guides/`) are the source, so the model relays them
 instead of recalling menus from memory.
@@ -14,11 +14,11 @@ from sparrow.guides import Device, guide
 
 @tool(
     "setup_guide",
-    "How to set up Plex on a device and get the best picture: installing and signing in, "
-    "finding the server's libraries, quality at home and away, the relay, Direct Play, "
-    "subtitles and sound. Use it for any setup or app-settings question and answer from it, "
-    "not from memory. device: apple_tv, roku, fire_tv, android_tv (Google TV, Nvidia "
-    "Shield), mobile (iPhone, iPad, Android phones) or web (a browser, or a computer).",
+    "How to set up raven and get the best picture: signing up and in, installing Raven on "
+    "a Mac, the player's Quality menu, a connection too slow for the file, audio and "
+    "subtitles. Use it for any setup or player-settings question and answer from it, not "
+    "from memory. device: web (raven in a browser) or mac (Raven, the Mac app, which plays "
+    "every file as it is).",
     tier=Tier.FRIEND,
 )
 async def setup_guide(ctx: ToolContext, device: Device) -> dict[str, Any]:
@@ -26,5 +26,5 @@ async def setup_guide(ctx: ToolContext, device: Device) -> dict[str, Any]:
         "device": device,
         "guide": guide(device),
         "note": "Answer from this guide, in a few steps; give the part they asked about. "
-        "Menu names vary by app version, so say where else to look if it isn't there.",
+        "Menu names can change between versions, so say where else to look if it isn't there.",
     }

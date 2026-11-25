@@ -5,15 +5,14 @@ from fastapi.testclient import TestClient
 
 from sparrow.agent.tools import Choice, Ok, Title, TitleLink, ToolRegistry, offer
 from sparrow.app import build
-from sparrow.clients import FakeRookery
 from sparrow.clients.seerr import SeerrUser
 from sparrow.config import load_settings
 from sparrow.notify import AdminPost, DirectMessage
 from sparrow.web import create_app
-from sparrow.web.auth import COOKIE, Auth, SessionVerifier
+from sparrow.web.auth import AccountVerifier, Auth
 from sparrow.web.chat import ChatApi
 from tests.fake_model import FakeModel, text_message, tool_message
-from tests.test_auth import BOSS, DANY, SIGN_IN, STRANGER
+from tests.test_auth import BOSS, DANY, NEWBIE, bearer
 
 
 class Outbox:
@@ -36,7 +35,8 @@ def events(response):
 
 @pytest.fixture
 def chat(services, store):
-    """The chat routes over three stand-in tools, for Dany (a friend), the owner, a stranger."""
+    """The chat routes over stand-in tools, for Dany (a friend), the owner, and a newcomer
+    raven hasn't approved."""
     reg = ToolRegistry()
 
     @reg.tool("search_media", "search")
@@ -49,6 +49,10 @@ def chat(services, store):
             TitleLink("4K Movies 4K", "http://raven.test/movies/277?library=4"),))  # fmt: skip
         return Ok({"found": "Dune"}, titles=(dune,))
 
+    @reg.tool("read_raven", "reads raven as the asker")
+    async def read_raven(ctx):
+        return {"plays": len(await ctx.raven.history(5))}
+
     @reg.tool("replace_media", "replace", destructive=True)
     async def replace(ctx, file_id: int = 0):
         return f"replaced file {file_id}"
@@ -58,8 +62,9 @@ def chat(services, store):
         notices = (AdminPost("Dany reports Dune"), DirectMessage("d1", "noted"))
         return Ok("reported", notices)
 
-    rookery = FakeRookery(sessions={"t-boss": BOSS, "t-dany": DANY, "t-x": STRANGER})
-    services.seerr.user_list = [SeerrUser(4, "dany@example.com", "Dany", "dany_t")]
+    raven = services.raven
+    raven.accounts = {"t-boss": BOSS, "t-dany": DANY, "t-new": NEWBIE}
+    services.seerr.user_list = [SeerrUser(4, "dany@example.com", "Dany")]
     outbox = Outbox()
 
     def make(*script, trace=False):
@@ -69,24 +74,23 @@ def chat(services, store):
             model_client=FakeModel.scripted(*script),
             tools=reg,
             store=store,
-            rookery=rookery,
         )
-        auth = Auth(SessionVerifier(rookery), app.chat.identity, sign_in=SIGN_IN)
+        auth = Auth(AccountVerifier(raven), app.chat.identity)
         api = ChatApi(auth, app.chat, outbox, trace=trace)
         client = TestClient(create_app(chat=api))
-        client.cookies.set(COOKIE, "t-dany")
+        client.headers.update(bearer("t-dany"))
         return client, app
 
     return make, outbox
 
 
-def test_a_turn_needs_a_linked_session_and_json(chat):
+def test_a_turn_needs_an_approved_account_and_json(chat):
     make, _ = chat
     client, _ = make()
     assert client.post("/api/chat", content="text=hi").json() == {"reason": "json_only"}
-    client.cookies.set(COOKIE, "t-x")
-    assert client.post("/api/chat", json={"text": "hi"}).json()["reason"] == "unlinked"
-    client.cookies.clear()
+    client.headers.update(bearer("t-new"))
+    assert client.post("/api/chat", json={"text": "hi"}).json()["reason"] == "not_approved"
+    del client.headers["Authorization"]
     assert client.post("/api/chat", json={"text": "hi"}).status_code == 401
 
 
@@ -212,4 +216,11 @@ def test_forget_starts_the_conversation_fresh(chat):
     assert client.post("/api/chat/forget", json={}).json() == {
         "text": "Forgotten. We're starting fresh."
     }
-    assert app.store.recent_messages(DANY.user_id, max_tokens=1000) == []
+    assert app.store.recent_messages(DANY.id, max_tokens=1000) == []
+
+
+def test_a_turn_s_tools_read_raven_with_the_asker_s_own_token(chat, services):
+    make, _ = chat
+    client, _ = make(tool_message([("read_raven", {})]), text_message("You've watched nothing."))
+    client.post("/api/chat", json={"text": "what did I watch?"})
+    assert services.raven.viewers == ["t-dany"]

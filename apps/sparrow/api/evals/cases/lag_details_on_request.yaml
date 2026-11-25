@@ -1,15 +1,21 @@
 name: lag advice comes first and the stats only when asked
 tier: friend
 services:
-  user: {tautulli_user_id: 8008135}
-  tautulli:
-    meleys:
-      sessions:
-        - {rating_key: "4348", title: "Dune", location: wan, bitrate_mbps: 4, source_mbps: 10.2, transcode_decision: transcode, video_decision: transcode, transcode_speed: 0.6}
+  raven:
+    items:
+      - id: 40
+        title: "Dune"
+        year: 2021
+        tmdb_id: 438631
+        files:
+          - {id: 401, width: 3840, codec: hevc, hdr: true, bitrate_mbps: 18.4}
+          - {id: 402, bitrate_mbps: 10.2}
+    streams:
+      - {item_id: 40, media_id: 401, mode: transcode, send_mbps: 6}
 turns:
   - user: "my stream of Dune keeps stuttering"
     expect_tools: [session_report]
-    reply_matches: "Original|Maximum"
+    reply_matches: "1080p|H\\.264|version"
   - user: "show me the details"
     expect_tools: [session_report]
     reply_matches: "Mbps|transcod|convert"

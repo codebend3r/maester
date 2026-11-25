@@ -1,13 +1,13 @@
 """Playback problems, from "this won't play" to a recorded report.
 
-`recent_sessions` finds what the friend is watching or just watched on any
-host and offers it as a picker, so they confirm the title and copy with
-one tap before anything is checked. With nothing recent, the model asks for
-the title and uses the search picker instead.
+`recent_sessions` finds what the friend just watched in raven and offers it
+as a picker, so they confirm the title and copy with one tap before anything
+is checked. With nothing recent, the model asks for the title and uses the
+search picker instead.
 
 `report_problem` files a report on a confirmed copy through the one report
-flow (`sparrow/playback/reports.py`): the player first, then the file, a
-decision from stored evidence, and a Seerr issue as the friend.
+flow (`sparrow/playback/reports.py`): the file's check, a decision from
+stored evidence, and a Seerr issue as the friend.
 
 `list_tracks` reads one copy's audio and subtitle tracks with ffprobe, to
 answer "does this have Spanish subs?". Like every file read, it names a
@@ -17,12 +17,23 @@ title and copy, never a path: the file comes from the owning arr.
 from __future__ import annotations
 
 import asyncio
-import time
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from pydantic import Field
 
-from sparrow.agent.tools import Choice, Ok, Refused, Result, Tier, ToolContext, offer, tool
+from sparrow.agent.tools import (
+    Choice,
+    Failed,
+    Ok,
+    Refused,
+    Result,
+    Tier,
+    ToolContext,
+    offer,
+    tool,
+)
+from sparrow.clients import ClientError
 from sparrow.clients.seerr import MediaDetails
 from sparrow.formatting import humanized
 from sparrow.library import NotLocated
@@ -30,7 +41,7 @@ from sparrow.media import Copy, MediaType, Version, copy_ref, episode_code, titl
 from sparrow.playback.diagnosis import FileChecked, TrackList, read_tracks
 from sparrow.playback.health import parse_clock
 from sparrow.playback.items import locate
-from sparrow.playback.plays import Play, identify, recent_plays
+from sparrow.playback.plays import Play, recent_plays
 from sparrow.playback.reports import ReportKind, file_report
 
 # The copy (and episode) a playback tool is about.
@@ -47,53 +58,49 @@ NOTHING_RECENT = (
 )
 
 
-def play_choice(play: Play, details: MediaDetails, is_4k: bool | None, now: float) -> Choice:
-    """A pick for a play: the title and copy (None when unclear), when it was played, and on
-    what."""
-    version = "?" if is_4k is None else version_label(is_4k)
+def play_choice(play: Play, details: MediaDetails, now: datetime) -> Choice:
+    """A pick for a play: the title and copy (`?` when unclear), when it last played, and
+    in which library."""
+    version = "?" if play.is_4k is None else version_label(play.is_4k)
     code = episode_code(play.season, play.episode)
-    when = "playing now" if play.live else f"{humanized(int(now) - play.started)} ago"
-    shown = "copy unclear: ask 1080p or 4K" if is_4k is None else version
+    played = datetime.fromisoformat(play.played.played_at)
+    when = f"{humanized(int((now - played).total_seconds()))} ago"
+    shown = "copy unclear: ask 1080p or 4K" if play.is_4k is None else version
     return Choice(
         label=titled(details.display, code),
         value=copy_ref(details.media_type, details.tmdb_id, version, code),
         year=details.year,
-        detail=f"{shown} · {when} · {play.player}",
+        detail=f"{shown} · {when} · {play.played.library}",
     )
 
 
 @tool(
     "recent_sessions",
-    "What the user is watching now or watched recently, on every server, as a picker of "
-    "titles with their copy (1080p or 4K) and episode. Use it first when they report a "
-    "problem without naming the title ('this won't play'), and have them confirm the "
-    "title and copy before reporting it. A pick reads media_type:tmdb_id:version[:SxxEyy], "
-    "with version ? when the copy is unclear. What couldn't be looked up is in notes. When "
-    "it finds nothing, ask which title and use search_media.",
+    "What the user watched lately in raven, as a picker of titles with their copy (1080p "
+    "or 4K) and episode. Use it first when they report a problem without naming the title "
+    "('this won't play'), and have them confirm the title and copy before reporting it. A "
+    "pick reads media_type:tmdb_id:version[:SxxEyy], with version ? when the copy is "
+    "unclear. What couldn't be looked up is in notes. When it finds nothing, ask which "
+    "title and use search_media.",
     tier=Tier.FRIEND,
 )
 async def recent_sessions(ctx: ToolContext) -> dict[str, Any] | Result:
-    link = ctx.linked_user()
-    if link.tautulli_user_id is None:
-        return Refused(
-            "Their Plex account isn't matched to a Tautulli user, so what they watched can't "
-            f"be looked up. {NOTHING_RECENT}"
-        )
-    found = await recent_plays(ctx.services, link.tautulli_user_id)
+    try:
+        found = await recent_plays(ctx.raven)
+    except ClientError as exc:
+        return Failed(f"raven couldn't say what they watched: {exc}. {NOTHING_RECENT}")
     titles = await asyncio.gather(
-        *(identify(ctx.services, p) for p in found.plays), return_exceptions=True
+        *(ctx.services.seerr.media_details(p.kind, p.tmdb_id) for p in found.plays),
+        return_exceptions=True,
     )
-    now = time.time()
-    choices, notes = (
-        [],
-        [f"couldn't reach Tautulli on {h}: {why}" for h, why in found.unreachable.items()],
-    )
+    now = datetime.now(UTC)
+    choices, notes = [], list(found.notes)
     for play, title in zip(found.plays, titles, strict=True):
         match title:
             case MediaDetails():
-                choices.append(play_choice(play, title, found.copy_of(play, title), now))
+                choices.append(play_choice(play, title, now))
             case BaseException():
-                notes.append(f"couldn't tell what {play.title} is: {title}")
+                notes.append(f"Seerr couldn't say what {play.played.title} is: {title}")
     if choices:
         return offer(choices, notes)
     if notes:
@@ -139,12 +146,12 @@ async def list_tracks(
 @tool(
     "report_problem",
     "Report a problem with one copy (and episode) the user has confirmed. kind: wont_play "
-    "(won't start, freezes, errors out: the player is checked first, then the file is "
-    "decoded, around `at` when they named a moment), wrong_title, wrong_episode, cam, "
+    "(won't start, freezes, errors out: the file is decoded, around `at` when they named a "
+    "moment), wrong_title, wrong_episode, cam, "
     "hardcoded_subs (burned-in foreign subtitles), subtitles (missing or out of sync), audio "
     "(out of sync, missing dub), other. Records the report, opens a Seerr issue as the user, "
-    "and returns what was found and decided: a player fix to relay, a new copy to offer with "
-    "replace_media, or that it's recorded. Follow its `next`.",
+    "and returns what was found and decided: a new copy to offer with replace_media, or "
+    "that it's recorded. Follow its `next`.",
     tier=Tier.FRIEND,
 )
 async def report_problem(

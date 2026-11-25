@@ -95,7 +95,7 @@ def test_registry_filters_by_tier_and_marks_cache_breakpoint():
     assert [s.name for s in reg.for_tier(Tier.FRIEND)] == ["search"]
     assert [s.name for s in reg.for_tier(Tier.TRUSTED)] == ["replace", "search"]
     assert [s.name for s in reg.for_tier(Tier.ADMIN)] == ["kill", "replace", "search"]
-    assert reg.definitions(Tier.UNLINKED) == []
+    assert reg.definitions(Tier.UNAPPROVED) == []
     defs = reg.definitions(Tier.TRUSTED)
     assert all(d["eager_input_streaming"] for d in defs)
     assert "cache_control" in defs[-1] and "cache_control" not in defs[0]

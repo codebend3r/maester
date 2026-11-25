@@ -14,7 +14,6 @@ from sparrow.perf.uplink import (
     reading,
     recent,
 )
-from tests.factories import session
 
 
 def result(upload_mbps: float) -> SpeedResult:
@@ -29,61 +28,59 @@ class Clock:
         return self.now
 
 
+ALONGSIDE = "alongside the streams already going out"
+
+
 @pytest.mark.parametrize(
-    ("upload", "streaming", "said"),
+    ("upload", "said"),
     [
-        (40.0, 12000, "Plenty of room: about 40 Mbps of upload is free alongside 12 Mbps of remote streams."),
-        (10.0, 0, "Some room: about 10 Mbps of upload is free with no remote streams running, enough for another HD stream."),
-        (3.2, 18500, "The upload is nearly full: only about 3.2 Mbps is free alongside 18.5 Mbps of remote streams"),
+        (40.0, f"Plenty of room: about 40 Mbps of upload is free {ALONGSIDE}."),
+        (10.0, f"Some room: about 10 Mbps of upload is free {ALONGSIDE}, enough for another HD stream."),
+        (3.2, f"The upload is nearly full: only about 3.2 Mbps is free {ALONGSIDE}"),
     ],
 )  # fmt: skip
-def test_headroom_in_plain_words(upload, streaming, said):
-    measured = Uplink("meleys", result(upload), streaming, ())
+def test_headroom_in_plain_words(upload, said):
+    measured = Uplink("meleys", result(upload))
     assert measured.headroom().startswith(said)
     assert measured.tight is (upload < 8)
 
 
-async def test_a_test_reads_every_hosts_remote_streams_as_it_runs(services):
-    services.tautulli["meleys"].sessions = [session(location="wan", stream_bitrate_kbps=8000)]
-    services.tautulli["vermithor"].sessions = [
-        session(location="wan", stream_bitrate_kbps=6000),
-        session(location="lan", stream_bitrate_kbps=60000),
-    ]
-    services.speedtest = tester = FakeSpeedTest(result=result(22.0))
-    found = await reading(Memo(), services, tester)
-    assert found.found == Uplink("meleys", result(22.0), 14000, ())
+async def test_a_test_says_the_upload_it_found_and_when():
+    tester = FakeSpeedTest(result=result(22.0))
+    found = await reading(Memo(), tester)
+    assert found.found == Uplink("meleys", result(22.0))
     facts = found.as_dict()
-    assert (facts["measured"], facts["remote_streams_mbps"], "next_test" in facts) == (
-        "just now", 14.0, False,
+    assert (facts["measured"], facts["upload_mbps"], "next_test" in facts) == (
+        "just now", 22.0, False,
     )  # fmt: skip
 
 
-async def test_tests_are_reused_then_rationed_then_run_again(services):
+async def test_tests_are_reused_then_rationed_then_run_again():
     clock = Clock()
     memo, tester = Memo(clock), FakeSpeedTest(result=result(30.0))
-    await reading(memo, services, tester)
+    await reading(memo, tester)
     clock.now += REUSE - timedelta(seconds=1)
-    assert (await reading(memo, services, tester)).found.result.upload_kbps == 30_000
+    assert (await reading(memo, tester)).found.result.upload_kbps == 30_000
     assert recent(memo) is not None and not can_test(memo, tester)
     tester.result = result(5.0)
     clock.now += timedelta(minutes=5)  # past REUSE, before MIN_GAP: the last one, flagged
-    rationed = await reading(memo, services, tester)
+    rationed = await reading(memo, tester)
     assert rationed.rationed and rationed.found.result.upload_kbps == 30_000
     assert "the next can run in about 5 min" in rationed.as_dict()["next_test"]
     assert recent(memo) is None  # too old to describe the connection now
     clock.now = memo.latest(SPEED_TEST).at + MIN_GAP
     assert can_test(memo, tester)
-    assert (await reading(memo, services, tester)).found.result.upload_kbps == 5_000
+    assert (await reading(memo, tester)).found.result.upload_kbps == 5_000
     assert tester.runs == 2
 
 
-async def test_a_failed_test_is_rationed_too(services):
+async def test_a_failed_test_is_rationed_too():
     clock = Clock()
     memo, tester = Memo(clock), FakeSpeedTest()
-    failed = await reading(memo, services, tester)
+    failed = await reading(memo, tester)
     assert failed.found == NotMeasured("meleys", tester.why)
     clock.now += timedelta(minutes=12)
-    assert (await reading(memo, services, tester)).found == failed.found
+    assert (await reading(memo, tester)).found == failed.found
     assert tester.runs == 1 and recent(memo) is None
     assert not can_test(memo, tester)  # a speed test now would only be refused
     assert not can_test(Memo(), None)  # nor is there one without a tester

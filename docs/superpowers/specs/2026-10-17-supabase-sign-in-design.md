@@ -6,7 +6,7 @@ Date: 2026-10-17. Status: step 1 shipped (#237), step 2 shipped (#239), steps 3 
 
 Ship the shortest safe path to a raven library that requires a login. Anyone can create an account and verify their email, but only the owner can approve access, from a Users section inside raven. Pending and removed accounts cannot browse the library or play media, even by calling the API directly.
 
-rookery, luwin, cross-app single sign-on and Google sign-in are not prerequisites for raven. The existing `2026-10-09-shared-sign-in-design.md` continues to describe rookery and luwin until their later migration.
+luwin, cross-app single sign-on and Google sign-in are not prerequisites for raven.
 
 The implementation plan is `docs/superpowers/plans/2026-10-17-supabase-sign-in.md`. It records foundation validation results and the remaining browser, deployment and desktop checks required before cutover.
 
@@ -14,13 +14,13 @@ The implementation plan is `docs/superpowers/plans/2026-10-17-supabase-sign-in.m
 
 | Area | First delivery | Later |
 |---|---|---|
-| Login host | raven itself | Consider moving shared account pages to rookery when another app adopts Supabase |
+| Login host | raven itself | Consider shared account pages when another app adopts Supabase |
 | Account creation | Email and password, email verification, password recovery and reset | Google sign-in |
 | Access | Verified accounts start pending; owner approves or removes access in raven | No delegated approval administrators in the first delivery |
 | Owner | Explicitly bootstrapped Supabase user UUID | Ownership transfer needs an operator procedure, not a public signup flow |
 | Web | Login, signup, check-email, confirm, forgot, reset, pending and Users screens inside raven | Cross-app redirects and shared-domain SSO |
 | Desktop | Minimum compatible login, pending state, secure session storage and authenticated playback before enforcement | Google callback flow and broader account-management UI |
-| rookery and luwin | Leave their current authentication working | Migrate after raven is protected |
+| luwin | Leave its current authentication working | Migrate after raven is protected |
 | Viewing data | Progress, plays, watched and favourites are per account; everything recorded before accounts moves to the owner on their first visit (step 7, `raven-account-data`) | Library view settings stay shared until per-account library preferences (step 9) |
 | Hosting | Keep raven's current hosting; no new shared parent domain required | Shared-domain hosting only if later SSO needs it |
 
@@ -54,7 +54,7 @@ raven server: account gate -> library PIN gate -> owner-only management
 raven desktop: login and pending screen; signup/recovery open raven web
 ```
 
-- **Identity:** Supabase `sub` UUID, not email, Plex identity or a browser-provided role. Email is display/contact data and may change.
+- **Identity:** Supabase `sub` UUID, not email or a browser-provided role. Email is display/contact data and may change.
 - **Owner:** one UUID in a private configuration table, set through the deployment runbook. RPCs check that value against `auth.uid()`. Server owner checks use the same authoritative configuration. No first-signup-wins rule and no owner id accepted from a client.
 - **Membership:** `public.members` holds the account id, email and status (`pending`, `approved`, `revoked`). A trigger enrols a user when their email becomes confirmed and keeps their email synchronized. Missing membership denies access.
 - **Approval:** Supabase is the source of truth. The first implementation checks current membership on protected requests rather than trusting a status or role embedded in a JWT. Do not introduce a membership cache without specifying and testing its revocation delay.
@@ -65,7 +65,7 @@ raven desktop: login and pending screen; signup/recovery open raven web
 
 ## Supabase as code, under raven
 
-Add `@raven/supabase` at `apps/raven/supabase`, not under rookery for this milestone. Its config, migrations, templates, local seed, pgTAP tests and deployment runbook belong to the product being shipped.
+Add `@raven/supabase` at `apps/raven/supabase` for this milestone. Its config, migrations, templates, local seed, pgTAP tests and deployment runbook belong to the product being shipped.
 
 - Pin the Supabase CLI exactly and expose its tasks through Nx. Include new targets in `nx.includedScripts`.
 - Configure email/password auth, confirmation, secure email changes, password recovery, refresh token rotation and appropriate password/rate-limit settings.
@@ -120,7 +120,7 @@ Before the protected server deploys, ship only the desktop support it actually n
 
 - Main owns the Supabase session, adds Bearer to server calls and stores refresh credentials using `safeStorage`; without encryption, use memory only.
 - Renderer receives safe account state, never raw tokens. In-app email/password login and pending/removed state are sufficient initially.
-- Create account and Forgot password open this raven server's configured web origin, not rookery.
+- Create account and Forgot password open this raven server's configured web origin.
 - Trust probing uses public auth configuration. Validate configured endpoints at the existing trust boundary.
 - Native playback uses account-bound tickets, including subtitles and seeks; do not put long-lived credentials in media URLs.
 - Remove obsolete admin-password calls and redact credentials, email-link tokens and playback tickets from logs.
@@ -142,7 +142,7 @@ Each implementation PR leaves main working. Steps 1 to 5 prepare the cutover; st
 | 5 | Minimum desktop login, secure main-process session and authenticated playback | Release compatible desktop before the server cutover |
 | 6 | Enforce approved-account access across every protected route; switch management to owner-only; remove admin-password authorization and bind PIN state to accounts | Configure production, deploy the gate and verify it before inviting users |
 | 7 | Separate progress, plays, watched and favourites per account; migrate existing rows to the owner | Built (#256), in review: per-account viewing data with owner adoption; before it ships, viewing data is shared |
-| 8 | Migrate rookery and luwin; extract shared auth modules when there are real consumers | Not a raven prerequisite |
+| 8 | Migrate luwin; extract shared auth modules when there are real consumers | Not a raven prerequisite |
 | 9 | Cross-app SSO, Google sign-in, optional per-account library preferences and expanded desktop account UI | Independently scoped follow-ups |
 
 Steps 3 and 4 can be combined if that yields a smaller, reviewable cutover. Do not turn every module into a separate blocking PR. The priority is a complete raven signup -> verification -> owner approval -> protected playback flow, not the suite's final architecture.
@@ -160,7 +160,7 @@ Run only these before the task-level plan; do not retain the previous requiremen
 | Delivery path | Netlify forwards cookies, Authorization and SSE without public caching |
 | Desktop/playback | Supabase auth in main, encrypted storage, account-bound tickets, subtitles and repeated seeks |
 
-PyJWT, luwin identity matching, shared-subdomain refresh races, rookery deployment, Google PKCE and session-deletion hooks do not block raven. Deleting refresh sessions is not a substitute for checking current membership: it does not invalidate an already-issued access JWT.
+PyJWT, luwin identity matching, shared-subdomain refresh races, Google PKCE and session-deletion hooks do not block raven. Deleting refresh sessions is not a substitute for checking current membership: it does not invalidate an already-issued access JWT.
 
 ## Verification and cutover
 
