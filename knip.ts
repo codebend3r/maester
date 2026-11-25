@@ -51,7 +51,7 @@ export default {
       // Its `dead-code` runs the root's knip on this workspace alone.
       ignoreBinaries: ['knip'],
     },
-    'apps/raven/music-web': {
+    'apps/wren/wren-web': {
       // Lighthouse CI runs the server lighthouserc.json names, which no import names.
       entry: ['lighthouse/serve.ts'],
       // Its `dead-code` runs the root's knip on this workspace alone.

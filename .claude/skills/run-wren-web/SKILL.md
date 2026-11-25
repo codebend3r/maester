@@ -1,11 +1,11 @@
 ---
 name: run-wren-web
-description: Use when running Wren's web app (`@raven/music-web`) locally to try a change in the browser: "run wren", "start the wren dev server", "run wren web", "start wren locally", "run wren on the fixture", or http://localhost:5185 not answering or answering 502 on /api because nothing listens on :8484.
+description: Use when running Wren's web app (`@wren/web`) locally to try a change in the browser: "run wren", "start the wren dev server", "run wren web", "start wren locally", "run wren on the fixture", or http://localhost:5185 not answering or answering 502 on /api because nothing listens on :8484.
 ---
 
 # Run Wren on the web
 
-Starts raven's server (`@raven/server`, http://localhost:8484) and Wren's Vite dev server (`@raven/music-web`, http://localhost:5185, strict port). Vite proxies `/api` to the server, so open :5185, never :8484.
+Starts raven's server (`@raven/server`, http://localhost:8484) and Wren's Vite dev server (`@wren/web`, http://localhost:5185, strict port). Vite proxies `/api` to the server, so open :5185, never :8484.
 
 The server reads `apps/raven/.env` and migrates `apps/raven/server/data/raven.db` on start. Wren needs music in that database; for an empty one use the fixture server (below) or import production's with the `run-raven-web` skill's step 3.
 
@@ -20,7 +20,7 @@ Run from the repo root, each server with `run_in_background`, logs in the scratc
    pgrep -fl 'tsx watch|vite|nx run-many'
    ```
 
-   A server already on 8484 is reused: start only Wren's Vite (`bun run nx run @raven/music-web:dev`). Stop only this checkout's processes, by PID; never `pkill -f` a pattern.
+   A server already on 8484 is reused: start only Wren's Vite (`bun run nx run @wren/web:dev`). Stop only this checkout's processes, by PID; never `pkill -f` a pattern.
 
 2. **Start both.** `bun run dev:wren:web`. Wait until `http://localhost:8484/api/health` and `http://localhost:5185/api/health` both answer `200` (the second proves the proxy reaches the backend). `ECONNREFUSED` proxy lines in the first seconds are harmless.
 
@@ -32,7 +32,7 @@ No account, one album (Morning Chorus by The Fixture Birds):
 
 ```bash
 bun run nx run @raven/server:serve:fixture
-RAVEN_DEV_API_ORIGIN=http://127.0.0.1:8490 bun run nx run @raven/music-web:dev
+RAVEN_DEV_API_ORIGIN=http://127.0.0.1:8490 bun run nx run @wren/web:dev
 ```
 
 Accounts are off, so the app opens on Home with no sign-in.

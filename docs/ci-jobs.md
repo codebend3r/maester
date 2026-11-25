@@ -55,10 +55,12 @@ The step times are from the same 150 runs, which ran the device app's and Wren's
 | Device app on Apple TV   | 🎬 E2E Raven Apple TV, after 🎬 Build Raven Apple TV | XCUITest on an Apple TV simulator  | `@raven/app:e2e:tvos`       | 1m 58s   | 16%              |
 | raven on the web         | 🌐 E2E Raven web (its own job)              | Playwright in Google Chrome           | `@raven/web:e2e:browser`    | 0m 47s   | 53%              |
 | Wren on iPhone           | 🎵 E2E Wren iPhone, after 🎵 Build Wren iPhone | Maestro on an iPhone simulator        | `@wren/app:e2e`          | 4m 45s   | 15%              |
+| Wren on the web          | 🎵 E2E Wren web (its own job)               | Playwright in Google Chrome           | `@wren/web:e2e:browser` | Not yet measured | Not yet measured |
 
 - The Android TV step's time includes booting the emulator, since one action boots it and runs the flows.
 - Wren's build jobs (🎵 Build Wren iPhone and 🎵 Build Wren Android) run on every pull request, and its 🎵 E2E Wren iPhone runs on main whenever a push touches Wren. The two build jobs ran once in those runs.
-- Android phones, Raven on Windows and Wren on the web have no end to end suite in CI: the first two jobs build and smoke-test only, and `@raven/music-web` has no e2e target.
+- Android phones and Raven on Windows have no end to end suite in CI: their jobs build and smoke-test only.
+- 🎵 E2E Wren web was added after those 150 runs, so it has no times here yet. It runs on every push to main, as 🌐 E2E Raven web does, and Nx restores its pass while Wren on the web, its libraries and the server are unchanged.
 
 The PR checks run one matrix, `standard-checks`: each check, the build of every project and the two web apps' Lighthouse runs (🔦 Lighthouse Raven web, 🔦 Lighthouse Wren web), one target a runner, on every project and on every pull request, every one Nx cached. Each runner OS installs the dependencies once, in 📦 Install Linux, 📦 Install macOS and 📦 Install Windows, and every other job restores that install from the cache (the `bun-install` action); a Windows job restores Bun's downloaded packages and installs from them, since the cache cannot keep the links a Windows install is made of. A failing check cancels the run, and the native builds wait for every check.
 

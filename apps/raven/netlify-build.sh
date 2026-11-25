@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Production uses the same commit-based build number as CI, even before CI
 # creates its tag. Previews keep package.json's version. Builds the Nx project
-# named first, @raven/web when none is (Wren's site names @raven/music-web).
+# named first, @raven/web when none is (Wren's site names @wren/web).
 set -euo pipefail
 
 project=${1:-@raven/web}

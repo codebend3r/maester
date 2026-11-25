@@ -7,7 +7,7 @@ import {
   type Playing,
   type PlayingArtist,
 } from '@/screens/NowPlaying/usePlaying'
-import { RADII, SIZES } from '@/theme/tokens'
+import { COLORS, RADII, SIZES } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { LikeButton } from '@/ui/LikeButton/LikeButton'
@@ -110,7 +110,7 @@ export function SongTitle({ playing, like, onAddToPlaylist }: SongTitleProps) {
     <div className={styles.titled}>
       <SongLines playing={playing} variant={SONG_VARIANTS.large} />
       <div className={styles.actions}>
-        <LikeButton like={like} title={playing.track.title} />
+        <LikeButton idleColor={COLORS.text2} like={like} title={playing.track.title} />
         <IconButton
           icon={ICONS.playlistAdd}
           label={NOW_PLAYING_COPY.addToPlaylist}

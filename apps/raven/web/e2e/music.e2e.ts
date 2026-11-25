@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
+import { audioTime } from '@tooling/web/playwright'
 import { APP_SHELL_COPY } from '@/components/AppShell/copy'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
@@ -28,13 +29,7 @@ test.describe('Music', () => {
     ).toBeVisible()
     const bar = page.getByRole('region', { name: NOW_PLAYING_BAR_COPY.miniPlayer })
     await expect(bar.getByRole('link', { name: new RegExp(`^${firstTrack}`, 'u') })).toBeVisible()
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          Math.max(0, ...[...document.querySelectorAll('audio')].map((audio) => audio.currentTime)),
-        ),
-      )
-      .toBeGreaterThan(1)
+    await expect.poll(() => audioTime({ page })).toBeGreaterThan(1)
 
     await bar.getByRole('link', { name: PANE_COPY.upNext }).click()
     await expect(page.getByRole('list', { name: NOW_PLAYING_COPY.queue })).toBeVisible()

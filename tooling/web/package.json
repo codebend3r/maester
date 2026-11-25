@@ -1,19 +1,21 @@
 {
   "name": "@tooling/web",
   "private": true,
-  "description": "What the web apps' tests and Vite configs share: the bun test harness (happy-dom, act, the fake intersection observer, the SCSS module loader, the jest-dom matchers), raven's Vite helpers, the web apps' Lighthouse server, and the coverage and dead CSS checks",
+  "description": "What the web apps' tests and Vite configs share: the bun test harness (happy-dom, act, the fake intersection observer, the SCSS module loader, the jest-dom matchers), raven's Vite helpers, the web apps' Lighthouse server and Playwright config, and the coverage and dead CSS checks",
   "type": "module",
   "exports": {
     "./act": "./act.ts",
     "./happy-dom": "./happy-dom.ts",
     "./intersection": "./intersection.ts",
     "./lighthouse": "./lighthouse.ts",
+    "./playwright": "./playwright.ts",
     "./versionTag": "./versionTag.ts",
     "./viewport": "./viewport.ts",
     "./viteRaven": "./viteRaven.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "21.0.4",
+    "@playwright/test": "1.65.0",
     "@raven/core": "workspace:*",
     "@shared/http": "workspace:*",
     "@testing-library/jest-dom": "7.0.1",

@@ -9,11 +9,11 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github/workflows"
-# Every job main's run starts with, so a "Release vX.Y.Z" commit runs none of them.
-NOT_A_RELEASE = "${{ !startsWith(github.event.head_commit.message, 'Release v') }}"
 ACTIONS = ROOT / ".github/actions"
 PULL_REQUEST = "pull-request-checks.yml"
 MAIN = "native-checks.yml"
+# Every job main's run starts with, so a "Release vX.Y.Z" commit runs none of them.
+NOT_A_RELEASE = "${{ !startsWith(github.event.head_commit.message, 'Release v') }}"
 # Each runner OS's one install in the pull request workflow, and its runner.
 INSTALL_JOBS = {
     "install": "ubuntu-24.04",
@@ -240,17 +240,30 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
     assert workflow["on"] == {"push": {"branches": ["main"]}}
     assert "concurrency" not in workflow
     assert workflow["permissions"]["actions"] == "write"
-    assert set(workflow["jobs"]) == {"select", *E2E_JOBS, "web-e2e", "screen-tests"}
+    assert set(workflow["jobs"]) == {
+        "select",
+        *E2E_JOBS,
+        "web-e2e",
+        "wren-web-e2e",
+        "screen-tests",
+    }
     assert all("uses" not in job for job in workflow["jobs"].values())
     # No base: the selection finds main's last green run.
     assert workflow["env"]["NATIVE_BUILD_SHA"] == "${{ github.sha }}"
     assert workflow["env"]["NATIVE_SELECT_BASE"] == ""
     assert "needs" not in workflow["jobs"]["select"]
-    # The web's browser suite runs here too, on every push, and Nx restores an unchanged pass.
-    web = workflow["jobs"]["web-e2e"]
-    assert "needs" not in web
-    assert web["if"] == NOT_A_RELEASE
-    assert any("-t e2e:browser" in step.get("run", "") for step in web["steps"])
+    # The browser suites run here too, on every push, and Nx restores an unchanged pass. Each
+    # job runs its own app's suite alone, through the one list of steps they share.
+    browser_projects = {"web-e2e": "@raven/web", "wren-web-e2e": "@wren/web"}
+    for name, project in browser_projects.items():
+        web = workflow["jobs"][name]
+        assert "needs" not in web
+        assert web["if"] == NOT_A_RELEASE
+        assert web["env"]["WEB_PROJECT"] == project
+        assert web["steps"] == workflow["jobs"]["web-e2e"]["steps"]
+        assert any(
+            '-t e2e:browser -p "$WEB_PROJECT"' in step.get("run", "") for step in web["steps"]
+        )
     # The device apps' screen tests run here alone, on every push, never on a pull request.
     screens = workflow["jobs"]["screen-tests"]
     assert "needs" not in screens
@@ -654,9 +667,9 @@ def test_the_standard_checks_run_every_check_at_once_and_cancel_on_a_failure():
     scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
     assert {scripts[check["script"]] for check in checks if "script" in check} == {
         "nx run @raven/web:lighthouse",
-        "nx run @raven/music-web:lighthouse",
+        "nx run @wren/web:lighthouse",
     }
     assert all(check["target"] == "lighthouse" for check in checks if "script" in check)
-    for project in ("apps/raven/web", "apps/raven/music-web"):
+    for project in ("apps/raven/web", "apps/wren/wren-web"):
         targets = json.loads((ROOT / project / "package.json").read_text())["nx"]["targets"]
         assert targets["lighthouse"]["cache"] is True

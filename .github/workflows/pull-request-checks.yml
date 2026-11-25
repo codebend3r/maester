@@ -124,7 +124,7 @@ jobs:
             target: lighthouse
             script: wren:web:lighthouse
             reports: wren-web
-            dir: apps/raven/music-web
+            dir: apps/wren/wren-web
             ffmpeg: true
           - name: 🧩 One command per script
             target: one-command-per-script
