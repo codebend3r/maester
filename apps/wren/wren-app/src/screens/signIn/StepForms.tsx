@@ -3,7 +3,7 @@ import { type ComponentType, useState } from 'react'
 import { Text, View } from 'react-native'
 
 import { SIGN_IN_COPY, signInErrorsOf } from '@raven/wren'
-import type { SignInFlow } from '@/screens/signIn/useSignInFlow'
+import type { SignInFlow } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BUTTON_SIZES, Button } from '@/ui/Button'

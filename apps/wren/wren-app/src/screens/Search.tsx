@@ -9,20 +9,23 @@ import {
 import { type ComponentType, useState } from 'react'
 import { Keyboard, ScrollView, View, useWindowDimensions } from 'react-native'
 
-import { useCovers } from '@/music/useCovers'
+import {
+  useCovers,
+  useResultActions,
+  useRecentSearches,
+  type WrenSession,
+  useWren,
+  useSearchResults,
+} from '@raven/wren-native'
 import type { ResultsProps } from '@/screens/search/ResultParts'
 import { SearchIdle } from '@/screens/search/SearchIdle'
 import { SearchResults } from '@/screens/search/SearchResults'
-import { useResultActions } from '@/screens/search/useResultActions'
-import { useSearchResults } from '@/screens/search/useSearchResults'
 import { usePageInsets } from '@/shell/useShell'
-import { useRecentSearches } from '@/stores/recentSearches'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { FilterChips } from '@/ui/FilterChips'
 import { PageHeader } from '@/ui/PageHeader'
 import { SearchField } from '@/ui/SearchField'
-import { type WrenSession, useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   page: { backgroundColor: colors.bg, flex: 1 },

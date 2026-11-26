@@ -1,6 +1,6 @@
 import { Image, StyleSheet, View } from 'react-native'
 
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS } from '@/theme/wrenTokens'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'

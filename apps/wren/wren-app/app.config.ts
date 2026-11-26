@@ -7,7 +7,8 @@ import packageJson from '#package'
  * `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
  * the app come in by their relative path and extension.
  */
-import { BRAND, COLORS, FONT_FILES } from './src/theme/wrenTokens.ts'
+import { BRAND, WREN_PALETTES } from '@raven/wren'
+import { FONT_FILES } from './src/theme/wrenTokens.ts'
 import { BUILD_EXTRA } from './src/about/buildExtra.ts'
 import { latestVersionTag } from '../../../tooling/web/versionTag.ts'
 import { withAndroidAuto } from './plugins/withAndroidAuto.ts'
@@ -90,14 +91,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
        * The window's own colour, under the app. iOS reads its counterpart only through
        * expo-system-ui; there the splash covers the window until Wren draws.
        */
-      backgroundColor: COLORS.night.bg,
+      backgroundColor: WREN_PALETTES.night.bg,
     },
     plugins: [
       'expo-router',
       // What the system draws before Wren's first frame, in the system's own light or dark.
       [
         'expo-splash-screen',
-        { backgroundColor: COLORS.paper.bg, dark: { backgroundColor: COLORS.night.bg } },
+        {
+          backgroundColor: WREN_PALETTES.paper.bg,
+          dark: { backgroundColor: WREN_PALETTES.night.bg },
+        },
       ],
       /*
        * Young Serif and Instrument Sans, embedded in both native projects, so they are there at

@@ -2,7 +2,7 @@
   "name": "@raven/wren",
   "version": "0.10.1",
   "private": true,
-  "description": "Wren's words and pure models, shared by the phone app and the web app",
+  "description": "Wren's words, palettes and pure models, shared by the phone, TV and web apps",
   "type": "module",
   "sideEffects": false,
   "exports": {

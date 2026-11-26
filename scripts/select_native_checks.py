@@ -43,7 +43,7 @@ def select_groups(projects: set[str], files: list[str]) -> dict[str, bool]:
     has_fixture_changes = "@raven/server" in projects
     return {
         "app": "@raven/app" in projects or has_fixture_changes,
-        "music": "@wren/app" in projects or has_fixture_changes,
+        "music": bool(projects & {"@wren/app", "@wren/tv"}) or has_fixture_changes,
         "desktop": bool(projects & {"@raven/desktop", "@raven/mpv", "@raven/web"})
         or has_fixture_changes,
     }

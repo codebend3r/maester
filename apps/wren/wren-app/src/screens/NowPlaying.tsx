@@ -7,14 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { MENU_VIEWS, type MenuView, NOW_PLAYING_COPY, type SongActions } from '@raven/wren'
 import { TrackMenu } from '@/components/TrackMenu'
-import { useTrackLike } from '@/music/useTrackLike'
+import { useTrackLike, type WrenSession, useWren } from '@raven/wren-native'
 import { PhonePlayer } from '@/screens/nowPlaying/PhonePlayer'
 import { CloseButton } from '@/screens/nowPlaying/PlayerHeader'
 import { TabletPlayer } from '@/screens/nowPlaying/TabletPlayer'
 import { type Playing, usePlaying } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles, useFormFactor, useIsPortrait } from '@/theme/wrenTheme'
 import { SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
-import { type WrenSession, useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   idle: { backgroundColor: colors.bg, flex: 1, paddingHorizontal: SPACE.s3 },

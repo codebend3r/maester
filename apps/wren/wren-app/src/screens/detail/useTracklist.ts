@@ -2,7 +2,7 @@ import type { AlbumTrack, QueueSource, Track } from '@raven/core'
 import { playingIdOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 
-import { useToast } from '@/stores/toast'
+import { useToast } from '@raven/wren-native'
 import { useFormFactor } from '@/theme/wrenTheme'
 import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 

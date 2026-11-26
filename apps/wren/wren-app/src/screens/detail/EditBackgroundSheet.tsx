@@ -19,8 +19,7 @@ import Animated, {
 import { type QueryStatus, useQuery } from '@tanstack/react-query'
 
 import { ARTIST_COPY } from '@raven/wren'
-import { useCovers } from '@/music/useCovers'
-import { toastFailure } from '@/stores/toast'
+import { useCovers, toastFailure, type WrenSession } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
   FORM_FACTORS,
@@ -36,7 +35,6 @@ import { LoadingMark } from '@/components/LoadingMark'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { tileWidthOf } from '@/ui/tileWidth'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
 
 /** What a picture does under a finger or a pointer: it grows by this much. */
 const LIFT_SCALE = 1.04

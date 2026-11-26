@@ -9,6 +9,8 @@ description: >-
 # reads no secrets: the workflow sets NX_CLOUD_ACCESS_TOKEN in its env, which every step here inherits.
 # One Release build of React Native takes up to an hour cold, its compile cached by ccache, and by
 # Gradle on Android; Nx Cloud's remote cache restores a build whose inputs a commit left alone.
+# An Apple TV build names its Xcode project in APP_XCODE_PROJECT (Raven unless set; the remote
+# test target is that name and RemoteTests) and its pods' target in APP_PODS_TARGET (raven).
 inputs:
   sha:
     description: The commit that was checked out, which the artifacts are named for.
@@ -44,7 +46,7 @@ runs:
       if: env.APP_RUNTIME == 'tvOS'
       shell: bash
       working-directory: ${{ env.APP_PROJECT }}/ios
-      run: grep -q 'SDKROOT = appletvos' Raven.xcodeproj/project.pbxproj
+      run: grep -q 'SDKROOT = appletvos' "${APP_XCODE_PROJECT:-Raven}.xcodeproj/project.pbxproj"
 
     # `expo prebuild` exits 0 when `pod install` fails, so the pods are checked by hand:
     # CocoaPods writes Pods/Manifest.lock as a copy of Podfile.lock once it has installed.
@@ -78,7 +80,7 @@ runs:
       if: env.APP_TEST_PROJECT == 'true'
       shell: bash
       working-directory: ${{ env.APP_PROJECT }}
-      run: tar -czf "$RUNNER_TEMP/remote-test-project.tgz" ios/Podfile.lock ios/Pods/Manifest.lock 'ios/Pods/Target Support Files/Pods-raven' ios/Raven.xcodeproj ios/RavenRemoteTests
+      run: tar -czf "$RUNNER_TEMP/remote-test-project.tgz" ios/Podfile.lock ios/Pods/Manifest.lock "ios/Pods/Target Support Files/Pods-${APP_PODS_TARGET:-raven}" "ios/${APP_XCODE_PROJECT:-Raven}.xcodeproj" "ios/${APP_XCODE_PROJECT:-Raven}RemoteTests"
 
     - name: 📤 Remote test project
       if: env.APP_TEST_PROJECT == 'true'

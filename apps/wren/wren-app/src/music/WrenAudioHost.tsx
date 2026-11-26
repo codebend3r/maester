@@ -5,9 +5,8 @@ import { useMemo } from 'react'
 import { deviceDisk } from '@/downloads/downloader'
 import { carBrowseFor } from '@/music/carBrowse'
 import { coverHeadersOf } from '@/music/coverHeaders'
-import { mediaSourcesFor } from '@/music/mediaSources'
+import { mediaSourcesFor, type WrenSession } from '@raven/wren-native'
 import { trackPlanFor } from '@/music/trackPlan'
-import type { WrenSession } from '@/useWren'
 
 type WrenAudioHostProps = { session: Pick<WrenSession, 'server' | 'api'> }
 

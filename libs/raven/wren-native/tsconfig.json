@@ -1,0 +1,11 @@
+{
+  /* React Native code the phone Wren and Wren on TV bundle through Metro, from dist. React Native's
+     types only, so code that reaches for a Bun global fails here; tsconfig.test.json checks the tests. */
+  "extends": "../../../tooling/tsconfig/react-native.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["react-native"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

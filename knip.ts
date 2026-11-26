@@ -42,6 +42,16 @@ export default {
       ignoreBinaries: ['watchman', 'maestro'],
       ignoreDependencies: ['expo-updates'],
     },
+    'apps/wren/wren-tv': {
+      /*
+       * Wren on TV, read as the device app is: its routes by path, the binaries the Mac installs,
+       * no over-the-air updates, and the native modules `@raven/native` reaches, which Expo
+       * autolinks only from the app's own dependencies.
+       */
+      entry: ['app/**/*.tsx'],
+      ignoreBinaries: ['watchman', 'maestro'],
+      ignoreDependencies: ['expo-updates', '@raven/audio', 'expo-file-system'],
+    },
     'apps/raven/web': {
       /*
        * Netlify runs each function by its folder's file of the same name, and Lighthouse CI the
@@ -80,6 +90,10 @@ export default {
     'libs/raven/core': {
       // The package's two entries: the library, and the fixture server's facts its e2e suites share.
       entry: ['src/index.ts', 'src/fixtureServer.ts'],
+    },
+    'libs/raven/wren-native': {
+      // The phone's and the TV's React Native entry, and the routes bun's tests load.
+      entry: ['src/index.ts', 'src/headless.ts'],
     },
     'libs/raven/native': {
       /*

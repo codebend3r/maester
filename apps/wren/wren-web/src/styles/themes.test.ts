@@ -1,21 +1,12 @@
 import { describe, expect, it } from 'bun:test'
 import { parseThemes } from '@raven/core'
-import { THEME_SCHEMES, WREN_THEMES } from '@raven/wren'
+import { THEME_SCHEMES, WREN_PALETTES, WREN_THEMES } from '@raven/wren'
 
 const GLOBALS = new URL('./globals.scss', import.meta.url)
-
-const APP_TOKENS = new URL('../../../wren-app/src/theme/wrenTokens.ts', import.meta.url)
 
 const stylesheet = await Bun.file(GLOBALS).text()
 
 const blocks = parseThemes(stylesheet)
-
-const appTokens = await Bun.file(APP_TOKENS).text()
-
-/** A palette's constant in the apps' tokens: `const NIGHT = { ... } as const`. */
-const APP_PALETTE = /^const ([A-Z]+) = \{([^}]*)\} as const/gm
-
-const APP_COLOUR = /^\s*(\w+): '([^']+)',$/gm
 
 /** A token's name as the apps key it: `--color-surface-2` is `surface2`. */
 const appKeyOf = (name: string): string =>
@@ -30,13 +21,11 @@ const colourOf = (value: string): string => {
   return [red, green, blue, Number(alpha) / (percent === '' ? 1 : 100)].join()
 }
 
-/** Each theme's colours in the apps' tokens, by the theme's name. */
-const appPalettes = Object.fromEntries(
-  [...appTokens.matchAll(APP_PALETTE)].map(([, constant = '', body = '']) => [
-    constant.toLowerCase(),
-    Object.fromEntries(
-      [...body.matchAll(APP_COLOUR)].map(([, key = '', value = '']) => [key, colourOf(value)]),
-    ),
+/** Each theme's colours as the apps paint them (`@raven/wren`'s palettes), by the theme's name. */
+const appPalettes: Record<string, Record<string, string>> = Object.fromEntries(
+  Object.entries(WREN_PALETTES).map(([theme, palette]) => [
+    theme,
+    Object.fromEntries(Object.entries(palette).map(([key, value]) => [key, colourOf(value)])),
   ]),
 )
 

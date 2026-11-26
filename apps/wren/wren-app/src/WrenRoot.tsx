@@ -22,10 +22,14 @@ import { configureDownloads } from '@/downloads/downloadStore'
 import { deviceDisk } from '@/downloads/downloader'
 import { WrenAudioHost } from '@/music/WrenAudioHost'
 import { forgetWrenAccount, keepDownloadsFor, queryClient } from '@/queryClient'
-import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
-import { useWrenAccount } from '@/session'
-import { accountServers, useActiveServer } from '@/stores/activeServer'
-import { configureRecentSearches } from '@/stores/recentSearches'
+import {
+  useWrenAccount,
+  accountServers,
+  useActiveServer,
+  configureRecentSearches,
+  useWren,
+} from '@raven/wren-native'
+import { WREN_ROUTES, WREN_SCREENS } from '@raven/wren-native/headless'
 import { configureWrenPrefs } from '@/stores/wrenPrefs'
 import { CHROMES } from '@/shell/chrome'
 import { TabletPlayerBar } from '@/shell/TabletPlayerBar'
@@ -34,7 +38,6 @@ import { useChrome } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { ToastHost } from '@/ui/Toast'
-import { useWren } from '@/useWren'
 
 // The splash stays up until the stores are read, so the first screen drawn is the right one; one the system cannot hold leaves Wren as it is.
 preventAutoHideAsync().catch(IGNORED)

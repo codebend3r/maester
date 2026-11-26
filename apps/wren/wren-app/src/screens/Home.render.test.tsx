@@ -14,8 +14,8 @@ import {
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
+import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   AIRBAG,

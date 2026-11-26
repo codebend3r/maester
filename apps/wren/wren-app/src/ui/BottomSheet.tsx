@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
 import { KIT_COPY } from '@raven/wren'
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { MOTION, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'

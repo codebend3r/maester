@@ -9,6 +9,8 @@
 #   PROFILE       its hardware profile
 #   BUILD_SCRIPT  the root script that builds the APK
 #   E2E_SCRIPT    the root script that runs the flows
+#   APK, APP_ID   the APK the build makes and the app it installs, raven's device app's unless
+#                 named (Wren on TV names its own)
 #
 # Every step finds the running emulator whose AVD is $AVD and exports its serial as
 # ANDROID_SERIAL, which adb reads and the flows hand to Maestro, so a phone on a cable or the
@@ -30,8 +32,8 @@ export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
 export MAESTRO_CLI_NO_ANALYTICS=1
 FAILURE_HINT="Maestro's screenshots and logs: ~/.maestro/tests; $FAILURE_HINT"
 
-APK=apps/raven/app/android/app/build/outputs/apk/release/app-release.apk
-APP_ID=io.github.codebend3r.raven.app
+APK="${APK:-apps/raven/app/android/app/build/outputs/apk/release/app-release.apk}"
+APP_ID="${APP_ID:-io.github.codebend3r.raven.app}"
 # The SDK's own manager, never another on the path, whose default SDK root is its own folder.
 SDK_TOOLS="$ANDROID_HOME/cmdline-tools/latest/bin"
 # Outside $WORK, which each step makes afresh, so the wait can show what the start logged.

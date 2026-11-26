@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/react.json"],
+  // React Native has no DOM: a browser global here is a bug.
+  "env": { "browser": false },
+  "ignorePatterns": ["dist"],
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

@@ -383,6 +383,52 @@ jobs:
       APP_LOGS: raven-music-e2e-logs
     steps: *e2e-steps
 
+  # Wren on TV's Siri Remote XCUITest (`apps/wren/wren-tv/tvos-e2e`): open on Home, play the
+  # fixture's album, and find it in Library, on a simulator of its own.
+  e2e-wren-apple-tv:
+    name: 🎵 E2E Wren Apple TV
+    needs: select
+    if: needs.select.outputs.music_selected == 'true'
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.music_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.music_build }}
+      BUILD_SHA: ${{ needs.select.outputs.music_sha }}
+      APP_SETUP: tvos
+      APP_PROJECT: apps/wren/wren-tv
+      APP_ARTIFACT: wren-tv-tvos-simulator
+      APP_BUNDLE: build/tvos/Build/Products/Release-appletvsimulator/Wren.app
+      APP_SIMULATOR: wren-tv
+      APP_SDK: appletvsimulator
+      APP_RUNTIME: tvOS
+      APP_DEVICE_TYPE: com.apple.CoreSimulator.SimDeviceType.Apple-TV-4K-3rd-generation-4K
+      APP_DRIVER: xcuitest
+      APP_FLOWS: bun run wren:tv:e2e:tvos
+      APP_LOGS: wren-tv-tvos-e2e-logs
+    steps: *e2e-steps
+
+  # Every flow in `apps/wren/wren-tv/e2e`, driven by the remote's keys on the Android TV emulator.
+  e2e-wren-android-tv:
+    name: 🎵 E2E Wren Android TV
+    needs: select
+    if: needs.select.outputs.music_selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.music_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.music_build }}
+      BUILD_SHA: ${{ needs.select.outputs.music_sha }}
+      APP_SETUP: android-tv
+      APP_PROJECT: apps/wren/wren-tv
+      APP_ARTIFACT: wren-tv-android-tv
+      APP_BUNDLE: ''
+      APP_DRIVER: maestro
+      APP_FLOWS: bun run wren:tv:e2e:android-tv
+      APP_LOGS: wren-tv-android-tv-e2e-logs
+      ANDROID_SERIAL: emulator-5554
+    steps: *e2e-steps
+
   # Raven's Playwright suite, on the native pieces the merged pull request built. It runs
   # `electron .`, never the packaged app, whose fuses turn off the inspector Playwright needs. The
   # target's `install:electron` step fetches the binary.

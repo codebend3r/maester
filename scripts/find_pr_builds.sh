@@ -39,7 +39,7 @@ echo "sha=$head"
 if has raven-app-ios-simulator raven-app-tvos-simulator raven-app-tvos-simulator-test-project raven-app-android-tv; then
   echo app=true
 fi
-if has raven-music-ios-simulator; then
+if has raven-music-ios-simulator wren-tv-tvos-simulator wren-tv-tvos-simulator-test-project wren-tv-android-tv; then
   echo music=true
 fi
 if has raven-native-handoff; then

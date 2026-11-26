@@ -3,7 +3,7 @@ import { IGNORED, forgetOnAccountChange } from '@raven/native/headless'
 import { createQueryClient } from '@raven/ui/headless'
 
 import { useDownloads } from '@/downloads/downloadStore'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
 
 /** Wren's one cache: it talks to one server. */
 export const queryClient = createQueryClient()

@@ -1,0 +1,15 @@
+appId: app.netlify.wren.tv
+name: Search finds the fixture's album by a word of its title
+---
+- runFlow: steps/signIn.yaml
+- runFlow:
+    file: steps/sidebarPlace.yaml
+    env:
+      PLACE: Search
+# Search opens with the remote on its field; select opens the TV's keyboard.
+- pressKey: Remote Dpad Center
+- inputText: Morning
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: Morning Chorus.*
+    timeout: 30000

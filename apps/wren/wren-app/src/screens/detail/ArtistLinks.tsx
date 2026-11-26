@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
 import { ALBUM_COPY } from '@raven/wren'
-import { WREN_PAGES, pageHref } from '@/routes'
+import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE, FORM_FACTORS } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'

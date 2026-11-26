@@ -12,8 +12,8 @@ import { SongsCollection } from '@/screens/library/SongsCollection'
 import { FavouritesCollection } from '@/screens/library/FavouritesCollection'
 import { FinishedCollection, InProgressCollection } from '@/screens/library/TracksCollection'
 import { UnmatchedAlbumsCollection } from '@/screens/library/UnmatchedAlbumsCollection'
-import { WREN_ROUTES, WREN_ROUTE_PARAMS } from '@/routes'
-import { type WrenSession, useWren } from '@/useWren'
+import { type WrenSession, useWren } from '@raven/wren-native'
+import { WREN_ROUTES, WREN_ROUTE_PARAMS } from '@raven/wren-native/headless'
 
 /** What is downloaded from this server, which plays with it out of reach. */
 function DownloadsCollection({ session, onBack }: CollectionPageProps) {

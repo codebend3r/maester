@@ -7,12 +7,10 @@ import type { SongLeadOf } from '@raven/wren'
 import { TrackMenu } from '@/components/TrackMenu'
 import { useDownloads } from '@/downloads/downloadStore'
 import { downloadedOf } from '@/downloads/downloadViews'
-import type { Cover } from '@/music/useCovers'
-import { useTrackLike } from '@/music/useTrackLike'
+import { type Cover, useTrackLike, type WrenSession, useWren } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SPACE } from '@/theme/wrenTokens'
 import { SongRow } from '@/ui/SongRow'
-import { type WrenSession, useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   inset: { borderRadius: RADIUS.item, paddingHorizontal: SPACE.s3 },

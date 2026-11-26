@@ -206,7 +206,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "deploy:devices",
-                "Puts raven on both TVs, and raven and Wren on every paired iPhone and iPad.",
+                "Puts raven and Wren on both TVs and on every paired iPhone and iPad.",
                 "Xcode",
             ),
             Command(
@@ -257,6 +257,52 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "app:e2e:android",
                 "The touch Maestro flows on the Android phone emulator ANDROID_SERIAL names.",
+                "emulator",
+            ),
+        ),
+    ),
+    Group(
+        "Wren on TV",
+        "Expo on react-native-tvos: Wren, raven's music app, on Apple TV and Android TV.",
+        "blue",
+        (
+            Command(
+                "wren:tv:dev:tvos",
+                "Wren on TV's development build on the wren-tv Apple TV simulator, against Metro.",
+                "Xcode",
+            ),
+            Command(
+                "wren:tv:dev:android-tv",
+                "Wren on TV's development build on the Android TV emulator or TV adb sees.",
+                "Android SDK",
+            ),
+            Command(
+                "wren:tv:build:tvos",
+                "The Release build for the Apple TV simulator, with a brief log.",
+                "Xcode",
+            ),
+            Command("wren:tv:build:android-tv", "The Release APK for Android TV.", "Android SDK"),
+            Command(
+                "wren:tv:deploy:tvos",
+                "Builds the signed Release and puts it on the paired Apple TV.",
+                "Xcode",
+            ),
+            Command(
+                "wren:tv:deploy:android-tv",
+                "Builds the Release APK and puts it on the Android TV over adb, found over mDNS.",
+                "Android SDK",
+            ),
+            Command(
+                "wren:tv:deploy:tvs",
+                "Puts the checked-out Wren on TV on the Android TV, then on the Apple TV.",
+                "Xcode",
+            ),
+            Command(
+                "wren:tv:e2e:tvos", "The Siri Remote XCUITest on the Apple TV simulator.", "Xcode"
+            ),
+            Command(
+                "wren:tv:e2e:android-tv",
+                "The remote's Maestro flows on the Android TV emulator.",
                 "emulator",
             ),
         ),
@@ -431,6 +477,51 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:wren", "The 🎵 Build Wren iPhone job and its end to end job.", "macOS + Xcode"
+            ),
+            Command(
+                "ci:wren:tv:tvos",
+                "The 🎵 Build Wren Apple TV job and its end to end job.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:wren:tv:tvos:build",
+                "The Wren Apple TV job's Release build for the simulator.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:wren:tv:android-tv",
+                "The 🎵 Build Wren Android TV job and its end to end job: every step below, in order.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:tools",
+                "Its tools: Android Studio, the SDK, the TV system image and Maestro.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:emulator",
+                "Starts the raven_tv emulator, making it when there is none.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:build",
+                "The fixture's Wren on TV Release APK for the emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:emulator:wait",
+                "Waits for the emulator to boot and turns its animations off.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:install",
+                "Installs Wren on TV's APK on the emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:tv:android-tv:e2e",
+                "Wren on TV's Maestro flows on the emulator.",
+                "Android SDK",
             ),
             Command("ci:desktop:e2e", "The 🎬 E2E Raven Mac desktop job.", "macOS"),
             Command(

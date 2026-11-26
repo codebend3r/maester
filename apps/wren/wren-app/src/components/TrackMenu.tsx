@@ -13,13 +13,11 @@ import {
   TRACK_MENU_COPY,
 } from '@raven/wren'
 import { AddToPlaylist } from '@/components/AddToPlaylist'
-import { useCovers } from '@/music/useCovers'
-import { WREN_PAGES, pageHref } from '@/routes'
-import { toastFailure } from '@/stores/toast'
+import { useCovers, toastFailure, type WrenSession, useWren } from '@raven/wren-native'
+import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { SheetActions } from '@/ui/SheetActions'
 import { ICONS } from '@/ui/WrenIcon'
-import { type WrenSession, useWren } from '@/useWren'
 
 type SheetHead = ComponentProps<typeof BottomSheet>['head']
 

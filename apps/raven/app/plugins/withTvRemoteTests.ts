@@ -3,12 +3,16 @@ import { join } from 'node:path'
 
 import { type ConfigPlugin, withXcodeProject } from 'expo/config-plugins'
 
-/** The UI test target the plugin adds, its bundle, and where its Swift lives in the repo. */
-const REMOTE_TESTS = {
+/** The UI test target the plugin adds and its bundle: raven's unless the app names its own. */
+type RemoteTests = { target: string; bundleId: string }
+
+const RAVEN_REMOTE_TESTS: RemoteTests = {
   target: 'RavenRemoteTests',
   bundleId: 'io.github.codebend3r.raven.app.remote-tests',
-  sources: 'tvos-e2e',
-} as const
+}
+
+/** Where the test's Swift lives in the app's folder. */
+const REMOTE_TEST_SOURCES = 'tvos-e2e'
 
 const XCODE = {
   uiTests: 'com.apple.product-type.bundle.ui-testing',
@@ -97,20 +101,22 @@ const quoted = (value: string): string => `"${value}"`
  * prebuild, with `--clean` or without, hands it a fresh project file, so only a second run on
  * the same one finds it.
  */
-const hasRemoteTests = (project: XcodeProjectApi): boolean =>
+type HasRemoteTestsProps = { project: XcodeProjectApi; tests: RemoteTests }
+
+const hasRemoteTests = ({ project, tests }: HasRemoteTestsProps): boolean =>
   Object.values(project.pbxNativeTargetSection()).some((target) => {
     const name: unknown =
       typeof target === 'object' && target !== null && Reflect.get(target, 'name')
-    return name === REMOTE_TESTS.target || name === quoted(REMOTE_TESTS.target)
+    return name === tests.target || name === quoted(tests.target)
   })
 
 /**
  * The test bundle's settings: a tvOS UI test bundle that drives the installed app by its bundle
  * id, so it names no app target, and building it never builds the app.
  */
-const TEST_SETTINGS = {
-  PRODUCT_NAME: quoted(REMOTE_TESTS.target),
-  PRODUCT_BUNDLE_IDENTIFIER: quoted(REMOTE_TESTS.bundleId),
+const testSettingsOf = (tests: RemoteTests) => ({
+  PRODUCT_NAME: quoted(tests.target),
+  PRODUCT_BUNDLE_IDENTIFIER: quoted(tests.bundleId),
   SDKROOT: 'appletvos',
   SUPPORTED_PLATFORMS: quoted('appletvos appletvsimulator'),
   TARGETED_DEVICE_FAMILY: '3',
@@ -122,17 +128,19 @@ const TEST_SETTINGS = {
   LD_RUNPATH_SEARCH_PATHS: quoted(
     '$(inherited) @executable_path/Frameworks @loader_path/Frameworks',
   ),
-} as const
+})
 
 type SchemeOfProps = {
   target: string
   project: string
+  tests: RemoteTests
 }
 
 /** A shared scheme whose Test action runs the bundle, which `xcodebuild test` needs. */
 const schemeOf = ({
   target,
   project,
+  tests,
 }: SchemeOfProps): string => `<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion = "1600" version = "1.7">
    <BuildAction parallelizeBuildables = "YES" buildImplicitDependencies = "YES">
@@ -143,8 +151,8 @@ const schemeOf = ({
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "${target}"
-               BuildableName = "${REMOTE_TESTS.target}.xctest"
-               BlueprintName = "${REMOTE_TESTS.target}"
+               BuildableName = "${tests.target}.xctest"
+               BlueprintName = "${tests.target}"
                ReferencedContainer = "container:${project}.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -156,35 +164,36 @@ const schemeOf = ({
 /**
  * Adds the Apple TV's remote-driven end to end test to the generated Xcode project, since
  * `ios/` is made afresh by each prebuild: the Swift in `tvos-e2e/` is copied into
- * `ios/RavenRemoteTests/`, a UI test target compiles it, and a shared scheme of the same name
- * runs it. A project that has the target already only gets the Swift copied afresh. The `xcode`
+ * `ios/<target>/` (`RavenRemoteTests`, or the target the app names: Wren on TV's
+ * `WrenRemoteTests`), a UI test target compiles it, and a shared scheme of the same name runs it. A project that has the target already only gets the Swift copied afresh. The `xcode`
  * package's project is changed in place, as every Xcode mod does.
  */
-export const withTvRemoteTests: ConfigPlugin = (config) =>
+export const withTvRemoteTests: ConfigPlugin<RemoteTests | void> = (config, named) =>
   withXcodeProject(config, (mod) => {
+    const tests = typeof named === 'object' ? named : RAVEN_REMOTE_TESTS
     const project = mod.modResults
     if (!isXcodeProjectApi(project)) throw new Error('The Xcode project has no API to add a target')
     const { projectRoot, platformProjectRoot, projectName } = mod.modRequest
     if (projectName === undefined) throw new Error('The Xcode project has no name')
 
-    const sources = join(projectRoot, REMOTE_TESTS.sources)
-    const copied = join(platformProjectRoot, REMOTE_TESTS.target)
+    const sources = join(projectRoot, REMOTE_TEST_SOURCES)
+    const copied = join(platformProjectRoot, tests.target)
     const files = readdirSync(sources).filter((file) => file.endsWith(SWIFT))
     mkdirSync(copied, { recursive: true })
     files.forEach((file) => copyFileSync(join(sources, file), join(copied, file)))
-    if (hasRemoteTests(project)) return mod
+    if (hasRemoteTests({ project, tests })) return mod
 
     const uuid = project.generateUuid()
     const configurations = project.addXCConfigurationList(
       [XCODE.debug, XCODE.release].map((name) => ({
         name,
         isa: XCODE.configuration,
-        buildSettings: { ...TEST_SETTINGS },
+        buildSettings: testSettingsOf(tests),
       })),
       XCODE.release,
-      `Build configuration list for PBXNativeTarget "${REMOTE_TESTS.target}"`,
+      `Build configuration list for PBXNativeTarget "${tests.target}"`,
     )
-    const product = project.addProductFile(`${REMOTE_TESTS.target}.xctest`, {
+    const product = project.addProductFile(`${tests.target}.xctest`, {
       group: XCODE.productsGroup,
       target: uuid,
       sourceTree: XCODE.builtProducts,
@@ -193,8 +202,8 @@ export const withTvRemoteTests: ConfigPlugin = (config) =>
       uuid,
       pbxNativeTarget: {
         isa: XCODE.nativeTarget,
-        name: quoted(REMOTE_TESTS.target),
-        productName: quoted(REMOTE_TESTS.target),
+        name: quoted(tests.target),
+        productName: quoted(tests.target),
         productReference: product.fileRef,
         productType: quoted(XCODE.uiTests),
         buildConfigurationList: configurations.uuid,
@@ -206,7 +215,7 @@ export const withTvRemoteTests: ConfigPlugin = (config) =>
     project.addToPbxNativeTargetSection(target)
     project.addToPbxProjectSection(target)
 
-    const group = project.addPbxGroup(files, REMOTE_TESTS.target, REMOTE_TESTS.target)
+    const group = project.addPbxGroup(files, tests.target, tests.target)
     project.addToPbxGroup(group.uuid, project.getFirstProject().firstProject.mainGroup)
     project.addBuildPhase(files, XCODE.sourcesPhase, XCODE.sourcesComment, uuid)
     project.addBuildPhase([], XCODE.frameworksPhase, XCODE.frameworksComment, uuid)
@@ -214,8 +223,8 @@ export const withTvRemoteTests: ConfigPlugin = (config) =>
     const schemes = join(platformProjectRoot, `${projectName}.xcodeproj`, XCODE.schemesFolder)
     mkdirSync(schemes, { recursive: true })
     writeFileSync(
-      join(schemes, `${REMOTE_TESTS.target}.xcscheme`),
-      schemeOf({ target: uuid, project: projectName }),
+      join(schemes, `${tests.target}.xcscheme`),
+      schemeOf({ target: uuid, project: projectName, tests }),
     )
     return mod
   })

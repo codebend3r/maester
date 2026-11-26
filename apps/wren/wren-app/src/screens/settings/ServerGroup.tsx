@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Text, View } from 'react-native'
 
 import { NotedGroup } from '@/screens/settings/NotedGroup'
-import { accountServers } from '@/stores/activeServer'
+import { accountServers, type WrenSession } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { FactRow } from '@/ui/FactRow'
@@ -14,7 +14,6 @@ import { IconTile, TILE_TONES } from '@/ui/IconTile'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
 import { TextField } from '@/ui/TextField'
 import { ICONS } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: {

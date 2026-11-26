@@ -9,7 +9,8 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
-import { ON_PICTURE, SIZE } from '@/theme/wrenTokens'
+import { ON_PICTURE } from '@raven/wren'
+import { SIZE } from '@/theme/wrenTokens'
 
 /*
  * The four bars from the logo's chest: each one's height at rest as a share of the tallest,

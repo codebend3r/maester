@@ -11,13 +11,17 @@
 #   ANDROID_TV=192.168.50.62:5555 ...        # skip discovery; the port is 5555 unless given
 #   ANDROID_TV_NAME=Google-TV-Streamer ...   # which cast name to look for when more than one TV
 #
+# Wren on TV's deploy (apps/wren/wren-tv/scripts/deploy_android_tv.sh) runs this script too, naming
+# its own folder and package through APP_DIR, APP_LABEL and ANDROID_APP_ID.
+#
 # The TV needs Developer options' USB debugging on (on Ethernet, where Wireless debugging will not
 # turn on), which opens plain adb on 5555 over the network. The relay this script starts ends
 # with it; one already listening on the relay port is used as it is and left running.
 set -euo pipefail
-cd "$(dirname "$0")/.."
-REPO="$(cd ../../.. && pwd)"
-source scripts/android_apk.sh
+SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$SCRIPTS/../../../.." && pwd)"
+cd "${APP_DIR:-$SCRIPTS/..}"
+source "$SCRIPTS/android_apk.sh"
 
 RELAY_PORT="${ADB_RELAY_PORT:-15556}"
 SERIAL="127.0.0.1:$RELAY_PORT"

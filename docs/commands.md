@@ -88,7 +88,7 @@ Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 | `app:build:android`       | A Release APK for Android phones, to install on the emulator or a phone.        | Android SDK |
 | `app:deploy:ios`          | Builds the signed Release and puts it on every paired iPhone and iPad.          | Xcode       |
 | `wren:deploy:ios`         | Builds Wren's signed Release and puts it on every paired iPhone and iPad.       | Xcode       |
-| `deploy:devices`          | Puts raven on both TVs, and raven and Wren on every paired iPhone and iPad.     | Xcode       |
+| `deploy:devices`          | Puts raven and Wren on both TVs and on every paired iPhone and iPad.            | Xcode       |
 | `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.                   | Xcode       |
 | `app:testflight:ios`      | Archives the iPhone and iPad app and uploads it to TestFlight.                  | Xcode       |
 | `app:testflight:tvos`     | Archives the Apple TV app and uploads it to TestFlight.                         | Xcode       |
@@ -99,6 +99,22 @@ Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 | `app:e2e:tvos`            | The Siri Remote XCUITest on the Apple TV simulator.                             | Xcode       |
 | `app:e2e:android-tv`      | The Maestro flows on the Android TV emulator, driven by the remote.             | emulator    |
 | `app:e2e:android`         | The touch Maestro flows on the Android phone emulator ANDROID_SERIAL names.     | emulator    |
+
+## Wren on TV
+
+Expo on react-native-tvos: Wren, raven's music app, on Apple TV and Android TV.
+
+| Command                     | What it does                                                                     | Needs       |
+| --------------------------- | -------------------------------------------------------------------------------- | ----------- |
+| `wren:tv:dev:tvos`          | Wren on TV's development build on the wren-tv Apple TV simulator, against Metro. | Xcode       |
+| `wren:tv:dev:android-tv`    | Wren on TV's development build on the Android TV emulator or TV adb sees.        | Android SDK |
+| `wren:tv:build:tvos`        | The Release build for the Apple TV simulator, with a brief log.                  | Xcode       |
+| `wren:tv:build:android-tv`  | The Release APK for Android TV.                                                  | Android SDK |
+| `wren:tv:deploy:tvos`       | Builds the signed Release and puts it on the paired Apple TV.                    | Xcode       |
+| `wren:tv:deploy:android-tv` | Builds the Release APK and puts it on the Android TV over adb, found over mDNS.  | Android SDK |
+| `wren:tv:deploy:tvs`        | Puts the checked-out Wren on TV on the Android TV, then on the Apple TV.         | Xcode       |
+| `wren:tv:e2e:tvos`          | The Siri Remote XCUITest on the Apple TV simulator.                              | Xcode       |
+| `wren:tv:e2e:android-tv`    | The remote's Maestro flows on the Android TV emulator.                           | emulator    |
 
 ## Raven desktop
 
@@ -122,46 +138,55 @@ The Electron app on macOS and Windows, with libmpv.
 
 Each runs one CI job from pull-request-checks.yml on this machine.
 
-| Command                           | What it does                                                                                                           | Needs                       |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `ci:docker`                       | The ✅ Checks job inside an Ubuntu 24.04 container.                                                                    | Docker                      |
-| `ci:app:ios`                      | The 🎬 Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.                           | macOS + Xcode               |
-| `ci:app:ios:tools`                | Its tools: Homebrew's, Maestro and the iOS simulator runtime.                                                          | macOS + Xcode               |
-| `ci:app:ios:simulator`            | Boots the raven-phone iPhone simulator, making it when there is none.                                                  | macOS + Xcode               |
-| `ci:app:ios:build`                | The fixture's Release build for the iPhone simulator.                                                                  | macOS + Xcode               |
-| `ci:app:ios:pods`                 | Checks the build's pod install finished.                                                                               | macOS + Xcode               |
-| `ci:app:ios:install`              | Installs the build on the iPhone simulator.                                                                            | macOS + Xcode               |
-| `ci:app:ios:e2e`                  | The touch Maestro flows on the iPhone simulator.                                                                       | macOS + Xcode               |
-| `ci:app:tvos`                     | The 🎬 Build Raven Apple TV job and its end to end job.                                                                | macOS + Xcode               |
-| `ci:app:tvos:build`               | The Apple TV job's Release build for the simulator, with a brief log.                                                  | macOS + Xcode               |
-| `ci:app:android-tv`               | The 🎬 Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order.                | Android SDK                 |
-| `ci:app:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                                   | Android SDK                 |
-| `ci:app:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                                                            | Android SDK                 |
-| `ci:app:android-tv:build`         | The fixture's Release APK for the emulator.                                                                            | Android SDK                 |
-| `ci:app:android-tv:emulator:wait` | Waits for the emulator to boot and turns its animations off.                                                           | Android SDK                 |
-| `ci:app:android-tv:install`       | Installs the APK on the emulator.                                                                                      | Android SDK                 |
-| `ci:app:android-tv:e2e`           | The remote's Maestro flows on the emulator.                                                                            | Android SDK                 |
-| `ci:app:android`                  | The Android phone end to end job: every ci:app:android step below, in order.                                           | Android SDK                 |
-| `ci:app:android:tools`            | Its tools: Android Studio, the SDK, the phone system image and Maestro.                                                | Android SDK                 |
-| `ci:app:android:emulator`         | Starts the raven_phone emulator, making it when there is none.                                                         | Android SDK                 |
-| `ci:app:android:build`            | The fixture's Release APK for the phone emulator.                                                                      | Android SDK                 |
-| `ci:app:android:emulator:wait`    | Waits for the phone emulator to boot and turns its animations off.                                                     | Android SDK                 |
-| `ci:app:android:install`          | Installs the APK on the phone emulator.                                                                                | Android SDK                 |
-| `ci:app:android:e2e`              | The touch Maestro flows on the phone emulator.                                                                         | Android SDK                 |
-| `ci:app:install`                  | The device app jobs' bun install.                                                                                      |                             |
-| `ci:app:libraries`                | Builds the libraries the fixture server and the device app read.                                                       |                             |
-| `ci:app:fixture`                  | The device app jobs' fixture server on :8490, in the foreground.                                                       | ffmpeg                      |
-| `ci:app:fixture:wait`             | Waits up to three minutes for the fixture server to answer.                                                            |                             |
-| `ci:wren`                         | The 🎵 Build Wren iPhone job and its end to end job.                                                                   | macOS + Xcode               |
-| `ci:desktop:e2e`                  | The 🎬 E2E Raven Mac desktop job.                                                                                      | macOS                       |
-| `web:e2e`                         | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                                      | Chrome + ffmpeg             |
-| `wren:web:e2e`                    | The 🎵 E2E Wren web job: Playwright drives Wren on the web against a fixture server.                                   | Chrome + ffmpeg             |
-| `lighthouse`                      | Lighthouse on both web apps, one after the other, against their floors.                                                | Chrome + ffmpeg             |
-| `raven:web:lighthouse`            | The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.                                        | Chrome + ffmpeg             |
-| `wren:web:lighthouse`             | The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.                                         | Chrome + ffmpeg             |
-| `axe`                             | axe-core over both web apps' pages, locally: fails on any WCAG 2.2 A or AA violation.                                  | Chrome + ffmpeg             |
-| `axe:ci`                          | The ♿ axe-core job: the same scan with GitHub annotations and an HTML report.                                         | Chrome + ffmpeg             |
-| `e2e`                             | Every end to end job, one after another: web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV and Android TV. | macOS + Xcode + Android SDK |
+| Command                               | What it does                                                                                                           | Needs                       |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `ci:docker`                           | The ✅ Checks job inside an Ubuntu 24.04 container.                                                                    | Docker                      |
+| `ci:app:ios`                          | The 🎬 Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.                           | macOS + Xcode               |
+| `ci:app:ios:tools`                    | Its tools: Homebrew's, Maestro and the iOS simulator runtime.                                                          | macOS + Xcode               |
+| `ci:app:ios:simulator`                | Boots the raven-phone iPhone simulator, making it when there is none.                                                  | macOS + Xcode               |
+| `ci:app:ios:build`                    | The fixture's Release build for the iPhone simulator.                                                                  | macOS + Xcode               |
+| `ci:app:ios:pods`                     | Checks the build's pod install finished.                                                                               | macOS + Xcode               |
+| `ci:app:ios:install`                  | Installs the build on the iPhone simulator.                                                                            | macOS + Xcode               |
+| `ci:app:ios:e2e`                      | The touch Maestro flows on the iPhone simulator.                                                                       | macOS + Xcode               |
+| `ci:app:tvos`                         | The 🎬 Build Raven Apple TV job and its end to end job.                                                                | macOS + Xcode               |
+| `ci:app:tvos:build`                   | The Apple TV job's Release build for the simulator, with a brief log.                                                  | macOS + Xcode               |
+| `ci:app:android-tv`                   | The 🎬 Build Raven Android TV job and its end to end job: every ci:app:android-tv step below, in order.                | Android SDK                 |
+| `ci:app:android-tv:tools`             | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                                   | Android SDK                 |
+| `ci:app:android-tv:emulator`          | Starts the raven_tv emulator, making it when there is none.                                                            | Android SDK                 |
+| `ci:app:android-tv:build`             | The fixture's Release APK for the emulator.                                                                            | Android SDK                 |
+| `ci:app:android-tv:emulator:wait`     | Waits for the emulator to boot and turns its animations off.                                                           | Android SDK                 |
+| `ci:app:android-tv:install`           | Installs the APK on the emulator.                                                                                      | Android SDK                 |
+| `ci:app:android-tv:e2e`               | The remote's Maestro flows on the emulator.                                                                            | Android SDK                 |
+| `ci:app:android`                      | The Android phone end to end job: every ci:app:android step below, in order.                                           | Android SDK                 |
+| `ci:app:android:tools`                | Its tools: Android Studio, the SDK, the phone system image and Maestro.                                                | Android SDK                 |
+| `ci:app:android:emulator`             | Starts the raven_phone emulator, making it when there is none.                                                         | Android SDK                 |
+| `ci:app:android:build`                | The fixture's Release APK for the phone emulator.                                                                      | Android SDK                 |
+| `ci:app:android:emulator:wait`        | Waits for the phone emulator to boot and turns its animations off.                                                     | Android SDK                 |
+| `ci:app:android:install`              | Installs the APK on the phone emulator.                                                                                | Android SDK                 |
+| `ci:app:android:e2e`                  | The touch Maestro flows on the phone emulator.                                                                         | Android SDK                 |
+| `ci:app:install`                      | The device app jobs' bun install.                                                                                      |                             |
+| `ci:app:libraries`                    | Builds the libraries the fixture server and the device app read.                                                       |                             |
+| `ci:app:fixture`                      | The device app jobs' fixture server on :8490, in the foreground.                                                       | ffmpeg                      |
+| `ci:app:fixture:wait`                 | Waits up to three minutes for the fixture server to answer.                                                            |                             |
+| `ci:wren`                             | The 🎵 Build Wren iPhone job and its end to end job.                                                                   | macOS + Xcode               |
+| `ci:wren:tv:tvos`                     | The 🎵 Build Wren Apple TV job and its end to end job.                                                                 | macOS + Xcode               |
+| `ci:wren:tv:tvos:build`               | The Wren Apple TV job's Release build for the simulator.                                                               | macOS + Xcode               |
+| `ci:wren:tv:android-tv`               | The 🎵 Build Wren Android TV job and its end to end job: every step below, in order.                                   | Android SDK                 |
+| `ci:wren:tv:android-tv:tools`         | Its tools: Android Studio, the SDK, the TV system image and Maestro.                                                   | Android SDK                 |
+| `ci:wren:tv:android-tv:emulator`      | Starts the raven_tv emulator, making it when there is none.                                                            | Android SDK                 |
+| `ci:wren:tv:android-tv:build`         | The fixture's Wren on TV Release APK for the emulator.                                                                 | Android SDK                 |
+| `ci:wren:tv:android-tv:emulator:wait` | Waits for the emulator to boot and turns its animations off.                                                           | Android SDK                 |
+| `ci:wren:tv:android-tv:install`       | Installs Wren on TV's APK on the emulator.                                                                             | Android SDK                 |
+| `ci:wren:tv:android-tv:e2e`           | Wren on TV's Maestro flows on the emulator.                                                                            | Android SDK                 |
+| `ci:desktop:e2e`                      | The 🎬 E2E Raven Mac desktop job.                                                                                      | macOS                       |
+| `web:e2e`                             | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                                      | Chrome + ffmpeg             |
+| `wren:web:e2e`                        | The 🎵 E2E Wren web job: Playwright drives Wren on the web against a fixture server.                                   | Chrome + ffmpeg             |
+| `lighthouse`                          | Lighthouse on both web apps, one after the other, against their floors.                                                | Chrome + ffmpeg             |
+| `raven:web:lighthouse`                | The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.                                        | Chrome + ffmpeg             |
+| `wren:web:lighthouse`                 | The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.                                         | Chrome + ffmpeg             |
+| `axe`                                 | axe-core over both web apps' pages, locally: fails on any WCAG 2.2 A or AA violation.                                  | Chrome + ffmpeg             |
+| `axe:ci`                              | The ♿ axe-core job: the same scan with GitHub annotations and an HTML report.                                         | Chrome + ffmpeg             |
+| `e2e`                                 | Every end to end job, one after another: web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV and Android TV. | macOS + Xcode + Android SDK |
 
 ## Help
 

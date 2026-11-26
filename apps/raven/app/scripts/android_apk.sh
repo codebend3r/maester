@@ -6,7 +6,8 @@
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 ADB="$ANDROID_HOME/platform-tools/adb"
 APK=android/app/build/outputs/apk/release/app-release.apk
-APP_ID=io.github.codebend3r.raven.app
+APP_ID="${ANDROID_APP_ID:-io.github.codebend3r.raven.app}"
+APP_LABEL="${APP_LABEL:-raven}"
 
 say() { printf '\n==> %s\n' "$*"; }
 
@@ -28,7 +29,7 @@ launch_in_front() {
   "$ADB" shell am start -W -n "$APP_ID/.MainActivity" > /dev/null
   front="$("$ADB" shell dumpsys activity activities | grep -m1 topResumedActivity || true)"
   case "$front" in
-    *"$APP_ID"*) say "raven is on $1" ;;
-    *) echo "raven was installed but is not in front: $front" >&2; exit 1 ;;
+    *"$APP_ID"*) say "$APP_LABEL is on $1" ;;
+    *) echo "$APP_LABEL was installed but is not in front: $front" >&2; exit 1 ;;
   esac
 }

@@ -1,6 +1,6 @@
 ---
 name: build-all-apps
-description: Use when building every app, raven and Wren, and putting them on every physical device at once: "build all the apps", "build and deploy everything", "put this branch on all my devices", "build raven and Wren for the Apple TV, Google TV, iPads and iPhone", "update every device", "check everything builds". Builds the working tree and installs raven on the Google TV Streamer, the Apple TV, both iPads and the iPhone, and Wren on both iPads and the iPhone. Packages Raven for Mac without installing it. Covers the order, the commands, what a Mac cannot build (Windows) and how long each takes.
+description: Use when building every app, raven and Wren, and putting them on every physical device at once: "build all the apps", "build and deploy everything", "put this branch on all my devices", "build raven and Wren for the Apple TV, Google TV, iPads and iPhone", "update every device", "check everything builds". Builds the working tree and installs raven on the Google TV Streamer, the Apple TV, both iPads and the iPhone, and Wren on the Google TV Streamer, the Apple TV, both iPads and the iPhone. Packages Raven for Mac without installing it. Covers the order, the commands, what a Mac cannot build (Windows) and how long each takes.
 ---
 
 # Build every app and put it on every device
@@ -9,12 +9,12 @@ The point of this skill is the devices: the working tree, both apps, built, inst
 
 | Device             | raven | Wren |
 | ------------------ | ----- | ---- |
-| Apple TV           | yes   | no   |
-| Google TV Streamer | yes   | no   |
+| Apple TV           | yes   | yes  |
+| Google TV Streamer | yes   | yes  |
 | iPad (two of them) | yes   | yes  |
 | iPhone             | yes   | yes  |
 
-Wren is a phone and tablet app, so the TVs get raven only. The desktop app is built and never deployed: this skill does not touch `/Applications/Raven.app` or run `desktop:deploy`.
+Wren on the TVs is its own app, `@wren/tv` (`apps/wren/wren-tv`), installed beside raven. The desktop app is built and never deployed: this skill does not touch `/Applications/Raven.app` or run `desktop:deploy`.
 
 Run it from the repo root on a Mac with Apple silicon and Xcode. Each step goes through Nx, so a step whose inputs are unchanged replays from the cache in seconds.
 
@@ -30,11 +30,13 @@ Run the steps **one after another, never at once**: every device deploy regenera
 | 3   | **raven on the Apple TV**               | `bun run app:deploy:tvos`                                           | 15 min cold                       |
 | 4   | **raven on both iPads and the iPhone**  | `bun run app:deploy:ios`                                            | 15 min cold                       |
 | 5   | **Wren on both iPads and the iPhone**   | `bun run wren:deploy:ios`                                           | 15 min cold                       |
+| 5a  | **Wren on the Google TV Streamer**      | `bun run wren:tv:deploy:android-tv`                                 | 20 min cold, 2 min warm           |
+| 5b  | **Wren on the Apple TV**                | `bun run wren:tv:deploy:tvos`                                       | 15 min cold                       |
 | 6   | Mac: native pieces, build only          | see [Desktop for Mac](#desktop-for-mac)                             | 40 min, or seconds with a handoff |
 | 7   | Mac: signed, notarized, audited package | see [Signing](#signing): `desktop:make` then `desktop:audit:bundle` | 5 min, plus Apple's notary        |
 | 8   | Windows                                 | CI only, see [Desktop for Windows](#desktop-for-windows)            | Windows only                      |
 
-Steps 2 to 5 are one command, `bun run deploy:devices` (`bun run --sequential app:deploy:android-tv app:deploy:tvos app:deploy:ios wren:deploy:ios`). `bun run --sequential` stops at the first failure, so when one deploy fails, fix it and run the ones after it on their own. The devices come first: the Mac package waits until every device has its builds, and it is only ever built.
+Steps 2 to 5b are one command, `bun run deploy:devices` (`bun run --sequential app:deploy:android-tv app:deploy:tvos app:deploy:ios wren:deploy:ios wren:tv:deploy:android-tv wren:tv:deploy:tvos`). `bun run --sequential` stops at the first failure, so when one deploy fails, fix it and run the ones after it on their own. The devices come first: the Mac package waits until every device has its builds, and it is only ever built.
 
 Before the device steps, export Xcode and Android Studio's JDK:
 
@@ -49,6 +51,7 @@ Stop at the first failure and report it, unless the user said to keep going; the
 
 ## What each deploy does and needs
 
+- **Wren on the Google TV Streamer** and **Apple TV**: the `deploy-wren-tv` skill, the same scripts run for Wren on TV's folder and id; they print `Wren is on the Android TV` and `Wren is on the Apple TV`.
 - **Google TV Streamer** and **Apple TV**: the `deploy-tv-apps` skill holds the details (discovery, the adb relay, pairing, a sleeping Apple TV). They print `raven is on the Android TV` and `raven is on the Apple TV`.
 - **raven on the iPads and the iPhone** (`apps/raven/app/scripts/deploy_ios.sh`): reads the team off the keychain, regenerates `ios/` with it, builds one signed Release for `generic/platform=iOS` into `build/ios-device`, then installs and launches it on every paired physical iPhone and iPad `xcrun devicectl list devices` shows. A device out of reach for two minutes (`IOS_WAIT_SECONDS`) is skipped and named at the end; a locked one takes the install and opens once unlocked. `IOS_DEVICES="Morty Jr,Naruto Smith"` limits it. It ends with which devices have raven open, which have it installed and which were skipped.
 - **Wren on the iPads and the iPhone** (`apps/wren/wren-app/scripts/deploy_ios.sh`): the same script, run for Wren's folder, Xcode project and bundle (`app.netlify.wren`), so it takes the same variables and ends with the same three lists, naming Wren. It launches last, so Wren is the app left in front on each device.
@@ -105,12 +108,12 @@ A Mac cannot build it: the addon, libmpv and Forge's installer are all Windows x
 
 ## Afterwards
 
-Report per device and per app: the branch and commit (`git log --oneline -1`), whether uncommitted changes went with it (`git status --short`), the variant, and whether its deploy printed its closing line (open, installed but not opened, or skipped and why). All five devices are named, with raven and Wren apart on the iPads and the iPhone. For the Mac package, say whether Gatekeeper accepted it as notarized and that it was not installed. Name Windows as not built.
+Report per device and per app: the branch and commit (`git log --oneline -1`), whether uncommitted changes went with it (`git status --short`), the variant, and whether its deploy printed its closing line (open, installed but not opened, or skipped and why). All five devices are named, with raven and Wren apart on each. For the Mac package, say whether Gatekeeper accepted it as notarized and that it was not installed. Name Windows as not built.
 
 ## Common mistakes
 
 - Installing the desktop app: this skill packages Raven for Mac and leaves `/Applications` alone.
-- Deploying raven and leaving Wren out: the iPads and the iPhone get both.
+- Deploying raven and leaving Wren out: every device gets both.
 - Treating a `ci:app:*` run as a deploy: it installs the fixture build, never on a device, and that build cannot reach a real server.
 - Running two deploys at once: the prebuilds collide.
 - Leaving the shell's Homebrew `JAVA_HOME` in place for the Android TV build.

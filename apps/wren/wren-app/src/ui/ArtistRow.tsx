@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native'
 
 import { countsLineOf } from '@raven/wren'
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { ArtistAvatar } from '@/ui/ArtistAvatar'

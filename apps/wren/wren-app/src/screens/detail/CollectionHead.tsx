@@ -6,7 +6,7 @@ import { DETAIL_COPY } from '@raven/wren'
 import { DetailAction } from '@/components/DetailAction'
 import { Nothing } from '@/components/Nothing'
 import { PlayButtons } from '@/components/PlayButtons'
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { BackButton } from '@/screens/detail/BackButton'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {

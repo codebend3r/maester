@@ -28,8 +28,8 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
-import { WREN_PAGES } from '@/routes'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
+import { WREN_PAGES } from '@raven/wren-native/headless'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import {
   AIRBAG,

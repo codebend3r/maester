@@ -7,8 +7,8 @@ import { Dimensions } from 'react-native'
 
 import { ARTIST_COPY, DETAIL_COPY, KIT_COPY, PLAYER_COPY, TRACK_MENU_COPY } from '@raven/wren'
 import { queryClient } from '@/queryClient'
-import { WREN_PAGES } from '@/routes'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
+import { WREN_PAGES } from '@raven/wren-native/headless'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import {
   LISTENER,

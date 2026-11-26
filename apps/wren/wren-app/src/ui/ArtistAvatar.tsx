@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from 'react-native'
 
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { FONTS, RADIUS, SIZE } from '@/theme/wrenTokens'
 

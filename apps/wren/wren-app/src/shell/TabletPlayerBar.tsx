@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { factsLineOf, PLAYER_COPY, TRANSPORTS } from '@raven/wren'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
 import { Transport } from '@/player/Transport'
-import { useNowPlaying } from '@/player/useNowPlaying'
-import { WREN_ROUTES } from '@/routes'
+import { useNowPlaying, type WrenSession, useWren } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
@@ -17,7 +17,6 @@ import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { QualityChips } from '@/ui/QualityChips'
 import { ICONS } from '@/ui/WrenIcon'
-import { type WrenSession, useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   bar: {

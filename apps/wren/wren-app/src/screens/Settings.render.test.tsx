@@ -24,9 +24,8 @@ import {
   useDownloads,
 } from '@/downloads/downloadStore'
 import { queryClient } from '@/queryClient'
-import { WREN_ROUTES } from '@/routes'
-import { useWrenAccount } from '@/session'
-import { accountServers, useActiveServer } from '@/stores/activeServer'
+import { useWrenAccount, accountServers, useActiveServer } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, MUSIC, OK_COMPUTER, PARANOID, musicApi } from '@/test/music'

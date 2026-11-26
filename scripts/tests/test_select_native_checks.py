@@ -13,6 +13,7 @@ import select_native_checks as selector
         ({"@sparrow/api"}, (False, False, False)),
         ({"@raven/app"}, (True, False, False)),
         ({"@wren/app"}, (False, True, False)),
+        ({"@wren/tv"}, (False, True, False)),
         ({"@raven/desktop"}, (False, False, True)),
         ({"@raven/mpv"}, (False, False, True)),
         ({"@raven/web"}, (False, False, True)),

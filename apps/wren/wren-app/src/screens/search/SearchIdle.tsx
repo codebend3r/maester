@@ -7,15 +7,15 @@ import {
   type RecentSearch,
   recentTextOf,
   SEARCH_COPY,
+  ART,
 } from '@raven/wren'
 import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
-import { WREN_PAGES, libraryHref, pageHref } from '@/routes'
-import { useRecentSearches } from '@/stores/recentSearches'
+import { useRecentSearches } from '@raven/wren-native'
+import { WREN_PAGES, libraryHref, pageHref } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
-  ART,
   RADIUS,
   SEARCH_SIZES,
   SIZE,

@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { wrenVersion } from '@/about/version'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup'
-import { WREN_ROUTES, collectionPathOf, libraryHref } from '@/routes'
+import { useWren } from '@raven/wren-native'
+import { WREN_ROUTES, collectionPathOf, libraryHref } from '@raven/wren-native/headless'
 import { CATEGORIES, type Category } from '@/screens/library/categories'
 import { type WrenTheme, themedStyles, useIsPortrait, useWrenTheme } from '@/theme/wrenTheme'
 import { FONTS, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
@@ -14,7 +15,6 @@ import { pressedStyleOf } from '@/ui/press'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
 import { Unseen } from '@/ui/Unseen'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
-import { useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   sidebar: {

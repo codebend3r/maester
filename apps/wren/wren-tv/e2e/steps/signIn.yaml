@@ -1,0 +1,14 @@
+appId: app.netlify.wren.tv
+---
+# Opens Wren clean on the fixture, whose accounts are off, so it lands on Home with no sign-in,
+# the remote on Shuffle all, and the fixture's album under Recently added.
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      text: Shuffle all.*
+      focused: true
+    timeout: 30000

@@ -8,10 +8,9 @@ import { Dimensions } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
-import { WREN_ROUTES } from '@/routes'
+import { useWrenAccount, useActiveServer } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { SignIn } from '@/screens/SignIn'
-import { useWrenAccount } from '@/session'
-import { useActiveServer } from '@/stores/activeServer'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 
 const HOME: Home = { inProgress: [], shelves: [] }

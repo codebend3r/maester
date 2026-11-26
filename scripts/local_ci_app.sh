@@ -58,7 +58,7 @@ install_maestro() {
 # with `rm -rf dist`) at once, so they are built once here and both skip their own.
 build_libraries() {
   step 'Build the libraries'
-  bunx nx run-many -t build -p @raven/core @raven/ui @raven/audio @raven/keys @raven/native @raven/wren @shared/server
+  bunx nx run-many -t build -p @raven/core @raven/ui @raven/audio @raven/keys @raven/native @raven/wren @raven/wren-native @shared/server
 }
 
 # run_fixture: the fixture server in the foreground (`bun run ci:app:fixture`), unless

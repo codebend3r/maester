@@ -5,14 +5,13 @@ import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useNowPlaying } from '@/player/useNowPlaying'
-import { WREN_ROUTES } from '@/routes'
+import { useNowPlaying, type WrenSession, useWren } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { CHROMES } from '@/shell/chrome'
 import { useChrome } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { MiniPlayer } from '@/ui/MiniPlayer'
-import { type WrenSession, useWren } from '@/useWren'
 
 /** Where a bar is drawn: above the tab bar on a tab, at the foot of a page the stack opened. */
 export const BAR_PLACES = { tabs: CHROMES.tabs, page: CHROMES.page } as const
