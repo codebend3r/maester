@@ -1,6 +1,6 @@
 [test]
-# The default 5s is too tight for a typing-heavy page test on a small CI runner.
-timeout = 20000
+# bun reads no test timeout from here, so the test scripts pass --timeout: the
+# default 5s is too tight for a page test on a small or busy runner.
 # happy-dom must register the DOM before test-setup imports Testing Library,
 # network replaces its fetch so no test reaches for a server, and scss-modules
 # registers its loader ahead of any component import.

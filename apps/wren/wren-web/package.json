@@ -26,8 +26,8 @@
     "one-command-per-script": "bash ../../../scripts/check_one_command_per_script.sh",
     "preview": "vite preview",
     "spellcheck": "uvx typos@1.51.1",
-    "test": "bun test --dots",
-    "test:watch": "bun test --dots --watch",
+    "test": "bun test --dots --timeout=20000",
+    "test:watch": "bun test --dots --timeout=20000 --watch",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
