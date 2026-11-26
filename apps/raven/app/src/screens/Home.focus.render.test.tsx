@@ -478,6 +478,32 @@ describe('Home on a TV', () => {
     expect(askedFor()).toEqual([])
     expect(preferred()).toEqual([BUSBOYS])
   })
+
+  it('stands a shelf far from the view in as an empty box its height, and draws it again as it comes near', async () => {
+    await renderHome()
+    const films = await screen.findByTestId(`library:${FILMS.id}`)
+    const slot = films.parent
+    if (slot === null || slot === undefined) throw new Error('No slot round the Films shelf')
+    const [shelves] = screen.container.queryAll(
+      (node) => typeof node.props.onScroll === 'function' && node.props.horizontal !== true,
+    )
+    if (shelves === undefined) throw new Error('No shelves')
+    const layout = (box: { y: number; height: number }) => ({
+      nativeEvent: { layout: { x: 0, width: 1920, ...box } },
+    })
+    const scrollTo = (y: number) => ({ nativeEvent: { contentOffset: { x: 0, y } } })
+
+    await fireEvent(shelves, NATIVE_EVENTS.layout, layout({ y: 0, height: 1000 }))
+    await fireEvent(slot, NATIVE_EVENTS.layout, layout({ y: 400, height: 300 }))
+    await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(2000))
+    expect(screen.queryByTestId(`library:${FILMS.id}`)).toBeNull()
+    expect(screen.queryByRole('button', { name: NIGHT_TRAIN })).toBeNull()
+    expect(StyleSheet.flatten(slot.children[0]?.props.style)).toEqual({ height: 300 })
+
+    await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(0))
+    expect(screen.getByTestId(`library:${FILMS.id}`)).toBeTruthy()
+    expect(screen.getByRole('button', { name: NIGHT_TRAIN })).toBeTruthy()
+  })
 })
 
 describe("Home's hero on a TV", () => {

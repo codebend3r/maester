@@ -3,6 +3,7 @@ export const NATIVE_EVENTS = {
   focus: 'focus',
   blur: 'blur',
   layout: 'layout',
+  scroll: 'scroll',
   error: 'error',
   endEditing: 'endEditing',
   submitEditing: 'submitEditing',
