@@ -118,7 +118,13 @@
         "cache": true,
         "dependsOn": [
           "build",
-          "install:electron"
+          "install:electron",
+          {
+            "projects": [
+              "@raven/mpv"
+            ],
+            "target": "build:native"
+          }
         ],
         "inputs": [
           "default",
