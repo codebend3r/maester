@@ -17,6 +17,7 @@ import { StatusBar, View } from 'react-native'
 import { TvMusicHost } from '@/music/TvMusicHost'
 import { forgetWrenAccount, queryClient } from '@/queryClient'
 import { useMediaKeys } from '@/remote/useMediaKeys'
+import { WrenLaunch } from '@/shell/WrenLaunch'
 import {
   useWrenAccount,
   accountServers,
@@ -31,8 +32,12 @@ import { ToastHost } from '@/ui/Toast'
 import { ReleasesShelf } from '@/topShelf/ReleasesShelf'
 import { SIGNED_OUT_SHELF } from '@/topShelf/topShelf'
 
-// The splash stays up until the stores are read, so the first screen drawn is the right one.
+// The splash stays up until the launch intro draws over it, on the same Leaf.
 preventAutoHideAsync().catch(IGNORED)
+
+const hideSplash = () => {
+  hideAsync().catch(IGNORED)
+}
 
 /** How the system draws its own parts over each scheme's ground. */
 const BAR_STYLES = {
@@ -59,9 +64,9 @@ const useStyles = themedStyles(({ colors }) => ({
 }))
 
 /**
- * Reads what Wren keeps on the TV before any route renders, then the routes. The tabs need a
- * signed-in account on raven, so without one they send the listener to sign in. The account's
- * token is renewed a minute before it ends and the cache emptied when the account changes, as
+ * Reads what Wren keeps on the TV before any route renders, then the routes, while Wren's lockup
+ * plays over them as it opens (`WrenLaunch`). The tabs need a signed-in account on raven, so
+ * without one they send the listener to sign in. The account's token is renewed a minute before it ends and the cache emptied when the account changes, as
  * on the phone. Music plays from here, above every route, and the remote's media keys work
  * wherever its focus is.
  */
@@ -76,9 +81,6 @@ export function WrenTvRoot() {
   useTokenRenewal()
   useMediaKeys()
   useEffect(forgetWrenAccount, [])
-  useEffect(() => {
-    if (isLoaded) hideAsync().catch(IGNORED)
-  }, [isLoaded])
   useEffect(
     () =>
       isLoaded
@@ -88,37 +90,40 @@ export function WrenTvRoot() {
   )
 
   return (
-    isLoaded && (
-      <QueryClientProvider client={queryClient}>
-        <View style={styles.root}>
-          <StatusBar barStyle={BAR_STYLES[scheme]} />
-          {session !== null && <TvMusicHost key={session.server.id} session={session} />}
-          {/* The Apple TV's Top Shelf: the latest releases while the tabs are open, else the invitation to sign in. */}
-          <TopShelfSync
-            session={isOpen ? session : null}
-            signedOut={SIGNED_OUT_SHELF}
-            SignedIn={ReleasesShelf}
-          />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              animation: 'fade',
-              contentStyle: { backgroundColor: colors.bg },
-            }}
-          >
-            <Stack.Protected guard={isOpen} redirectTo={WREN_ROUTES.signIn}>
-              <Stack.Screen name={WREN_SCREENS.tabs} />
-              <Stack.Screen name={WREN_SCREENS.album} />
-              <Stack.Screen name={WREN_SCREENS.artist} />
-              <Stack.Screen name={WREN_SCREENS.playlist} />
-              <Stack.Screen name={WREN_SCREENS.collection} />
-              <Stack.Screen name={WREN_SCREENS.nowPlaying} />
-            </Stack.Protected>
-            <Stack.Screen name={WREN_SCREENS.signIn} />
-          </Stack>
-          <ToastHost />
-        </View>
-      </QueryClientProvider>
-    )
+    <>
+      {isLoaded && (
+        <QueryClientProvider client={queryClient}>
+          <View style={styles.root}>
+            <StatusBar barStyle={BAR_STYLES[scheme]} />
+            {session !== null && <TvMusicHost key={session.server.id} session={session} />}
+            {/* The Apple TV's Top Shelf: the latest releases while the tabs are open, else the invitation to sign in. */}
+            <TopShelfSync
+              session={isOpen ? session : null}
+              signedOut={SIGNED_OUT_SHELF}
+              SignedIn={ReleasesShelf}
+            />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                animation: 'fade',
+                contentStyle: { backgroundColor: colors.bg },
+              }}
+            >
+              <Stack.Protected guard={isOpen} redirectTo={WREN_ROUTES.signIn}>
+                <Stack.Screen name={WREN_SCREENS.tabs} />
+                <Stack.Screen name={WREN_SCREENS.album} />
+                <Stack.Screen name={WREN_SCREENS.artist} />
+                <Stack.Screen name={WREN_SCREENS.playlist} />
+                <Stack.Screen name={WREN_SCREENS.collection} />
+                <Stack.Screen name={WREN_SCREENS.nowPlaying} />
+              </Stack.Protected>
+              <Stack.Screen name={WREN_SCREENS.signIn} />
+            </Stack>
+            <ToastHost />
+          </View>
+        </QueryClientProvider>
+      )}
+      <WrenLaunch isReady={isLoaded} onShown={hideSplash} />
+    </>
   )
 }
