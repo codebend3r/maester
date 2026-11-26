@@ -20,6 +20,8 @@
     "app:deploy:android-tv": "APP_VARIANT=${APP_VARIANT:-development} nx run @raven/app:deploy:android-tv",
     "app:deploy:ios": "APP_VARIANT=${APP_VARIANT:-development} nx run @raven/app:deploy:ios",
     "app:deploy:tvos": "APP_VARIANT=${APP_VARIANT:-development} nx run @raven/app:deploy:tvos",
+    "app:testflight:ios": "nx run @raven/app:testflight:ios",
+    "app:testflight:tvos": "nx run @raven/app:testflight:tvos",
     "app:deploy:tvs": "bun run --sequential app:deploy:android-tv app:deploy:tvos",
     "app:dev:ios": "nx run @raven/app:dev:ios",
     "app:dev:ipad": "nx run @raven/app:dev:ipad",

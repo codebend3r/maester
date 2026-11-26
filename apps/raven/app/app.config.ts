@@ -84,6 +84,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       supportsTablet: true,
       infoPlist: {
         NSLocalNetworkUsageDescription: LOCAL_NETWORK_USE,
+        // raven's only encryption is the system's HTTPS, which is exempt, so TestFlight never asks.
+        ITSAppUsesNonExemptEncryption: false,
         /*
          * Expo's template allows local networking in every build, so the whole dictionary is
          * written here: a LAN server without TLS is for development, and a release keeps ATS.

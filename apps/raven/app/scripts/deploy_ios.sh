@@ -17,9 +17,9 @@
 # Wren's deploy (apps/wren/wren-app/scripts/deploy_ios.sh) runs this script too, naming its own
 # folder, Xcode project and bundle through APP_DIR, APP_NAME, APP_LABEL and IOS_BUNDLE_ID.
 set -euo pipefail
+source "$(dirname "$0")/apple_team.sh"
 cd "${APP_DIR:-$(dirname "$0")/..}"
 
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 export APP_VARIANT="${APP_VARIANT:-development}"
 APP_NAME="${APP_NAME:-Raven}"
 APP_LABEL="${APP_LABEL:-raven}"
@@ -27,15 +27,6 @@ BUNDLE_ID="${IOS_BUNDLE_ID:-io.github.codebend3r.raven.app}"
 DERIVED=build/ios-device
 APP="$DERIVED/Build/Products/Release-iphoneos/$APP_NAME.app"
 WAIT_SECONDS="${IOS_WAIT_SECONDS:-120}"
-
-say() { printf '\n==> %s\n' "$*"; }
-
-# The team is the OU of the Apple Development certificate, the one field that names it.
-team_id() {
-  security find-certificate -c "Apple Development" -p 2>/dev/null \
-    | openssl x509 -noout -subject 2>/dev/null \
-    | sed -n 's/.*OU *= *\([A-Z0-9]\{10\}\).*/\1/p' | head -1
-}
 
 # Every paired physical iPhone and iPad as "UDID<tab>name", the hardware UDID being what
 # xcodebuild and devicectl take (00008112-000170223A45401E, or 40 hex characters on older ones).
@@ -64,12 +55,7 @@ is_reachable() {
   xcrun devicectl list devices 2>/dev/null | grep "$1" | grep -qwE 'available|connected'
 }
 
-TEAM="${APPLE_TEAM_ID:-$(team_id)}"
-if [ -z "$TEAM" ]; then
-  echo "No Apple Development certificate in the keychain: sign in to Xcode (Settings > Accounts) once." >&2
-  exit 1
-fi
-export APPLE_TEAM_ID="$TEAM"
+require_team "No Apple Development certificate in the keychain: sign in to Xcode (Settings > Accounts) once." "Apple Development"
 
 DEVICES="$(ios_devices)"
 if [ -z "$DEVICES" ]; then
