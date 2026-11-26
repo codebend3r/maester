@@ -14,8 +14,7 @@ const RELEASES_HOOK = 'RAVEN_DESKTOP_RELEASES_URL'
 
 export const UPDATE_COPY = {
   ...UPDATE_WORDS,
-  newerDetail:
-    'Download it from its release page. While Raven is signed ad hoc it cannot update itself.',
+  newerDetail: 'Download it from its release page and install it over this one.',
   noRelease: 'Raven has not found a newer release.',
   unopened: 'Raven could not open the release page.',
 } as const

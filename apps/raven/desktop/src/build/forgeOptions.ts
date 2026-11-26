@@ -50,8 +50,9 @@ export const FUSES = {
 export type Signing = { osxSign?: { identity: string }; osxNotarize?: { keychainProfile: string } }
 
 /**
- * Developer ID signing and notarization, off until a certificate exists: with no
- * `RAVEN_SIGN_IDENTITY` the app is signed ad hoc, and notarizing needs an identity too.
+ * Developer ID signing and notarization, read from the environment: with no
+ * `RAVEN_SIGN_IDENTITY` (a local build, a fork) the app is signed ad hoc, and notarizing
+ * needs an identity too.
  */
 export const signingFrom = (env: Readonly<Record<string, string | undefined>>): Signing => {
   const identity = env.RAVEN_SIGN_IDENTITY ?? ''
