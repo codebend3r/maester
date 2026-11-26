@@ -127,6 +127,8 @@ export const SIZES = {
   fieldHeight: size('--field-size'),
   controlLarge: size('--control-size-large'),
   cover: size('--cover-size'),
+  // The line under a chosen tab, as thick as the web's.
+  tabRule: size('--border-thick'),
   // The web's `--focus-ring` is `2px solid var(--color-bark)`, which React Native takes in parts.
   focusRing: size('--border-thick'),
   // The web's ring is read from a desk; from the sofa it is drawn twice as thick.

@@ -207,6 +207,27 @@ describe('jumpScale', () => {
     expect(under({ scale, label: '0' })).toEqual(['show:9'])
   })
 
+  it("lays a TV library's release order along its newest episodes' years, and first aired along the shows' own", () => {
+    const shows: ShowEntry[] = [
+      {
+        ...showEntry(),
+        show: itemSummary({ id: 9, type: 'show', title: 'Severance', year: 2022 }),
+        latestAired: '2025-01-17',
+      },
+      {
+        ...showEntry(),
+        show: itemSummary({ id: 8, type: 'show', title: 'Frieren', year: 2023 }),
+        latestAired: '2024-03-22',
+      },
+    ]
+    const released = jumpScale({ sort: 'year-new', files: [], shows, source: 'tmdb' })
+    expect(under({ scale: released, label: '2025' })).toEqual(['show:9'])
+    const first = jumpScale({ sort: 'first-aired-new', files: [], shows, source: 'tmdb' })
+    expect(first?.field).toBe('firstAired')
+    expect(under({ scale: first, label: '2022' })).toEqual(['show:9'])
+    expect(under({ scale: first, label: '2023' })).toEqual(['show:8'])
+  })
+
   it("has no strip for a TV library's order by when files changed, which its shows do not have", () => {
     const show = { ...showEntry(), show: itemSummary({ id: 9, type: 'show', title: 'The Wire' }) }
     const files = [movie({ id: 1, changedAt: '2026-10-03T12:00:00Z' })]

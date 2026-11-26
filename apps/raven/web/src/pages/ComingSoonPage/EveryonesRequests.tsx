@@ -1,3 +1,4 @@
+import { REQUESTS_STATES, type RequestsState, requestsStateOf } from '@raven/core'
 import type { MemberRequest } from '@raven/core'
 import { requestKeyOf } from '@raven/core'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
@@ -11,11 +12,6 @@ import { type AccountName, accountNamesOf, useAccounts } from '@/lib/useAccounts
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import styles from '@/pages/ComingSoonPage/EveryonesRequests.module.scss'
 import { requestPathOf } from '@/pages/ComingSoonPage/requestPath'
-import {
-  REQUESTS_STATES,
-  type RequestsState,
-  requestsStateOf,
-} from '@/pages/ComingSoonPage/requestsState'
 import { RequestStatusPill } from '@/pages/ComingSoonPage/RequestStatusPill'
 import tableStyles from '@/pages/ComingSoonPage/RequestsTable.module.scss'
 

@@ -11,19 +11,24 @@ export const SORT_FIELD_LABELS: Record<SortFieldName, string> = {
   bitrate: 'Bitrate',
   resolution: 'Resolution',
   release: 'Release date',
+  firstAired: 'First aired',
   rating: 'Rating',
   random: 'Random',
 }
 
+/** How a field that runs through time reads each way. */
+const BY_AGE = { ascending: 'Oldest first', descending: 'Newest first' } as const
+
 /** How each way a field runs reads: A to Z, newest first. */
 export const SORT_DIRECTION_LABELS: Record<DirectedSortFieldName, Record<SortDirection, string>> = {
   title: { ascending: 'A to Z', descending: 'Z to A' },
-  added: { ascending: 'Oldest first', descending: 'Newest first' },
-  changed: { ascending: 'Oldest first', descending: 'Newest first' },
+  added: BY_AGE,
+  changed: BY_AGE,
   size: { ascending: 'Smallest first', descending: 'Largest first' },
   bitrate: { ascending: 'Lowest first', descending: 'Highest first' },
   resolution: { ascending: 'Lowest first', descending: 'Highest first' },
-  release: { ascending: 'Oldest first', descending: 'Newest first' },
+  release: BY_AGE,
+  firstAired: BY_AGE,
   rating: { ascending: 'Lowest first', descending: 'Highest first' },
 }
 
@@ -44,6 +49,9 @@ export const GROUPING_LABELS: Record<MediaGroupBy, string> = {
   month: 'Month added',
 }
 
+/** What a strip that jumps by year is called aloud. */
+const JUMP_TO_YEAR = 'Jump to a year'
+
 /** What the jump strip is called aloud, by what it jumps by. */
 export const JUMP_SCALE_LABELS: Record<JumpScale['field'], string> = {
   title: 'Jump to a letter',
@@ -52,7 +60,8 @@ export const JUMP_SCALE_LABELS: Record<JumpScale['field'], string> = {
   size: 'Jump to a size',
   bitrate: 'Jump to a bitrate',
   resolution: 'Jump to a resolution',
-  release: 'Jump to a year',
+  release: JUMP_TO_YEAR,
+  firstAired: JUMP_TO_YEAR,
   rating: 'Jump to a score',
 }
 

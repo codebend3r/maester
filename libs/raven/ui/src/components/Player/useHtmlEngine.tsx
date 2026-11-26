@@ -53,8 +53,7 @@ export const useHtmlEngine = ({
   // A library file's server, and a local file kept beside its own subtitles; each is null for the other.
   const server = source.kind === PLAYER_SOURCE_KINDS.server ? source : null
   const file = source.kind === PLAYER_SOURCE_KINDS.file ? source : null
-  // A local file has no server to ask, so it draws the look last read.
-  const captions = useCaptionStyle(server?.api ?? null)
+  const captions = useCaptionStyle()
   const shift = rendition.mode === PLAYBACK_MODES.direct ? 0 : STREAM_TIME_SHIFT
   const playback = useVideoState({
     videoRef,

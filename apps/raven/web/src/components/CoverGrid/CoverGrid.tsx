@@ -18,6 +18,7 @@ import { useSelectable } from '@/lib/useSelectable'
 import styles from '@/components/CoverGrid/CoverGrid.module.scss'
 import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 import { classNames } from '@raven/ui'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 type CoverProps = {
   entry: string
@@ -67,38 +68,44 @@ type MediaCoversProps = { items: MediaItem[]; picture: CardPicture }
  * page, or the player for one with no page: posters for a library that is
  * matched, frame grabs for one that is not.
  */
-export const MediaCovers = ({ items, picture }: MediaCoversProps) => (
-  <CoverList picture={picture}>
-    {items.map((media) => (
-      <Cover
-        key={media.id}
-        entry={mediaEntryKey(media)}
-        title={cardTitle(media).title}
-        link={{ ...cardLink({ media, hasPages: true }), prefetchItem: pageItemOf(media) }}
-      >
-        <PosterImage media={media} sizes={POSTER_SIZES.cover} />
-      </Cover>
-    ))}
-  </CoverList>
-)
+export const MediaCovers = ({ items, picture }: MediaCoversProps) => {
+  const drawn = useDrawnFirst({ items })
+  return (
+    <CoverList picture={picture}>
+      {drawn.map((media) => (
+        <Cover
+          key={media.id}
+          entry={mediaEntryKey(media)}
+          title={cardTitle(media).title}
+          link={{ ...cardLink({ media, hasPages: true }), prefetchItem: pageItemOf(media) }}
+        >
+          <PosterImage media={media} sizes={POSTER_SIZES.cover} />
+        </Cover>
+      ))}
+    </CoverList>
+  )
+}
 
 type ShowCoversProps = { shows: ShowEntry[] }
 
 /** A TV library's shows as nothing but their posters, each opening the show's page. */
-export const ShowCovers = ({ shows }: ShowCoversProps) => (
-  <CoverList picture={CARD_PICTURES.poster}>
-    {shows.map(({ show }) => (
-      <Cover
-        key={show.id}
-        entry={showEntryKey(show)}
-        title={show.title}
-        link={{ to: showPath(show.id), prefetchItem: show.id }}
-      >
-        <ItemPoster item={show} sizes={POSTER_SIZES.cover} />
-      </Cover>
-    ))}
-  </CoverList>
-)
+export const ShowCovers = ({ shows }: ShowCoversProps) => {
+  const drawn = useDrawnFirst({ items: shows })
+  return (
+    <CoverList picture={CARD_PICTURES.poster}>
+      {drawn.map(({ show }) => (
+        <Cover
+          key={show.id}
+          entry={showEntryKey(show)}
+          title={show.title}
+          link={{ to: showPath(show.id), prefetchItem: show.id }}
+        >
+          <ItemPoster item={show} sizes={POSTER_SIZES.cover} />
+        </Cover>
+      ))}
+    </CoverList>
+  )
+}
 
 /** How many blank covers stand in: a screen's worth at 1440 wide. */
 const SKELETON_COUNT = 24

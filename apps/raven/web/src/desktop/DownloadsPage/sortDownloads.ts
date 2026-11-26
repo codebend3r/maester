@@ -36,6 +36,8 @@ const FIELD_VALUES = {
   bitrate: ({ view }) => view.facts.bitrate,
   resolution: ({ view }) => view.facts.pixels,
   release: ({ view }) => view.facts.year,
+  // A download keeps no show's first day; its menu leaves the field out.
+  firstAired: ({ view }) => view.facts.year,
   rating: ({ view }) => view.facts.score,
   random: ({ view, seed }) => unitOf(`${seed}:${view.downloadId}`),
 } as const satisfies Record<SortFieldName, (props: ValueOfProps) => SortValue>

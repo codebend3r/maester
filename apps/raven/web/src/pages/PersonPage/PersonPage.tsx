@@ -25,6 +25,7 @@ import { FilmographyBones } from '@/pages/PersonPage/FilmographyTable'
 import { PersonHeader } from '@/pages/PersonPage/PersonHeader'
 import styles from '@/pages/PersonPage/PersonPage.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 
 /** The groups a person's credits fall into, in page order. */
 const GROUPS: ReadonlyArray<{ title: string; jobs: readonly CreditJob[] }> = [
@@ -76,9 +77,7 @@ const CARD_PICTURE_KEYS = { poster: 'poster', initial: 'initial' } as const
 
 type CardPosterProps = { poster: NonNullable<ReturnType<typeof posterSources>> }
 
-const CardPoster = ({ poster }: CardPosterProps) => (
-  <img {...poster} alt="" loading="lazy" decoding="async" />
-)
+const CardPoster = ({ poster }: CardPosterProps) => <ViewportImage {...poster} alt="" />
 
 type CardInitialProps = { title: string }
 

@@ -259,30 +259,35 @@ export const ravenQueriesFor = (api: ApiClient) => {
     homeQuery: queryOptions({
       queryKey: queryKeys.home,
       queryFn: () => api.getHome(),
+      gcTime: LISTING_GC_MS,
     }),
 
     /** The titles home's hero takes turns with, read apart from the shelves. */
     heroQuery: queryOptions({
       queryKey: queryKeys.hero,
       queryFn: () => api.getHero(),
+      gcTime: LISTING_GC_MS,
     }),
 
     /** A shelf of albums for each pinned music library, read apart from the shelves. */
     homeAlbumsQuery: queryOptions({
       queryKey: queryKeys.homeAlbums,
       queryFn: () => api.getHomeAlbums(),
+      gcTime: LISTING_GC_MS,
     }),
 
     /** Each library's shelf by its newest releases, for the shelves turned to Newly released. */
     releasedShelvesQuery: queryOptions({
       queryKey: queryKeys.releasedShelves,
       queryFn: async () => (await api.getHome({ order: SHELF_ORDERS.released })).shelves,
+      gcTime: LISTING_GC_MS,
     }),
 
     /** Each music library's albums by their newest releases, for the shelves turned to Newly released. */
     releasedAlbumsQuery: queryOptions({
       queryKey: queryKeys.releasedAlbums,
       queryFn: () => api.getHomeAlbums({ order: SHELF_ORDERS.released }),
+      gcTime: LISTING_GC_MS,
     }),
 
     /** The admin's picks for the hero, and how many it holds at most. */

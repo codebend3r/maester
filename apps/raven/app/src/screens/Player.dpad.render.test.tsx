@@ -344,7 +344,7 @@ describe('Player on Android TV', () => {
     expect(lastCall()[0]).toBe(false)
   })
 
-  it("plays a file with a text track as it is and hands the track to ExoPlayer to draw in the account's look", async () => {
+  it("plays a file with a text track as it is and hands the track to ExoPlayer to draw in this device's look", async () => {
     usePlayerPrefs.setState({ subtitles: { on: true, language: null } })
     const props = await playing({ id: BUSBOYS_MP4.id })
     expect(sourceUri(props)).toBe(

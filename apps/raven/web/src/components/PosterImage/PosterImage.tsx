@@ -2,7 +2,7 @@ import { type ItemSummary, type MediaItem, cardTitle } from '@raven/core'
 import { type ComponentType, useState } from 'react'
 import { api } from '@/lib/api'
 import { type PosterSizes, posterSources } from '@/lib/posters'
-import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
+import { ViewportImage, hasArrived } from '@/components/ViewportImage/ViewportImage'
 import styles from '@/components/PosterImage/PosterImage.module.scss'
 
 type Source = NonNullable<ReturnType<typeof posterSources>>
@@ -40,9 +40,9 @@ const PictureLetter = ({ initial, isWaiting }: PictureLetterProps) =>
 
 type PictureImageProps = PictureViewProps
 
-/** The picture fades in over its stand-in once it has arrived. */
+/** The picture fades in over its stand-in once it has arrived; one that arrived before shows at once. */
 const PictureImage = ({ source, initial, onFail }: PictureImageProps) => {
-  const [isLoaded, setLoaded] = useState(false)
+  const [isLoaded, setLoaded] = useState(() => source !== undefined && hasArrived(source.src))
   return (
     <span className={styles.stack} aria-hidden="true">
       <PictureLetter initial={initial} isWaiting={!isLoaded} />
@@ -133,12 +133,5 @@ type TmdbPosterProps = {
 
 /** The poster of a title no library holds, from TMDB through the server's image cache; its frame is the container's to give. */
 export const TmdbPoster = ({ poster, sizes, className }: TmdbPosterProps) => (
-  <img
-    {...api.tmdbPosterSources(poster)}
-    sizes={sizes}
-    alt=""
-    loading="lazy"
-    decoding="async"
-    className={className}
-  />
+  <ViewportImage {...api.tmdbPosterSources(poster)} sizes={sizes} alt="" className={className} />
 )

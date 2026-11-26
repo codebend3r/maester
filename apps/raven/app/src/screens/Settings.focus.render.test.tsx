@@ -49,7 +49,11 @@ jest.mock('@raven/native', () => ({
 
 /** Whatever on screen asks for the remote's focus, by its label. */
 const preferred = (): unknown[] =>
-  [...screen.getAllByRole('button'), ...screen.getAllByRole('switch')]
+  [
+    ...screen.getAllByRole('tab'),
+    ...screen.getAllByRole('button'),
+    ...screen.getAllByRole('switch'),
+  ]
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
 
@@ -63,22 +67,32 @@ describe('Settings on a TV', () => {
     useAppPrefs.setState(DEFAULT_APP_PREFS)
   })
 
-  it('opens with the remote on the first button, and only as it opens', async () => {
+  it('opens with the remote on the chosen tab, Playback, and only as it opens', async () => {
     await renderScreen({ ui: <Settings /> })
-    expect(preferred()).toEqual(['Sign out'])
+    expect(preferred()).toEqual(['Playback'])
 
-    await fireEvent(screen.getByRole('button', { name: 'Sign out' }), NATIVE_EVENTS.focus)
+    await fireEvent(screen.getByRole('tab', { name: 'Playback' }), NATIVE_EVENTS.focus)
     expect(preferred()).toEqual([])
   })
 
-  it('puts the way Home at the top left, which leaves the opening focus on Sign out', async () => {
+  it('chooses a tab as the remote lands on it, as the web chooses with the arrow keys', async () => {
+    await renderScreen({ ui: <Settings /> })
+    await fireEvent(screen.getByRole('tab', { name: 'Account' }), NATIVE_EVENTS.focus)
+    expect(screen.getByRole('tab', { name: 'Account' }).props.accessibilityState).toMatchObject({
+      selected: true,
+    })
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Allow transcoding' })).toBeNull()
+  })
+
+  it('puts the way Home at the top left, which leaves the opening focus on the tab', async () => {
     await renderScreen({ ui: <Settings /> })
     const [first] = screen.getAllByRole('button')
     if (first === undefined) throw new Error('No button')
     expect(first.props.accessibilityLabel).toBe('Home')
 
     await fireEvent(first, NATIVE_EVENTS.focus)
-    expect(preferred()).toEqual(['Sign out'])
+    expect(preferred()).toEqual(['Playback'])
   })
 
   it('lets go of the opening focus for whatever the remote reaches first', async () => {
@@ -92,6 +106,7 @@ describe('Settings on a TV', () => {
     const light = THEMES.find((theme) => theme.tone !== themeOf(DEFAULT_APP_PREFS.theme).tone)
     if (light === undefined) throw new Error('No light theme')
     await renderScreen({ ui: <Settings /> })
+    await fireEvent.press(screen.getByRole('tab', { name: 'This app' }))
 
     await fireEvent.press(screen.getByRole('button', { name: `Theme: ${DEFAULT_THEME_NAME}` }))
     const list = within(screen.getByLabelText('Theme'))
@@ -117,6 +132,7 @@ describe('Settings on a TV', () => {
     const styleOf = (node: ReturnType<typeof screen.getByRole>) =>
       StyleSheet.flatten(node.props.style)
     await renderScreen({ ui: <Settings /> })
+    await fireEvent.press(screen.getByRole('tab', { name: 'This app' }))
     await fireEvent.press(screen.getByRole('button', { name: `Theme: ${DEFAULT_THEME_NAME}` }))
     await fireEvent.press(
       within(screen.getByLabelText('Theme')).getByRole('button', { name: light.name }),

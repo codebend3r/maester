@@ -59,6 +59,7 @@ import { MIGRATION_058 } from '@/db/migrations/migration058AddMediaDolbyVisionPr
 import { MIGRATION_059 } from '@/db/migrations/migration059AddArtistBackground'
 import { MIGRATION_060 } from '@/db/migrations/migration060CreateAlbumDiagnoses'
 import { MIGRATION_061 } from '@/db/migrations/migration061AddBugReportArchive'
+import { MIGRATION_062 } from '@/db/migrations/migration062DropCaptionStyles'
 
 /**
  * raven's schema, one version per entry, a file each; `openSqlite` runs the ones a
@@ -127,4 +128,5 @@ export const MIGRATIONS: readonly string[] = [
   MIGRATION_059,
   MIGRATION_060,
   MIGRATION_061,
+  MIGRATION_062,
 ]

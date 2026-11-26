@@ -8,6 +8,7 @@ import {
   reversedSort,
   SORT_DIRECTION_LABELS,
   SORT_FIELD_LABELS,
+  FILE_SORT_FIELDS,
   isSortFieldName,
   sortParts,
   startingSort,
@@ -173,8 +174,8 @@ const Direction = ({ sort, onSort }: DirectionProps) => {
   )
 }
 
-/** Every field a library sorts on, since a download keeps the facts each needs. */
-const SORT_FIELDS = isSortFieldName.values
+/** Every field a library of files sorts on, since a download, a file, keeps the facts each needs. */
+const SORT_FIELDS = FILE_SORT_FIELDS
 
 const SortBar = ({ sort, onSort, onShuffle }: SortBarProps) => {
   const id = useId()

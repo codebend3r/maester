@@ -61,6 +61,13 @@ describe('defaultLibrarySettings', () => {
     expect(DEFAULT_LIBRARY_SETTINGS.watchedPercent).toBe(95)
   })
 
+  it('turns a sort by first aired, which only a TV library has, back to newest releases elsewhere', () => {
+    const movies: LibrarySettings = { ...defaultLibrarySettings('movies'), sort: 'first-aired-new' }
+    expect(coherentSettings(movies).sort).toBe('year-new')
+    const shows: LibrarySettings = { ...defaultLibrarySettings('shows'), sort: 'first-aired-new' }
+    expect(coherentSettings(shows).sort).toBe('first-aired-new')
+  })
+
   it('starts every type with settings it can show', () => {
     isLibraryKind.values.forEach((kind) => {
       const settings = defaultLibrarySettings(kind)

@@ -26,7 +26,7 @@ export type EngineActions = {
   setRate: (rate: number) => void
   setAudio: (index: number | null) => void
   setSubtitle: (id: string | null) => void
-  /** Saves the account's subtitle size, colour or both. */
+  /** Keeps this device's subtitle size, colour or both. */
   setCaptionStyle: (change: Partial<CaptionStyle>) => void
   /** Shows or hides the engine's own video info overlay; null for an engine with none. */
   toggleStats: (() => void) | null
@@ -50,7 +50,7 @@ export type EngineHandle = {
   duration: number | null
   position: RefObject<number>
   tracks: MediaTracks | null
-  /** How the account's subtitles look, whoever draws them. */
+  /** How this device's subtitles look, whoever draws them. */
   captionStyle: CaptionStyle
   actions: EngineActions
   /** The tracks playing and the picks between them, which the menus show and change. */

@@ -64,10 +64,7 @@ type SetSubtitlesProps = { on: boolean; language: string | null }
 type PlayerPrefs = {
   volume: number
   muted: boolean
-  /**
-   * The account's subtitle size and colour as the server last gave them, so the first frame, a
-   * local file and a server out of reach still draw its look. `useCaptionStyle` keeps it.
-   */
+  /** This device's subtitle size and colour; each device keeps its own. `useCaptionStyle` reads it. */
   captionStyle: CaptionStyle
   /** Whether subtitles were last on, and in which language. */
   subtitles: { on: boolean; language: string | null }
@@ -131,7 +128,7 @@ const storedGuardedOf = ({ stored, current }: StoredGuardedOfProps): GuardedPref
 })
 
 /**
- * Volume, subtitles and the look last read for them, audio language, how long the controls linger,
+ * Volume, subtitles and their look on this device, audio language, how long the controls linger,
  * autoplay and its countdown, skipping intros, whether the keyboard tip
  * has shown, how fast audiobooks play and how music sounds carry over from one video to the next, and across visits.
  */

@@ -1,8 +1,9 @@
 import { useKeyShortcut } from '@raven/ui'
 import { classNames } from '@raven/ui/headless'
-import { LIBRARY_PAGE_COPY, SIDEBAR_COPY, SIDEBAR_KEY } from '@raven/wren'
+import { LIBRARY_PAGE_COPY, SETTINGS_COPY, SIDEBAR_COPY, SIDEBAR_KEY } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup/WrenLockup'
+import { wrenVersion } from '@/lib/version'
 import { useShownPath } from '@/shell/chrome'
 import { LIBRARY_PLACES, type Place, TAB_PLACES } from '@/shell/places'
 import { useSidebar } from '@/stores/sidebar'
@@ -64,10 +65,11 @@ function SidebarItem({ place }: SidebarItemProps) {
 }
 
 /**
- * The wide layout's sidebar: the lockup, Home and Search, Library's categories, then Settings
- * and the server's status at its foot. B or the toggle folds it to a rail of icons, kept across
- * visits, as raven's side menu does. At `64rem` and narrower it is that rail whatever the toggle
- * says, and the toggle and B do nothing, as the apps' does on an upright tablet.
+ * The wide layout's sidebar: the lockup, Home and Search, Library's categories, then Settings,
+ * the server's status and, at its foot, the toggle with Wren's version beside it. B or the
+ * toggle folds it to a rail of icons, kept across visits, as raven's side menu does. At `64rem`
+ * and narrower it is that rail whatever the toggle says, and the toggle and B do nothing, as the
+ * apps' does on an upright tablet.
  */
 export function Sidebar() {
   const isCollapsed = useSidebar((state) => state.isCollapsed)
@@ -94,18 +96,23 @@ export function Sidebar() {
           <ServerStatusChip />
         </span>
         {!isRailed && (
-          <button
-            aria-controls={SIDEBAR_ID}
-            aria-expanded={!isCollapsed}
-            aria-keyshortcuts={SIDEBAR_COPY.key}
-            aria-label={SIDEBAR_COPY.name}
-            className={styles.toggle}
-            onClick={toggle}
-            title={isCollapsed ? SIDEBAR_COPY.expand : SIDEBAR_COPY.collapse}
-            type="button"
-          >
-            <WrenIcon name={ICONS.sidebar} size={SIZES.navIcon} />
-          </button>
+          <div className={styles.toggleRow}>
+            <button
+              aria-controls={SIDEBAR_ID}
+              aria-expanded={!isCollapsed}
+              aria-keyshortcuts={SIDEBAR_COPY.key}
+              aria-label={SIDEBAR_COPY.name}
+              className={styles.toggle}
+              onClick={toggle}
+              title={isCollapsed ? SIDEBAR_COPY.expand : SIDEBAR_COPY.collapse}
+              type="button"
+            >
+              <WrenIcon name={ICONS.sidebar} size={SIZES.navIcon} />
+            </button>
+            {!isCollapsed && (
+              <p className={styles.version}>{SETTINGS_COPY.versionOf(wrenVersion)}</p>
+            )}
+          </div>
         )}
       </div>
     </nav>

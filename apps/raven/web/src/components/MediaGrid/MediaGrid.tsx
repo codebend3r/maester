@@ -7,6 +7,7 @@ import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/MediaGrid/MediaGrid.module.scss'
 import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
 import { classNames } from '@raven/ui'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 type GridCardProps = {
   media: MediaItem
@@ -67,9 +68,10 @@ export const MediaGrid = ({
   posterOf,
 }: MediaGridProps) => {
   const Card: ComponentType<GridCardProps> = GRID_CARDS[picture]
+  const drawn = useDrawnFirst({ items })
   return (
     <ul className={GRID_CLASSES[picture]}>
-      {items.map((item) => (
+      {drawn.map((item) => (
         <Card key={item.id} media={item} matchType={matchType} sort={sort} posterOf={posterOf} />
       ))}
     </ul>

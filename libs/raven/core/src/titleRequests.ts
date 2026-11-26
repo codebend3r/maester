@@ -22,6 +22,35 @@ const isAddedRequest = (request: TitleRequest): boolean =>
 export const myRequestsOf = (list: TitleRequests | undefined): TitleRequest[] =>
   list?.requests.filter((request) => request.isMine) ?? []
 
+/** How many requests the caller made, once the list is read. */
+export const myRequestCountOf = (list: TitleRequests | undefined): number | undefined =>
+  list === undefined ? undefined : myRequestsOf(list).length
+
+/** What a list of the caller's requests shows: the requests still being read, a failed read, none to list, or the list. */
+export const REQUESTS_STATES = {
+  reading: 'reading',
+  failed: 'failed',
+  none: 'none',
+  listed: 'listed',
+} as const
+
+export type RequestsState = (typeof REQUESTS_STATES)[keyof typeof REQUESTS_STATES]
+
+/** Where the read of a list stands, as any query library reports it. */
+type RequestsRead = { isPending: boolean; isError: boolean }
+
+type RequestsStateOfProps = {
+  query: RequestsRead
+  /** How many requests the list holds. */
+  count: number
+}
+
+export const requestsStateOf = ({ query, count }: RequestsStateOfProps): RequestsState => {
+  if (query.isPending) return REQUESTS_STATES.reading
+  if (query.isError) return REQUESTS_STATES.failed
+  return count === 0 ? REQUESTS_STATES.none : REQUESTS_STATES.listed
+}
+
 /*
  * Every title on its way for the caller: their own requests, and the titles
  * still to come that an arr holds without anyone asking, which every account

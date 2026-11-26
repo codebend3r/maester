@@ -6,7 +6,7 @@ import {
   SHUFFLE_LENGTH,
   type ViewingSession,
 } from '@raven/core'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { LibrariesRepository } from '@/libraries/librariesRepository'
 import type { Viewer } from '@/lock/lockService'
 import { MediaIndex } from '@/media/mediaIndex'
@@ -311,6 +311,31 @@ describe("listing a TV library's shows", () => {
     ])
     bitrates.run(5_000_000, 'Aired%')
     bitrates.run(5_000_000, 'Special%')
+  })
+
+  it("sorts by release on the newest episode aired, and by first aired on the show's own first day", () => {
+    const released = database.get().db.prepare('UPDATE items SET released = ? WHERE tmdb_id = ?')
+    // Aired began first but has the newer episode; Special began later and has aired nothing since.
+    const dated = ['Aired', 'Aired-1-1', 'Aired-1-2', 'Special', 'Special-0-1', 'Special-1-1']
+    // Put back before the assertions, so one that fails leaves no dates for the tests after it.
+    onTestFinished(() => dated.forEach((id) => released.run(null, id)))
+    released.run('2010-01-10', 'Aired')
+    released.run('2010-01-10', 'Aired-1-1')
+    released.run('2024-05-02', 'Aired-1-2')
+    released.run('2020-03-01', 'Special')
+    released.run('2020-03-01', 'Special-0-1')
+    released.run('2020-03-08', 'Special-1-1')
+    const listed = (sort: MediaSort) =>
+      media()
+        .listShows({ libraryId: state.libraryId, sort, account: TEST_ACCOUNTS.a })
+        .map((entry) => [entry.show.title, entry.latestAired])
+    expect(listed(MEDIA_SORTS.yearNew)).toEqual([
+      ['Aired', '2024-05-02'],
+      ['Special', '2020-03-08'],
+    ])
+    expect(listed(MEDIA_SORTS.yearOld).map(([title]) => title)).toEqual(['Special', 'Aired'])
+    expect(listed(MEDIA_SORTS.firstAiredNew).map(([title]) => title)).toEqual(['Special', 'Aired'])
+    expect(listed(MEDIA_SORTS.firstAiredOld).map(([title]) => title)).toEqual(['Aired', 'Special'])
   })
 
   it("answers a show's next episode on its own too", () => {

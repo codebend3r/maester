@@ -1,3 +1,4 @@
+import type { TabEntry } from '@raven/ui/headless'
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
@@ -12,8 +13,10 @@ import type {
   SettingsFactProps,
   SettingsKit,
   SettingsPageProps,
+  SettingsTabsProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
+import { tabA11yOf } from '@/layouts/settingsKit'
 import { usePlateStyles } from '@/layouts/tvControls'
 import { OPACITIES } from '@/theme/appTheme'
 import { CODE_FONT } from '@/theme/fonts'
@@ -33,7 +36,7 @@ const TOGGLE_STATES = { on: 'On', off: 'Off' } as const
 
 /**
  * Settings on a TV: one column within the title-safe margin, read from the sofa. Menu or Back
- * leaves it, as the native stack pops it. The remote opens on the opener button, once: anything
+ * leaves it, as the native stack pops it. The remote opens on the chosen tab, once: anything
  * here taking the focus spends the opening focus.
  */
 const SettingsPage = ({ title, children }: SettingsPageProps) => {
@@ -77,14 +80,8 @@ const SettingsToggle = ({ label, hint, isOn, onToggle }: SettingsToggleProps) =>
 }
 
 /** A button at the start of its line, in a band as wide as the page. */
-const SettingsButton = ({
-  text,
-  isDisabled,
-  onPress,
-  name = text,
-  isOpener = false,
-}: SettingsButtonProps) => {
-  const { isOpening, settle } = useOpeningFocus()
+const SettingsButton = ({ text, isDisabled, onPress, name = text }: SettingsButtonProps) => {
+  const { settle } = useOpeningFocus()
   const styles = useStyles()
   const plateStyles = usePlateStyles()
   return (
@@ -95,7 +92,6 @@ const SettingsButton = ({
         accessibilityState={{ disabled: isDisabled }}
         disabled={isDisabled}
         focusable={!isDisabled}
-        hasTVPreferredFocus={isOpener && isOpening && !isDisabled}
         onFocus={settle}
         onPress={onPress}
         style={({ focused }) => [
@@ -148,6 +144,63 @@ const SettingsChoice = <K extends string>(props: SettingsChoiceProps<K>) => {
   )
 }
 
+type TabPlateProps<T extends string> = {
+  tab: TabEntry<T>
+  isChosen: boolean
+  onChoose: (value: T) => void
+}
+
+/** A tab on a plate, filled in the primary tone while chosen; the remote landing on it chooses it. */
+const TabPlate = <T extends string>({ tab, isChosen, onChoose }: TabPlateProps<T>) => {
+  const { isOpening, settle } = useOpeningFocus()
+  const styles = useStyles()
+  const plateStyles = usePlateStyles()
+  return (
+    <Pressable
+      {...tabA11yOf({ tab, isChosen })}
+      hasTVPreferredFocus={isChosen && isOpening}
+      onFocus={() => {
+        settle()
+        onChoose(tab.value)
+      }}
+      onPress={() => onChoose(tab.value)}
+      style={({ focused }) => [
+        plateStyles.plate,
+        isChosen && plateStyles.on,
+        focused && plateStyles.focused,
+      ]}
+    >
+      <Text style={[plateStyles.label, isChosen && styles.onAccent]}>{tab.label}</Text>
+      {tab.count !== undefined && (
+        <Text style={[styles.tabCount, isChosen && styles.onAccent]}>{tab.count}</Text>
+      )}
+    </Pressable>
+  )
+}
+
+/**
+ * The web's tabs as a band of plates under the title. Moving along it chooses as it goes, as the
+ * web's arrow keys do, and the band hands the remote back to the chosen tab from below, since it
+ * is the one the remote last left there.
+ */
+const SettingsTabs = <T extends string>({
+  label,
+  tabs,
+  chosen,
+  onChoose,
+}: SettingsTabsProps<T>) => {
+  const styles = useStyles()
+  return (
+    <FocusBand>
+      <View accessibilityLabel={label} accessibilityRole="tablist" style={styles.tabs}>
+        {tabs.map((tab) => (
+          <TabPlate key={tab.value} isChosen={tab.value === chosen} onChoose={onChoose} tab={tab} />
+        ))}
+      </View>
+    </FocusBand>
+  )
+}
+
 /** Settings on a TV: plates the remote moves down through, and the TV's picker lists. */
 export const focusSettings: SettingsKit = {
   SettingsPage,
@@ -157,6 +210,7 @@ export const focusSettings: SettingsKit = {
   SettingsLine,
   SettingsFact,
   SettingsChoice,
+  SettingsTabs,
 }
 
 const useStyles = themedStyles((colours) =>
@@ -185,6 +239,9 @@ const useStyles = themedStyles((colours) =>
       paddingVertical: TV_SIZES.space2,
     },
     button: { alignSelf: 'flex-start' },
+    tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: TV_SIZES.space2 },
+    tabCount: { color: colours.muted, fontSize: TV_SIZES.text },
+    onAccent: { color: colours.onAccent },
     off: { opacity: OPACITIES.disabled },
   }),
 )

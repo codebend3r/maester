@@ -1,5 +1,7 @@
+import type { TabEntry } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
 
+import { SETTINGS_TABS_COPY } from '@/layouts/copy'
 import type { PickerProps } from '@/layouts/gridKit'
 
 export type SettingsPageProps = {
@@ -29,8 +31,6 @@ export type SettingsButtonProps = {
   onPress: () => void
   /** What a screen reader calls it, when the text alone is the same on several: "Quick scan Films". */
   name?: string
-  /** The button a TV's remote opens the page on, once. */
-  isOpener?: boolean
 }
 
 /** A line of its own between the controls: a status, a fact or why something failed. */
@@ -54,6 +54,27 @@ export type SettingsChoiceProps<K extends string> = Pick<
   'label' | 'options' | 'value' | 'onChoose'
 >
 
+type TabA11yOfProps<T extends string> = { tab: TabEntry<T>; isChosen: boolean }
+
+/** How a screen reader hears one of Settings' tabs, the same on a phone and a TV. */
+export const tabA11yOf = <T extends string>({ tab, isChosen }: TabA11yOfProps<T>) =>
+  ({
+    accessibilityLabel: SETTINGS_TABS_COPY.name(tab),
+    accessibilityRole: 'tab',
+    accessibilityState: { selected: isChosen },
+  }) as const
+
+/**
+ * Settings' tabs, the web's, each a group of related settings, drawn under the title over the
+ * chosen tab's settings. A TV's remote opens the page on the chosen tab, once.
+ */
+export type SettingsTabsProps<T extends string> = {
+  label: string
+  tabs: readonly TabEntry<T>[]
+  chosen: T
+  onChoose: (value: T) => void
+}
+
 /** Settings' pieces, which each platform lays out and drives its own way. */
 export type SettingsKit = {
   SettingsPage: (props: SettingsPageProps) => ReactNode
@@ -63,4 +84,5 @@ export type SettingsKit = {
   SettingsLine: (props: SettingsLineProps) => ReactNode
   SettingsFact: (props: SettingsFactProps) => ReactNode
   SettingsChoice: <K extends string>(props: SettingsChoiceProps<K>) => ReactNode
+  SettingsTabs: <T extends string>(props: SettingsTabsProps<T>) => ReactNode
 }

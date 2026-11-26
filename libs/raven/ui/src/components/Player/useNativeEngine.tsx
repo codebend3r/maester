@@ -1,5 +1,4 @@
 import {
-  type ApiClient,
   type MediaTracks,
   PLAYER_COMMANDS,
   PLAYER_EVENTS,
@@ -39,8 +38,6 @@ type PlayerErrorEvent = Extract<PlayerEvent, { type: typeof PLAYER_EVENTS.error 
 type UseNativeEngineProps = {
   player: NativePlayer
   source: PlayerSource
-  /** The server whose account's subtitle look the player draws; null for a plain local file. */
-  api: ApiClient | null
   onFailure: (message: string) => void
   toggleFullscreen: () => void
 }
@@ -55,7 +52,6 @@ type UseNativeEngineProps = {
 export const useNativeEngine = ({
   player,
   source,
-  api,
   onFailure,
   toggleFullscreen,
 }: UseNativeEngineProps): EngineHandle => {
@@ -64,7 +60,7 @@ export const useNativeEngine = ({
   const isVolumeFixed = useHostServices((services) => services.isVolumeFixed)
   const onEngineError = useHostServices((services) => services.onEngineError)
   const setVolume = usePlayerPrefs((prefs) => prefs.setVolume)
-  const captions = useCaptionStyle(api)
+  const captions = useCaptionStyle()
   // Whether main answered this mount's load, after which it takes the subtitle look.
   const [hasLoaded, setHasLoaded] = useState(false)
   const [state, dispatch] = useReducer(videoReducer, title.resumeAt, initialVideoState)
@@ -147,7 +143,7 @@ export const useNativeEngine = ({
     }
   }, [player])
 
-  // The account's look, sent once the load is answered and again whenever it changes.
+  // This device's look, sent once the load is answered and again whenever it changes.
   useEffect(() => {
     if (!hasLoaded) return
     sendQuietly({

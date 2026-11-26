@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import { SIDEBAR_COPY } from '@raven/wren'
+import { SETTINGS_COPY, SIDEBAR_COPY } from '@raven/wren'
 import { act, cleanup, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { sizeWindow } from '@tooling/web/viewport'
 import { AppRoutes } from '@/AppRoutes'
+import { wrenVersion } from '@/lib/version'
 import { WREN_ROUTES } from '@/routes'
 import { mockMusicApiEach } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
@@ -32,6 +33,15 @@ describe('the sidebar', () => {
     expect(button).toHaveAttribute('title', SIDEBAR_COPY.expand)
     await userEvent.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it("shows Wren's version beside the toggle while the sidebar is open", async () => {
+    renderWithProviders({ ui: <AppRoutes />, route: WREN_ROUTES.library })
+    const button = await toggle()
+    const version = SETTINGS_COPY.versionOf(wrenVersion)
+    expect(screen.getByText(version)).toBeInTheDocument()
+    await userEvent.click(button)
+    expect(screen.queryByText(version)).not.toBeInTheDocument()
   })
 
   it('folds and opens with the B key, and keeps what it was told', async () => {

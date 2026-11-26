@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AUDIO_STATES, useAudioQueue } from '@raven/ui/headless'
 import type * as Native from '@raven/native'
-import { LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS } from '@raven/wren'
+import { LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS, SETTINGS_COPY } from '@raven/wren'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 import { Dimensions } from 'react-native'
 
+import { wrenVersion } from '@/about/version'
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES, collectionPathOf } from '@/routes'
 import { useWrenAccount } from '@/session'
@@ -86,6 +87,13 @@ describe("Wren's shell", () => {
     expect(screen.getByRole('link', { name: 'Albums' }).props.accessibilityState).toEqual(
       expect.objectContaining({ selected: true }),
     )
+  })
+
+  it("shows Wren's version at the foot of the tablet's sidebar", async () => {
+    await holdAs(TABLET_WINDOW)
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.home })
+    await screen.findByRole('header', { name: LIBRARY_PAGE_COPY.recent })
+    expect(screen.getByText(SETTINGS_COPY.versionOf(wrenVersion))).toBeTruthy()
   })
 
   it("plays from the tablet's player bar in place of the mini player", async () => {

@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import {
   ACCOUNT_TICKET_SECONDS,
-  DEFAULT_CAPTION_STYLE,
   ITEM_TYPES,
   type MediaMarkers,
   type MediaTracks,
@@ -66,12 +65,11 @@ const TRACKS: MediaTracks = {
 }
 
 const spies: Array<{ mockRestore: () => void }> = []
-/** What the player reads beside the video: its tracks, its markers, none by default, and the account's subtitle look. */
+/** What the player reads beside the video: its tracks and its markers, none by default. */
 const stubPlayerReads = (tracks: MediaTracks = TRACKS) =>
   spies.push(
     spyOn(api, 'getTracks').mockImplementation(async () => tracks),
     spyOn(api, 'getMarkers').mockImplementation(async () => NO_MARKERS),
-    spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE),
   )
 
 afterEach(() => {

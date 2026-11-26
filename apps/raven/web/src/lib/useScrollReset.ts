@@ -12,6 +12,9 @@ type TopCard = { index: number; entry: string; top: number }
  */
 const topCards = new Map<string, TopCard>()
 
+/** Where among its page's cards the one at the top sat when the history entry `key` was left, if it was noted. */
+export const notedTopIndex = (key: string): number | null => topCards.get(key)?.index ?? null
+
 /** A card (`data-entry`) that is on show, not folded away in a closed bucket. */
 export const ENTRY_SELECTOR = '[data-entry]:not(details:not([open]) *)'
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { HTTP_METHODS, APP_CLIENT_CALLS, QUALITIES, themeOf } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, QUALITIES } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -13,6 +13,7 @@ import { type AdminServerState, OWNER, PLAYBACK, SIGNED_IN, adminApi } from '@/t
 import { NAS } from '@/test/homeServer'
 import type * as NavigationFocus from '@/test/navigationFocus'
 import { resetTestScreen } from '@/test/navigationFocus'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 
 // The layouts pick their variant once, as they load, so the TV is set before anything does.
@@ -48,9 +49,17 @@ jest.mock('@raven/native', () => ({
 
 /** Whatever on screen asks for the remote's focus, by its label. */
 const preferred = (): unknown[] =>
-  [...screen.getAllByRole('button'), ...screen.getAllByRole('switch')]
+  [
+    ...screen.getAllByRole('tab'),
+    ...screen.getAllByRole('button'),
+    ...screen.getAllByRole('switch'),
+  ]
     .filter((node) => node.props.hasTVPreferredFocus === true)
     .map((node) => node.props.accessibilityLabel)
+
+/** Opens Settings' Admin tab once the account is known to be the owner's, as the remote lands on it. */
+const openAdmin = async () =>
+  fireEvent(await screen.findByRole('tab', { name: 'Admin' }), NATIVE_EVENTS.focus)
 
 describe("the owner's settings on a TV", () => {
   let client = createScreenClient()
@@ -68,17 +77,15 @@ describe("the owner's settings on a TV", () => {
     useAccountSession.setState({ session: SIGNED_IN })
   })
 
-  it('still opens on Sign out once the Admin sections are drawn, the theme among the settings', async () => {
+  it('still opens on Playback once the Admin tab is drawn', async () => {
     await renderScreen({ ui: <Settings />, client })
-    await screen.findByRole('button', { name: 'Cancel all running scans' })
-    expect(preferred()).toEqual(['Sign out'])
-    expect(
-      screen.getByRole('button', { name: `Theme: ${themeOf(DEFAULT_APP_PREFS.theme).name}` }),
-    ).toBeTruthy()
+    await screen.findByRole('tab', { name: 'Admin' })
+    expect(preferred()).toEqual(['Playback'])
   })
 
   it("saves a playback setting picked from the TV's list", async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     await fireEvent.press(await screen.findByRole('button', { name: 'Transcode quality: Medium' }))
     await fireEvent.press(
       within(screen.getByLabelText('Transcode quality')).getByRole('button', { name: 'High' }),
@@ -96,6 +103,7 @@ describe("the owner's settings on a TV", () => {
 
   it('turns a server switch on with a press, saying which it is', async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     const markers = await screen.findByRole('switch', { name: 'Find intros and credits' })
     expect(markers.props.accessibilityState).toMatchObject({ checked: true })
     await fireEvent.press(markers)
@@ -111,9 +119,9 @@ describe("the owner's settings on a TV", () => {
     await renderScreen({ ui: <Settings />, client })
     await waitFor(() =>
       expect(mockServer.heard.map(({ path }) => path).toSorted()).toEqual(
-        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.getCaptionStyle.path].toSorted(),
+        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.listRequests.path].toSorted(),
       ),
     )
-    expect(screen.queryByRole('header', { name: 'Admin' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Admin' })).toBeNull()
   })
 })

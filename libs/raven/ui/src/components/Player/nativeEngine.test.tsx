@@ -151,7 +151,6 @@ const types = (sent: PlayerCommand[]) => sent.map((command) => command.type)
 const spies: Array<{ mockRestore: () => void }> = []
 
 beforeEach(() => {
-  spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE))
   usePlayerPrefs.setState({
     volume: 1,
     muted: false,
@@ -463,9 +462,9 @@ describe('the native engine', () => {
     expect(usePlayerPrefs.getState().captionStyle.size).toBe(CAPTION_SIZES.large)
   })
 
-  it("draws a library file's subtitles in the account's look once the server gives it", async () => {
+  it("draws a library file's subtitles in this device's look", async () => {
     const yellow = { size: CAPTION_SIZES.largest, colour: CAPTION_COLOURS.yellow }
-    spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => yellow))
+    usePlayerPrefs.setState({ captionStyle: yellow })
     const fake = fakePlayer()
     renderNative({ player: fake.player, file: { media: mediaItem(), api } })
     await waitFor(() =>
@@ -474,7 +473,6 @@ describe('the native engine', () => {
         style: yellow,
       }),
     )
-    expect(usePlayerPrefs.getState().captionStyle).toEqual(yellow)
   })
 
   it('never sends volume when it is fixed', async () => {

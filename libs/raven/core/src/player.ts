@@ -54,7 +54,7 @@ export const isPlayerCommand = union(
   object({ type: literal(PLAYER_COMMANDS.subtitle), id: nullable(isString) }),
   object({ type: literal(PLAYER_COMMANDS.volume), volume: isNumber, muted: isBoolean }),
   object({ type: literal(PLAYER_COMMANDS.speed), rate: isNumber }),
-  /** How the player draws its subtitles: the account's look, which the player maps to its own. */
+  /** How the player draws its subtitles: this device's look, which the player maps to its own. */
   object({ type: literal(PLAYER_COMMANDS.subtitleStyle), style: isCaptionStyle }),
   object({ type: literal(PLAYER_COMMANDS.stats) }),
   object({ type: literal(PLAYER_COMMANDS.stop) }),

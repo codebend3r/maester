@@ -14,6 +14,7 @@ import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/AlbumGrid/AlbumGrid.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 /** What a card's hint is handed: its album, whether the pointer or the focus is on the card, and the id its title is described by. */
 export type AlbumHintProps = { album: AlbumSummary; isShown: boolean; id: string }
@@ -97,13 +98,16 @@ export const AlbumCard = ({ album, hint: Hint }: AlbumCardProps) => {
 type AlbumGridProps = { albums: readonly AlbumSummary[] } & Pick<AlbumCardProps, 'hint'>
 
 /** Albums as a grid of covers, each named with its artists and year, and a hint over each cover when given one. */
-export const AlbumGrid = ({ albums, hint }: AlbumGridProps) => (
-  <ul className={styles.grid}>
-    {albums.map((album) => (
-      <AlbumCard key={album.id} album={album} hint={hint} />
-    ))}
-  </ul>
-)
+export const AlbumGrid = ({ albums, hint }: AlbumGridProps) => {
+  const drawn = useDrawnFirst({ items: albums })
+  return (
+    <ul className={styles.grid}>
+      {drawn.map((album) => (
+        <AlbumCard key={album.id} album={album} hint={hint} />
+      ))}
+    </ul>
+  )
+}
 
 /** How many blank covers stand in while the albums are on their way. */
 const SKELETON_COUNT = 12

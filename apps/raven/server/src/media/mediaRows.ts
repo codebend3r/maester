@@ -157,6 +157,8 @@ export type ShowRow = {
   total_episodes: number
   watched_episodes: number
   added_at: string
+  /** The day its newest episode on disk aired. */
+  latest_aired: string | null
   bitrate: number | null
 }
 
@@ -166,9 +168,16 @@ const SHOW_BY_TITLE = 'sh.sort_title COLLATE NOCASE, sh.id'
 const SHOW_RELEASED = 'COALESCE(sh.released, CAST(sh.year AS TEXT))'
 
 /**
+ * The day a show's newest episode on disk aired, else the day the show
+ * first aired, so a show TMDB names no episode day for still sorts.
+ */
+const SHOW_LATEST = `COALESCE(latest_aired, ${SHOW_RELEASED})`
+
+/**
  * A show's listing order: by its files' mean bitrate for the bitrate sorts,
- * by the day it first aired for the release sorts, and by title for the
- * others that only mean something per file.
+ * by the day its newest episode aired for the release sorts, so a show with
+ * a new season sorts as new, by the day it first aired for the first aired
+ * sorts, and by title for the others that only mean something per file.
  */
 export const SHOW_ORDER_BY = {
   [MEDIA_SORTS.title]: SHOW_BY_TITLE,
@@ -183,8 +192,10 @@ export const SHOW_ORDER_BY = {
   [MEDIA_SORTS.bitrateLow]: `bitrate IS NULL, bitrate, ${SHOW_BY_TITLE}`,
   [MEDIA_SORTS.resolutionHigh]: SHOW_BY_TITLE,
   [MEDIA_SORTS.resolutionLow]: SHOW_BY_TITLE,
-  [MEDIA_SORTS.yearNew]: `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED} DESC, ${SHOW_BY_TITLE}`,
-  [MEDIA_SORTS.yearOld]: `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED}, ${SHOW_BY_TITLE}`,
+  [MEDIA_SORTS.yearNew]: `${SHOW_LATEST} IS NULL, ${SHOW_LATEST} DESC, ${SHOW_BY_TITLE}`,
+  [MEDIA_SORTS.yearOld]: `${SHOW_LATEST} IS NULL, ${SHOW_LATEST}, ${SHOW_BY_TITLE}`,
+  [MEDIA_SORTS.firstAiredNew]: `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED} DESC, ${SHOW_BY_TITLE}`,
+  [MEDIA_SORTS.firstAiredOld]: `${SHOW_RELEASED} IS NULL, ${SHOW_RELEASED}, ${SHOW_BY_TITLE}`,
   [MEDIA_SORTS.ratingHigh]: `score IS NULL, score DESC, ${SHOW_BY_TITLE}`,
   [MEDIA_SORTS.ratingLow]: `score IS NULL, score, ${SHOW_BY_TITLE}`,
   [MEDIA_SORTS.random]: SHOW_BY_TITLE,
@@ -193,6 +204,7 @@ export const SHOW_ORDER_BY = {
 /** The files of a library that are episodes, with their show and numbers. */
 export const EPISODE_FILES = `
   SELECT m.id AS media_id, m.library_id, m.added_at, m.changed_at, m.bitrate, e.id AS episode_id,
+         e.released AS episode_released,
          s.parent_id AS show_id, ${fileWatched('m')} AS watched
     FROM media m
     JOIN libraries l ON l.id = m.library_id
@@ -244,6 +256,9 @@ export const ORDER_BY = {
   [MEDIA_SORTS.resolutionLow]: `width * height IS NULL, width * height, ${BY_TITLE}`,
   [MEDIA_SORTS.yearNew]: `${RELEASED} IS NULL, ${RELEASED} DESC, ${BY_TITLE}`,
   [MEDIA_SORTS.yearOld]: `${RELEASED} IS NULL, ${RELEASED}, ${BY_TITLE}`,
+  // A file has one day, so first aired runs as release does: a TV library's files no show was found for.
+  [MEDIA_SORTS.firstAiredNew]: `${RELEASED} IS NULL, ${RELEASED} DESC, ${BY_TITLE}`,
+  [MEDIA_SORTS.firstAiredOld]: `${RELEASED} IS NULL, ${RELEASED}, ${BY_TITLE}`,
   [MEDIA_SORTS.ratingHigh]: `score IS NULL, score DESC, ${BY_TITLE}`,
   [MEDIA_SORTS.ratingLow]: `score IS NULL, score, ${BY_TITLE}`,
   [MEDIA_SORTS.random]: BY_TITLE,

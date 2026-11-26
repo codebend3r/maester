@@ -33,12 +33,16 @@ import { APP_PATHS, comingSoonTitlePath } from '@/lib/appPaths'
 import { POSTER_SIZES } from '@/lib/posters'
 import { homeSearchQuery, librariesQuery, upcomingSearchQuery } from '@/lib/queries'
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
+import { useOnScreen } from '@/lib/useOnScreen'
 import { useAddressSearch } from '@/lib/useSearch'
 import styles from '@/components/SiteSearch/SiteSearch.module.scss'
 import { handled } from '@/lib/handled'
 
 /** How many letters, spaces aside, the box waits for before it suggests. */
 const SUGGEST_AFTER_LETTERS = 3
+
+/** The box dims the page only while some of it is on the screen. */
+const ON_SCREEN_MARGIN = '0px'
 
 /** How many titles the list offers; the last row opens every result. */
 const MAX_SUGGESTIONS = 8
@@ -309,8 +313,8 @@ type SiteSearchProps = { className?: string }
  * first titles found, each opening its page, and a last row that opens home
  * on every result, as Enter does. Its results are home's: on home the search
  * rides in the address as `?q=`, and anywhere else Enter opens home on it.
- * Over a pale backdrop the box has nothing to stand on, so focus brings up
- * dark glass under it.
+ * Focus dims the page behind the box while the box is on the screen, so
+ * scrolling it away brings the page back and scrolling back dims it again.
  */
 export const SiteSearch = ({ className }: SiteSearchProps) => {
   const id = useId()
@@ -328,6 +332,7 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
   const asked = suggestionQueryOf(search.query)
   const { found, isPending } = useScopeSuggestions({ scope, asked })
   const [isFocused, setFocused] = useState(false)
+  const { ref: onScreenRef, isOnScreen } = useOnScreen(ON_SCREEN_MARGIN)
   // The text the list was dismissed on: Escape, Enter or a pick hide it until the text changes.
   const [dismissed, setDismissed] = useState<{ text: string } | null>(null)
   // Adjusting state during render is React's way to derive this from the previous render.
@@ -392,7 +397,8 @@ export const SiteSearch = ({ className }: SiteSearchProps) => {
 
   return (
     <search
-      className={classNames([styles.search, className])}
+      ref={onScreenRef}
+      className={classNames([styles.search, isOnScreen && styles.onScreen, className])}
       onFocus={() => setFocused(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false)

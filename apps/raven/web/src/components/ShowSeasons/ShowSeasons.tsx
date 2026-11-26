@@ -20,14 +20,13 @@ import { COMMON_COPY } from '@/lib/copy'
 import { POSTER_SIZES, posterSources } from '@/lib/posters'
 import { useSelectable } from '@/lib/useSelectable'
 import { SEASON_VIEWS, type SeasonView, useSeasonView } from '@/stores/seasonView'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 
 const SEASON_POSTER_KEYS = { picture: 'picture', number: 'number' } as const
 
 type SeasonPictureProps = { poster: NonNullable<ReturnType<typeof posterSources>> }
 
-const SeasonPicture = ({ poster }: SeasonPictureProps) => (
-  <img {...poster} alt="" loading="lazy" decoding="async" />
-)
+const SeasonPicture = ({ poster }: SeasonPictureProps) => <ViewportImage {...poster} alt="" />
 
 type SeasonNumberProps = { number: ReactNode }
 

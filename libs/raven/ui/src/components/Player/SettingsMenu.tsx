@@ -96,7 +96,7 @@ type GroupProps = {
   subtitleStatus: SubtitleStatus
   /** The ways the server offers; its `pictures` says whether a picture subtitle can be picked. */
   choices: PlayChoices | null
-  /** How the account's subtitles look, on every video. */
+  /** How this device's subtitles look, on every video. */
   captionStyle: CaptionStyle
   onPickCaption: (change: Partial<CaptionStyle>) => void
 }
@@ -158,7 +158,7 @@ type SubtitleGroupProps = GroupProps
 
 type CaptionLookProps = Pick<GroupProps, 'labelledBy' | 'captionStyle' | 'onPickCaption'>
 
-/** The account's subtitle size and colour: one look for every video, saved as it is picked. */
+/** This device's subtitle size and colour: one look for every video, kept as it is picked. */
 const CaptionLook = ({ labelledBy, captionStyle, onPickCaption }: CaptionLookProps) => (
   <>
     <ChoiceRow

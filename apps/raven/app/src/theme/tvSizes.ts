@@ -43,6 +43,7 @@ export const TV_SIZES = {
   fieldHeight: tvSize(SIZES.fieldHeight * TV_TYPE_BOOST),
   controlLarge: tvSize(SIZES.controlLarge * TV_TYPE_BOOST),
   cover: tvSize(SIZES.cover),
+  tabRule: tvSize(SIZES.tabRule),
   focusRing: tvSize(SIZES.focusRing),
   tvFocusRing: tvSize(SIZES.tvFocusRing),
 } as const satisfies Sizes

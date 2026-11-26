@@ -82,7 +82,7 @@ export type PlayerChromeProps = {
   isOpening: boolean
   /** The subtitle cues showing now, as WebVTT text, drawn over the video whether or not the controls are. */
   caption: string | null
-  /** How the account's subtitles look: the size and colour raven draws the cues in, where it draws them. */
+  /** How this device's subtitles look: the size and colour raven draws the cues in, where it draws them. */
   captionStyle: CaptionStyle
   /** The picture subtitle cues showing now (Blu-ray PGS), laid over the video where the disc puts them. */
   pictures: readonly PictureCue[]

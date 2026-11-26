@@ -128,6 +128,7 @@ export const {
   SettingsLine,
   SettingsFact,
   SettingsChoice,
+  SettingsTabs,
 } = byInput({ [INPUT_KINDS.focus]: focusSettings, [INPUT_KINDS.touch]: touchSettings })
 
 /**

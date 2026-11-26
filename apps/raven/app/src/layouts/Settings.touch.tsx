@@ -1,5 +1,6 @@
+import type { TabEntry } from '@raven/ui/headless'
 import { type ComponentRef, useRef } from 'react'
-import { Pressable, StyleSheet, Switch, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { HomeScrollView } from '@/layouts/ScrollHome.touch'
@@ -13,8 +14,10 @@ import type {
   SettingsKit,
   SettingsFactProps,
   SettingsPageProps,
+  SettingsTabsProps,
   SettingsToggleProps,
 } from '@/layouts/settingsKit'
+import { tabA11yOf } from '@/layouts/settingsKit'
 import { OPACITIES, SIZES } from '@/theme/appTheme'
 import { CODE_FONT } from '@/theme/fonts'
 import { themedStyles, useTheme } from '@/theme/useTheme'
@@ -122,6 +125,59 @@ const SettingsChoice = <K extends string>(props: SettingsChoiceProps<K>) => {
   )
 }
 
+type TouchTabProps<T extends string> = {
+  tab: TabEntry<T>
+  isChosen: boolean
+  onChoose: (value: T) => void
+}
+
+/** A tab's label over its rule, in the text colour over the played line while chosen. */
+const TouchTab = <T extends string>({ tab, isChosen, onChoose }: TouchTabProps<T>) => {
+  const styles = useStyles()
+  return (
+    <Pressable
+      {...tabA11yOf({ tab, isChosen })}
+      onPress={() => onChoose(tab.value)}
+      style={({ pressed }) => [styles.tab, isChosen && styles.tabChosen, pressed && styles.pressed]}
+    >
+      <Text
+        variant={TEXT_VARIANTS.display}
+        style={[styles.tabLabel, isChosen && styles.tabLabelChosen]}
+      >
+        {tab.label}
+      </Text>
+      {tab.count !== undefined && <Text style={styles.tabCount}>{tab.count}</Text>}
+    </Pressable>
+  )
+}
+
+/**
+ * The web's tabs: their labels in a row ruled off underneath, the chosen one in the text colour
+ * over the played line, the rest muted. A row wider than the screen scrolls sideways.
+ */
+const SettingsTabs = <T extends string>({
+  label,
+  tabs,
+  chosen,
+  onChoose,
+}: SettingsTabsProps<T>) => {
+  const styles = useStyles()
+  return (
+    <ScrollView
+      horizontal
+      accessibilityLabel={label}
+      accessibilityRole="tablist"
+      contentContainerStyle={styles.tabs}
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabRule}
+    >
+      {tabs.map((tab) => (
+        <TouchTab key={tab.value} isChosen={tab.value === chosen} onChoose={onChoose} tab={tab} />
+      ))}
+    </ScrollView>
+  )
+}
+
 /** Settings on a phone or tablet: one page under the thumb, the system's switches and sheets. */
 export const touchSettings: SettingsKit = {
   SettingsPage,
@@ -131,6 +187,7 @@ export const touchSettings: SettingsKit = {
   SettingsLine,
   SettingsFact,
   SettingsChoice,
+  SettingsTabs,
 }
 
 const useStyles = themedStyles((colours) =>
@@ -164,6 +221,26 @@ const useStyles = themedStyles((colours) =>
       borderRadius: SIZES.radius,
       backgroundColor: colours.quiet,
     },
+    tabRule: {
+      flexGrow: 0,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: colours.line,
+    },
+    tabs: { gap: SIZES.space1 },
+    tab: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: SIZES.space1,
+      minHeight: SIZES.fieldHeight,
+      paddingHorizontal: SIZES.space2,
+      paddingVertical: SIZES.space1,
+      borderBottomWidth: SIZES.tabRule,
+      borderColor: 'transparent',
+    },
+    tabChosen: { borderColor: colours.played },
+    tabLabel: { color: colours.muted, fontSize: SIZES.textLg },
+    tabLabelChosen: { color: colours.text },
+    tabCount: { color: colours.muted, fontSize: SIZES.textXs },
     pressed: { opacity: OPACITIES.pressed },
     off: { opacity: OPACITIES.disabled },
   }),

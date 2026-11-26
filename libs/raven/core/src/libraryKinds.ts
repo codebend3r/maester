@@ -75,6 +75,12 @@ type WithoutProps<T> = { all: readonly T[]; left: readonly T[] }
 const without = <T>({ all, left }: WithoutProps<T>): T[] =>
   all.filter((item) => !left.includes(item))
 
+/** Fields only a show has, which only a TV library sorts on: the day it first aired. */
+const SHOW_FIELDS: readonly SortFieldName[] = [SORT_FIELD_NAMES.firstAired]
+
+/** Every field a library of files can sort on, a download's among them. */
+export const FILE_SORT_FIELDS = without({ all: isSortFieldName.values, left: SHOW_FIELDS })
+
 /** A library of movies opens on its posters. */
 const MOVIE_RULES = {
   media: MEDIA_TYPES.video,
@@ -82,7 +88,7 @@ const MOVIE_RULES = {
   listing: LIBRARY_LISTINGS.media,
   matcher: { by: MATCH_SOURCES.tmdb, type: ITEM_TYPES.movie },
   prefer: TIER_SET_NAMES.any,
-  fields: isSortFieldName.values,
+  fields: FILE_SORT_FIELDS,
   views: isLibraryView.values,
   groupings: isMediaGroupBy.values,
   view: LIBRARY_VIEWS.grid,
@@ -114,7 +120,7 @@ const UNMATCHED_RULES = {
   listing: LIBRARY_LISTINGS.media,
   matcher: null,
   prefer: TIER_SET_NAMES.any,
-  fields: without({ all: isSortFieldName.values, left: MATCHED_FIELDS }),
+  fields: without({ all: FILE_SORT_FIELDS, left: MATCHED_FIELDS }),
   views: isLibraryView.values,
   groupings: without({ all: isMediaGroupBy.values, left: [MEDIA_GROUPINGS.match] }),
   view: LIBRARY_VIEWS.grid,
@@ -129,7 +135,7 @@ const AUDIO_RULES = {
   matcher: null,
   prefer: TIER_SET_NAMES.any,
   fields: without({
-    all: isSortFieldName.values,
+    all: FILE_SORT_FIELDS,
     left: [...MATCHED_FIELDS, SORT_FIELD_NAMES.resolution],
   }),
   views: isLibraryView.values,

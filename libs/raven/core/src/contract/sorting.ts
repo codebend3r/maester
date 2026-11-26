@@ -15,6 +15,7 @@ export const SORT_FIELD_NAMES = {
   bitrate: 'bitrate',
   resolution: 'resolution',
   release: 'release',
+  firstAired: 'firstAired',
   rating: 'rating',
   random: 'random',
 } as const
@@ -39,6 +40,8 @@ export const MEDIA_SORTS = {
   resolutionHigh: 'resolution-high',
   yearOld: 'year-old',
   yearNew: 'year-new',
+  firstAiredOld: 'first-aired-old',
+  firstAiredNew: 'first-aired-new',
   ratingLow: 'rating-low',
   ratingHigh: 'rating-high',
   random: 'random',
@@ -101,6 +104,12 @@ export const SORT_FIELDS = {
     type: SORT_FIELD_TYPES.directed,
     ascending: MEDIA_SORTS.yearOld,
     descending: MEDIA_SORTS.yearNew,
+    start: SORT_DIRECTIONS.descending,
+  },
+  firstAired: {
+    type: SORT_FIELD_TYPES.directed,
+    ascending: MEDIA_SORTS.firstAiredOld,
+    descending: MEDIA_SORTS.firstAiredNew,
     start: SORT_DIRECTIONS.descending,
   },
   rating: {

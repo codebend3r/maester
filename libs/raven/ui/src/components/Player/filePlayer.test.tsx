@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
+import { describe, expect, it, mock } from 'bun:test'
 import {
-  DEFAULT_CAPTION_STYLE,
   PLAYER_SOURCE_KINDS,
   SUBTITLE_SOURCES,
   type SubtitleCue,
@@ -12,7 +11,6 @@ import { ENGINE_KINDS, type FileSubtitles } from '@/components/Player/engine'
 import { Player } from '@/components/Player/Player'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
 import { useHostPlayer } from '@/stores/playerServices'
-import { api } from '@/test/api'
 import { renderWithProviders } from '@/test/render'
 import { NO_TITLE_EXTRAS, NO_HOST_EXTRAS } from '@/components/Player/PlayerServices'
 
@@ -79,12 +77,6 @@ const playTo = (time: number) => {
 }
 
 describe('Player of a local file', () => {
-  const captions = spyOn(api, 'getCaptionStyle').mockImplementation(
-    async () => DEFAULT_CAPTION_STYLE,
-  )
-
-  afterEach(() => captions.mockClear())
-
   it('plays the file at its address, with no track to pick when its host kept none', async () => {
     renderWithProviders({ ui: <FilePlayer /> })
     await waitFor(() => expect(document.querySelector('video')).toHaveAttribute('src', URL))

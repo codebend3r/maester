@@ -1,143 +1,135 @@
-import {
-  CAPTION_COLOURS,
-  CAPTION_SIZES,
-  MAX_HEIGHTS,
-  type MaxHeight,
-  isMaxHeight,
-} from '@raven/core'
-import { CAPTION_COLOUR_NAMES, CAPTION_SIZE_NAMES, useCaptionStyle } from '@raven/ui/headless'
+import { myRequestCountOf } from '@raven/core'
+import { KeyedView, type TabEntry, type ViewOf, type ViewsOf } from '@raven/ui/headless'
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
+import { type ComponentType, type ReactNode, useState } from 'react'
 
-import { useAccountSession } from '@/account/session'
 import { useOwnerId } from '@/account/useOwnerId'
-import {
-  SettingsButton,
-  SettingsChoice,
-  SettingsPage,
-  SettingsSection,
-  SettingsToggle,
-} from '@/layouts'
+import { SettingsPage, SettingsTabs } from '@/layouts'
 import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { AdminSettings } from '@/screens/AdminSettings'
+import {
+  AccountPanel,
+  AdvancedPanel,
+  PlaybackPanel,
+  RequestsPanel,
+  SubtitlesPanel,
+  ThisAppPanel,
+} from '@/screens/SettingsPanels'
 import { ServerSettings } from '@/screens/ServerSettings'
-import { useAppPrefs } from '@/stores/appPrefs'
 import { SETTINGS_COPY } from '@/screens/copy'
-import { THEME_PICKER } from '@/theme/themeOptions'
 
-/** What the away cap is called, as the web's server settings name the same heights. */
-const AWAY_LABELS = {
-  [MAX_HEIGHTS.uhd]: SETTINGS_COPY.heights.uhd,
-  [MAX_HEIGHTS.fullHd]: SETTINGS_COPY.heights.fullHd,
-  [MAX_HEIGHTS.hd]: SETTINGS_COPY.heights.hd,
-} as const satisfies Record<MaxHeight, string>
+/** Settings' tabs, each a group of related settings, the owner's Admin last. */
+const SETTINGS_TABS = {
+  playback: 'playback',
+  subtitles: 'subtitles',
+  servers: 'servers',
+  account: 'account',
+  thisApp: 'thisApp',
+  advanced: 'advanced',
+  requests: 'requests',
+  admin: 'admin',
+} as const
 
-/** A height as the picker keys it, which takes only strings. */
-const awayKeyOf = (height: MaxHeight) => `${height}` as const
+type SettingsTabKey = (typeof SETTINGS_TABS)[keyof typeof SETTINGS_TABS]
 
-const AWAY_OPTIONS = Object.values(MAX_HEIGHTS).map((height) => ({
-  key: awayKeyOf(height),
-  label: AWAY_LABELS[height],
-}))
+/** A tab and the settings it opens on. */
+type PanelTab = { tab: TabEntry<SettingsTabKey>; panel: ReactNode }
 
-const SIZE_OPTIONS = Object.values(CAPTION_SIZES).map((size) => ({
-  key: size,
-  label: CAPTION_SIZE_NAMES[size],
-}))
+/** The tabs every device has, server or none, in their order. */
+const DEVICE_PANELS = [
+  [SETTINGS_TABS.playback, SETTINGS_COPY.tabs.playback, PlaybackPanel],
+  [SETTINGS_TABS.subtitles, SETTINGS_COPY.tabs.subtitles, SubtitlesPanel],
+  [SETTINGS_TABS.servers, SETTINGS_COPY.tabs.servers, ServerSettings],
+  [SETTINGS_TABS.account, SETTINGS_COPY.tabs.account, AccountPanel],
+  [SETTINGS_TABS.thisApp, SETTINGS_COPY.tabs.thisApp, ThisAppPanel],
+  [SETTINGS_TABS.advanced, SETTINGS_COPY.tabs.advanced, AdvancedPanel],
+] as const satisfies readonly (readonly [SettingsTabKey, string, ComponentType])[]
 
-const COLOUR_OPTIONS = Object.values(CAPTION_COLOURS).map((colour) => ({
-  key: colour,
-  label: CAPTION_COLOUR_NAMES[colour],
-}))
+type DevicePanel = (typeof DEVICE_PANELS)[number]
 
-type OwnerSettingsProps = { session: AppQueries }
+const panelTabOf = ([value, label, Panel]: DevicePanel): PanelTab => ({
+  tab: { value, label },
+  panel: <Panel />,
+})
 
-/**
- * The owner's settings, shown only once `GET /api/me` says the signed-in account is the
- * approved owner; anyone else sees nothing more. The server stays the authority on each call.
- */
-const OwnerSettings = ({ session }: OwnerSettingsProps) => {
-  const ownerId = useOwnerId(session)
-  return ownerId !== null && <AdminSettings ownerId={ownerId} session={session} />
+/** Playback, which Settings opens on and falls back to. */
+const FIRST_TAB = panelTabOf(DEVICE_PANELS[0])
+
+const DEVICE_TABS: readonly PanelTab[] = DEVICE_PANELS.map(panelTabOf)
+
+type SettingsViewProps = {
+  /** The tabs only a server gives, after the device's own. */
+  serverTabs: readonly PanelTab[]
 }
 
-/**
- * `/settings`: the signed-in account, its servers, its theme and how it plays, kept on the device, how its
- * subtitles look, kept on the server for every device it signs in on, and for the owner the
- * server's own settings, as the web's Admin page has them. Signing out sends the viewer back
- * to sign-in.
- */
-export const Settings = () => {
+/** The page: the title, the tabs, and the chosen tab's settings, which last while the page is open. */
+const SettingsView = ({ serverTabs }: SettingsViewProps) => {
   const router = useRouter()
-  const email = useAccountSession((state) => state.session?.email ?? null)
-  const signOut = useAccountSession((state) => state.signOut)
-  const theme = useAppPrefs((state) => state.theme)
-  const shouldPreferDirectPlay = useAppPrefs((state) => state.shouldPreferDirectPlay)
-  const isTranscodeAllowed = useAppPrefs((state) => state.isTranscodeAllowed)
-  const awayMaxHeight = useAppPrefs((state) => state.awayMaxHeight)
-  const change = useAppPrefs((state) => state.change)
-  const session = useAppQueries()
-  const captions = useCaptionStyle(session?.api ?? null)
-
+  const [asked, setAsked] = useState<SettingsTabKey>(SETTINGS_TABS.playback)
+  const shown = [...DEVICE_TABS, ...serverTabs]
+  // A tab that has gone (Admin, once the account is no longer the owner's) gives way to the first.
+  const chosen = shown.find(({ tab }) => tab.value === asked) ?? FIRST_TAB
   return (
     <SettingsPage onBack={() => router.back()} title={SETTINGS_COPY.title}>
-      <SettingsSection
-        note={email === null ? null : SETTINGS_COPY.signedInAs(email)}
-        title={SETTINGS_COPY.account}
-      >
-        <SettingsButton
-          isDisabled={false}
-          isOpener
-          onPress={signOut}
-          text={SETTINGS_COPY.signOut}
-        />
-      </SettingsSection>
-      <ServerSettings />
-      <SettingsSection note={SETTINGS_COPY.themeNote} title={THEME_PICKER.label}>
-        <SettingsChoice
-          label={THEME_PICKER.label}
-          onChoose={(picked) => change({ theme: picked })}
-          options={THEME_PICKER.options}
-          value={theme}
-        />
-      </SettingsSection>
-      <SettingsSection note={SETTINGS_COPY.awayNote} title={SETTINGS_COPY.playback}>
-        <SettingsToggle
-          hint={SETTINGS_COPY.preferDirectHint}
-          isOn={shouldPreferDirectPlay}
-          label={SETTINGS_COPY.preferDirect}
-          onToggle={(isOn) => change({ shouldPreferDirectPlay: isOn })}
-        />
-        <SettingsToggle
-          hint={SETTINGS_COPY.allowTranscodeHint}
-          isOn={isTranscodeAllowed}
-          label={SETTINGS_COPY.allowTranscode}
-          onToggle={(isOn) => change({ isTranscodeAllowed: isOn })}
-        />
-        <SettingsChoice
-          label={SETTINGS_COPY.away}
-          onChoose={(key) => {
-            const height = Number(key)
-            if (isMaxHeight(height)) change({ awayMaxHeight: height })
-          }}
-          options={AWAY_OPTIONS}
-          value={awayKeyOf(awayMaxHeight)}
-        />
-      </SettingsSection>
-      <SettingsSection note={SETTINGS_COPY.subtitlesNote} title={SETTINGS_COPY.subtitles}>
-        <SettingsChoice
-          label={SETTINGS_COPY.subtitleSize}
-          onChoose={(size) => captions.change({ size })}
-          options={SIZE_OPTIONS}
-          value={captions.style.size}
-        />
-        <SettingsChoice
-          label={SETTINGS_COPY.subtitleColour}
-          onChoose={(colour) => captions.change({ colour })}
-          options={COLOUR_OPTIONS}
-          value={captions.style.colour}
-        />
-      </SettingsSection>
-      {session !== null && <OwnerSettings session={session} />}
+      <SettingsTabs
+        chosen={chosen.tab.value}
+        label={SETTINGS_COPY.tabs.label}
+        onChoose={setAsked}
+        tabs={shown.map(({ tab }) => tab)}
+      />
+      {chosen.panel}
     </SettingsPage>
   )
 }
+
+type ServerSettingsViewProps = { session: AppQueries }
+
+/** With a server: the caller's Requests, with how many they made once read, and Admin for the approved owner alone. */
+const ServerSettingsView = ({ session }: ServerSettingsViewProps) => {
+  const ownerId = useOwnerId(session)
+  const { data: requests } = useQuery(session.queries.requestsQuery)
+  const requestsTab: PanelTab = {
+    tab: {
+      value: SETTINGS_TABS.requests,
+      label: SETTINGS_COPY.tabs.requests,
+      count: myRequestCountOf(requests),
+    },
+    panel: <RequestsPanel session={session} />,
+  }
+  const adminTabs: PanelTab[] =
+    ownerId === null
+      ? []
+      : [
+          {
+            tab: { value: SETTINGS_TABS.admin, label: SETTINGS_COPY.tabs.admin },
+            panel: <AdminSettings ownerId={ownerId} session={session} />,
+          },
+        ]
+  return <SettingsView serverTabs={[requestsTab, ...adminTabs]} />
+}
+
+const DeviceSettingsView = () => <SettingsView serverTabs={[]} />
+
+/** Whether Settings has a server to read, which gives it the server's tabs. */
+const SETTINGS_SOURCES = { device: 'device', server: 'server' } as const
+
+type SettingsSourceProps = {
+  [SETTINGS_SOURCES.device]: Record<string, never>
+  [SETTINGS_SOURCES.server]: ServerSettingsViewProps
+}
+
+const SETTINGS_VIEWS = {
+  [SETTINGS_SOURCES.device]: DeviceSettingsView,
+  [SETTINGS_SOURCES.server]: ServerSettingsView,
+} as const satisfies ViewsOf<SettingsSourceProps>
+
+const settingsViewOf = (session: AppQueries | null): ViewOf<SettingsSourceProps> =>
+  session === null
+    ? { key: SETTINGS_SOURCES.device, props: {} }
+    : { key: SETTINGS_SOURCES.server, props: { session } }
+
+/** `/settings`: the web's Settings, in its tabs. */
+export const Settings = () => (
+  <KeyedView<SettingsSourceProps> views={SETTINGS_VIEWS} view={settingsViewOf(useAppQueries())} />
+)

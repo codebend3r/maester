@@ -45,7 +45,7 @@ const keyedRuns = (text: string): KeyedRun[] =>
 
 type CaptionTextProps = {
   caption: string
-  /** The account's subtitle size and colour, the same for every video on every device. */
+  /** This device's subtitle size and colour, the same for every video it plays. */
   look: CaptionStyle
   /** The size a medium caption stands at on this screen; a TV's is sized to it. */
   baseSize?: number

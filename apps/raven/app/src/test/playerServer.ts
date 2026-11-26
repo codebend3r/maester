@@ -1,5 +1,4 @@
 import {
-  DEFAULT_CAPTION_STYLE,
   HTTP_METHODS,
   APP_CLIENT_CALLS,
   type ApiClient,
@@ -173,7 +172,6 @@ const FILES = [
 ] as const
 
 const {
-  getCaptionStyle,
   getItem,
   getMedia,
   getMediaTicket,
@@ -220,7 +218,6 @@ const READS: Record<string, unknown> = {
   [pathWithId({ path: getMarkers.path, id: GOOD_NEWS_MP4.id })]: GOOD_NEWS_MARKERS,
   [pathWithId({ path: nextInSession.path, id: HALF_LOOP_MP4.id })]: null,
   [getMediaOrigins.path]: { origins: [] },
-  [getCaptionStyle.path]: DEFAULT_CAPTION_STYLE,
   [listLibraries.path]: [WATCHED_AT_90, SERIES],
   [busboysPath(subtitles.path).replace(TRACK_PARAM, SUBTITLE_ID)]: VTT,
 }

@@ -176,6 +176,8 @@ export {
   STAGE_COPY,
 } from '@/components/Player/copy'
 export { MENU_TITLES } from '@/components/Player/menus'
+export { REQUESTS_COPY, type RangeHintProps, playbackPrefsCopy } from '@/settings/copy'
+export type { TabEntry } from '@/settings/tabEntry'
 export {
   UnplayableTrackError,
   failureOf,

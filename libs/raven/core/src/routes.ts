@@ -2,7 +2,6 @@ import {
   AUTH_PATHS,
   BUG_REPORT_PATHS,
   LIVE_STREAM_PATHS,
-  CAPTION_PATHS,
   DEVICE_DOWNLOAD_PATHS,
   DISCOVERY_PATHS,
   HLS_PATHS,
@@ -34,7 +33,6 @@ import {
   isBingeState,
   isBugReport,
   isBugReportList,
-  isCaptionStyle,
   isDeviceDownload,
   isDirectoryListing,
   isDisplaySettings,
@@ -276,8 +274,6 @@ export const ROUTES = {
   getBinge: { method: get, path: '/api/binge', reply: isBingeState },
   dismissBingeTip: { method: put, path: '/api/binge/tip', reply: isBingeState },
   setBinge: { method: put, path: '/api/binge/:id', reply: isBingeState },
-  getCaptionStyle: { method: get, path: CAPTION_PATHS.style, reply: isCaptionStyle },
-  setCaptionStyle: { method: put, path: CAPTION_PATHS.style, reply: isCaptionStyle },
 
   getAlbum: { method: get, path: '/api/albums/:id', reply: isAlbumDetails },
   searchAlbumMatches: {
