@@ -36,6 +36,7 @@ export {
   SETTINGS_COPY,
   SIGN_IN_COPY,
   STORAGE_COPY,
+  TOP_SHELF_COPY,
 } from '@/copy/screens'
 export { NAME_SAVES, type ServerNameSave, serverNameSaveOf } from '@/serverName'
 export { themePickerLabelOf, themeSlotLabelOf } from '@/themePickerLabel'

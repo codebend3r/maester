@@ -1,0 +1,5 @@
+{
+  "extends": ["../../../tooling/oxlint/react.json"],
+  "env": { "browser": false },
+  "ignorePatterns": ["ios", "android", "dist"]
+}

@@ -43,6 +43,7 @@
     "@raven/audio": "workspace:*",
     "@raven/core": "workspace:*",
     "@raven/native": "workspace:*",
+    "@raven/top-shelf": "workspace:*",
     "@raven/ui": "workspace:*",
     "@raven/wren": "workspace:*",
     "@raven/wren-native": "workspace:*",

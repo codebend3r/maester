@@ -9,14 +9,16 @@ import packageJson from '#package'
  * the app come in by their relative path and extension.
  */
 import { FONT_FILES } from './src/theme/tvFonts.ts'
+import { WREN_TV_SCHEME } from './src/config/linkScheme.ts'
 import { BUILD_EXTRA } from './src/about/buildExtra.ts'
 import { latestVersionTag } from '../../../tooling/web/versionTag.ts'
 /*
  * raven's TV plugins and the phone's cleartext plugin, by path: the remote's test target named
- * for Wren, and the Android TV manifest without the phone's music service.
+ * for Wren, the Top Shelf extension, and the Android TV manifest without the phone's music service.
  */
 import { withCleartextTraffic } from '../wren-app/plugins/withCleartextTraffic.ts'
 import { withTvRemoteTests } from '../../raven/app/plugins/withTvRemoteTests.ts'
+import { withTvTopShelf } from '../../raven/app/plugins/withTvTopShelf.ts'
 import { withoutTvAudioService } from '../../raven/app/plugins/withoutTvAudioService.ts'
 
 /** Wren on TV's own id, so it installs beside raven's TV app and beside the phone's Wren. */
@@ -50,6 +52,11 @@ export const WREN_TV_IMAGES = {
     topShelfWide: `${APPLE_TV_IMAGES}/top-shelf-wide.png`,
     topShelfWide2x: `${APPLE_TV_IMAGES}/top-shelf-wide-2x.png`,
   },
+  // The signed out Top Shelf's invitation, which `withTvTopShelf` copies into the extension.
+  signIn: {
+    picture: `${APPLE_TV_IMAGES}/top-shelf-sign-in.png`,
+    picture2x: `${APPLE_TV_IMAGES}/top-shelf-sign-in-2x.png`,
+  },
 } as const
 
 const buildNumber = buildNumberOf({ runNumber: process.env[BUILD_ENV.runNumber] })
@@ -68,7 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     // What the TV's launcher writes under the icon, and the name of the Xcode project.
     name: 'Wren',
     slug: 'wren-tv',
-    scheme: 'wren-tv',
+    scheme: WREN_TV_SCHEME,
     version: packageJson.version,
     // The build Settings shows, `0.9.0.15`, where the store version stays package.json's.
     extra: { ...config.extra, [BUILD_EXTRA.releaseVersion]: latestVersionTag() },
@@ -122,7 +129,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ['expo-font', { fonts: FONT_FILES }],
     ],
   }
-  // The remote-driven test joins the Apple TV's project; Android TV drops the phone's music service.
-  const withTv = withoutTvAudioService(withTvRemoteTests(app, REMOTE_TESTS))
+  /*
+   * The remote-driven test and the Top Shelf extension join the Apple TV's project; Android TV
+   * drops the phone's music service.
+   */
+  const withTv = withoutTvAudioService(
+    withTvTopShelf(withTvRemoteTests(app, REMOTE_TESTS), { signIn: WREN_TV_IMAGES.signIn }),
+  )
   return isDevelopment ? withCleartextTraffic(withTv) : withTv
 }

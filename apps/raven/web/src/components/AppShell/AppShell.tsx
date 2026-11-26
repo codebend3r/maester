@@ -351,8 +351,8 @@ export const AppShell = () => {
           )}
         </div>
         <div className={styles.dock}>
-          {hasServers && <ServerSwitcher servers={servers} isIconsOnly={isIconsOnly} />}
           <ManageGroup isIconsOnly={isIconsOnly}>
+            {hasServers && <ServerSwitcher servers={servers} isIconsOnly={isIconsOnly} />}
             {!isOffline && (
               <>
                 <NavItems

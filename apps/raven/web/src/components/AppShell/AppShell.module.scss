@@ -135,8 +135,9 @@
 }
 
 /*
- * Under a rule where the libraries end: the Manage button, Libraries to
- * Settings, then raven's version and the toggle under a fainter rule.
+ * Under a rule where the libraries end: the Manage button, the server in use
+ * and Libraries to Settings, then raven's version and the toggle under a
+ * fainter rule.
  */
 .dock {
   grid-area: dock;
@@ -201,6 +202,17 @@
 
   &[hidden] {
     display: none;
+  }
+
+  /*
+   * Its icons wear the theme's accent, a step off their words, until the row is pointed at or
+   * current. Downloads' icon sits in its count's wrapper.
+   */
+  .navLink:not(:hover, [aria-current='page']) {
+    > svg,
+    > .counted > svg {
+      color: var(--color-lichen-accent);
+    }
   }
 }
 

@@ -27,6 +27,7 @@ import { WREN_ROUTES, WREN_SCREENS } from '@raven/wren-native/headless'
 import { configureWrenPrefs } from '@/stores/wrenPrefs'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { ToastHost } from '@/ui/Toast'
+import { TopShelfSync } from '@/topShelf/TopShelfSync'
 
 // The splash stays up until the stores are read, so the first screen drawn is the right one.
 preventAutoHideAsync().catch(IGNORED)
@@ -66,6 +67,7 @@ export function WrenTvRoot() {
   const isLoaded = useStoresLoaded({ load: loadStores })
   const session = useWren()
   const isSignedIn = useWrenAccount((state) => state.session !== null)
+  const isOpen = session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)
 
   useTokenRenewal()
   useMediaKeys()
@@ -87,6 +89,8 @@ export function WrenTvRoot() {
         <View style={styles.root}>
           <StatusBar barStyle={BAR_STYLES[scheme]} />
           {session !== null && <VideoAudioHost key={session.server.id} session={session} />}
+          {/* The Apple TV's Top Shelf: the latest releases while the tabs are open, else the invitation to sign in. */}
+          <TopShelfSync session={isOpen ? session : null} />
           <Stack
             screenOptions={{
               headerShown: false,
@@ -94,10 +98,7 @@ export function WrenTvRoot() {
               contentStyle: { backgroundColor: colors.bg },
             }}
           >
-            <Stack.Protected
-              guard={session !== null && (isSignedIn || IS_SIGN_IN_BYPASSED)}
-              redirectTo={WREN_ROUTES.signIn}
-            >
+            <Stack.Protected guard={isOpen} redirectTo={WREN_ROUTES.signIn}>
               <Stack.Screen name={WREN_SCREENS.tabs} />
               <Stack.Screen name={WREN_SCREENS.album} />
               <Stack.Screen name={WREN_SCREENS.artist} />

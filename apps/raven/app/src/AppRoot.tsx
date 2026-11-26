@@ -40,6 +40,7 @@ import { followReduceMotion } from '@/stores/reduceMotion'
 import { returnScreen } from '@/stores/screenFocus'
 import type { AppTheme } from '@/theme/appTheme'
 import { followTheme, useTheme } from '@/theme/useTheme'
+import { TopShelfSync } from '@/topShelf/TopShelfSync'
 
 /** One cache for the app's life, emptied whenever the active server or the signed-in account changes. */
 const queryClient = createQueryClient()
@@ -143,6 +144,8 @@ const AppRoutes = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
+      {/* The Apple TV's Top Shelf: Continue watching while the routes are open, else the invitation to sign in. */}
+      <TopShelfSync session={hasNav ? session : null} />
       {/* One key for both, so a server switch remounts them together and no two siblings share it. */}
       {session !== null && (
         <Fragment key={session.server.id}>

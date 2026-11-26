@@ -151,7 +151,12 @@ export function Sidebar() {
       <View style={styles.brand}>{isOpen && <WrenLockup />}</View>
       <View style={styles.places}>
         {PLACES.map((place) => (
-          <PlaceRow {...row} isHere={here?.route === place.route} key={place.route} place={place} />
+          <PlaceRow
+            {...row}
+            isHere={(here?.route ?? null) === place.route}
+            key={place.route}
+            place={place}
+          />
         ))}
       </View>
       {session !== null && track !== null && (

@@ -29,6 +29,11 @@
   &:focus-visible {
     outline: var(--focus-ring);
   }
+
+  // The globe wears the Manage group's accent, as the rows under it do, until pointed at or open.
+  &:not(:hover, [aria-expanded='true']) > svg {
+    color: var(--color-lichen-accent);
+  }
 }
 
 // Down to the globe, which keeps the place a row's icon has.

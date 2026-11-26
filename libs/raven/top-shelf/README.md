@@ -1,0 +1,10 @@
+# @raven/top-shelf
+
+The Apple TV's Top Shelf for raven (`@raven/app`) and Wren on TV (`@wren/tv`): what the home screen shows above the app's tile while it is in the top row.
+
+- **`src/contract.ts`** is the shelf an app writes (`TopShelf`): the invitation to sign in (`signedOut`), a full screen carousel (`carousel`, raven's Continue watching) or a row of square tiles (`sectioned`, Wren's latest releases), each item a picture on the server with the headers it needs and the deep links Play and select open. `deepLinkOf` builds a link from an expo-router path and its params. It loads no native module, so bun's tests read it as `@raven/top-shelf/contract`.
+- **`src/index.ts`** is `useTopShelf(shelf)`, which writes the shelf whenever its titles change, through the `RavenTopShelf` Expo module. The module is Apple's alone (`expo-module.config.json`); on Android `requireOptionalNativeModule` finds none and the hook does nothing, and on an iPhone or iPad the module drops the shelf.
+- **`ios/`** is the module's pod: `RavenTopShelfModule.swift` downloads each picture into the App Group's container (the group's id is the Info.plist's `RavenTopShelfGroup`), writes `shelf.json` beside them without the headers, sweeps the pictures no longer shown and asks tvOS to load the shelf again. `RavenTopShelfStore.swift` is what the module and the extension share.
+- **`extension/RavenTopShelfProvider.swift`** is the TV Services extension's provider. raven's `apps/raven/app/plugins/withTvTopShelf.ts` copies it and the store into the app's `RavenTopShelfExtension` target at a TV prebuild, with the invitation's pictures, the Info.plist and the entitlements.
+
+The extension shows nothing of its own (the static Top Shelf image stays up) before the app has written a shelf, and while a carousel or a row holds no items.
