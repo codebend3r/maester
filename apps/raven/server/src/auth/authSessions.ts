@@ -54,6 +54,8 @@ type AuthSessionsFreshestForProps = { accountId: string }
 
 type AuthSessionsReleaseProps = { accountId: string }
 
+type AuthSessionsMakeRoomProps = { now: number }
+
 type AuthSessionsBindSessionProps = {
   request: object
   session: Session
@@ -69,7 +71,7 @@ type AuthSessionsSessionOfProps = { request: object }
 @Injectable()
 export class AuthSessions {
   private readonly callers = new WeakMap<object, Caller>()
-  private freshest = new Map<string, Freshest>()
+  private readonly freshest = new Map<string, Freshest>()
 
   constructor(
     @Inject(AUTH_VERIFY) private readonly verify: ReturnType<typeof createTokenVerifier>,
@@ -91,19 +93,30 @@ export class AuthSessions {
    * Keeps `token` as an approved account's freshest when it outlives the
    * one held, so an open response stays open for as long as its account
    * keeps calling with live tokens. Only approved accounts are held, so
-   * sign-ups waiting for approval cannot crowd them out. Expired entries go
-   * whenever one is added.
+   * sign-ups waiting for approval cannot crowd them out. It runs on every
+   * signed-in request, so it touches one entry, and only a new account
+   * arriving at a full map pays for a pass over it (`makeRoom`).
    */
   remember({ account, token, expiresAt }: Session): void {
     const now = Date.now()
     if (account.status !== MEMBER_STATUSES.approved || expiresAt <= now) return
     const held = this.freshest.get(account.id)
     if (held !== undefined && held.expiresAt >= expiresAt) return
-    const others = [...this.freshest]
-      .filter(([id, entry]) => id !== account.id && entry.expiresAt > now)
-      .toSorted(([, a], [, b]) => b.expiresAt - a.expiresAt)
-      .slice(0, REMEMBERED_ACCOUNTS - 1)
-    this.freshest = new Map([...others, [account.id, { token, expiresAt }]])
+    if (held === undefined && this.freshest.size >= REMEMBERED_ACCOUNTS) this.makeRoom({ now })
+    this.freshest.set(account.id, { token, expiresAt })
+  }
+
+  /** Drops the expired entries, then, if the map is still full, the one soonest to expire. */
+  private makeRoom({ now }: AuthSessionsMakeRoomProps): void {
+    const entries = [...this.freshest]
+    entries
+      .filter(([, entry]) => entry.expiresAt <= now)
+      .forEach(([id]) => this.freshest.delete(id))
+    if (this.freshest.size < REMEMBERED_ACCOUNTS) return
+    const [soonestId] = entries.reduce((soonest, entry) =>
+      entry[1].expiresAt < soonest[1].expiresAt ? entry : soonest,
+    )
+    this.freshest.delete(soonestId)
   }
 
   /** The unexpired token with the latest expiry seen for the account, or null when none is live. */
@@ -114,7 +127,7 @@ export class AuthSessions {
 
   /** Lets go of the token held for the account, once it is known to be no longer approved. */
   release({ accountId }: AuthSessionsReleaseProps): void {
-    this.freshest = new Map([...this.freshest].filter(([id]) => id !== accountId))
+    this.freshest.delete(accountId)
   }
 
   bindSession({ request, session, isBearer }: AuthSessionsBindSessionProps): void {
