@@ -36,6 +36,8 @@ export function ShortcutCard({
         </span>
         <span className={styles.text}>
           <span className={styles.title}>{title}</span>
+          {/* The space keeps the visible text inside the spoken name, "Shuffle all, 3 songs". */}
+          {value !== undefined && ' '}
           {value !== undefined && <span className={styles.value}>{value}</span>}
         </span>
       </Pressable>

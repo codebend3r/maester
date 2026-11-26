@@ -7,6 +7,8 @@
     "#package": "./package.json"
   },
   "scripts": {
+    "axe": "playwright test --config playwright.axe.config.ts",
+    "axe:ci": "playwright test --config playwright.axe.config.ts --reporter=github,html",
     "build": "vite build",
     "dead-code": "knip --no-progress --directory ../../.. --workspace apps/raven/web",
     "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
@@ -91,7 +93,9 @@
       "dead-css",
       "lint:py",
       "one-command-per-script",
-      "spellcheck"
+      "spellcheck",
+      "axe",
+      "axe:ci"
     ],
     "targets": {
       "build": {
@@ -126,6 +130,7 @@
       },
       "lighthouse": {
         "cache": true,
+        "parallelism": false,
         "dependsOn": [
           "build",
           "^build",
@@ -196,6 +201,42 @@
         "inputs": [
           "{projectRoot}/**/*",
           "{workspaceRoot}/typos.toml"
+        ]
+      },
+      "axe": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
+        ]
+      },
+      "axe:ci": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
         ]
       }
     }

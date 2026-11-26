@@ -28,11 +28,17 @@ export function AlbumTile({ title, subtitle, detail, cover, label, ...press }: A
       <span className={styles.text}>
         <span className={styles.title} title={title}>
           {title}
-        </span>
+        </span>{' '}
+        {/* The spaces keep the visible text inside the spoken name, "OK Computer, Radiohead". */}
         <span className={styles.subtitle} title={subtitle}>
           {subtitle}
         </span>
-        {detail !== undefined && <span className={styles.detail}>{detail}</span>}
+        {detail !== undefined && (
+          <>
+            {' '}
+            <span className={styles.detail}>{detail}</span>
+          </>
+        )}
       </span>
     </Pressable>
   )

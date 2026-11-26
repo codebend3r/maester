@@ -20,7 +20,7 @@ export const ART = {
   ochre: '#d9a43f',
   dusk: '#3a3e57',
   blush: '#e0b8a0',
-  slate: '#4d6c8c',
+  slate: '#4a6988',
   cream: '#efe7d8',
   pine: '#2e4a44',
   sand: '#e8dcc4',

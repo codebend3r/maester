@@ -60,12 +60,13 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "verify",
                 "Every check at once: spelling, one command per script, dead "
-                "code and CSS, lint, format, typecheck, unit and screen tests, and every build.",
+                "code and CSS, lint, format, typecheck, unit and screen tests, every build, "
+                "Lighthouse and axe-core.",
             ),
             Command("verify:uncached", "verify, ignoring Nx's cache, after a toolchain change."),
             Command(
                 "verify:push",
-                "What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.",
+                "What the pre-push hook runs: verify without dead code, dead CSS, Lighthouse and axe-core, in one Nx run.",
             ),
             Command(
                 "affected",
@@ -443,6 +444,11 @@ GROUPS: tuple[Group, ...] = (
                 "Chrome + ffmpeg",
             ),
             Command(
+                "lighthouse",
+                "Lighthouse on both web apps, one after the other, against their floors.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
                 "raven:web:lighthouse",
                 "The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.",
                 "Chrome + ffmpeg",
@@ -450,6 +456,16 @@ GROUPS: tuple[Group, ...] = (
             Command(
                 "wren:web:lighthouse",
                 "The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
+                "axe",
+                "axe-core over both web apps' pages, locally: fails on any WCAG 2.2 A or AA violation.",
+                "Chrome + ffmpeg",
+            ),
+            Command(
+                "axe:ci",
+                "The ♿ axe-core job: the same scan with GitHub annotations and an HTML report.",
                 "Chrome + ffmpeg",
             ),
             Command(

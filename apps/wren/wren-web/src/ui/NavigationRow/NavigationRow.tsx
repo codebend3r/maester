@@ -48,6 +48,8 @@ export function RowBody({ label, icon, variant, value, hasChevron }: RowBodyProp
     <>
       {icon !== undefined && <Lead icon={icon} />}
       <span className={classNames([styles.label, styles[variant]])}>{label}</span>
+      {/* The space keeps the visible text, "Albums 1", inside the spoken name, "Albums, 1". */}
+      {value !== undefined && ' '}
       <span className={styles.end}>
         {value !== undefined && <span className={styles.value}>{value}</span>}
         {hasChevron && (
