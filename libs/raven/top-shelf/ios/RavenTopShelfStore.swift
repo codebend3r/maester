@@ -7,9 +7,14 @@ import Foundation
  * the app or reach the server, reads them back.
  */
 
-/// The three shelves, the JS contract's `TOP_SHELF_KINDS`.
+/// The two shelves, the JS contract's `TOP_SHELF_KINDS`: the key a shelf is told apart by.
 enum RavenTopShelfKind: String, Codable {
   case signedOut
+  case titles
+}
+
+/// How a shelf of titles is laid out, the JS contract's `TOP_SHELF_LAYOUTS`.
+enum RavenTopShelfLayout: String, Codable {
   case carousel
   case sectioned
 }
@@ -24,13 +29,47 @@ struct RavenTopShelfStoredItem: Codable {
   let openUrl: String
 }
 
-/// The shelf as the extension reads it.
-struct RavenTopShelfStored: Codable {
-  let kind: RavenTopShelfKind
-  let title: String
-  let openUrl: String?
-  let items: [RavenTopShelfStoredItem]
+/// A shelf as the JS contract's `TopShelf` writes it, keyed on `kind`, over the item the side reading it holds.
+enum RavenTopShelf<Item: Codable>: Codable {
+  case signedOut(title: String, openUrl: String)
+  case titles(layout: RavenTopShelfLayout, title: String, items: [Item])
+
+  private enum CodingKeys: String, CodingKey {
+    case kind, title, openUrl, layout, items
+  }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    let title = try values.decode(String.self, forKey: .title)
+    switch try values.decode(RavenTopShelfKind.self, forKey: .kind) {
+    case .signedOut:
+      self = .signedOut(title: title, openUrl: try values.decode(String.self, forKey: .openUrl))
+    case .titles:
+      self = .titles(
+        layout: try values.decode(RavenTopShelfLayout.self, forKey: .layout),
+        title: title,
+        items: try values.decode([Item].self, forKey: .items))
+    }
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var values = encoder.container(keyedBy: CodingKeys.self)
+    switch self {
+    case let .signedOut(title, openUrl):
+      try values.encode(RavenTopShelfKind.signedOut, forKey: .kind)
+      try values.encode(title, forKey: .title)
+      try values.encode(openUrl, forKey: .openUrl)
+    case let .titles(layout, title, items):
+      try values.encode(RavenTopShelfKind.titles, forKey: .kind)
+      try values.encode(layout, forKey: .layout)
+      try values.encode(title, forKey: .title)
+      try values.encode(items, forKey: .items)
+    }
+  }
 }
+
+/// The shelf as the extension reads it.
+typealias RavenTopShelfStored = RavenTopShelf<RavenTopShelfStoredItem>
 
 enum RavenTopShelfStore {
   /// The Info.plist key `withTvTopShelf` writes the App Group's id under, in the app and the extension alike.

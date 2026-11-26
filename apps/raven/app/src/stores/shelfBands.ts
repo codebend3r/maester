@@ -1,12 +1,9 @@
 import { create } from 'zustand'
 
-import { type ShelfViewport, farHeightOf } from '@/layouts/shelfScroll'
+import { type ShelfBand, type ShelfViewport, farHeightOf } from '@/layouts/shelfScroll'
 
 /** The keys of Home's bands that are no library shelf, and so carry no shelf key of their own. */
 export const HOME_BANDS = { hero: 'hero', binge: 'binge' } as const
-
-/** Where a shelf stands in its screen's scrolling content: its top and its height. */
-export type ShelfBand = { top: number; height: number }
 
 type ShelfBandsState = {
   screens: Readonly<Record<string, Readonly<Record<string, ShelfBand>>>>

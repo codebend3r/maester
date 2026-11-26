@@ -1,6 +1,6 @@
 import { type Track, artistNames } from '@raven/core'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { HOME_COPY } from '@raven/wren'
+import { HOME_COPY, WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { useCovers } from '@/music/useCovers'
 import { WREN_ROUTES } from '@/routes'
@@ -11,7 +11,6 @@ import { Button } from '@/ui/Button/Button'
 import { Card } from '@/ui/Card/Card'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Home/ContinueCard.module.scss'
 
 /**
@@ -26,7 +25,7 @@ function PlayCircle({ onResume }: ActionProps) {
     <IconButton
       color={COLORS.accentInk}
       fill={COLORS.accent}
-      icon={ICONS.play}
+      icon={WREN_ICONS.play}
       label={HOME_COPY.resume}
       onPress={onResume}
       size={SIZES.button}
@@ -36,7 +35,7 @@ function PlayCircle({ onResume }: ActionProps) {
 
 /** The wide layout's Resume. */
 function ResumeButton({ onResume }: ActionProps) {
-  return <Button icon={ICONS.play} label={HOME_COPY.resume} onPress={onResume} />
+  return <Button icon={WREN_ICONS.play} label={HOME_COPY.resume} onPress={onResume} />
 }
 
 const ACTIONS = {

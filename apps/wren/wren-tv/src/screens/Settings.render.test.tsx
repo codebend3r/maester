@@ -18,7 +18,7 @@ import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { wrenVersion } from '@/about/version'
 import { queryClient } from '@/queryClient'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import { LISTENER, MUSIC, musicApi } from '@/test/music'
+import { LISTENER, MUSIC, musicApi } from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
 

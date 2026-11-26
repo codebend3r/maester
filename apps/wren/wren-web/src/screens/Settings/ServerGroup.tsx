@@ -1,4 +1,4 @@
-import { SETTINGS_COPY, STATUS_COPY, NAME_SAVES, serverNameSaveOf } from '@raven/wren'
+import { SETTINGS_COPY, STATUS_COPY, NAME_SAVES, serverNameSaveOf, WREN_ICONS } from '@raven/wren'
 import { queryKeys } from '@raven/ui/headless'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
@@ -10,7 +10,6 @@ import { FactRow } from '@/ui/FactRow/FactRow'
 import { IconTile, TILE_TONES } from '@/ui/IconTile/IconTile'
 import { ServerStatusChip } from '@/ui/ServerStatusChip/ServerStatusChip'
 import { TextField } from '@/ui/TextField/TextField'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Settings/ServerGroup.module.scss'
 
 /**
@@ -61,7 +60,7 @@ export function ServerGroup() {
   return (
     <NotedGroup heading={SETTINGS_COPY.server} note={SETTINGS_COPY.serverNote}>
       <div className={styles.row}>
-        <IconTile icon={ICONS.server} tone={TILE_TONES.accent} />
+        <IconTile icon={WREN_ICONS.server} tone={TILE_TONES.accent} />
         <p className={styles.name}>{name}</p>
         <ServerStatusChip />
       </div>

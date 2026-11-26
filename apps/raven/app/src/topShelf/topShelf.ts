@@ -1,5 +1,10 @@
 import type { PosterEntry } from '@raven/core'
-import { TOP_SHELF_KINDS, type TopShelf, deepLinkOf } from '@raven/top-shelf/contract'
+import {
+  TOP_SHELF_KINDS,
+  TOP_SHELF_LAYOUTS,
+  type TopShelf,
+  deepLinkOf,
+} from '@raven/top-shelf/contract'
 
 import { APP_SCHEME } from '@/config/linkScheme'
 import type { Pictures, ShelfCard } from '@/queries/cards'
@@ -43,7 +48,8 @@ export const continueShelfOf = ({
   arts,
   ...pictures
 }: ContinueShelfOfProps): TopShelf => ({
-  kind: TOP_SHELF_KINDS.carousel,
+  kind: TOP_SHELF_KINDS.titles,
+  layout: TOP_SHELF_LAYOUTS.carousel,
   title: CONTINUE_WATCHING,
   items: entries.slice(0, HOME_CONTINUE_COUNT).flatMap((entry) => {
     const card = continueCard({ entry, arts, ...pictures })

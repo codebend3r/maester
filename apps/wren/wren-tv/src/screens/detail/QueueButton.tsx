@@ -1,10 +1,9 @@
 import type { Track } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { toastFailure, useToast } from '@raven/wren-native'
 
 import { FocusButton } from '@/ui/FocusButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 type QueueButtonProps = {
   tracksOf: () => Promise<readonly Track[]>
@@ -22,5 +21,5 @@ export function QueueButton({ tracksOf, queued }: QueueButtonProps) {
       toast(queued)
     }, toastFailure)
   }
-  return <FocusButton icon={ICONS.queueAdd} label={PLAYER_COPY.queue} onPress={queue} />
+  return <FocusButton icon={WREN_ICONS.queueAdd} label={PLAYER_COPY.queue} onPress={queue} />
 }

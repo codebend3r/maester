@@ -8,7 +8,7 @@ import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 
 import { queryClient } from '@/queryClient'
-import { AIRBAG, LISTENER, PARANOID, musicApi, trackFor } from '@/test/music'
+import { AIRBAG, LISTENER, PARANOID, musicApi, trackFor } from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
 

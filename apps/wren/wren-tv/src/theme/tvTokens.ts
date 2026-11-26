@@ -1,7 +1,7 @@
+import { tvScaleOf } from '@raven/native/headless'
 import { Dimensions } from 'react-native'
 
 import { FONTS } from '@/theme/tvFonts'
-import { tvScaleOf } from '@/theme/tvScale'
 
 /*
  * Wren on TV's sizes, drawn for a 1920 point screen read from across the room and scaled to the

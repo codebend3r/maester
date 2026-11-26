@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   type ColorScheme,
   COLOR_SCHEMES,
@@ -20,7 +21,6 @@ import { SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useSystemScheme } from '@/theme/wrenTheme'
 import { CHOICE_LOOKS, ChoiceButton } from '@/ui/ChoiceButton'
 import { ChoiceRow } from '@/ui/ChoiceRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 const MODES = [THEME_MODES.system, THEME_MODES.single] as const
 
@@ -72,7 +72,7 @@ export function AppearanceGroup() {
       )}
       <ChoiceButton
         chosen={worn}
-        icon={ICONS.grid}
+        icon={WREN_ICONS.grid}
         look={CHOICE_LOOKS.row}
         onChoose={(theme) => change(withThemePicked({ choice, scheme: slot, theme }))}
         options={THEME_NAMES.map((theme) => ({

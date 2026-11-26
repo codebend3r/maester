@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { factsLineOf, PLAYER_COPY, TRANSPORTS } from '@raven/wren'
+import { factsLineOf, PLAYER_COPY, TRANSPORTS, WREN_ICONS } from '@raven/wren'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber'
 import { Transport } from '@/player/Transport'
 import { useNowPlaying, type WrenSession, useWren } from '@raven/wren-native'
@@ -16,7 +16,6 @@ import { AlbumArt } from '@/ui/AlbumArt'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { QualityChips } from '@/ui/QualityChips'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   bar: {
@@ -74,9 +73,9 @@ function PlayingBar({ session, track }: PlayingBarProps) {
         <Scrubber kind={SCRUBBERS.bar} length={length} />
       </View>
       <View style={[styles.side, styles.end]}>
-        <IconButton icon={ICONS.lyrics} label={PLAYER_COPY.lyrics} onPress={openNowPlaying} />
-        <IconButton icon={ICONS.upNext} label={PLAYER_COPY.upNext} onPress={openNowPlaying} />
-        <IconButton icon={ICONS.output} label={PLAYER_COPY.output} onPress={openNowPlaying} />
+        <IconButton icon={WREN_ICONS.lyrics} label={PLAYER_COPY.lyrics} onPress={openNowPlaying} />
+        <IconButton icon={WREN_ICONS.upNext} label={PLAYER_COPY.upNext} onPress={openNowPlaying} />
+        <IconButton icon={WREN_ICONS.output} label={PLAYER_COPY.output} onPress={openNowPlaying} />
       </View>
     </View>
   )

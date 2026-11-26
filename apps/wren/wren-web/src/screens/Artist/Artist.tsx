@@ -1,6 +1,6 @@
 import { type AlbumSummary, type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { useAudioQueue, useIsOwner, useServerArtistFavourite } from '@raven/ui/headless'
-import { ARTIST_COPY, PLAYER_COPY, artistMetaOf } from '@raven/wren'
+import { ARTIST_COPY, PLAYER_COPY, artistMetaOf, WREN_ICONS } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
@@ -21,7 +21,6 @@ import { Page } from '@/shell/Page/Page'
 import { useAuthSession } from '@/stores/authSession'
 import { toastFailure } from '@/stores/toast'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Artist/Artist.module.scss'
 
 type ActionsSlotProps = { children: ReactNode }
@@ -85,7 +84,7 @@ function ArtistPage({ details }: ArtistPageProps) {
       />
       {isOwner && (
         <DetailAction
-          icon={ICONS.image}
+          icon={WREN_ICONS.image}
           label={ARTIST_COPY.editBackground}
           onPress={() => setIsBackgroundOpen(true)}
           shape={ACTION_SHAPES.circle}

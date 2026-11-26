@@ -1,8 +1,9 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import { type ComponentProps, useId } from 'react'
 import { SIZES } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS, type IconAction, type WrenIconName } from '@/ui/WrenIcon/icons'
+import { type IconAction } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/TextField/TextField.module.scss'
 
@@ -55,7 +56,7 @@ export function TextField({
       </div>
       {hasError && (
         <p aria-live="polite" className={styles.error} id={errorId}>
-          <WrenIcon name={ICONS.alert} size={SIZES.smallIcon} />
+          <WrenIcon name={WREN_ICONS.alert} size={SIZES.smallIcon} />
           <span>{error}</span>
         </p>
       )}

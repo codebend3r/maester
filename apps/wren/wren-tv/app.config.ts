@@ -64,8 +64,8 @@ const isDevelopment = isDevelopmentVariant({ variant: process.env[BUILD_ENV.appV
 // The team a device build is signed under; with none written, Xcode asks on every prebuild.
 const appleTeamId = process.env[BUILD_ENV.appleTeamId]?.trim() ?? ''
 
-/** The Siri Remote's UI test target `tvos-e2e/` compiles into, and its bundle. */
-const REMOTE_TESTS = { target: 'WrenRemoteTests', bundleId: `${WREN_TV_ID}.remote-tests` } as const
+/** The Siri Remote's UI test target `tvos-e2e/` compiles into; its bundle is the app's id with `.remote-tests`. */
+const REMOTE_TESTS = { target: 'WrenRemoteTests' } as const
 
 const LOCAL_NETWORK_USE = 'Wren reaches your raven server on your local network.'
 

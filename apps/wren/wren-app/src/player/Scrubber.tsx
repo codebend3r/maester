@@ -1,15 +1,12 @@
 import { formatDuration, remainingTimeOf } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, scrubTextOf } from '@raven/wren'
+import { PLAYER_COPY, SCRUB_STEP_SECONDS, scrubTextOf } from '@raven/wren'
 import type { ComponentType, ReactElement } from 'react'
 import { Text, View } from 'react-native'
 
 import { Adjuster } from '@/player/Adjuster'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
-
-// How far a screen reader's swipe moves the scrubber, in seconds.
-const SCRUB_STEP = 15
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   stacked: { gap: SPACE.s1 / 2 },
@@ -97,7 +94,7 @@ export function Scrubber({ length, kind }: ScrubberProps) {
           label={PLAYER_COPY.position}
           max={length}
           onChange={seekTo}
-          step={SCRUB_STEP}
+          step={SCRUB_STEP_SECONDS}
           value={position}
           valueText={(at) => scrubTextOf({ position: at, length })}
         />

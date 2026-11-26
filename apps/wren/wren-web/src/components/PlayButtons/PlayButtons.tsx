@@ -1,6 +1,5 @@
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button/Button'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type PlayButtonsProps = {
   onPlay: () => void
@@ -14,13 +13,13 @@ export function PlayButtons({ onPlay, onShuffle, isStretched = true }: PlayButto
   return (
     <>
       <Button
-        icon={ICONS.play}
+        icon={WREN_ICONS.play}
         isStretched={isStretched}
         label={PLAYER_COPY.play}
         onPress={onPlay}
       />
       <Button
-        icon={ICONS.shuffle}
+        icon={WREN_ICONS.shuffle}
         isStretched={isStretched}
         label={PLAYER_COPY.shuffle}
         onPress={onShuffle}

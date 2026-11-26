@@ -1,5 +1,5 @@
+import { type WrenIconName } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/components/DetailAction/DetailAction.module.scss'
 

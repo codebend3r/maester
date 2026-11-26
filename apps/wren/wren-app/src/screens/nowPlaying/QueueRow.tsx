@@ -1,4 +1,4 @@
-import { NOW_PLAYING_COPY, type UpNextRow } from '@raven/wren'
+import { NOW_PLAYING_COPY, type UpNextRow, WREN_ICONS } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 import { GestureDetector, useCompetingGestures, usePanGesture } from 'react-native-gesture-handler'
 import Animated, {
@@ -15,7 +15,7 @@ import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { MOTION, PLAYER_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /*
  * How long a finger rests on a row before it lifts to be dragged, in milliseconds, and how far
@@ -158,7 +158,7 @@ export function QueueRow({
   return (
     <View style={[styles.holder, { height }]}>
       <View style={styles.underlay}>
-        <WrenIcon color={colors.accentText} name={ICONS.trash} />
+        <WrenIcon color={colors.accentText} name={WREN_ICONS.trash} />
       </View>
       <GestureDetector gesture={gestures}>
         <Animated.View style={[styles.row, styles[upNextPlace], { height }, moved]}>
@@ -182,7 +182,7 @@ export function QueueRow({
               </Text>
             </View>
           </Pressable>
-          <WrenIcon color={colors.text3} name={ICONS.dragHandle} />
+          <WrenIcon color={colors.text3} name={WREN_ICONS.dragHandle} />
         </Animated.View>
       </GestureDetector>
     </View>

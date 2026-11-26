@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { formatBytes } from '@raven/core'
 import {
   countsLineOf,
@@ -31,7 +32,6 @@ import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
 import { PageHeader } from '@/ui/PageHeader'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** How many of the newest albums Library's grid shows: three rows on a phone, two on a tablet. */
 const RECENT_SHOWN = {
@@ -114,7 +114,7 @@ function LibraryPage({ session }: LibraryPageProps) {
         actions={
           <IconButton
             color={colors.text}
-            icon={ICONS.search}
+            icon={WREN_ICONS.search}
             label={LIBRARY_PAGE_COPY.search}
             onPress={() => router.navigate(WREN_ROUTES.search)}
           />

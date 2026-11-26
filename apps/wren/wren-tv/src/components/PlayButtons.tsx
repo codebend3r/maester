@@ -1,10 +1,9 @@
 import type { QueueSource, Track } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { toastFailure } from '@raven/wren-native'
 
 import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 type PlayButtonsProps = {
   /** The songs they play, read as a press needs them: an artist's are fetched then. */
@@ -31,14 +30,14 @@ export function PlayButtons({ tracksOf, source, hasPreferredFocus }: PlayButtons
     <>
       <FocusButton
         hasPreferredFocus={hasPreferredFocus}
-        icon={ICONS.play}
+        icon={WREN_ICONS.play}
         label={PLAYER_COPY.play}
         onPress={play}
         text={PLAYER_COPY.play}
         tone={BUTTON_TONES.primary}
       />
       <FocusButton
-        icon={ICONS.shuffle}
+        icon={WREN_ICONS.shuffle}
         label={PLAYER_COPY.shuffle}
         onPress={shuffle}
         text={PLAYER_COPY.shuffle}

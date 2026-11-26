@@ -40,7 +40,7 @@ import {
   OK_COMPUTER_PAGE,
   RADIOHEAD,
   musicApi,
-} from '@/test/music'
+} from '@raven/wren-native/testing'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 

@@ -1,9 +1,10 @@
+import { type WrenIconName } from '@raven/wren'
 import { Text } from 'react-native'
 
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { Focusable, type FocusableProps } from '@/ui/Focusable'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** How loud a button is: the screen's one main action, or a plain one. */
 export const BUTTON_TONES = { primary: 'primary', secondary: 'secondary' } as const

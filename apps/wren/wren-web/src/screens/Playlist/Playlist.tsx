@@ -4,7 +4,7 @@ import {
   QUEUE_SOURCE_KINDS,
   playlistTracksOf,
 } from '@raven/core'
-import { PLAYLIST_COPY, SONG_LEADS, playlistMetaOf } from '@raven/wren'
+import { PLAYLIST_COPY, SONG_LEADS, playlistMetaOf, WREN_ICONS } from '@raven/wren'
 import { TracksMenu } from '@/components/TrackMenu/TrackMenu'
 import { queries } from '@/lib/queries'
 import { useCovers } from '@/music/useCovers'
@@ -16,7 +16,6 @@ import { DetailTracks } from '@/screens/detail/DetailTracks'
 import { QueueAction } from '@/screens/detail/QueueAction'
 import { useTracklist } from '@/screens/detail/useTracklist'
 import { EmptyState } from '@/ui/EmptyState/EmptyState'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type PlaylistPageProps = { details: PlaylistDetails }
 
@@ -64,7 +63,7 @@ function PlaylistPage({ details }: PlaylistPageProps) {
         {!hasTracks && (
           <EmptyState
             body={PLAYLIST_COPY.empty(playlist.name)}
-            icon={ICONS.playlist}
+            icon={WREN_ICONS.playlist}
             title={PLAYLIST_COPY.emptyTitle}
           />
         )}

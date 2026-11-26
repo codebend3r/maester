@@ -92,15 +92,21 @@ export default {
       entry: ['src/index.ts', 'src/fixtureServer.ts'],
     },
     'libs/raven/wren-native': {
-      // The phone's and the TV's React Native entry, and the routes bun's tests load.
-      entry: ['src/index.ts', 'src/headless.ts'],
+      // The phone's and the TV's React Native entry, the routes bun's tests load, and their screen tests' fixtures.
+      entry: ['src/index.ts', 'src/headless.ts', 'src/testing.ts'],
     },
     'libs/raven/native': {
       /*
-       * The package's four entries, the apps' test fixtures among them. Its exports name them in
+       * The package's five entries, the apps' test fixtures among them. Its exports name them in
        * dist, and knip's default finds only src/index.ts.
        */
-      entry: ['src/index.ts', 'src/headless.ts', 'src/polyfills.ts', 'src/testing.ts'],
+      entry: [
+        'src/index.ts',
+        'src/headless.ts',
+        'src/polyfills.ts',
+        'src/testing.ts',
+        'src/testingVideo.ts',
+      ],
     },
     'libs/raven/wren': {
       /*

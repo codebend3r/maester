@@ -3,7 +3,7 @@ import { unlockNow } from '@raven/native/headless'
 import { type ComponentType, useMemo } from 'react'
 
 import { trackPlanFor } from '@/downloads/downloadVisibility'
-import { VideoAudioHost } from '@/music/VideoAudioHost'
+import { TvMusicHost } from '@/music/TvMusicHost'
 import { DEVICE_INPUT } from '@/platform/devicePlatform'
 import { INPUT_KINDS, type InputKind } from '@/platform/platform'
 import { mediaSourcesFor } from '@/player/mediaSources'
@@ -43,7 +43,7 @@ type MusicHostProps = { session: MusicSession }
 
 /** The player each kind of device plays music through: the video player on a TV, `@raven/audio` under the thumb. */
 const MUSIC_HOSTS = {
-  [INPUT_KINDS.focus]: VideoAudioHost,
+  [INPUT_KINDS.focus]: TvMusicHost,
   [INPUT_KINDS.touch]: NativeAudioHost,
 } as const satisfies Record<InputKind, ComponentType<MusicHostProps>>
 

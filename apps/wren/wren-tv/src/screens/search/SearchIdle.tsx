@@ -1,8 +1,8 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import {
   ART,
   LIBRARY_SEGMENTS,
   type LibrarySegment,
-  isRecentPage,
   type RecentSearch,
   SEARCH_COPY,
   recentKeyOf,
@@ -10,8 +10,8 @@ import {
 } from '@raven/wren'
 import { router } from 'expo-router'
 import { ScrollView, Text, View } from 'react-native'
-import { useRecentSearches } from '@raven/wren-native'
-import { libraryHref, recentPageHref } from '@raven/wren-native/headless'
+import { useOpenRecent, useRecentSearches } from '@raven/wren-native'
+import { libraryHref } from '@raven/wren-native/headless'
 
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
@@ -20,7 +20,7 @@ import { FocusButton } from '@/ui/FocusButton'
 import { SectionHeader } from '@/ui/Headers'
 import { ListRow } from '@/ui/ListRow'
 import { usePageStyles } from '@/ui/pageStyles'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
   scroller: { flex: 1 },
@@ -52,21 +52,21 @@ const BROWSE_TILES = [
   {
     segment: LIBRARY_SEGMENTS.albums,
     label: SEARCH_COPY.albums,
-    icon: ICONS.album,
+    icon: WREN_ICONS.album,
     ground: ART.ink,
     ink: ART.ochre,
   },
   {
     segment: LIBRARY_SEGMENTS.artists,
     label: SEARCH_COPY.artists,
-    icon: ICONS.artist,
+    icon: WREN_ICONS.artist,
     ground: ART.dusk,
     ink: ART.blush,
   },
   {
     segment: LIBRARY_SEGMENTS.songs,
     label: SEARCH_COPY.songs,
-    icon: ICONS.song,
+    icon: WREN_ICONS.song,
     ground: ART.slate,
     ink: ART.cream,
   },
@@ -104,24 +104,17 @@ type RecentRowProps = { recent: RecentSearch; onSearch: (text: string) => void }
 /** A recent search: a press searches again or opens its page, and its Remove forgets it. */
 function RecentRow({ recent, onSearch }: RecentRowProps) {
   const styles = useStyles()
-  const remember = useRecentSearches((state) => state.remember)
   const forget = useRecentSearches((state) => state.forget)
   const { name, line } = recentTextOf(recent)
-  const open = () => {
-    remember(recent)
-    if (isRecentPage(recent)) {
-      router.push(recentPageHref(recent))
-      return
-    }
-    onSearch(recent.text)
-  }
+  const openRecent = useOpenRecent({ onSearch })
+  const open = () => openRecent(recent)
   return (
     <View style={styles.recent}>
       <View style={styles.recentRow}>
-        <ListRow icon={ICONS.recent} line={line} onPress={open} title={name} />
+        <ListRow icon={WREN_ICONS.recent} line={line} onPress={open} title={name} />
       </View>
       <FocusButton
-        icon={ICONS.close}
+        icon={WREN_ICONS.close}
         label={SEARCH_COPY.removeRecent(name)}
         onPress={() => forget(recentKeyOf(recent))}
       />

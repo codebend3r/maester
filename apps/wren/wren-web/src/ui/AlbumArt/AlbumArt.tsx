@@ -1,8 +1,8 @@
+import { WREN_ICONS } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import type { Cover } from '@/music/useCovers'
 import type { Radius, Size, TokenStyle } from '@/theme/tokens'
 import { Picture } from '@/ui/Picture/Picture'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/AlbumArt/AlbumArt.module.scss'
 
@@ -24,7 +24,7 @@ export function AlbumArt({ cover, size, radius, isRaised = false }: AlbumArtProp
   const style: TokenStyle = { '--art-size': size, '--art-radius': radius }
   return (
     <span className={classNames([styles.art, isRaised && styles.raised])} style={style}>
-      <WrenIcon name={ICONS.song} />
+      <WrenIcon name={WREN_ICONS.song} />
       <Picture picture={cover} />
     </span>
   )

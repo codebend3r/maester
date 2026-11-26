@@ -1,13 +1,19 @@
 import { type BottomTabBarProps, Tabs } from 'expo-router/js-tabs'
 import { View } from 'react-native'
 
-import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
+import {
+  HOME_COPY,
+  LIBRARY_PAGE_COPY,
+  SEARCH_COPY,
+  SETTINGS_COPY,
+  WREN_ICONS,
+  type WrenIconName,
+} from '@raven/wren'
 import { BAR_PLACES, NowPlayingBar } from '@/components/NowPlayingBar'
 import { FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { WREN_TABS } from '@raven/wren-native/headless'
 import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { TabBar } from '@/ui/TabBar'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 type WrenTab = (typeof WREN_TABS)[keyof typeof WREN_TABS]
 
@@ -18,10 +24,10 @@ type TabLook = { title: string; icon: WrenIconName }
 
 /** Each tab's name and drawing on the bar, in the bar's order. */
 const TABS = {
-  [WREN_TABS.home]: { title: HOME_COPY.title, icon: ICONS.home },
-  [WREN_TABS.library]: { title: LIBRARY_PAGE_COPY.title, icon: ICONS.library },
-  [WREN_TABS.search]: { title: SEARCH_COPY.title, icon: ICONS.search },
-  [WREN_TABS.settings]: { title: SETTINGS_COPY.title, icon: ICONS.settings },
+  [WREN_TABS.home]: { title: HOME_COPY.title, icon: WREN_ICONS.home },
+  [WREN_TABS.library]: { title: LIBRARY_PAGE_COPY.title, icon: WREN_ICONS.library },
+  [WREN_TABS.search]: { title: SEARCH_COPY.title, icon: WREN_ICONS.search },
+  [WREN_TABS.settings]: { title: SETTINGS_COPY.title, icon: WREN_ICONS.settings },
 } as const satisfies Record<WrenTab, TabLook>
 
 const isWrenTab = (name: string): name is WrenTab => Object.hasOwn(TABS, name)

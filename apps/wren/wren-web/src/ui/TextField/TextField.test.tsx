@@ -1,9 +1,9 @@
+import { WREN_ICONS } from '@raven/wren'
 import { describe, expect, it, mock } from 'bun:test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { TextField } from '@/ui/TextField/TextField'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type HeldFieldProps = { error?: string | null }
 
@@ -13,7 +13,7 @@ function HeldField({ error = null }: HeldFieldProps) {
   return (
     <TextField
       error={error}
-      icon={ICONS.mail}
+      icon={WREN_ICONS.mail}
       label="Email"
       onChangeText={setValue}
       placeholder="you@example.com"
@@ -47,7 +47,7 @@ describe('TextField', () => {
     const onPress = mock()
     render(
       <TextField
-        action={{ icon: ICONS.eye, label: 'Show password', onPress }}
+        action={{ icon: WREN_ICONS.eye, label: 'Show password', onPress }}
         label="Password"
         onChangeText={() => undefined}
         type="password"

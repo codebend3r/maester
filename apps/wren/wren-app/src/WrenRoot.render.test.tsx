@@ -12,7 +12,7 @@ import { DOWNLOAD_STATUSES, downloadKeyOf, useDownloads } from '@/downloads/down
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
-import { AIRBAG, LISTENER, MIXTAPE, PARANOID, musicApi } from '@/test/music'
+import { AIRBAG, LISTENER, MIXTAPE, PARANOID, musicApi } from '@raven/wren-native/testing'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()

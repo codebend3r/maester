@@ -10,7 +10,7 @@ import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { PHONE_WINDOW } from '@/test/jestSetup'
-import { AIRBAG, LISTENER, PARANOID, musicApi } from '@/test/music'
+import { AIRBAG, LISTENER, PARANOID, musicApi } from '@raven/wren-native/testing'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()

@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   SETTINGS_COPY,
   THEME_SCHEMES,
@@ -12,7 +13,7 @@ import { FORM_FACTORS, RADIUS, SIZE, SPACE, THEME_SIZES, TYPE } from '@/theme/wr
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
 import { type GridColumns, TileGrid } from '@/ui/TileGrid'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const THEME_NAMES = Object.values(WREN_THEMES)
 
@@ -119,7 +120,7 @@ function ThemeTile({ theme, width, isPicked, onPress }: ThemeTileProps) {
         </View>
         {/* Drawn for every tile, so no tile changes size when it is picked; seen on the picked one alone. */}
         <View style={[styles.check, !isPicked && UNSEEN]}>
-          <WrenIcon color={colors.bg} name={ICONS.check} size={SIZE.check} />
+          <WrenIcon color={colors.bg} name={WREN_ICONS.check} size={SIZE.check} />
         </View>
       </View>
     </Pressable>

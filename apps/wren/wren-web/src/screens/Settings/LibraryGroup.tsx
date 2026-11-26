@@ -1,12 +1,11 @@
 import type { Library } from '@raven/core'
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { useMusicLibraries } from '@/music/musicLibraries'
 import { NotedGroup } from '@/screens/Settings/NotedGroup'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { SIZES } from '@/theme/tokens'
 import { type Choice, RadioChoices } from '@/ui/RadioChoices/RadioChoices'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Settings/LibraryGroup.module.scss'
 
 const CLASSES = { group: styles.rows, choice: styles.choice, label: styles.row } as const
@@ -16,7 +15,7 @@ const rowOf = ({ label }: Choice<number>) => (
   <>
     <span className={styles.name}>{label}</span>
     <span className={styles.check}>
-      <WrenIcon name={ICONS.check} size={SIZES.smallIcon} />
+      <WrenIcon name={WREN_ICONS.check} size={SIZES.smallIcon} />
     </span>
   </>
 )

@@ -1,9 +1,10 @@
+import { WREN_ICONS } from '@raven/wren'
 import { Image, StyleSheet, View } from 'react-native'
 
 import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS } from '@/theme/wrenTokens'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 // The fallback's note is drawn at this share of the square.
 const NOTE_SHARE = 0.4
@@ -41,7 +42,7 @@ export function AlbumArt({ cover, size, radius = RADIUS.sm, isRaised = false }: 
   return (
     <View style={isRaised && [styles.raised, { borderRadius: radius }]}>
       <View style={[styles.art, { width: size, height: size, borderRadius: radius }]}>
-        <WrenIcon color={colors.text3} name={ICONS.song} size={size * NOTE_SHARE} />
+        <WrenIcon color={colors.text3} name={WREN_ICONS.song} size={size * NOTE_SHARE} />
         {cover !== null && (
           <Image
             accessibilityIgnoresInvertColors

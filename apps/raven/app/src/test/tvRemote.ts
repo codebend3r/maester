@@ -1,6 +1,6 @@
 import { act } from '@testing-library/react-native'
 
-import { KEY_ACTIONS, type LONG_PRESSES, type RemoteKey } from '@/layouts/remoteKeys'
+import { KEY_ACTIONS, type LONG_PRESSES, type RemoteKey } from '@raven/native/headless'
 
 /** What Android TV's fork hands each listener for a key: its name and whether it went down or up. */
 type KeyEvent = { eventType: RemoteKey | keyof typeof LONG_PRESSES; eventKeyAction: number }

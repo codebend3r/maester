@@ -1,6 +1,6 @@
 import { Pressable, type StyleProp, Text, type TextStyle, View } from 'react-native'
 
-import { NOW_PLAYING_COPY, type SongActions } from '@raven/wren'
+import { NOW_PLAYING_COPY, type SongActions, WREN_ICONS } from '@raven/wren'
 import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
@@ -9,7 +9,6 @@ import { IconButton } from '@/ui/IconButton'
 import { LikeButton } from '@/ui/LikeButton'
 import { pressedStyleOf } from '@/ui/press'
 import { QualityChips } from '@/ui/QualityChips'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   // The song's lines, then its heart and Add to playlist beside its name.
@@ -114,7 +113,7 @@ export function SongTitle({ playing, like, onAddToPlaylist }: SongTitleProps) {
       <View style={styles.actions}>
         <LikeButton like={like} title={playing.track.title} />
         <IconButton
-          icon={ICONS.playlistAdd}
+          icon={WREN_ICONS.playlistAdd}
           label={NOW_PLAYING_COPY.addToPlaylist}
           onPress={onAddToPlaylist}
         />

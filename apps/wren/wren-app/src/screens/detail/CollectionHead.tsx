@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router'
 import type { ComponentType, ReactNode } from 'react'
 import { type StyleProp, Text, type TextStyle, View, type ViewStyle } from 'react-native'
 
-import { DETAIL_COPY } from '@raven/wren'
+import { DETAIL_COPY, WREN_ICONS } from '@raven/wren'
 import { DetailAction } from '@/components/DetailAction'
 import { Nothing } from '@/components/Nothing'
 import { PlayButtons } from '@/components/PlayButtons'
@@ -20,7 +20,7 @@ import {
 import { AlbumArt } from '@/ui/AlbumArt'
 import { BackLink } from '@/ui/BackLink'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** The cover on a phone's page, and in a tablet's left column. */
 const COVER_SIZES = {
@@ -88,7 +88,7 @@ function TabletMore({ onMore }: MoreActionProps) {
   const { colors } = useWrenTheme()
   return (
     <DetailAction
-      glyph={<WrenIcon color={colors.text2} name={ICONS.more} />}
+      glyph={<WrenIcon color={colors.text2} name={WREN_ICONS.more} />}
       label={DETAIL_COPY.more}
       onPress={onMore}
     />
@@ -109,7 +109,12 @@ function PhoneTop({ onMore }: HeadTopProps) {
   return (
     <View style={styles.nav}>
       <BackButton />
-      <IconButton color={colors.text} icon={ICONS.more} label={DETAIL_COPY.more} onPress={onMore} />
+      <IconButton
+        color={colors.text}
+        icon={WREN_ICONS.more}
+        label={DETAIL_COPY.more}
+        onPress={onMore}
+      />
     </View>
   )
 }

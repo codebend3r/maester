@@ -1,5 +1,5 @@
+import { type WrenIconName } from '@raven/wren'
 import { NAVIGATION_ROW_VARIANTS, RowBody, rowClassOf } from '@/ui/NavigationRow/NavigationRow'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 
 type FactRowProps = {
   label: string

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { AUTH_HEADERS } from '@raven/core'
-import { TOP_SHELF_KINDS } from '@raven/top-shelf/contract'
+import { TOP_SHELF_KINDS, TOP_SHELF_LAYOUTS } from '@raven/top-shelf/contract'
 
 import type { ShowArts } from '@/queries/showArt'
 import { HOME, NAS, homeApi } from '@/test/homeServer'
@@ -29,7 +29,8 @@ describe('the Top Shelf', () => {
       headersFor,
     })
     expect(shelf).toEqual({
-      kind: TOP_SHELF_KINDS.carousel,
+      kind: TOP_SHELF_KINDS.titles,
+      layout: TOP_SHELF_LAYOUTS.carousel,
       title: 'Continue watching',
       items: [
         {
@@ -49,6 +50,6 @@ describe('the Top Shelf', () => {
     if (entry === undefined) throw new Error('HOME has a video in progress')
     const entries = Array.from({ length: 9 }, () => entry)
     const shelf = continueShelfOf({ entries, arts: NO_ARTS, api: homeApi(), headersFor })
-    expect(shelf.kind === TOP_SHELF_KINDS.carousel && shelf.items.length).toBe(6)
+    expect(shelf.kind === TOP_SHELF_KINDS.titles && shelf.items.length).toBe(6)
   })
 })

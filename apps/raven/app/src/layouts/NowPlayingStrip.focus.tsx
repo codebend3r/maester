@@ -9,7 +9,7 @@ import {
   View,
   useTVEventHandler,
 } from 'react-native'
-import { BUTTON_TONES } from '@raven/native/headless'
+import { BUTTON_TONES, REMOTE_KEYS, pressedKeyOf } from '@raven/native/headless'
 
 import { useToneStyles } from '@/layouts/formStyles'
 import { type IsInFront, useReturnAsks } from '@/layouts/focus'
@@ -20,7 +20,6 @@ import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { Cover, useMusicStyles } from '@/layouts/MusicParts.focus'
 import { FocusQualityLine } from '@/layouts/QualityLine'
 import { Text } from '@/layouts/Text'
-import { REMOTE_KEYS, pressedKeyOf } from '@/layouts/remoteKeys'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useLastFocus } from '@/stores/lastFocus'
 import { useMusicStarts } from '@/stores/musicStarts'

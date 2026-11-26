@@ -1,8 +1,9 @@
+import { WREN_ICONS } from '@raven/wren'
 import type { ComponentProps } from 'react'
 
 import { DetailAction } from '@/components/DetailAction'
 import { useWrenTheme } from '@/theme/wrenTheme'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 type FavouriteActionProps = Pick<ComponentProps<typeof DetailAction>, 'label' | 'shape'> & {
   isOn: boolean
@@ -17,7 +18,7 @@ export function FavouriteAction({ label, shape, isOn, onToggle }: FavouriteActio
       glyph={
         <WrenIcon
           color={isOn ? colors.accentText : colors.text2}
-          name={isOn ? ICONS.heartFilled : ICONS.heart}
+          name={isOn ? WREN_ICONS.heartFilled : WREN_ICONS.heart}
         />
       }
       isOn={isOn}

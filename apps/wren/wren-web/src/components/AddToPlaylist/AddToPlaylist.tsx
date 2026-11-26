@@ -1,5 +1,5 @@
 import type { PlaylistSummary, Track } from '@raven/core'
-import { NEW_PLAYLIST_COPY, TRACK_MENU_COPY, countsLineOf } from '@raven/wren'
+import { NEW_PLAYLIST_COPY, TRACK_MENU_COPY, countsLineOf, WREN_ICONS } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { type PickedPlaylist, useAddToPlaylist } from '@/components/AddToPlaylist/useAddToPlaylist'
@@ -11,7 +11,6 @@ import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { EmptyState } from '@/ui/EmptyState/EmptyState'
 import { NewPlaylistForm } from '@/components/NewPlaylistForm/NewPlaylistForm'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/components/AddToPlaylist/AddToPlaylist.module.scss'
 
@@ -67,7 +66,7 @@ export function AddToPlaylist({ tracksOf, name, onDone }: AddToPlaylistProps) {
       {!isNaming && (
         <Pressable className={styles.create} onPress={() => setIsNaming(true)}>
           <span className={styles.createTile}>
-            <WrenIcon name={ICONS.plus} />
+            <WrenIcon name={WREN_ICONS.plus} />
           </span>
           <span className={styles.createLabel}>{NEW_PLAYLIST_COPY.title}</span>
         </Pressable>
@@ -80,7 +79,7 @@ export function AddToPlaylist({ tracksOf, name, onDone }: AddToPlaylistProps) {
       {isEmpty && (
         <EmptyState
           body={TRACK_MENU_COPY.noPlaylistsHint(name)}
-          icon={ICONS.playlist}
+          icon={WREN_ICONS.playlist}
           title={TRACK_MENU_COPY.noPlaylists}
         />
       )}

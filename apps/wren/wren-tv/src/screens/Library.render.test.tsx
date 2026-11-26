@@ -7,7 +7,7 @@ import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import { LISTENER, MUSIC, musicApi } from '@/test/music'
+import { LISTENER, MUSIC, musicApi } from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { TOP_SHELF_KINDS } from '@raven/top-shelf/contract'
+import { TOP_SHELF_KINDS, TOP_SHELF_LAYOUTS } from '@raven/top-shelf/contract'
 import { HOME_COPY, TOP_SHELF_COPY } from '@raven/wren'
 import { OK_COMPUTER } from '@raven/wren/testing'
 import type { CoverOf } from '@raven/wren-native'
@@ -27,7 +27,8 @@ describe("Wren's Top Shelf", () => {
 
   it('shows the latest releases as covers, each opening its album', () => {
     expect(releasesShelfOf({ albums: [WITH_COVER], coverOf })).toEqual({
-      kind: TOP_SHELF_KINDS.sectioned,
+      kind: TOP_SHELF_KINDS.titles,
+      layout: TOP_SHELF_LAYOUTS.sectioned,
       title: HOME_COPY.latestReleases,
       items: [
         {
@@ -45,8 +46,6 @@ describe("Wren's Top Shelf", () => {
   it('leaves off an album with no cover, and holds no more than a row', () => {
     const albums = [OK_COMPUTER, ...Array.from({ length: 20 }, () => WITH_COVER)]
     const shelf = releasesShelfOf({ albums, coverOf })
-    expect(shelf.kind === TOP_SHELF_KINDS.sectioned && shelf.items.length).toBe(
-      TOP_SHELF_ALBUMS - 1,
-    )
+    expect(shelf.kind === TOP_SHELF_KINDS.titles && shelf.items.length).toBe(TOP_SHELF_ALBUMS - 1)
   })
 })

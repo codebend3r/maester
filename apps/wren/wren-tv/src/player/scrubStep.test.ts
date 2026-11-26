@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'bun:test'
 
-import { SCRUB_KEYS, SCRUB_STEP, scrubStepOf } from '@/player/scrubStep'
+import { SCRUB_STEP_SECONDS } from '@raven/wren'
+
+import { SCRUB_KEYS, scrubStepOf } from '@/player/scrubStep'
 
 describe('scrubStepOf', () => {
   it('moves the playhead a step on with right and a step back with left', () => {
     expect(scrubStepOf({ event: { eventType: SCRUB_KEYS.right }, position: 30, length: 200 })).toBe(
-      30 + SCRUB_STEP,
+      30 + SCRUB_STEP_SECONDS,
     )
     expect(scrubStepOf({ event: { eventType: SCRUB_KEYS.left }, position: 30, length: 200 })).toBe(
-      30 - SCRUB_STEP,
+      30 - SCRUB_STEP_SECONDS,
     )
   })
 
@@ -25,7 +27,7 @@ describe('scrubStepOf', () => {
       scrubStepOf({ event: { ...right, eventKeyAction: 0 }, position: 0, length: 60 }),
     ).toBeNull()
     expect(scrubStepOf({ event: { ...right, eventKeyAction: 1 }, position: 0, length: 60 })).toBe(
-      SCRUB_STEP,
+      SCRUB_STEP_SECONDS,
     )
   })
 

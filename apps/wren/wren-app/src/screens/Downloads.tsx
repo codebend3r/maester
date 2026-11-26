@@ -4,7 +4,7 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
 import { FlatList, Pressable, Text, View } from 'react-native'
 
-import { LIBRARY_PAGE_COPY } from '@raven/wren'
+import { LIBRARY_PAGE_COPY, WREN_ICONS } from '@raven/wren'
 import { PlayButtons } from '@/components/PlayButtons'
 import { useDownloads } from '@/downloads/downloadStore'
 import { deviceDisk } from '@/downloads/downloader'
@@ -22,7 +22,6 @@ import { EmptyState } from '@/ui/EmptyState'
 import { MeterBar } from '@/ui/MeterBar'
 import { pressedStyleOf } from '@/ui/press'
 import { TextLink } from '@/ui/TextLink'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -112,7 +111,7 @@ function NothingDownloaded() {
   return (
     <EmptyState
       body={LIBRARY_PAGE_COPY.noDownloadsHint}
-      icon={ICONS.downloads}
+      icon={WREN_ICONS.downloads}
       title={LIBRARY_PAGE_COPY.noDownloads}
     />
   )

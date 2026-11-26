@@ -14,7 +14,7 @@ import { hideAsync, preventAutoHideAsync } from 'expo-splash-screen'
 import { useEffect } from 'react'
 import { StatusBar, View } from 'react-native'
 
-import { VideoAudioHost } from '@/music/VideoAudioHost'
+import { TvMusicHost } from '@/music/TvMusicHost'
 import { forgetWrenAccount, queryClient } from '@/queryClient'
 import { useMediaKeys } from '@/remote/useMediaKeys'
 import {
@@ -24,8 +24,8 @@ import {
   configureRecentSearches,
   useWren,
 } from '@raven/wren-native'
-import { WREN_ROUTES, WREN_SCREENS } from '@raven/wren-native/headless'
-import { configureWrenPrefs } from '@/stores/wrenPrefs'
+import { WREN_ROUTES, WREN_SCREENS, configureLibraryChoice } from '@raven/wren-native/headless'
+import { configureWrenPrefs, useWrenPrefs } from '@/stores/wrenPrefs'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { ToastHost } from '@/ui/Toast'
 import { ReleasesShelf } from '@/topShelf/ReleasesShelf'
@@ -43,6 +43,8 @@ const BAR_STYLES = {
 const useTokenRenewal = tokenRenewalFor({ session: useWrenAccount })
 
 const loadStores = async (): Promise<void> => {
+  // The shared listings read the music library picked in this app's own prefs.
+  configureLibraryChoice({ prefs: useWrenPrefs })
   // A store whose keychain or AsyncStorage cannot be read starts empty rather than holding the splash.
   await Promise.allSettled([
     useActiveServer.persist.rehydrate(),
@@ -90,7 +92,7 @@ export function WrenTvRoot() {
       <QueryClientProvider client={queryClient}>
         <View style={styles.root}>
           <StatusBar barStyle={BAR_STYLES[scheme]} />
-          {session !== null && <VideoAudioHost key={session.server.id} session={session} />}
+          {session !== null && <TvMusicHost key={session.server.id} session={session} />}
           {/* The Apple TV's Top Shelf: the latest releases while the tabs are open, else the invitation to sign in. */}
           <TopShelfSync
             session={isOpen ? session : null}

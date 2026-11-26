@@ -1,6 +1,6 @@
+import { type WrenIconName } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import { Spinner } from '@/ui/Spinner/Spinner'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import { SIZES } from '@/theme/tokens'
 import styles from '@/ui/Button/Button.module.scss'

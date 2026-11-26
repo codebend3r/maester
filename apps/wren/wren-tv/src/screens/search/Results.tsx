@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   ALBUMS_IN_ALL,
   FILTER_LABELS,
@@ -22,7 +23,6 @@ import { EmptyState } from '@/ui/EmptyState'
 import { SectionHeader } from '@/ui/Headers'
 import { Loading } from '@/ui/Loading'
 import { usePageStyles } from '@/ui/pageStyles'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
   scroller: { flex: 1 },
@@ -101,7 +101,7 @@ function NoMatches({ query, onClear }: ResultsProps) {
     <EmptyState
       action={{ text: SEARCH_COPY.clearSearch, onPress: onClear }}
       body={SEARCH_COPY.noMatchesHint}
-      icon={ICONS.search}
+      icon={WREN_ICONS.search}
       title={SEARCH_COPY.noMatches(query)}
     />
   )
@@ -186,7 +186,7 @@ function Failed({ results }: ResultsProps) {
   return (
     <EmptyState
       body={SEARCH_COPY.failedHint(results.failure?.message ?? '')}
-      icon={ICONS.alert}
+      icon={WREN_ICONS.alert}
       title={SEARCH_COPY.failed}
     />
   )
@@ -194,7 +194,11 @@ function Failed({ results }: ResultsProps) {
 
 function NoMusic() {
   return (
-    <EmptyState body={SEARCH_COPY.noMusicHint} icon={ICONS.album} title={LIBRARY_COPY.noMusic} />
+    <EmptyState
+      body={SEARCH_COPY.noMusicHint}
+      icon={WREN_ICONS.album}
+      title={LIBRARY_COPY.noMusic}
+    />
   )
 }
 

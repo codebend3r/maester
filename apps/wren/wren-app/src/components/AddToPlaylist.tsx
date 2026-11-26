@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 
-import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY } from '@raven/wren'
+import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY, WREN_ICONS } from '@raven/wren'
 import { LoadingMark } from '@/components/LoadingMark'
 import { Notice } from '@/components/Notice'
 import { type PickedPlaylist, useAddToPlaylist, type WrenSession } from '@raven/wren-native'
@@ -13,7 +13,7 @@ import { AlbumArt } from '@/ui/AlbumArt'
 import { EmptyState } from '@/ui/EmptyState'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   body: { gap: SPACE.s4, paddingHorizontal: SPACE.s3, paddingTop: SPACE.s4 },
@@ -111,7 +111,7 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
           style={pressedStyleOf({ style: styles.create })}
         >
           <View style={styles.createTile}>
-            <WrenIcon color={colors.accentInk} name={ICONS.plus} />
+            <WrenIcon color={colors.accentInk} name={WREN_ICONS.plus} />
           </View>
           <Text style={styles.createLabel}>{NEW_PLAYLIST_COPY.title}</Text>
         </Pressable>
@@ -122,7 +122,7 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
       {isEmpty && (
         <EmptyState
           body={TRACK_MENU_COPY.noPlaylistsHint(name)}
-          icon={ICONS.playlist}
+          icon={WREN_ICONS.playlist}
           title={TRACK_MENU_COPY.noPlaylists}
         />
       )}

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { TVEventHandler } from 'react-native'
 
-import { LONG_PRESS_NAMES } from '@/layouts/remoteKeys'
+import { LONG_PRESS_NAMES } from '@raven/native/headless'
 
 type UseLongSelectProps = { isListening: boolean; onLongSelect: () => void }
 

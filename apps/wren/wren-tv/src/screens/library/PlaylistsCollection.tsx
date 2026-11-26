@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type PlaylistSummary, playlistFactsOf, plural } from '@raven/core'
 import {
   COUNTS_COPY,
@@ -24,7 +25,6 @@ import { FocusButton } from '@/ui/FocusButton'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import { Sheet } from '@/ui/Sheet'
 import { Tile } from '@/ui/Tile'
-import { ICONS } from '@/ui/WrenIcon'
 
 const NO_PLAYLISTS: readonly PlaylistSummary[] = []
 
@@ -41,7 +41,7 @@ function NoPlaylists({ onNew }: NoPlaylistsProps) {
     <EmptyState
       action={{ text: NEW_PLAYLIST_COPY.title, onPress: onNew }}
       body={LIBRARY_PAGE_COPY.noPlaylistsHint}
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       title={LIBRARY_PAGE_COPY.noPlaylists}
     />
   )
@@ -90,7 +90,7 @@ export function PlaylistsCollection({ session }: CollectionPageProps) {
           >
             <FocusButton
               hasPreferredFocus
-              icon={ICONS.plus}
+              icon={WREN_ICONS.plus}
               label={NEW_PLAYLIST_COPY.title}
               onPress={onNew}
               text={NEW_PLAYLIST_COPY.title}

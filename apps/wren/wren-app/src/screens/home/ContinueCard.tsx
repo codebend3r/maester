@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
-import { HOME_COPY } from '@raven/wren'
+import { HOME_COPY, WREN_ICONS } from '@raven/wren'
 import { type Covers } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
@@ -22,7 +22,6 @@ import { Button } from '@/ui/Button'
 import { Card } from '@/ui/Card'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   card: {
@@ -67,7 +66,7 @@ function PlayCircle({ onResume }: ActionProps) {
     <IconButton
       color={colors.accentInk}
       fill={colors.accent}
-      icon={ICONS.play}
+      icon={WREN_ICONS.play}
       label={HOME_COPY.resume}
       onPress={onResume}
       size={SIZE.button}
@@ -77,7 +76,7 @@ function PlayCircle({ onResume }: ActionProps) {
 
 /** The tablet's Resume. */
 function ResumeButton({ onResume }: ActionProps) {
-  return <Button icon={ICONS.play} label={HOME_COPY.resume} onPress={onResume} />
+  return <Button icon={WREN_ICONS.play} label={HOME_COPY.resume} onPress={onResume} />
 }
 
 const ACTIONS = {

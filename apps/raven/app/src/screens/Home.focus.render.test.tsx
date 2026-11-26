@@ -2,11 +2,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { type FetchLike, type Hero, type Home as HomeAnswer, isRecord } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
-import type { AppServer } from '@raven/native/headless'
+import { type AppServer, KEY_ACTIONS, LONG_PRESS_NAMES } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
-import { KEY_ACTIONS, LONG_PRESS_NAMES } from '@/layouts/remoteKeys'
 import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, itemTarget } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
@@ -498,7 +497,7 @@ describe('Home on a TV', () => {
     await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(2000))
     expect(screen.queryByTestId(`library:${FILMS.id}`)).toBeNull()
     expect(screen.queryByRole('button', { name: NIGHT_TRAIN })).toBeNull()
-    expect(StyleSheet.flatten(slot.children[0]?.props.style)).toEqual({ height: 300 })
+    expect(StyleSheet.flatten(slot.props.style)).toEqual({ height: 300 })
 
     await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(0))
     expect(screen.getByTestId(`library:${FILMS.id}`)).toBeTruthy()

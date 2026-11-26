@@ -1,9 +1,10 @@
+import { type WrenIconName } from '@raven/wren'
 import { Text, View } from 'react-native'
 
 import { SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   empty: { alignItems: 'center', gap: SPACE.s3, paddingVertical: SPACE.s8 },

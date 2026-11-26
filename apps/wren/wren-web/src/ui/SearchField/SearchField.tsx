@@ -1,8 +1,7 @@
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type FormEvent, type MouseEvent, useRef } from 'react'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/SearchField/SearchField.module.scss'
 
@@ -49,7 +48,7 @@ export function SearchField({
     <search>
       <form className={styles.row} onSubmit={submit}>
         <div className={styles.box}>
-          <WrenIcon color={COLORS.text3} name={ICONS.search} size={SIZES.navIcon} />
+          <WrenIcon color={COLORS.text3} name={WREN_ICONS.search} size={SIZES.navIcon} />
           <input
             aria-label={label}
             autoCapitalize="none"
@@ -68,7 +67,7 @@ export function SearchField({
             <span className={styles.clear}>
               <IconButton
                 color={COLORS.text3}
-                icon={ICONS.close}
+                icon={WREN_ICONS.close}
                 label={KIT_COPY.clearSearch}
                 onPress={clear}
                 size={SIZES.smallButton}

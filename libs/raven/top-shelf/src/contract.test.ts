@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
-import { TOP_SHELF_KINDS, type TopShelf, deepLinkOf, topShelfKeyOf } from '@/contract'
+import {
+  TOP_SHELF_KINDS,
+  TOP_SHELF_LAYOUTS,
+  type TopShelf,
+  deepLinkOf,
+  topShelfKeyOf,
+} from '@/contract'
 
 describe('deepLinkOf', () => {
   test('fills each bracketed segment from its param', () => {
@@ -33,7 +39,8 @@ describe('deepLinkOf', () => {
 })
 
 const shelfWith = (token: string): TopShelf => ({
-  kind: TOP_SHELF_KINDS.carousel,
+  kind: TOP_SHELF_KINDS.titles,
+  layout: TOP_SHELF_LAYOUTS.carousel,
   title: 'Continue watching',
   items: [
     {

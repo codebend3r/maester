@@ -1,6 +1,6 @@
+import { WREN_ICONS } from '@raven/wren'
 import type { ComponentProps } from 'react'
 import { DetailAction } from '@/components/DetailAction/DetailAction'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type FavouriteActionProps = Pick<ComponentProps<typeof DetailAction>, 'label' | 'shape'> & {
   isOn: boolean
@@ -11,7 +11,7 @@ type FavouriteActionProps = Pick<ComponentProps<typeof DetailAction>, 'label' | 
 export function FavouriteAction({ label, shape, isOn, onToggle }: FavouriteActionProps) {
   return (
     <DetailAction
-      icon={isOn ? ICONS.heartFilled : ICONS.heart}
+      icon={isOn ? WREN_ICONS.heartFilled : WREN_ICONS.heart}
       isOn={isOn}
       label={label}
       onPress={onToggle}

@@ -3,6 +3,8 @@
  * an Xcode mod: its types, the guard that finds its methods, and the target itself.
  */
 
+import { isRecord } from '@shared/http'
+
 export const XCODE = {
   builtProducts: 'BUILT_PRODUCTS_DIR',
   sourcesPhase: 'PBXSourcesBuildPhase',
@@ -89,9 +91,6 @@ const XCODE_METHODS = [
   'pbxNativeTargetSection',
   'pbxFileReferenceSection',
 ] as const satisfies readonly (keyof XcodeProjectApi)[]
-
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
 
 const hasObjects = (value: unknown): boolean => {
   const project: unknown = isRecord(value) && isRecord(value.hash) && value.hash.project

@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   type MenuLike,
   type MenuPlaces,
@@ -20,7 +21,6 @@ import { SPACE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { ListRow } from '@/ui/ListRow'
 import { Sheet } from '@/ui/Sheet'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({ group: { gap: SPACE.s1 } }))
 
@@ -69,7 +69,7 @@ function MenuActions({
     router.push(href)
   }
   const groups = menuGroupsOf({
-    icons: ICONS,
+    icons: WREN_ICONS,
     like,
     canAddToPlaylist,
     places,

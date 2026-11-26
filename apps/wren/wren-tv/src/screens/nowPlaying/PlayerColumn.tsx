@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import type { ArtistCredit } from '@raven/core'
 import {
   AUDIOBOOK_SPEEDS,
@@ -28,7 +29,6 @@ import { FavouriteButton } from '@/ui/FavouriteButton'
 import { FOCUS_ROLES, Focusable } from '@/ui/Focusable'
 import { FocusButton } from '@/ui/FocusButton'
 import { QualityChips } from '@/ui/QualityChips'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   column: { gap: SPACE.s4, width: SIZE.playerArt },
@@ -171,11 +171,15 @@ export function PlayerColumn({ playing, actions }: PlayerColumnProps) {
             onToggle={like.onToggle}
           />
           <FocusButton
-            icon={ICONS.playlistAdd}
+            icon={WREN_ICONS.playlistAdd}
             label={NOW_PLAYING_COPY.addToPlaylist}
             onPress={actions.onAddToPlaylist}
           />
-          <FocusButton icon={ICONS.more} label={KIT_COPY.more(title)} onPress={actions.onMore} />
+          <FocusButton
+            icon={WREN_ICONS.more}
+            label={KIT_COPY.more(title)}
+            onPress={actions.onMore}
+          />
         </View>
       </View>
       <Scrubber length={playing.length} />

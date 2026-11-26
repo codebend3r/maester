@@ -1,12 +1,12 @@
 import type { ComponentType } from 'react'
 import { Pressable, Text } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconTile } from '@/ui/IconTile'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** Where a navigation row sits: Library's categories, or a Settings card. */
 export const NAVIGATION_ROW_VARIANTS = { library: 'library', settings: 'settings' } as const
@@ -57,7 +57,7 @@ export function RowBody({ label, icon, variant, value, hasChevron }: RowBodyProp
       </Text>
       {value !== undefined && <Text style={styles.value}>{value}</Text>}
       {hasChevron && (
-        <WrenIcon color={colors.text3} name={ICONS.chevronRight} size={SIZE.smallIcon} />
+        <WrenIcon color={colors.text3} name={WREN_ICONS.chevronRight} size={SIZE.smallIcon} />
       )}
     </>
   )

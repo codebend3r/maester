@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { type QueryStatus, useQuery } from '@tanstack/react-query'
 
-import { ARTIST_COPY } from '@raven/wren'
+import { ARTIST_COPY, WREN_ICONS } from '@raven/wren'
 import { useCovers, toastFailure, type WrenSession } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
@@ -34,7 +34,7 @@ import {
 import { LoadingMark } from '@/components/LoadingMark'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { tileWidthOf } from '@/ui/tileWidth'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** What a picture does under a finger or a pointer: it grows by this much. */
 const LIFT_SCALE = 1.04
@@ -183,7 +183,7 @@ function ReadyView({ options, chosen, artistId, session, isChoosing, onChoose }:
           width={width}
         >
           <View style={styles.plain}>
-            <WrenIcon color={colors.text2} name={ICONS.artist} size={SIZE.smallIcon} />
+            <WrenIcon color={colors.text2} name={WREN_ICONS.artist} size={SIZE.smallIcon} />
             <Text style={styles.defaultLabel}>{ARTIST_COPY.backgroundDefault}</Text>
           </View>
         </BackgroundTile>

@@ -14,8 +14,8 @@ import { useActiveServer } from '@/stores/activeServer'
 import { NAS } from '@/test/homeServer'
 import { BUSBOYS_MP4, BUSBOYS_UNSUBTITLED, CUE_TEXT, playerApi } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
-import type * as VideoMock from '@/test/videoMock'
-import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
+import type * as VideoMock from '@raven/native/testing/video'
+import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@raven/native/testing/video'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
@@ -59,7 +59,7 @@ jest.mock('@raven/native', () => ({
   },
 }))
 jest.mock('react-native-video', () =>
-  jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
+  jest.requireActual<typeof VideoMock>('@raven/native/testing/video').videoModuleMock(),
 )
 
 const shown = { client: createScreenClient() }

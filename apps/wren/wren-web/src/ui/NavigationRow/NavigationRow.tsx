@@ -1,10 +1,9 @@
 import { classNames } from '@raven/ui/headless'
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS, type WrenIconName } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { IconTile } from '@/ui/IconTile/IconTile'
 import { type Press, Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/NavigationRow/NavigationRow.module.scss'
 
@@ -53,7 +52,7 @@ export function RowBody({ label, icon, variant, value, hasChevron }: RowBodyProp
       <span className={styles.end}>
         {value !== undefined && <span className={styles.value}>{value}</span>}
         {hasChevron && (
-          <WrenIcon color={COLORS.text3} name={ICONS.chevronRight} size={SIZES.smallIcon} />
+          <WrenIcon color={COLORS.text3} name={WREN_ICONS.chevronRight} size={SIZES.smallIcon} />
         )}
       </span>
     </>

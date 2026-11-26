@@ -1,6 +1,6 @@
+import { type WrenIconName } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import { SIZES } from '@/theme/tokens'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/IconTile/IconTile.module.scss'
 

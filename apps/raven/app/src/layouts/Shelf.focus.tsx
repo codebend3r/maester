@@ -26,7 +26,7 @@ import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope, useShelfBand } from '@/layouts/focus'
+import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   type BingeShelfProps,
   NOTHING_HERE,
@@ -61,7 +61,7 @@ import {
   shelfViewOf,
   viewShelves,
 } from '@/stores/shelfBands'
-import { TV_DESIGN_WIDTH } from '@/theme/tvScale'
+import { TV_DESIGN_WIDTH } from '@raven/native/headless'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -445,11 +445,10 @@ const ShelfPage = ({ title, note, children }: ShelfPageProps) => {
  */
 const BingeRows = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
-  const band = useShelfBand(HOME_BANDS.binge)
   const styles = useStyles()
   return (
     cards.length > 0 && (
-      <View onLayout={band.onLayout}>
+      <ShelfSlot shelf={HOME_BANDS.binge}>
         <FocusBand>
           <View style={styles.bingeRows}>
             {cards.map((card, index) => (
@@ -464,7 +463,7 @@ const BingeRows = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
             ))}
           </View>
         </FocusBand>
-      </View>
+      </ShelfSlot>
     )
   )
 }

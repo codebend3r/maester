@@ -1,9 +1,8 @@
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import type { Cover } from '@/music/useCovers'
 import { COLORS, SIZES, type TokenStyle } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { PlayingSummary } from '@/ui/PlayingSummary/PlayingSummary'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/ui/MiniPlayer/MiniPlayer.module.scss'
 
 type MiniPlayerProps = {
@@ -52,11 +51,16 @@ export function MiniPlayer({
       />
       <IconButton
         color={COLORS.text}
-        icon={isPlaying ? ICONS.pause : ICONS.play}
+        icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
         label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
         onPress={onToggle}
       />
-      <IconButton color={COLORS.text} icon={ICONS.next} label={PLAYER_COPY.next} onPress={onNext} />
+      <IconButton
+        color={COLORS.text}
+        icon={WREN_ICONS.next}
+        label={PLAYER_COPY.next}
+        onPress={onNext}
+      />
       <span className={styles.track}>
         <span className={styles.progress} style={played} />
       </span>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Text, View } from 'react-native'
 
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { wrenVersion } from '@/about/version'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
@@ -9,7 +9,6 @@ import { BottomSheet } from '@/ui/BottomSheet'
 import { FactRow } from '@/ui/FactRow'
 import { GroupedList } from '@/ui/GroupedList'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   notices: { gap: SPACE.s4, padding: SPACE.s3 },
@@ -43,7 +42,7 @@ export function AboutGroup() {
     <>
       <GroupedList heading={SETTINGS_COPY.about}>
         <FactRow
-          icon={ICONS.info}
+          icon={WREN_ICONS.info}
           label={SETTINGS_COPY.version}
           value={SETTINGS_COPY.versionOf(wrenVersion)}
         />

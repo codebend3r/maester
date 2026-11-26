@@ -1,9 +1,9 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import { useState } from 'react'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/Collection/ChoiceButton.module.scss'
 
@@ -65,7 +65,11 @@ export function ChoiceButton<T extends string>({
             >
               <span className={styles.optionLabel}>{optionLabel}</span>
               {value === chosen && (
-                <WrenIcon color={COLORS.accentText} name={ICONS.check} size={SIZES.smallIcon} />
+                <WrenIcon
+                  color={COLORS.accentText}
+                  name={WREN_ICONS.check}
+                  size={SIZES.smallIcon}
+                />
               )}
             </button>
           ))}

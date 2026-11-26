@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type Track, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import { useRouter } from 'expo-router'
@@ -17,7 +18,6 @@ import { useCovers, toastFailure, type WrenSession, useWren } from '@raven/wren-
 import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { SheetActions } from '@/ui/SheetActions'
-import { ICONS } from '@/ui/WrenIcon'
 
 type SheetHead = ComponentProps<typeof BottomSheet>['head']
 
@@ -66,7 +66,7 @@ function MenuActions({
     router.push(href)
   }
   const groups = menuGroupsOf({
-    icons: ICONS,
+    icons: WREN_ICONS,
     like,
     canAddToPlaylist,
     places,

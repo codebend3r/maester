@@ -15,13 +15,12 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { scheduleOnRN } from 'react-native-worklets'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { MOTION, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { ICON_BUTTON_VARIANTS, IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 // A drag past this far down, or a flick this fast, lets the sheet go.
 const DISMISS = { distance: 120, velocity: 900 } as const
@@ -153,7 +152,7 @@ function SheetBody({ onClose, head, children }: SheetBodyProps) {
             </View>
             <IconButton
               color={colors.text2}
-              icon={ICONS.close}
+              icon={WREN_ICONS.close}
               label={KIT_COPY.close}
               onPress={slideAway}
               size={SIZE.smallButton}

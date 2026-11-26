@@ -1,3 +1,4 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
@@ -5,7 +6,7 @@ import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/the
 import { FORM_FACTORS, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, type WrenIconName, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   button: {
@@ -108,7 +109,7 @@ export function ChoiceButton<Choice extends string>({
                 {option.label}
               </Text>
               {option.value === chosen && (
-                <WrenIcon color={colors.accentText} name={ICONS.check} size={SIZE.smallIcon} />
+                <WrenIcon color={colors.accentText} name={WREN_ICONS.check} size={SIZE.smallIcon} />
               )}
             </Pressable>
           ))}

@@ -1,7 +1,12 @@
-import { SETTINGS_COPY, THEME_SCHEMES, WREN_THEMES, type WrenThemeName } from '@raven/wren'
+import {
+  SETTINGS_COPY,
+  THEME_SCHEMES,
+  WREN_THEMES,
+  type WrenThemeName,
+  WREN_ICONS,
+} from '@raven/wren'
 import { type Choice, RadioChoices } from '@/ui/RadioChoices/RadioChoices'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Settings/ThemePicker.module.scss'
 
 const CLASSES = { group: styles.grid, choice: styles.choice, label: styles.tile } as const
@@ -28,7 +33,7 @@ const tileOf = ({ key, label }: Choice<WrenThemeName>) => (
         <span className={styles.scheme}>{SETTINGS_COPY.schemeNames[THEME_SCHEMES[key]]}</span>
       </span>
       <span className={styles.check}>
-        <WrenIcon name={ICONS.check} />
+        <WrenIcon name={WREN_ICONS.check} />
       </span>
     </span>
   </>

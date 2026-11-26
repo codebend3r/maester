@@ -1,4 +1,5 @@
-import type { ShelfBand } from '@/stores/shelfBands'
+/** Where a shelf stands in its screen's scrolling content: its top and its height. */
+export type ShelfBand = { top: number; height: number }
 
 /** What the shelves show of their content: how far they are scrolled and how tall the view is. */
 export type ShelfViewport = { offset: number; viewport: number }

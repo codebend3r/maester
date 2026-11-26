@@ -1,5 +1,5 @@
 import type { QueueSource, Track } from '@raven/core'
-import { DETAIL_COPY } from '@raven/wren'
+import { DETAIL_COPY, WREN_ICONS } from '@raven/wren'
 import { type ComponentProps, type ReactNode, useState } from 'react'
 import { Text, View } from 'react-native'
 
@@ -11,7 +11,6 @@ import { PlayButtons } from '@/components/PlayButtons'
 import { TracksMenu } from '@/components/TracksMenu'
 import { FocusButton } from '@/ui/FocusButton'
 import { PageHeader } from '@/ui/Headers'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   head: { gap: SPACE.s3, width: SIZE.headArt },
@@ -80,7 +79,7 @@ export function DetailHead({
           {actions}
           <FocusButton
             hasPreferredFocus={!canPlay}
-            icon={ICONS.more}
+            icon={WREN_ICONS.more}
             label={DETAIL_COPY.more}
             onPress={() => setIsMenuOpen(true)}
           />

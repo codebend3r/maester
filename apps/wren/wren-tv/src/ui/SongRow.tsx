@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   KIT_COPY,
   SONG_LEADS,
@@ -16,7 +17,6 @@ import { AlbumArt } from '@/ui/AlbumArt'
 import { Equalizer } from '@/ui/Equalizer'
 import { FocusButton } from '@/ui/FocusButton'
 import { Focusable } from '@/ui/Focusable'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   row: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s2 },
@@ -145,7 +145,7 @@ export function SongRow({
         </View>
         {duration !== null && <Text style={styles.duration}>{duration}</Text>}
       </Focusable>
-      <FocusButton icon={ICONS.more} label={KIT_COPY.more(title)} onPress={onMore} />
+      <FocusButton icon={WREN_ICONS.more} label={KIT_COPY.more(title)} onPress={onMore} />
     </View>
   )
 }

@@ -1,6 +1,6 @@
 import type { ArtistBackgroundOption } from '@raven/core'
 import { classNames, useChooseArtistBackground } from '@raven/ui/headless'
-import { ARTIST_COPY } from '@raven/wren'
+import { ARTIST_COPY, WREN_ICONS } from '@raven/wren'
 import { type QueryStatus, useQuery } from '@tanstack/react-query'
 import type { ComponentType, ReactNode } from 'react'
 import { LoadingMark } from '@/components/LoadingMark/LoadingMark'
@@ -10,7 +10,6 @@ import { queries } from '@/lib/queries'
 import { toastFailure } from '@/stores/toast'
 import { SIZES } from '@/theme/tokens'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/Artist/ArtistBackgroundModal.module.scss'
 
@@ -77,7 +76,7 @@ function PickerReady({ artistId, options, ...choice }: PickerViewProps) {
       <ul aria-label={ARTIST_COPY.backgroundTitle} className={styles.grid}>
         <Option {...choice} optionKey={null}>
           <span className={styles.plain}>
-            <WrenIcon name={ICONS.artist} />
+            <WrenIcon name={WREN_ICONS.artist} />
             <span>{ARTIST_COPY.backgroundDefault}</span>
           </span>
         </Option>

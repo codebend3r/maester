@@ -1,4 +1,4 @@
-import { LIBRARY_PAGE_COPY, RECENT_SORTS } from '@raven/wren'
+import { LIBRARY_PAGE_COPY, RECENT_SORTS, WREN_ICONS } from '@raven/wren'
 import { useNavigate } from 'react-router-dom'
 import { AlbumGrid } from '@/components/AlbumGrid/AlbumGrid'
 import { ListNotice } from '@/components/ListNotice/ListNotice'
@@ -13,7 +13,6 @@ import { COLORS } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow/NavigationRow'
 import { PageHeader } from '@/ui/PageHeader/PageHeader'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Library/Library.module.scss'
 
 /** How many of the newest albums Library's grid shows: three rows on the narrow layout, two on the wide. */
@@ -61,7 +60,7 @@ export function Library() {
         actions={
           <IconButton
             color={COLORS.text}
-            icon={ICONS.search}
+            icon={WREN_ICONS.search}
             label={LIBRARY_PAGE_COPY.search}
             onPress={() => navigate(WREN_ROUTES.search)}
           />

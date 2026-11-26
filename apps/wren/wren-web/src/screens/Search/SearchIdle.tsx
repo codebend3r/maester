@@ -1,3 +1,4 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import {
   KIT_COPY,
   RECENT_KINDS,
@@ -20,7 +21,6 @@ import { COLORS, type Color, SIZES, type TokenStyle } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
 import { SectionHeader } from '@/ui/SectionHeader/SectionHeader'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/Search/SearchIdle.module.scss'
 
@@ -38,21 +38,21 @@ const BROWSE_TILES = [
   {
     kind: COLLECTION_KINDS.albums,
     label: SEARCH_COPY.albums,
-    icon: ICONS.album,
+    icon: WREN_ICONS.album,
     ground: COLORS.artInk,
     ink: COLORS.artOchre,
   },
   {
     kind: COLLECTION_KINDS.artists,
     label: SEARCH_COPY.artists,
-    icon: ICONS.artist,
+    icon: WREN_ICONS.artist,
     ground: COLORS.artDusk,
     ink: COLORS.artBlush,
   },
   {
     kind: COLLECTION_KINDS.songs,
     label: SEARCH_COPY.songs,
-    icon: ICONS.song,
+    icon: WREN_ICONS.song,
     ground: COLORS.artSlate,
     ink: COLORS.artCream,
   },
@@ -116,7 +116,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
         label={KIT_COPY.labelled({ label: name, value: line })}
         onPress={open}
       >
-        <WrenIcon color={COLORS.text3} name={ICONS.recent} size={SIZES.icon} />
+        <WrenIcon color={COLORS.text3} name={WREN_ICONS.recent} size={SIZES.icon} />
         <span className={styles.recentText}>
           <span className={styles.recentName}>{name}</span>
           <span className={styles.recentLine}>{line}</span>
@@ -124,7 +124,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
       </Pressable>
       <IconButton
         color={COLORS.text3}
-        icon={ICONS.close}
+        icon={WREN_ICONS.close}
         label={SEARCH_COPY.removeRecent(name)}
         onPress={() => forget(recentKeyOf(recent))}
         size={SIZES.smallButton}

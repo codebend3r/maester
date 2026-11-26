@@ -1,6 +1,5 @@
 import type { AudioItem } from '@raven/audio'
 import {
-  AUDIO_BITRATES,
   type ApiClient,
   type AudioBitrate,
   type AudioPlatform,
@@ -8,9 +7,9 @@ import {
   type Track,
   type TrackStream,
   artistNames,
-  canPlayAudio,
 } from '@raven/core'
 
+import { trackStreamOf } from '@/music/trackStream'
 import type { MediaSources } from '@/servers/mediaAccess'
 
 /** What a track is played through: the server's client, for its cover, and where its media plays from. */
@@ -81,19 +80,13 @@ export const audioItemOf = async ({
       artworkUri: downloaded.artworkUri ?? details.artworkUri,
     }
   }
-  // A track the server has not probed yet names no codec; the player is left to try it.
-  const canDecode =
-    track.codec === null ||
-    canPlayAudio({ platform, codec: track.codec, container: track.container })
-  const kbps = (await plan.streamKbps()) ?? (canDecode ? null : AUDIO_BITRATES.standard)
+  const { kbps, stream } = trackStreamOf({
+    track,
+    platform,
+    chosenKbps: await plan.streamKbps(),
+  })
   const outcome = await server.sources.trackSource({ mediaId: track.id, kbps })
   if (!outcome.ok) throw new Error(outcome.message)
-  plan.onStream({
-    track,
-    stream:
-      kbps === null
-        ? { kind: TRACK_STREAM_KINDS.file }
-        : { kind: TRACK_STREAM_KINDS.transcode, kbps },
-  })
+  plan.onStream({ track, stream })
   return { ...details, uri: outcome.source.uri, headers: outcome.source.headers }
 }

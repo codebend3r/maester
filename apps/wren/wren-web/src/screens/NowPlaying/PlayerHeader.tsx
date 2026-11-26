@@ -1,7 +1,6 @@
-import { NOW_PLAYING_COPY, type SourceTitle } from '@raven/wren'
+import { NOW_PLAYING_COPY, type SourceTitle, WREN_ICONS } from '@raven/wren'
 import { COLORS } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/NowPlaying/PlayerHeader.module.scss'
 
 type SourceNameProps = { title: SourceTitle }
@@ -23,7 +22,7 @@ export function CloseButton({ onClose }: CloseButtonProps) {
   return (
     <IconButton
       color={COLORS.text}
-      icon={ICONS.chevronDown}
+      icon={WREN_ICONS.chevronDown}
       label={NOW_PLAYING_COPY.close}
       onPress={onClose}
     />
@@ -48,7 +47,7 @@ export function PlayerHeader({ title, onClose, onMore }: PlayerHeaderProps) {
       <span className={styles.more}>
         <IconButton
           color={COLORS.text}
-          icon={ICONS.more}
+          icon={WREN_ICONS.more}
           label={NOW_PLAYING_COPY.more}
           onPress={onMore}
         />

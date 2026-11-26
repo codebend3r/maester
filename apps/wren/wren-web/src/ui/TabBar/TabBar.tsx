@@ -1,7 +1,6 @@
 import { classNames } from '@raven/ui/headless'
-import { TAB_COPY } from '@raven/wren'
+import { TAB_COPY, type WrenIconName } from '@raven/wren'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 import { STROKES, WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/TabBar/TabBar.module.scss'
 

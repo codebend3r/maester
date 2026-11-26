@@ -1,10 +1,9 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { KIT_COPY, TRACK_MENU_COPY } from '@raven/wren'
+import { KIT_COPY, TRACK_MENU_COPY, WREN_ICONS } from '@raven/wren'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { SheetActions } from '@/ui/SheetActions/SheetActions'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type RenderSheetProps = { isOpen?: boolean }
 
@@ -20,11 +19,15 @@ const renderSheet = ({ isOpen = true }: RenderSheetProps = {}) => {
       <SheetActions
         groups={[
           [
-            { icon: ICONS.playNext, label: TRACK_MENU_COPY.playNext, onPress: onPlayNext },
-            { icon: ICONS.queueAdd, label: TRACK_MENU_COPY.addToQueue, onPress: () => undefined },
+            { icon: WREN_ICONS.playNext, label: TRACK_MENU_COPY.playNext, onPress: onPlayNext },
+            {
+              icon: WREN_ICONS.queueAdd,
+              label: TRACK_MENU_COPY.addToQueue,
+              onPress: () => undefined,
+            },
           ],
           [],
-          [{ icon: ICONS.album, label: TRACK_MENU_COPY.goToAlbum, onPress: () => undefined }],
+          [{ icon: WREN_ICONS.album, label: TRACK_MENU_COPY.goToAlbum, onPress: () => undefined }],
         ]}
       />
     </BottomSheet>,

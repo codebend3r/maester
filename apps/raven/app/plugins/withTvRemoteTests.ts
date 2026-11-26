@@ -13,13 +13,13 @@ import {
   quoted,
 } from './xcodeTargets.ts'
 
-/** The UI test target the plugin adds and its bundle: raven's unless the app names its own. */
-type RemoteTests = { target: string; bundleId: string }
+/** The UI test target the plugin adds, named by the app: `RavenRemoteTests`, `WrenRemoteTests`. */
+type RemoteTestsOptions = { target: string }
 
-const RAVEN_REMOTE_TESTS: RemoteTests = {
-  target: 'RavenRemoteTests',
-  bundleId: 'io.github.codebend3r.raven.app.remote-tests',
-}
+/** The target and its bundle, the app's own id with `REMOTE_TESTS_SUFFIX`. */
+type RemoteTests = RemoteTestsOptions & { bundleId: string }
+
+const REMOTE_TESTS_SUFFIX = '.remote-tests'
 
 /** Where the test's Swift lives in the app's folder. */
 const REMOTE_TEST_SOURCES = 'tvos-e2e'
@@ -81,13 +81,16 @@ const schemeOf = ({
 /**
  * Adds the Apple TV's remote-driven end to end test to the generated Xcode project, since
  * `ios/` is made afresh by each prebuild: the Swift in `tvos-e2e/` is copied into
- * `ios/<target>/` (`RavenRemoteTests`, or the target the app names: Wren on TV's
- * `WrenRemoteTests`), a UI test target compiles it, and a shared scheme of the same name runs it. A project that has the target already only gets the Swift copied afresh. The `xcode`
- * package's project is changed in place, as every Xcode mod does.
+ * `ios/<target>/` (the target the app names: raven's `RavenRemoteTests`, Wren on TV's
+ * `WrenRemoteTests`), a UI test target compiles it, and a shared scheme of the same name runs it.
+ * A project that has the target already only gets the Swift copied afresh. The `xcode` package's
+ * project is changed in place, as every Xcode mod does.
  */
-export const withTvRemoteTests: ConfigPlugin<RemoteTests | void> = (config, named) =>
-  withXcodeProject(config, (mod) => {
-    const tests = typeof named === 'object' ? named : RAVEN_REMOTE_TESTS
+export const withTvRemoteTests: ConfigPlugin<RemoteTestsOptions> = (config, { target }) => {
+  const appId = config.ios?.bundleIdentifier
+  if (appId === undefined) throw new Error('The remote tests need the app’s bundle identifier')
+  const tests: RemoteTests = { target, bundleId: `${appId}${REMOTE_TESTS_SUFFIX}` }
+  return withXcodeProject(config, (mod) => {
     const project = mod.modResults
     if (!isXcodeProjectApi(project)) throw new Error('The Xcode project has no API to add a target')
     const { projectRoot, platformProjectRoot, projectName } = mod.modRequest
@@ -120,3 +123,4 @@ export const withTvRemoteTests: ConfigPlugin<RemoteTests | void> = (config, name
     )
     return mod
   })
+}

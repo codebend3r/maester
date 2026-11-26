@@ -2,12 +2,12 @@ import { type Track, artistNames } from '@raven/core'
 import { playingTrackOf, shuffledTracksOf, useAudioQueue } from '@raven/ui/headless'
 import {
   HOME_COPY,
+  HOME_RECENT_CHOICES,
+  HOME_RECENT_TITLES,
   KIT_COPY,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
   OFFLINE_COPY,
-  RECENT_SORTS,
-  type RecentSort,
   countsLineOf,
   greetingOf,
   lineValueOf,
@@ -47,18 +47,6 @@ const RECENT_ROWS = 6
 
 /** As many tiles as the page holds to a row, so the grid's rows are whole. */
 const RECENT_COLUMNS = TAB_TILE_COLUMNS
-
-/** The two orders of Home's albums, as its choices offer them, the phone's order. */
-const RECENT_CHOICES = [
-  { key: RECENT_SORTS.release, label: HOME_COPY.sorts.release },
-  { key: RECENT_SORTS.added, label: HOME_COPY.sorts.added },
-] as const
-
-/** What the section is called under each order. */
-const RECENT_TITLES = {
-  [RECENT_SORTS.added]: LIBRARY_PAGE_COPY.recent,
-  [RECENT_SORTS.release]: HOME_COPY.latestReleases,
-} as const satisfies Record<RecentSort, string>
 
 const useStyles = themedStyles(({ colors }) => ({
   content: { gap: SPACE.s6, padding: SPACE.gutter },
@@ -210,13 +198,13 @@ function RecentAlbums({ session }: RecentAlbumsProps) {
       <SectionHeader
         action={{
           text: KIT_COPY.seeAll,
-          label: KIT_COPY.seeAllOf(RECENT_TITLES[sort]),
+          label: KIT_COPY.seeAllOf(HOME_RECENT_TITLES[sort]),
           onPress: () => router.push(libraryHref(LIBRARY_SEGMENTS.albums)),
         }}
-        title={RECENT_TITLES[sort]}
+        title={HOME_RECENT_TITLES[sort]}
       />
       <ChoiceRow
-        choices={RECENT_CHOICES}
+        choices={HOME_RECENT_CHOICES}
         label={HOME_COPY.sortAlbums}
         onSelect={(homeSort) => change({ homeSort })}
         selected={sort}

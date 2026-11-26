@@ -1,6 +1,6 @@
+import { WREN_ICONS } from '@raven/wren'
 import { SIZES } from '@/theme/tokens'
 import { useToast } from '@/stores/toast'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/Toast/Toast.module.scss'
 
@@ -15,7 +15,7 @@ export function ToastHost() {
     <output aria-live="polite" className={styles.host}>
       {message !== null && (
         <span className={styles.toast}>
-          <WrenIcon name={ICONS.check} size={SIZES.smallIcon} />
+          <WrenIcon name={WREN_ICONS.check} size={SIZES.smallIcon} />
           <span className={styles.message}>{message}</span>
         </span>
       )}

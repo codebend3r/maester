@@ -1,8 +1,13 @@
 import type { AlbumSummary } from '@raven/core'
-import { TOP_SHELF_KINDS, type TopShelf, deepLinkOf } from '@raven/top-shelf/contract'
+import {
+  TOP_SHELF_KINDS,
+  TOP_SHELF_LAYOUTS,
+  type TopShelf,
+  deepLinkOf,
+} from '@raven/top-shelf/contract'
 import { HOME_COPY, TOP_SHELF_COPY } from '@raven/wren'
 import type { CoverOf } from '@raven/wren-native'
-import { WREN_PAGES, WREN_ROUTES, WREN_ROUTE_PARAMS } from '@raven/wren-native/headless'
+import { WREN_PAGES, WREN_ROUTES, pageHref } from '@raven/wren-native/headless'
 
 import { WREN_TV_SCHEME } from '@/config/linkScheme'
 
@@ -24,7 +29,8 @@ type ReleasesShelfOfProps = { albums: readonly AlbumSummary[]; coverOf: CoverOf 
  * left off, since a tile is its cover.
  */
 export const releasesShelfOf = ({ albums, coverOf }: ReleasesShelfOfProps): TopShelf => ({
-  kind: TOP_SHELF_KINDS.sectioned,
+  kind: TOP_SHELF_KINDS.titles,
+  layout: TOP_SHELF_LAYOUTS.sectioned,
   title: HOME_COPY.latestReleases,
   items: albums.slice(0, TOP_SHELF_ALBUMS).flatMap((album) => {
     const cover = coverOf({ albumId: album.id, coverVersion: album.coverVersion })
@@ -38,8 +44,7 @@ export const releasesShelfOf = ({ albums, coverOf }: ReleasesShelfOfProps): TopS
         playUrl: null,
         openUrl: deepLinkOf({
           scheme: WREN_TV_SCHEME,
-          pathname: WREN_PAGES.album,
-          params: { [WREN_ROUTE_PARAMS.id]: String(album.id) },
+          ...pageHref({ page: WREN_PAGES.album, id: album.id }),
         }),
       },
     ]

@@ -1,9 +1,9 @@
 import { View } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { type Palette } from '@raven/wren'
+import { type Palette, type WrenIconName } from '@raven/wren'
 import { RADIUS, SIZE } from '@/theme/wrenTokens'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** How an icon tile is drawn: quiet, as most rows' are, or in red, as the server's is. */
 export const TILE_TONES = { quiet: 'quiet', accent: 'accent' } as const

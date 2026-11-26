@@ -1,5 +1,5 @@
+import { type Drawing, INKS, type WrenIconName } from '@raven/wren'
 import { type Color, type Size, type TokenStyle } from '@/theme/tokens'
-import { INKS, type Ink, type WrenIconName } from '@/ui/WrenIcon/icons'
 import styles from '@/ui/WrenIcon/WrenIcon.module.scss'
 
 /** A line icon's width: 1.75, and 2 for the tab showing. */
@@ -30,7 +30,7 @@ const INK_PROPS = {
       strokeLinejoin: 'round',
     }) as const,
   [INKS.fill]: () => ({ fill: 'currentColor' }) as const,
-} as const satisfies Record<Ink, (props: InkPropsOf) => object>
+} as const satisfies Record<Drawing['ink'], (props: InkPropsOf) => object>
 
 /**
  * One of Wren's icons. It is decorative: the control it sits in carries the label, so a

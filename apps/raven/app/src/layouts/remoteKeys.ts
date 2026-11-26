@@ -1,68 +1,11 @@
-import { type SkipStep, oneOf } from '@raven/core'
-
-/** The remote's keys the d-pad player answers, as the fork's `useTVEventHandler` names them. */
-export const REMOTE_KEYS = {
-  left: 'left',
-  right: 'right',
-  up: 'up',
-  down: 'down',
-  select: 'select',
-  playPause: 'playPause',
-  play: 'play',
-  pause: 'pause',
-  rewind: 'rewind',
-  fastForward: 'fastForward',
-} as const
-
-export type RemoteKey = (typeof REMOTE_KEYS)[keyof typeof REMOTE_KEYS]
-
-const isRemoteKey = oneOf(Object.values(REMOTE_KEYS))
-
-/** The names the fork's Android helper gives a key held down (only the d-pad and select). */
-export const LONG_PRESS_NAMES = {
-  longLeft: 'longLeft',
-  longRight: 'longRight',
-  longUp: 'longUp',
-  longDown: 'longDown',
-  longSelect: 'longSelect',
-} as const
-
-/** A key held down, by the fork's name for it, and the key it is. */
-export const LONG_PRESSES = {
-  [LONG_PRESS_NAMES.longLeft]: REMOTE_KEYS.left,
-  [LONG_PRESS_NAMES.longRight]: REMOTE_KEYS.right,
-  [LONG_PRESS_NAMES.longUp]: REMOTE_KEYS.up,
-  [LONG_PRESS_NAMES.longDown]: REMOTE_KEYS.down,
-  [LONG_PRESS_NAMES.longSelect]: REMOTE_KEYS.select,
-} as const
-
-// Its own keys only: `in` would also pass a name an object inherits, such as `toString`.
-const isLongPress = (name: string): name is keyof typeof LONG_PRESSES =>
-  Object.hasOwn(LONG_PRESSES, name)
-
-/** Android's `KeyEvent` actions, which the fork hands on with each key. */
-export const KEY_ACTIONS = { down: 0, up: 1 } as const
-
-type PressedKeyOfProps = {
-  eventType: string
-  eventKeyAction?: unknown
-}
-
-/**
- * The key a remote event presses, once. On Android TV the fork sends a press as the key coming
- * up (its key-down events are off), and a key held down as its long name, once going down and
- * once coming up, so a press counts as it comes up, a held one as the key it is. The fork's
- * types call the action a string, but Android sends its `KeyEvent`'s, a number; an event naming
- * none counts.
- */
-export const pressedKeyOf = ({
-  eventType,
-  eventKeyAction,
-}: PressedKeyOfProps): RemoteKey | null => {
-  if (eventKeyAction !== undefined && Number(eventKeyAction) !== KEY_ACTIONS.up) return null
-  if (isLongPress(eventType)) return LONG_PRESSES[eventType]
-  return isRemoteKey(eventType) ? eventType : null
-}
+import type { SkipStep } from '@raven/core'
+import {
+  KEY_ACTIONS,
+  LONG_PRESSES,
+  REMOTE_KEYS,
+  type RemoteKey,
+  isLongPress,
+} from '@raven/native/headless'
 
 /** Which way a held key carries the playhead: left back, right on, the rest not at all. */
 const SEEK_DIRECTIONS: Partial<Record<RemoteKey, -1 | 1>> = {

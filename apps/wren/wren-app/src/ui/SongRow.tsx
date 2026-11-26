@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import {
@@ -17,7 +18,7 @@ import { AlbumArt } from '@/ui/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: {
@@ -177,7 +178,7 @@ export function SongRow({
         <View style={styles.end}>
           {isDownloaded && (
             <View accessibilityLabel={KIT_COPY.downloaded} accessible>
-              <WrenIcon color={colors.text3} name={ICONS.downloaded} size={SIZE.check} />
+              <WrenIcon color={colors.text3} name={WREN_ICONS.downloaded} size={SIZE.check} />
             </View>
           )}
           <Text style={styles.duration}>{duration}</Text>
@@ -187,7 +188,7 @@ export function SongRow({
         <View style={styles.more}>
           <IconButton
             color={colors.text3}
-            icon={ICONS.more}
+            icon={WREN_ICONS.more}
             label={KIT_COPY.more(title)}
             onPress={onMore}
             size={SIZE.smallButton}

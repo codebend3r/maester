@@ -1,6 +1,6 @@
 import type { Track } from '@raven/core'
 import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, TRANSPORTS, factsLineOf } from '@raven/wren'
+import { PLAYER_COPY, TRANSPORTS, factsLineOf, WREN_ICONS } from '@raven/wren'
 import { useNavigate } from 'react-router-dom'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
 import { Transport } from '@/player/Transport/Transport'
@@ -11,7 +11,6 @@ import { WREN_ROUTES } from '@/routes'
 import { SIZES } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { PlayingSummary } from '@/ui/PlayingSummary/PlayingSummary'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/shell/PlayerBar/PlayerBar.module.scss'
 
 type PlayingBarProps = { track: Track }
@@ -41,8 +40,8 @@ function PlayingBar({ track }: PlayingBarProps) {
         <Scrubber kind={SCRUBBERS.bar} length={length} />
       </div>
       <div className={styles.end}>
-        <IconButton icon={ICONS.lyrics} label={PLAYER_COPY.lyrics} onPress={openNowPlaying} />
-        <IconButton icon={ICONS.upNext} label={PLAYER_COPY.upNext} onPress={openNowPlaying} />
+        <IconButton icon={WREN_ICONS.lyrics} label={PLAYER_COPY.lyrics} onPress={openNowPlaying} />
+        <IconButton icon={WREN_ICONS.upNext} label={PLAYER_COPY.upNext} onPress={openNowPlaying} />
         <span className={styles.volume}>
           <Volume />
         </span>
