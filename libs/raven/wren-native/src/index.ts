@@ -45,10 +45,5 @@ export { type SearchResults, useSearchResults } from '@/search/useSearchResults'
 export { type SignInFlow, useSignInFlow } from '@/signIn/useSignInFlow'
 export { useServerNameField } from '@/settings/useServerNameField'
 export { type CollectionSearch, useCollectionSearch } from '@/library/useCollectionSearch'
-export {
-  type DetailRouteProps,
-  type DetailStandInProps,
-  type DetailViews,
-  DetailRoute,
-} from '@/detail/DetailRoute'
+export { type DetailStandInProps, type DetailViews, detailRouteWith } from '@/detail/DetailRoute'
 export { type WrenTheme, createWrenTheming } from '@/theme/wrenTheming'

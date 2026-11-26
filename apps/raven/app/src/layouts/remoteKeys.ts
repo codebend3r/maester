@@ -85,9 +85,8 @@ export const isSeekingWith = ({ isShown, isScrubbing }: IsSeekingWithProps): boo
 
 /**
  * What the d-pad player does with a press. Left and right skip (how far is the chrome's skip
- * ladder's to say) from the scrubber,
- * or while the controls are hidden, as the press brings them back; on the buttons they move the
- * focus instead. Rewind and fast forward skip wherever the focus is, and the play keys play and
+ * ladder's to say) from the scrubber, or while the controls are hidden, as the press brings them
+ * back; on the buttons they move the focus instead. Rewind and fast forward skip wherever the focus is, and the play keys play and
  * pause. Every press brings the controls back, which the chrome does for any key.
  */
 export const remoteAnswerOf = ({

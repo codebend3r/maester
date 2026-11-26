@@ -57,7 +57,7 @@ type DetailCopy = Parameters<typeof detailNoticeOf>[0]['copy']
 /** What a detail page is handed: the session it reads through, and the thing it shows. */
 type DetailPageProps<T> = { session: WrenSession; details: T }
 
-export type DetailRouteProps<T, Key extends QueryKey> = {
+type DetailRouteProps<T, Key extends QueryKey> = {
   /** The page itself, drawn once the thing it shows is read. */
   Page: ComponentType<DetailPageProps<T>>
   copy: DetailCopy
@@ -65,8 +65,6 @@ export type DetailRouteProps<T, Key extends QueryKey> = {
   queryOf: (
     queries: WrenSession['queries'],
   ) => (id: number | null) => UseQueryOptions<T, Error, T, Key>
-  /** The app's own stand-ins, drawn while the page is opening, missing or not read. */
-  views: DetailViews
 }
 
 type DetailViewOfProps<T, Key extends QueryKey> = Pick<
@@ -94,6 +92,7 @@ const detailViewOf = <T, Key extends QueryKey>({
 
 type SessionDetailProps<T, Key extends QueryKey> = DetailRouteProps<T, Key> & {
   session: WrenSession
+  views: DetailViews
 }
 
 function SessionDetail<T, Key extends QueryKey>({
@@ -119,12 +118,18 @@ function SessionDetail<T, Key extends QueryKey>({
   )
 }
 
-/**
- * A page reading one thing from its address, once a server is active, every Wren's on React
- * Native: the page when it is read, else the app's stand-in saying that it is opening, missing
- * from the server, or could not be read.
- */
-export function DetailRoute<T, Key extends QueryKey>(props: DetailRouteProps<T, Key>) {
-  const session = useWren()
-  return session !== null && <SessionDetail {...props} session={session} />
+type DetailRouteWithProps = {
+  /** The app's own stand-ins, drawn while the page is opening, missing or not read. */
+  views: DetailViews
 }
+
+/**
+ * An app's `DetailRoute`, every Wren's on React Native, in the app's own stand-ins: a page
+ * reading one thing from its address once a server is active, drawn when it is read, else the
+ * stand-in saying that it is opening, missing from the server, or could not be read.
+ */
+export const detailRouteWith = ({ views }: DetailRouteWithProps) =>
+  function DetailRoute<T, Key extends QueryKey>(props: DetailRouteProps<T, Key>) {
+    const session = useWren()
+    return session !== null && <SessionDetail {...props} session={session} views={views} />
+  }

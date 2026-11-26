@@ -1,10 +1,4 @@
-import {
-  type DetailRouteProps,
-  type DetailStandInProps,
-  type DetailViews,
-  DetailRoute as WrenDetailRoute,
-} from '@raven/wren-native'
-import type { QueryKey } from '@tanstack/react-query'
+import { type DetailStandInProps, type DetailViews, detailRouteWith } from '@raven/wren-native'
 import type { ReactNode } from 'react'
 import { ScrollView, View } from 'react-native'
 
@@ -59,9 +53,5 @@ const PHONE_DETAIL_VIEWS = {
   notice: DetailNotice,
 } as const satisfies DetailViews
 
-type PhoneDetailRouteProps<T, Key extends QueryKey> = Omit<DetailRouteProps<T, Key>, 'views'>
-
 /** A page reading one thing from its address, in the phone's stand-ins, each with the way back. */
-export function DetailRoute<T, Key extends QueryKey>(props: PhoneDetailRouteProps<T, Key>) {
-  return <WrenDetailRoute {...props} views={PHONE_DETAIL_VIEWS} />
-}
+export const DetailRoute = detailRouteWith({ views: PHONE_DETAIL_VIEWS })

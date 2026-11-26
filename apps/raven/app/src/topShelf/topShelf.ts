@@ -3,6 +3,7 @@ import {
   TOP_SHELF_KINDS,
   TOP_SHELF_LAYOUTS,
   type TopShelf,
+  type TopShelfInvitation,
   deepLinkOf,
 } from '@raven/top-shelf/contract'
 
@@ -20,7 +21,7 @@ const linkTo = (target: RouteTarget): string =>
   deepLinkOf({ scheme: APP_SCHEME, ...hrefOf(target) })
 
 /** Signed out: the invitation, which opens sign-in. */
-export const SIGNED_OUT_SHELF: TopShelf = {
+export const SIGNED_OUT_SHELF: TopShelfInvitation = {
   kind: TOP_SHELF_KINDS.signedOut,
   title: TOP_SHELF_COPY.signIn,
   openUrl: deepLinkOf({ scheme: APP_SCHEME, pathname: APP_ROUTES.signIn, params: {} }),

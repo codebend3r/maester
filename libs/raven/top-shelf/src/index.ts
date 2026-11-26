@@ -7,5 +7,5 @@ export {
   type TopShelfPicture,
   deepLinkOf,
 } from '@/contract'
-export { HAS_TOP_SHELF, type SignedInShelfProps, TopShelfSync } from '@/TopShelfSync'
+export { type SignedInShelfProps, TopShelfSync } from '@/TopShelfSync'
 export { useTopShelf } from '@/useTopShelf'

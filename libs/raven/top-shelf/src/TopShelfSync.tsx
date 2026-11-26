@@ -1,14 +1,14 @@
 import type { ComponentType, ReactNode } from 'react'
 import { Platform } from 'react-native'
 
-import type { TopShelf } from '@/contract'
+import type { TopShelfInvitation } from '@/contract'
 import { useTopShelf } from '@/useTopShelf'
 
 /** The system whose TVs have a Top Shelf: tvOS reports itself as iOS. */
 const TOP_SHELF_OS = { ios: 'ios' } as const
 
 /** Only the Apple TV has a Top Shelf; an iPhone, an iPad and Android TV's home screen show none of an app's own. */
-export const HAS_TOP_SHELF = Platform.OS === TOP_SHELF_OS.ios && Platform.isTV
+const HAS_TOP_SHELF = Platform.OS === TOP_SHELF_OS.ios && Platform.isTV
 
 const ACCOUNT_STATES = { signedIn: 'signedIn', signedOut: 'signedOut' } as const
 
@@ -21,7 +21,7 @@ type TopShelfSyncProps<Session> = {
   /** The session while the app is open to the viewer; null shows the invitation. */
   session: Session | null
   /** The invitation to sign in, shown while nobody is. */
-  signedOut: TopShelf
+  signedOut: TopShelfInvitation
   /** The app's own shelf while an account is signed in, which writes it through `useTopShelf`. */
   SignedIn: ComponentType<SignedInShelfProps<Session>>
 }

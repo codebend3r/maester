@@ -478,6 +478,9 @@ describe('Home on a TV', () => {
     expect(preferred()).toEqual([BUSBOYS])
   })
 
+  /** Where a view is laid out down its parent, for the layout events a test fires. */
+  type LaidOut = { y: number; height: number }
+
   it('stands a shelf far from the view in as an empty box its height, and draws it again as it comes near', async () => {
     await renderHome()
     const films = await screen.findByTestId(`library:${FILMS.id}`)
@@ -487,7 +490,7 @@ describe('Home on a TV', () => {
       (node) => typeof node.props.onScroll === 'function' && node.props.horizontal !== true,
     )
     if (shelves === undefined) throw new Error('No shelves')
-    const layout = (box: { y: number; height: number }) => ({
+    const layout = (box: LaidOut) => ({
       nativeEvent: { layout: { x: 0, width: 1920, ...box } },
     })
     const scrollTo = (y: number) => ({ nativeEvent: { contentOffset: { x: 0, y } } })

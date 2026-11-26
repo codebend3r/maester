@@ -23,10 +23,11 @@ import { usePlayedStreams } from '@/stores/playedStreams'
 /** What a TV's music host reads of the active server. */
 type MusicSession = { server: AppServer; api: ApiClient }
 
+/** The cache key a track's ticketed address sits under, with the server and the track. */
+const TRACK_SOURCE_KEYS = { tv: 'tvTrackSource' } as const
+
 /** Where a track plays from on a TV, as the app asks for it. */
 export type VideoTrackSource = {
-  /** The cache key its ticketed address sits under, with the server and the track. */
-  key: string
   /** Makes its ticketed address, or says why the server would not play it. */
   load: () => Promise<SourceOutcome>
   /** What it plays from once the address is made, for a player that shows it. */
@@ -59,7 +60,7 @@ const VideoTrack = ({ session, sourceOf, track, rate, start }: VideoTrackProps) 
 
   // The track's ticketed address: server data, so it lives in the query cache, read once per track.
   const source = useQuery({
-    queryKey: [plan.key, session.server.id, track.id],
+    queryKey: [TRACK_SOURCE_KEYS.tv, session.server.id, track.id],
     queryFn: plan.load,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 0,

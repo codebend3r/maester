@@ -1,10 +1,4 @@
-import {
-  type DetailRouteProps,
-  type DetailStandInProps,
-  type DetailViews,
-  DetailRoute as WrenDetailRoute,
-} from '@raven/wren-native'
-import type { QueryKey } from '@tanstack/react-query'
+import { type DetailStandInProps, type DetailViews, detailRouteWith } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
 import { SPACE, TYPE } from '@/theme/tvTokens'
@@ -43,12 +37,8 @@ const TV_DETAIL_VIEWS = {
   notice: DetailNotice,
 } as const satisfies DetailViews
 
-type TvDetailRouteProps<T, Key extends QueryKey> = Omit<DetailRouteProps<T, Key>, 'views'>
-
 /**
  * A page reading one thing from its address, the phone's, in the TV's stand-ins. A TV draws no
  * way back: Back on Android TV and Menu on Apple TV leave it.
  */
-export function DetailRoute<T, Key extends QueryKey>(props: TvDetailRouteProps<T, Key>) {
-  return <WrenDetailRoute {...props} views={TV_DETAIL_VIEWS} />
-}
+export const DetailRoute = detailRouteWith({ views: TV_DETAIL_VIEWS })

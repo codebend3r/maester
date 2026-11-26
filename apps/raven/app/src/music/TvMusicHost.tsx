@@ -5,9 +5,6 @@ import { useMemo } from 'react'
 import { mediaSourcesFor } from '@/player/mediaSources'
 import type { AppQueries } from '@/queries/useAppQueries'
 
-/** The cache keys a track's ticketed address sits under, with the server and the track. */
-const MUSIC_SOURCE_KEYS = { tv: 'musicSource' } as const
-
 /** What a music host reads of the active server. */
 type MusicSession = Pick<AppQueries, 'server' | 'api'>
 
@@ -21,7 +18,6 @@ export const TvMusicHost = ({ session }: TvMusicHostProps) => {
   const { server } = session
   const sourceOf = useMemo(
     (): VideoTrackSourceOf => (track) => ({
-      key: MUSIC_SOURCE_KEYS.tv,
       load: () =>
         mediaSourcesFor(server).source({
           media: { id: track.id },

@@ -3,9 +3,6 @@ import { trackStreamOf } from '@raven/native/headless'
 import { type WrenSession, mediaSourcesFor } from '@raven/wren-native'
 import { useMemo } from 'react'
 
-/** The cache keys a track's ticketed address sits under, with the server and the track. */
-const TRACK_SOURCE_KEYS = { tv: 'wrenTvTrackSource' } as const
-
 /** What the music host reads of the active server. */
 type MusicSession = Pick<WrenSession, 'server' | 'api'>
 
@@ -27,7 +24,6 @@ export const TvMusicHost = ({ session }: TvMusicHostProps) => {
         chosenKbps: null,
       })
       return {
-        key: TRACK_SOURCE_KEYS.tv,
         load: () => mediaSourcesFor(server).trackSource({ mediaId: track.id, kbps }),
         stream,
       }

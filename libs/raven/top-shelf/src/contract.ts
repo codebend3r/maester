@@ -32,14 +32,17 @@ export type TopShelfItem = {
   openUrl: string
 }
 
+/** The shelf shown while nobody is signed in: an invitation to sign in. */
+export type TopShelfInvitation = {
+  kind: typeof TOP_SHELF_KINDS.signedOut
+  title: string
+  /** Where pressing the invitation goes: the sign-in page. */
+  openUrl: string
+}
+
 /** What the Top Shelf shows above the app's tile, as the app last wrote it. */
 export type TopShelf =
-  | {
-      kind: typeof TOP_SHELF_KINDS.signedOut
-      title: string
-      /** Where pressing the invitation goes: the sign-in page. */
-      openUrl: string
-    }
+  | TopShelfInvitation
   | {
       kind: typeof TOP_SHELF_KINDS.titles
       layout: TopShelfLayout
