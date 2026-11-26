@@ -45,7 +45,6 @@ describe('useWrenPrefs', () => {
       homeSort: RECENT_SORTS.added,
       coverSize: COVER_SIZES.medium,
       libraryId: null,
-      serverName: null,
     })
   })
 
@@ -69,7 +68,6 @@ describe('useWrenPrefs', () => {
       homeSort: RECENT_SORTS.release,
       coverSize: COVER_SIZES.extraSmall,
       libraryId: null,
-      serverName: null,
     })
   })
 
@@ -110,7 +108,6 @@ describe('useWrenPrefs', () => {
       homeSort: RECENT_SORTS.added,
       coverSize: COVER_SIZES.medium,
       libraryId: null,
-      serverName: null,
     })
   })
 

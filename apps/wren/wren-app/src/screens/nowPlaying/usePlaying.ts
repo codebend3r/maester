@@ -16,7 +16,6 @@ import { Platform } from 'react-native'
 import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
 import { deviceOf } from '@/screens/nowPlaying/device'
 import { WREN_PAGES, pageHref } from '@/routes'
-import { useServerName } from '@/stores/wrenPrefs'
 import { useFormFactor } from '@/theme/wrenTheme'
 import type { WrenSession } from '@/useWren'
 
@@ -57,7 +56,7 @@ export const usePlaying = ({ session, track }: UsePlayingProps): Playing => {
     session.queries.artistQuery(sourceIdOf({ source, kind: QUEUE_SOURCE_KINDS.artist })),
   )
   const quality = usePlayedQuality({ track })
-  const serverName = useServerName({ fallback: session.server.name })
+  const serverName = session.server.name
   const device = deviceOf({ os: Platform.OS, formFactor })
   const [firstArtist] = track.artists
   const close = () => router.back()

@@ -1,34 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  AUTH_CONFIG_STATES,
-  type AccountDataClient,
-  type ReadyAuthConfig,
-  createAccountDataClient,
-} from '@raven/core'
+import { AUTH_CONFIG_STATES, type AccountDataClient, accountDataClientsFor } from '@raven/core'
 import { authConfigQuery } from '@/lib/queries'
 import { currentAccessToken, useAuthSession } from '@/stores/authSession'
 
-const accountDataClients = new Map<string, AccountDataClient>()
-
-const accessToken = async (): Promise<string | null> => currentAccessToken()
-
 /** The account database's client for the home server's Supabase project, made once for it. */
-export const accountDataFor = ({
-  supabaseUrl,
-  publishableKey,
-}: ReadyAuthConfig): AccountDataClient => {
-  const key = `${supabaseUrl} ${publishableKey}`
-  const known = accountDataClients.get(key)
-  if (known !== undefined) return known
-  const client = createAccountDataClient({
-    supabaseUrl,
-    publishableKey,
-    accessToken,
-    fetch: (url, init) => window.fetch(url, init),
-  })
-  accountDataClients.set(key, client)
-  return client
-}
+export const accountDataFor = accountDataClientsFor({
+  accessToken: async () => currentAccessToken(),
+  fetch: (url, init) => window.fetch(url, init),
+})
 
 /**
  * The account database's client and who it is for: null while accounts are off or the home

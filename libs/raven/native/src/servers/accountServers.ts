@@ -9,6 +9,7 @@ import {
   type LibraryPin,
   SERVER_CHECK_PROBLEMS,
   type ServerId,
+  type ServerName,
   createAccountDataClient,
   isAuthConfig,
   renamedServers,
@@ -59,15 +60,36 @@ export type AddProblem = (typeof ADD_PROBLEMS)[keyof typeof ADD_PROBLEMS]
 
 type RenameProps = { id: string; name: string }
 
+type WriteNameProps = RenameProps & { client: AccountDataClient }
+
 type SetPinProps = { serverId: ServerId; libraryId: number; shouldPin: boolean }
 
-/** How a rename ended: done, or refused because `renamedServers` would not take the name. */
-export const RENAME_OUTCOMES = { renamed: 'renamed', badName: 'badName' } as const
+/**
+ * How a rename ended: done, refused because `renamedServers` would not take the name, or with no
+ * account to keep it (accounts off, no one signed in, or a server the account cannot name).
+ */
+export const RENAME_OUTCOMES = {
+  renamed: 'renamed',
+  badName: 'badName',
+  noAccount: 'noAccount',
+} as const
 
 export type RenameOutcome = (typeof RENAME_OUTCOMES)[keyof typeof RENAME_OUTCOMES]
 
 /** Home's auth config as last read, and the database's client while accounts are on. */
 type HomeConfig = { config: AuthConfig; client: AccountDataClient | null }
+
+type AccountList = { rows: AccountServer[]; names: ServerName[] }
+
+/** The account's servers and the names it gave the rest, or null when its database did not answer. */
+const readAccountList = async (client: AccountDataClient): Promise<AccountList | null> => {
+  try {
+    const [rows, names] = await Promise.all([client.listServers(), client.listServerNames()])
+    return { rows, names }
+  } catch {
+    return null
+  }
+}
 
 /**
  * The account's servers, kept in its Supabase database (`createAccountDataClient`), for an app
@@ -122,21 +144,38 @@ export const accountServersFor = ({ servers, session, fetch }: AccountServersFor
     if (config.state === AUTH_CONFIG_STATES.unavailable) return SYNC_OUTCOMES.unreachable
     if (client === null) {
       rows = []
-      await servers.getState().follow({ servers: [], homeServerId })
+      await servers.getState().follow({ servers: [], homeServerId, homeName: null })
       return SYNC_OUTCOMES.accountsOff
     }
     if (session.getState().session === null) return SYNC_OUTCOMES.signedOut
-    try {
-      rows = await client.listServers()
-    } catch {
-      return SYNC_OUTCOMES.unreachable
-    }
-    await servers.getState().follow({ servers: rows.map(appServerOf), homeServerId })
+    const list = await readAccountList(client)
+    if (list === null) return SYNC_OUTCOMES.unreachable
+    rows = list.rows
+    const homeName = list.names.find((named) => named.serverId === homeServerId)?.name ?? null
+    await servers.getState().follow({ servers: rows.map(appServerOf), homeServerId, homeName })
     return SYNC_OUTCOMES.followed
   }
 
   const rowIdOf = (serverId: string): string | null =>
     rows.find((row) => row.serverId === serverId)?.id ?? null
+
+  /**
+   * Writes a server's new name where the account keeps it, as the web does: the account's row for
+   * one it added, its name for home, which has no row and goes by its own id. False when there is
+   * nowhere to write it: a server not on the account, or a home too old to say its id.
+   */
+  const writeName = async ({ client, id, name }: WriteNameProps): Promise<boolean> => {
+    const { homeServerId } = servers.getState()
+    if (id === home.id) {
+      if (homeServerId === null) return false
+      await client.nameServer({ serverId: homeServerId, name })
+      return true
+    }
+    const rowId = rowIdOf(id)
+    if (rowId === null) return false
+    await client.renameServer({ id: rowId, name })
+    return true
+  }
 
   return {
     sync,
@@ -169,14 +208,17 @@ export const accountServersFor = ({ servers, session, fetch }: AccountServersFor
       return null
     },
 
-    /** Gives one of the account's servers the name typed, tidied as every client's list renames. */
+    /**
+     * Gives a server the name typed, tidied as every client's list renames: one the account added,
+     * or home. The name is the account's, so every device signed in to it wears it.
+     */
     rename: async ({ id, name }: RenameProps): Promise<RenameOutcome> => {
       const client = await accountData()
-      const rowId = rowIdOf(id)
       const renamed = renamedServers({ servers: servers.getState().servers, id, name })
       const cleaned = renamed?.find((server) => server.id === id)?.name ?? null
-      if (client === null || rowId === null || cleaned === null) return RENAME_OUTCOMES.badName
-      await client.renameServer({ id: rowId, name: cleaned })
+      if (cleaned === null) return RENAME_OUTCOMES.badName
+      if (client === null) return RENAME_OUTCOMES.noAccount
+      if (!(await writeName({ client, id, name: cleaned }))) return RENAME_OUTCOMES.noAccount
       await sync()
       return RENAME_OUTCOMES.renamed
     },

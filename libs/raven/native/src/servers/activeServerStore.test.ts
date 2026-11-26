@@ -66,7 +66,9 @@ describe('createActiveServerStore', () => {
   it("follows the account's list after home and keeps it, with the active id, under raven.servers", async () => {
     const { store, items } = memoryStore()
     const useServers = storeOf({ store })
-    await useServers.getState().follow({ servers: [NAS, DEN], homeServerId: HOME_SERVER_ID })
+    await useServers
+      .getState()
+      .follow({ servers: [NAS, DEN], homeServerId: HOME_SERVER_ID, homeName: null })
     useServers.getState().activate(NAS.id)
     await Promise.resolve()
     expect(SERVER_LIST_KEY).toBe('raven.servers')
@@ -78,7 +80,7 @@ describe('createActiveServerStore', () => {
   it('reads them back in a new launch, the server last used still in use', async () => {
     const { store } = memoryStore()
     const first = storeOf({ store })
-    await first.getState().follow({ servers: [NAS], homeServerId: HOME_SERVER_ID })
+    await first.getState().follow({ servers: [NAS], homeServerId: HOME_SERVER_ID, homeName: null })
     first.getState().activate(NAS.id)
     await Promise.resolve()
 
@@ -125,7 +127,7 @@ describe('createActiveServerStore', () => {
   it('works for the run when the store fails, rather than failing', async () => {
     const useServers = storeOf({ store: failingStore })
     await useServers.persist.rehydrate()
-    await useServers.getState().follow({ servers: [NAS], homeServerId: null })
+    await useServers.getState().follow({ servers: [NAS], homeServerId: null, homeName: null })
     useServers.getState().activate(NAS.id)
     expect(useServers.getState()).toMatchObject({ servers: [HOME, NAS], activeId: NAS.id })
   })
@@ -133,9 +135,9 @@ describe('createActiveServerStore', () => {
   it('goes home when the server in use leaves the list, forgetting its cookies', async () => {
     const { forgotten, jar } = recordingJar()
     const useServers = storeOf({ jar })
-    await useServers.getState().follow({ servers: [NAS, DEN], homeServerId: null })
+    await useServers.getState().follow({ servers: [NAS, DEN], homeServerId: null, homeName: null })
     useServers.getState().activate(NAS.id)
-    await useServers.getState().follow({ servers: [DEN], homeServerId: null })
+    await useServers.getState().follow({ servers: [DEN], homeServerId: null, homeName: null })
     expect(useServers.getState()).toMatchObject({ servers: [HOME, DEN], activeId: HOME.id })
     expect(forgotten).toEqual([NAS.id])
   })
@@ -143,9 +145,11 @@ describe('createActiveServerStore', () => {
   it('keeps the server in use while it stays on the list', async () => {
     const { forgotten, jar } = recordingJar()
     const useServers = storeOf({ jar })
-    await useServers.getState().follow({ servers: [NAS, DEN], homeServerId: null })
+    await useServers.getState().follow({ servers: [NAS, DEN], homeServerId: null, homeName: null })
     useServers.getState().activate(NAS.id)
-    await useServers.getState().follow({ servers: [{ ...NAS, name: 'Attic' }], homeServerId: null })
+    await useServers
+      .getState()
+      .follow({ servers: [{ ...NAS, name: 'Attic' }], homeServerId: null, homeName: null })
     expect(useServers.getState()).toMatchObject({
       servers: [HOME, { ...NAS, name: 'Attic' }],
       activeId: NAS.id,
@@ -156,10 +160,60 @@ describe('createActiveServerStore', () => {
   it('leaves out a row naming home by its own id, and never removes home', async () => {
     const useServers = storeOf()
     const homeRow = { ...NAS, id: HOME_SERVER_ID, origin: 'https://home.lan' }
-    await useServers.getState().follow({ servers: [homeRow, DEN], homeServerId: HOME_SERVER_ID })
+    await useServers
+      .getState()
+      .follow({ servers: [homeRow, DEN], homeServerId: HOME_SERVER_ID, homeName: null })
     expect(useServers.getState().servers).toEqual([HOME, DEN])
-    await useServers.getState().follow({ servers: [], homeServerId: HOME_SERVER_ID })
+    await useServers
+      .getState()
+      .follow({ servers: [], homeServerId: HOME_SERVER_ID, homeName: null })
     expect(useServers.getState().servers).toEqual([HOME])
+  })
+
+  it("wears the account's name for home, keeps it for the next launch and lets it go with the account", async () => {
+    const { store } = memoryStore()
+    const first = storeOf({ store })
+    await first
+      .getState()
+      .follow({ servers: [NAS], homeServerId: HOME_SERVER_ID, homeName: 'Vhagar' })
+    const named = { ...HOME, name: 'Vhagar' }
+    expect(first.getState()).toMatchObject({
+      home: named,
+      servers: [named, NAS],
+      homeName: 'Vhagar',
+    })
+    await Promise.resolve()
+
+    const next = storeOf({ store })
+    await next.persist.rehydrate()
+    expect(next.getState()).toMatchObject({
+      home: named,
+      servers: [named, NAS],
+      homeName: 'Vhagar',
+    })
+
+    await next.getState().follow({ servers: [NAS], homeServerId: HOME_SERVER_ID, homeName: null })
+    expect(next.getState()).toMatchObject({ home: HOME, servers: [HOME, NAS], homeName: null })
+  })
+
+  it('reads back no home name it could not have kept', async () => {
+    const stored = { state: { servers: [HOME], activeId: HOME.id, homeName: '  x  ' }, version: 0 }
+    const { store } = memoryStore([[SERVER_LIST_KEY, JSON.stringify(stored)]])
+    const useServers = storeOf({ store })
+    await useServers.persist.rehydrate()
+    expect(useServers.getState()).toMatchObject({ home: HOME, homeName: null })
+  })
+
+  it('leaves the list as it was when a read changed nothing', async () => {
+    const useServers = storeOf()
+    await useServers
+      .getState()
+      .follow({ servers: [NAS], homeServerId: HOME_SERVER_ID, homeName: 'Vhagar' })
+    const servers = useServers.getState().servers
+    await useServers
+      .getState()
+      .follow({ servers: [{ ...NAS }], homeServerId: HOME_SERVER_ID, homeName: 'Vhagar' })
+    expect(useServers.getState().servers).toBe(servers)
   })
 
   it('activates only a listed server', () => {

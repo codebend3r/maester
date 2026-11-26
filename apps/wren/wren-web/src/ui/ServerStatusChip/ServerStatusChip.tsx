@@ -1,5 +1,5 @@
 import { useMusicLibraries } from '@/music/musicLibraries'
-import { useServerName } from '@/stores/wrenPrefs'
+import { useServerName } from '@/lib/serverName'
 import { StatusChip } from '@/ui/StatusChip/StatusChip'
 
 /** The server's chip: its name, and whether it answers, read from its libraries. */

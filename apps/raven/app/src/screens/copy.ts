@@ -188,6 +188,7 @@ export const SERVERS_COPY = {
   remove: 'Remove',
   removeName: (name: string) => `Remove ${name}`,
   badName: 'A name needs 1 to 80 characters, with no hidden ones.',
+  noAccount: 'Sign in to keep a name on your account.',
   add: 'Add server',
   adding: 'Checking',
   address: 'Server address',

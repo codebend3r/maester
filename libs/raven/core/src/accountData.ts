@@ -26,6 +26,13 @@ export const ACCOUNT_TABLES = {
   preferences: 'account_preferences',
 } as const
 
+/**
+ * How often an open app reads the account's servers and their names again, so a rename made on
+ * another device shows here without a relaunch. Every client also reads them on coming back to
+ * the front.
+ */
+export const ACCOUNT_DATA_REFRESH_MS = 30_000
+
 /** The columns the clients send and filter on, as the tables name them. */
 export const ACCOUNT_COLUMNS = {
   id: 'id',
@@ -232,3 +239,28 @@ export const createAccountDataClient = (props: CreatePostgrestProps) => {
 }
 
 export type AccountDataClient = ReturnType<typeof createAccountDataClient>
+
+type AccountDataClientsForProps = Pick<CreatePostgrestProps, 'accessToken' | 'fetch'>
+
+/** The Supabase project a client reads: the address and key the server's auth config names. */
+type AccountProject = Pick<CreatePostgrestProps, 'supabaseUrl' | 'publishableKey'>
+
+/**
+ * An app's account database clients, one per Supabase project and made the first time it is
+ * asked for, all with the app's own token and `fetch`: what a web page hands its account queries,
+ * so every render of them reads one client and a test spies on that one.
+ */
+export const accountDataClientsFor = ({
+  accessToken,
+  fetch,
+}: AccountDataClientsForProps): ((project: AccountProject) => AccountDataClient) => {
+  const clients = new Map<string, AccountDataClient>()
+  return ({ supabaseUrl, publishableKey }) => {
+    const key = `${supabaseUrl} ${publishableKey}`
+    const known = clients.get(key)
+    if (known !== undefined) return known
+    const client = createAccountDataClient({ supabaseUrl, publishableKey, accessToken, fetch })
+    clients.set(key, client)
+    return client
+  }
+}

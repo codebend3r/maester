@@ -51,7 +51,12 @@ export type { TrackPlan } from '@/music/audioItem'
 export { TRACK_STREAM_KINDS, type TrackStream } from '@raven/core'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { nativePlayerOf } from '@/music/nativePlayer'
-export { type AddProblem, RENAME_OUTCOMES, accountServersFor } from '@/servers/accountServers'
+export {
+  type AddProblem,
+  RENAME_OUTCOMES,
+  type RenameOutcome,
+  accountServersFor,
+} from '@/servers/accountServers'
 export {
   activePinServerIdOf,
   createActiveServerStore,

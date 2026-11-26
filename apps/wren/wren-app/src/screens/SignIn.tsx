@@ -6,7 +6,6 @@ import { SIGN_IN_FRAMES } from '@/screens/signIn/SignInFrame'
 import { SIGN_IN_VIEWS } from '@/screens/signIn/StepForms'
 import { useSignInFlow } from '@/screens/signIn/useSignInFlow'
 import { useActiveServer } from '@/stores/activeServer'
-import { useServerName } from '@/stores/wrenPrefs'
 import { useFormFactor } from '@/theme/wrenTheme'
 
 type ActiveServerState = ReturnType<typeof useActiveServer.getState>
@@ -22,8 +21,7 @@ const serverNameOf = ({ servers, activeId }: ActiveServerState): string =>
  */
 export function SignIn() {
   const router = useRouter()
-  const listedName = useActiveServer(serverNameOf)
-  const serverName = useServerName({ fallback: listedName })
+  const serverName = useActiveServer(serverNameOf)
   const openTabs = () => router.replace(WREN_ROUTES.home)
   const flow = useSignInFlow({
     initial: { email: '', password: '' },

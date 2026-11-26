@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { THEME_TONES } from '@raven/core'
+import { followAccountServers } from '@raven/native'
 import {
   IGNORED,
   IS_SIGN_IN_BYPASSED,
@@ -70,20 +71,6 @@ const loadStores = async (): Promise<void> => {
   const downloads = useDownloads.getState()
   await downloads.keepFor({ accountId: accountIdOf(useAccountSession.getState()) }).catch(IGNORED)
   downloads.resume().catch(IGNORED)
-}
-
-/**
- * Reads the account's servers into the list once the stores are read and again whenever the
- * account changes, so the switcher, the pins and Settings show its servers, and the app goes
- * home when the one in use is no longer the account's. A read that fails keeps the list kept
- * on the device, so a server's downloads still play away from the network. Hands back the way
- * to stop.
- */
-const followAccountServers = (): (() => void) => {
-  accountServers.sync().catch(IGNORED)
-  return useAccountSession.subscribe((state, previous) => {
-    if (accountIdOf(state) !== accountIdOf(previous)) accountServers.sync().catch(IGNORED)
-  })
 }
 
 /**
@@ -234,7 +221,13 @@ export const AppRoot = () => {
   useEffect(() => {
     if (isLoaded) hideAsync().catch(IGNORED)
   }, [isLoaded])
-  useEffect(() => (isLoaded ? followAccountServers() : undefined), [isLoaded])
+  useEffect(
+    () =>
+      isLoaded
+        ? followAccountServers({ sync: accountServers.sync, session: useAccountSession })
+        : undefined,
+    [isLoaded],
+  )
 
   return isLoaded && <AppRoutes />
 }

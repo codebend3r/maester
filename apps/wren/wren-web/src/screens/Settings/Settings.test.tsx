@@ -8,16 +8,18 @@ import {
   THEME_MODES,
   WREN_THEMES,
 } from '@raven/wren'
+import { queryKeys } from '@raven/ui/headless'
 import { QueryClient } from '@tanstack/react-query'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { wrenVersion } from '@/lib/version'
+import { accountDataFor } from '@/lib/accountData'
 import { api } from '@/lib/api'
 import type { AuthClient } from '@/lib/authClient'
 import { WREN_ROUTES } from '@/routes'
 import { Settings } from '@/screens/Settings/Settings'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import { SIGNED_IN, fakeAuthClient } from '@/test/authClient'
+import { SIGNED_IN, fakeAuthClient, readyConfig } from '@/test/authClient'
 import { MUSIC, mockMusicApiEach } from '@/test/music'
 import { renderWithProviders, signedIn } from '@/test/render'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
@@ -59,6 +61,20 @@ const renderSignedIn = ({
     client,
   })
   return { calls }
+}
+
+const HOME_SERVER_ID = '3f2b1c0d-9e8f-4a7b-8c6d-5e4f3a2b1c0d'
+
+/** Settings signed in to a server the account has named Vhagar. */
+const renderNamed = () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  signedIn({ client, auth: fakeAuthClient().client })
+  client.setQueryData(queryKeys.authConfig, { ...readyConfig, serverId: HOME_SERVER_ID })
+  client.setQueryData(queryKeys.serverNames(SIGNED_IN.userId), [
+    { serverId: HOME_SERVER_ID, name: 'Vhagar' },
+  ])
+  renderWithProviders({ ui: <Settings />, route: WREN_ROUTES.settings, authConfig: null, client })
+  return { client }
 }
 
 /** Settings on a server with accounts off, as the fixture server runs: nobody signed in. */
@@ -183,26 +199,39 @@ describe('Settings', () => {
     expect(within(libraries).getByRole('radio', { name: vinyl.name })).toBeChecked()
   })
 
-  it('names the server, and says that name wherever it says what it is connected to', async () => {
-    renderSignedIn()
+  it("names the server on the account, and wears the account's name wherever it says what it is connected to", async () => {
+    const { client } = renderNamed()
+    const account = accountDataFor(readyConfig)
+    let names = [{ serverId: HOME_SERVER_ID, name: 'Vhagar' }]
+    const listed = spyOn(account, 'listServerNames').mockImplementation(async () => names)
+    const named = spyOn(account, 'nameServer').mockImplementation(async ({ serverId, name }) => {
+      names = [{ serverId, name }]
+      return { serverId, name }
+    })
     const field = await screen.findByRole('textbox', { name: SETTINGS_COPY.serverName })
-    await userEvent.type(field, 'Living room')
-    expect(useWrenPrefs.getState().serverName).toBe('Living room')
-    expect(await screen.findByText(STATUS_COPY.connected('Living room'))).toBeInTheDocument()
-
+    expect(field).toHaveValue('Vhagar')
     await userEvent.clear(field)
-    expect(useWrenPrefs.getState().serverName).toBeNull()
-    expect(await screen.findByText(STATUS_COPY.connected(STATUS_COPY.raven))).toBeInTheDocument()
+    await userEvent.type(field, '  Living   room {Enter}')
+    expect(named).toHaveBeenCalledWith({ serverId: HOME_SERVER_ID, name: 'Living room' })
+    expect(await screen.findByText(STATUS_COPY.connected('Living room'))).toBeInTheDocument()
+    expect(client.getQueryData(queryKeys.serverNames(SIGNED_IN.userId))).toEqual(names)
+    listed.mockRestore()
+    named.mockRestore()
   })
 
-  it('refuses a name that is too long and keeps the last one that will do', async () => {
-    renderSignedIn()
+  it('keeps the name when the field is left blank, and refuses one that is too long', async () => {
+    renderNamed()
+    const named = spyOn(accountDataFor(readyConfig), 'nameServer')
     const field = await screen.findByRole('textbox', { name: SETTINGS_COPY.serverName })
-    await userEvent.type(field, 'Home')
+    await userEvent.clear(field)
+    await userEvent.tab()
+    expect(field).toHaveValue('Vhagar')
     await userEvent.click(field)
     await userEvent.paste('x'.repeat(80))
     expect(screen.getByText(SETTINGS_COPY.serverNameError)).toBeInTheDocument()
-    expect(useWrenPrefs.getState().serverName).toBe('Home')
+    await userEvent.type(field, '{Enter}')
+    expect(named).not.toHaveBeenCalled()
+    named.mockRestore()
   })
 
   it('has nothing of the downloads or the cellular stream', () => {

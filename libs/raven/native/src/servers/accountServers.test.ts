@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   ACCOUNT_COLUMNS,
+  ACCOUNT_TABLES,
   AUTH_CONFIG_STATES,
   AUTH_COOKIE,
   AUTH_PATHS,
@@ -10,6 +11,7 @@ import {
   type FetchInit,
   type FetchLike,
   POSTGREST,
+  type ServerName,
   ROUTES,
   SERVERS_CAP,
 } from '@raven/core'
@@ -62,11 +64,18 @@ type Call = { url: string; init: FetchInit }
 type FakeFetchProps = {
   config?: unknown
   rows?: () => AccountServer[]
+  /** The names the account gave servers it keeps no row for. */
+  names?: () => ServerName[]
   health?: Record<string, unknown>
 }
 
-/** A fetch that answers home's auth config, servers' health and the account's servers table, and logs every call. */
-const fakeFetch = ({ config = READY_CONFIG, rows = () => [], health = {} }: FakeFetchProps) => {
+/** A fetch that answers home's auth config, servers' health and the account's servers and names, and logs every call. */
+const fakeFetch = ({
+  config = READY_CONFIG,
+  rows = () => [],
+  names = () => [],
+  health = {},
+}: FakeFetchProps) => {
   const calls: Call[] = []
   const fetch: FetchLike = async (url, init = {}) => {
     calls.push({ url, init })
@@ -79,7 +88,16 @@ const fakeFetch = ({ config = READY_CONFIG, rows = () => [], health = {} }: Fake
       if (body === undefined) throw new TypeError('Network request failed')
       return responseOf({ status: HTTP_STATUSES.ok, body })
     }
-    // The account's servers table is the only one these tests reach.
+    if (url.startsWith(SUPABASE) && url.includes(`/${ACCOUNT_TABLES.serverNames}`)) {
+      const isWrite = (init.method ?? HTTP_METHODS.get) !== HTTP_METHODS.get
+      const written = JSON.parse(isWrite ? (init.body ?? '{}') : '{}')
+      return responseOf({
+        status: isWrite ? HTTP_STATUSES.created : HTTP_STATUSES.ok,
+        body: isWrite
+          ? [{ serverId: written[ACCOUNT_COLUMNS.serverId], name: written[ACCOUNT_COLUMNS.name] }]
+          : names(),
+      })
+    }
     if (url.startsWith(SUPABASE)) {
       const isWrite = (init.method ?? HTTP_METHODS.get) !== HTTP_METHODS.get
       return responseOf({
@@ -146,7 +164,8 @@ describe('accountServersFor', () => {
     const session = { getState: () => ({ ...SIGNED_IN, refresh: async () => 'fresh' }) }
     const account = accountServersFor({ servers, session, fetch })
     expect(await account.sync()).toBe(SYNC_OUTCOMES.followed)
-    expect(tokens).toEqual([`${AUTH_SCHEME} token`, fresh])
+    // The servers and their names are read together, and each read renews the token it was refused.
+    expect(tokens).toEqual([`${AUTH_SCHEME} token`, `${AUTH_SCHEME} token`, fresh, fresh])
     expect(servers.getState().servers).toMatchObject([HOME, { id: MELEYS_ID }])
   })
 
@@ -225,6 +244,40 @@ describe('accountServersFor', () => {
     const patch = calls.find(({ init }) => init.method === HTTP_METHODS.patch)
     expect(patch?.url ?? '').toContain(`${ACCOUNT_COLUMNS.id}=${POSTGREST.equals}${MELEYS_ROW.id}`)
     expect(JSON.parse(patch?.init.body ?? '{}')).toEqual({ [ACCOUNT_COLUMNS.name]: 'Attic' })
+  })
+
+  it("wears the account's name for home, and lets it go once the account has none", async () => {
+    let names: ServerName[] = [{ serverId: HOME_SERVER_ID, name: 'Vhagar' }]
+    const { servers, account } = accountOf({ rows: () => [MELEYS_ROW], names: () => names })
+    await account.sync()
+    expect(servers.getState().servers[0]).toEqual({ ...HOME, name: 'Vhagar' })
+    names = []
+    await account.sync()
+    expect(servers.getState().servers[0]).toEqual(HOME)
+  })
+
+  it('renames home by its own id on the account, so every device wears the name', async () => {
+    let names: ServerName[] = []
+    const { servers, calls, account } = accountOf({ names: () => names })
+    await account.sync()
+    const renaming = account.rename({ id: HOME.id, name: '  Vhagar ' })
+    names = [{ serverId: HOME_SERVER_ID, name: 'Vhagar' }]
+    expect(await renaming).toBe(RENAME_OUTCOMES.renamed)
+    const upsert = calls.find(
+      ({ url, init }) =>
+        url.includes(`/${ACCOUNT_TABLES.serverNames}`) && init.method === HTTP_METHODS.post,
+    )
+    expect(JSON.parse(upsert?.init.body ?? '{}')).toEqual({
+      [ACCOUNT_COLUMNS.serverId]: HOME_SERVER_ID,
+      [ACCOUNT_COLUMNS.name]: 'Vhagar',
+    })
+    expect(servers.getState().home.name).toBe('Vhagar')
+  })
+
+  it('keeps no name while there is no account to keep it', async () => {
+    const { account } = accountOf({ isSignedIn: false })
+    await account.sync()
+    expect(await account.rename({ id: HOME.id, name: 'Vhagar' })).toBe(RENAME_OUTCOMES.noAccount)
   })
 
   it('removes by the row, going home first when it is the one in use', async () => {
