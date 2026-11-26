@@ -1,6 +1,6 @@
 [project]
 name = "sparrow"
-version = "0.9.4"
+version = "0.10.0"
 description = "AI concierge of the maester suite, for raven's friends and its admin"
 requires-python = ">=3.12,<3.13"
 dependencies = [
