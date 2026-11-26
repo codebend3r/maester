@@ -82,7 +82,8 @@ export const readLog = async ({ userData }: ReadLogProps): Promise<string[]> => 
   return text.split('\n').filter((line) => line !== '')
 }
 
-const hasExited = (app: ElectronApplication): boolean => {
+/** Whether the app's process has exited or been killed by a signal. */
+export const hasExited = (app: ElectronApplication): boolean => {
   const child = app.process()
   return child.exitCode !== null || child.signalCode !== null
 }
@@ -198,14 +199,18 @@ type LaunchAppProps = {
   mpv?: MpvMode
   /** Extra variables for main, such as a test hook, merged last. */
   env?: Readonly<Record<string, string>>
+  /** Another Electron to run the app on, such as `hardenedElectron`'s; the checkout's by default. */
+  executable?: string
 }
 
 export const launchApp = async ({
   userData,
   mpv = ENGINE_MODES.headless,
   env = {},
+  executable,
 }: LaunchAppProps): Promise<Launched> => {
   const app = await _electron.launch({
+    executablePath: executable,
     /*
      * Chromium's fake audio sink: playback is clocked by the audio output, so a real device
      * whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
@@ -233,16 +238,11 @@ export const launchApp = async ({
   return { app, page, marks, output }
 }
 
-type WithAppProps<T> = {
-  userData: string
-  mpv?: MpvMode
-  env?: Readonly<Record<string, string>>
-  run: (launched: Launched) => Promise<T>
-}
+type WithAppProps<T> = LaunchAppProps & { run: (launched: Launched) => Promise<T> }
 
 /** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
-export const withApp = async <T>({ userData, mpv, env, run }: WithAppProps<T>): Promise<T> => {
-  const launched = await launchApp({ userData, mpv, env })
+export const withApp = async <T>({ run, ...launch }: WithAppProps<T>): Promise<T> => {
+  const launched = await launchApp(launch)
   const result = await run(launched).catch(async (error: unknown) => {
     await closeApp({ app: launched.app }).catch(() => undefined)
     throw error

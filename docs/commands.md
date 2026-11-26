@@ -90,6 +90,8 @@ Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 | `wren:deploy:ios`         | Builds Wren's signed Release and puts it on every paired iPhone and iPad.       | Xcode       |
 | `deploy:devices`          | Puts raven on both TVs, and raven and Wren on every paired iPhone and iPad.     | Xcode       |
 | `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.                   | Xcode       |
+| `app:testflight:ios`      | Archives the iPhone and iPad app and uploads it to TestFlight.                  | Xcode       |
+| `app:testflight:tvos`     | Archives the Apple TV app and uploads it to TestFlight.                         | Xcode       |
 | `app:deploy:android-tv`   | Builds the Release APK and puts it on the Android TV over adb, found over mDNS. | Android SDK |
 | `app:deploy:android`      | Builds the Release APK and puts it on the Android phone or emulator adb sees.   | Android SDK |
 | `app:deploy:tvs`          | Puts the checked-out app on the Android TV, then on the Apple TV.               | Xcode       |

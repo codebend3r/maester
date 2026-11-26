@@ -271,7 +271,14 @@ await run({
     'BUILDMODE=static',
     `PREFIX=${prefix}`,
     `MACOSX_DEPLOYMENT_TARGET=12.0`,
-    'XCFLAGS=-fPIC',
+    /*
+     * LuaJIT maps its machine code with MAP_JIT only when told to. Without it the hardened
+     * runtime's allow-jit does not cover those pages, and the kernel kills Raven the first
+     * time one of mpv's built-in Lua scripts (stats, auto_profiles) turns hot. That branch
+     * ends a void function with `return 0;`, which Xcode's clang makes an error; it is the
+     * last statement, so as a warning it compiles to the same code.
+     */
+    'XCFLAGS=-fPIC -DLUAJIT_ENABLE_OSX_HRT -Wno-error=return-mismatch',
   ],
   cwd: src('luajit'),
   env,

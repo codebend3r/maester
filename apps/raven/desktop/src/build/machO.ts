@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process'
 import type { Dirent } from 'node:fs'
 import { open, readdir } from 'node:fs/promises'
 import { join, sep } from 'node:path'
+import { promisify } from 'node:util'
 
 /*
  * Ad hoc signing from the inside out. `codesign --deep` signs nested code in an order of its
@@ -125,6 +127,11 @@ type RunCommandProps = { command: string; args: string[] }
 
 /** Runs a command to its end; rejects when it fails. */
 export type RunCommand = (command: RunCommandProps) => Promise<unknown>
+
+const execFileAsync = promisify(execFile)
+
+/** The `RunCommand` that runs on this machine, through `execFile`. */
+export const runCommand: RunCommand = ({ command, args }) => execFileAsync(command, args)
 
 type SignAdHocProps = { app: string; run: RunCommand }
 
