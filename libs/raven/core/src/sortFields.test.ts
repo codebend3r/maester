@@ -29,6 +29,8 @@ describe('sort fields', () => {
       'resolution-low',
       'year-new',
       'year-old',
+      'first-aired-new',
+      'first-aired-old',
       'rating-high',
       'rating-low',
       'random',
@@ -86,6 +88,7 @@ describe('sort fields', () => {
       'changed',
       'bitrate',
       'release',
+      'firstAired',
       'rating',
       'random',
     ])

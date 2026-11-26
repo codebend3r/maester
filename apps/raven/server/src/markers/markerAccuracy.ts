@@ -34,6 +34,7 @@ import type { KeptFingerprint } from '@/markers/fingerprintMatch'
 import { strongest } from '@/markers/markerRows'
 import { REGIONS, type Region } from '@/markers/seasonListen'
 import { detectSeasonMarkers } from '@/markers/seasonMarkers'
+import { withSecretFiles } from '@shared/server'
 
 /** An intro's ends, or an end theme's start, within this many seconds count as right. */
 const WITHIN_S = 2
@@ -186,7 +187,7 @@ const main = async (): Promise<void> => {
       : {}
   const cache: Record<string, KeptFingerprint> = isCache(read) ? read : {}
   const ffmpeg = new FfmpegService(
-    readServerConfig(process.env),
+    readServerConfig(withSecretFiles({ env: process.env })),
     {
       playback: () => DEFAULT_PLAYBACK_SETTINGS,
     },

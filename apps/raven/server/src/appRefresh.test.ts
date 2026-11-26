@@ -194,7 +194,6 @@ describe('upgrading cached anime release dates', () => {
     db.exec('ALTER TABLE media DROP COLUMN dolby_vision_only')
     db.exec('DROP TABLE play_history')
     db.exec('DROP TABLE notifications')
-    db.exec('DROP TABLE caption_styles')
     db.exec('DROP TABLE download_requests')
     db.exec('ALTER TABLE media DROP COLUMN dolby_vision_profile')
     db.exec('ALTER TABLE artists DROP COLUMN background')

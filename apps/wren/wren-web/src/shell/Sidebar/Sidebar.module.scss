@@ -126,8 +126,26 @@
   padding-block-start: var(--space-2);
 }
 
+// The toggle and, while the sidebar is open, Wren's version at the row's far end, as raven's side menu has them.
+.toggleRow {
+  display: grid;
+  grid-template-areas: 'toggle version';
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.version {
+  grid-area: version;
+  padding-inline-end: var(--space-3);
+  color: var(--color-text-3);
+  font: var(--type-small);
+  font-variant-numeric: tabular-nums;
+}
+
 // Folds the sidebar to its icons, or opens it again; the rail has no room for it.
 .toggle {
+  grid-area: toggle;
   display: grid;
   place-items: center;
   inline-size: var(--size-touch-target);

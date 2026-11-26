@@ -201,3 +201,12 @@ export const PIN_PAD_COPY = {
   unlock: 'Unlock',
   cancel: 'Cancel',
 } as const
+
+type SettingsTabNameProps = { label: string; count?: number }
+
+/** Settings' tabs as a screen reader names them. */
+export const SETTINGS_TABS_COPY = {
+  /** A tab, with how many it holds where it counts: "Requests, 3". */
+  name: ({ label, count }: SettingsTabNameProps) =>
+    count === undefined ? label : `${label}, ${count}`,
+} as const

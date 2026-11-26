@@ -1,13 +1,11 @@
 import { type ReactNode, useId } from 'react'
 import { KEYS } from '@raven/core'
+import type { TabEntry } from '@raven/ui/headless'
 import styles from '@/components/Tabs/Tabs.module.scss'
-
-/** A tab: its value, its label and, where it lists things, how many it holds. */
-type Tab<T extends string> = { value: T; label: string; count?: number }
 
 type TabsProps<T extends string> = {
   label: string
-  tabs: readonly Tab<T>[]
+  tabs: readonly TabEntry<T>[]
   chosen: T
   onChoose: (value: T) => void
   children: ReactNode

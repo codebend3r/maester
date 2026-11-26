@@ -36,6 +36,11 @@ trap 'log "✗ update failed on line $LINENO"' ERR
 # means none are set.
 [ -f .env ] || touch .env
 
+# The secret files (README, "Secrets"), readable by raven's user alone:
+# 1026:100 is the compose file's `user:`. Run every time, so a folder Docker
+# made as root for the bind mount is handed back.
+install -d -m 700 -o 1026 -g 100 secrets
+
 image="$("$DOCKER" compose config --images "$SERVICE")"
 "$DOCKER" compose pull --quiet "$SERVICE"
 pulled="$("$DOCKER" image inspect --format '{{.Id}}' "$image")"

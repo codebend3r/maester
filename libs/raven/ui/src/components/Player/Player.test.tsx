@@ -11,7 +11,7 @@ import {
   type PlaybackSettingsState,
   type SubtitleTrack,
 } from '@raven/core'
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes, useNavigationType } from 'react-router-dom'
 import { Player } from '@/components/Player/Player'
@@ -102,7 +102,6 @@ const TRACKS: MediaTracks = {
 const spies: Array<{ mockRestore: () => void }> = []
 const stubTracks = (tracks: MediaTracks = TRACKS) =>
   spies.push(spyOn(api, 'getTracks').mockImplementation(async () => tracks))
-spies.push(spyOn(api, 'getCaptionStyle').mockImplementation(async () => DEFAULT_CAPTION_STYLE))
 
 afterEach(() => {
   spies.splice(0).forEach((spy) => spy.mockRestore())
@@ -345,16 +344,12 @@ describe('the player controls', () => {
 
     press('c')
     expect(usePlayerPrefs.getState().subtitles.on).toBe(true)
-    const saveCaptions = spyOn(api, 'setCaptionStyle').mockImplementation(async (style) => style)
-    spies.push(saveCaptions)
     press('+')
     expect(screen.getAllByText('Subtitle size: Large').length).toBeGreaterThan(0)
-    await waitFor(() =>
-      expect(saveCaptions).toHaveBeenCalledWith({
-        ...DEFAULT_CAPTION_STYLE,
-        size: CAPTION_SIZES.large,
-      }),
-    )
+    expect(usePlayerPrefs.getState().captionStyle).toEqual({
+      ...DEFAULT_CAPTION_STYLE,
+      size: CAPTION_SIZES.large,
+    })
     press('>')
     expect(video.playbackRate).toBe(1.25)
 

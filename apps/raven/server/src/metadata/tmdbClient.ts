@@ -79,11 +79,11 @@ const itemPath = ({ type, tmdbId }: ItemPathProps): string =>
 /** TMDB's search routes, which the client calls and the test fake answers. */
 export const TMDB_SEARCH_ROUTES = { movie: '/search/movie', show: '/search/tv' } as const
 
-/** TMDB's discover routes, and the parameter each takes the earliest day out in. */
+/** TMDB's discover routes. */
 const TMDB_DISCOVER = {
-  movie: { path: '/discover/movie', from: 'primary_release_date.gte' },
-  show: { path: '/discover/tv', from: 'first_air_date.gte' },
-} as const satisfies Record<MatchItemType, { path: string; from: string }>
+  movie: '/discover/movie',
+  show: '/discover/tv',
+} as const satisfies Record<MatchItemType, string>
 
 /** TMDB's order by popularity, the most popular first. */
 const TMDB_MOST_POPULAR = 'popularity.desc'
@@ -112,6 +112,33 @@ const LIST_PARAMS = {
     without_genres: DOCUMENTARY,
   },
 } as const satisfies Record<UpcomingList, Record<string, string>>
+
+/** The day a movie first comes out on, the parameter its discover takes the earliest one in. */
+const MOVIE_FROM = 'primary_release_date.gte'
+
+/** The day a show first airs on. */
+const SHOW_FIRST_FROM = 'first_air_date.gte'
+
+/** A show with an episode airing from the day on, so a running series' new season counts. */
+const SHOW_EPISODE_FROM = 'air_date.gte'
+
+/*
+ * The parameter each list takes its earliest day in. Anime shows go by any
+ * episode still to air, since TMDB dates few new series ahead and a new
+ * season of a running one is what is on its way.
+ */
+const LIST_FROM = {
+  movie: {
+    [UPCOMING_LISTS.general]: MOVIE_FROM,
+    [UPCOMING_LISTS.documentaries]: MOVIE_FROM,
+    [UPCOMING_LISTS.anime]: MOVIE_FROM,
+  },
+  show: {
+    [UPCOMING_LISTS.general]: SHOW_FIRST_FROM,
+    [UPCOMING_LISTS.documentaries]: SHOW_FIRST_FROM,
+    [UPCOMING_LISTS.anime]: SHOW_EPISODE_FROM,
+  },
+} as const satisfies Record<MatchItemType, Record<UpcomingList, string>>
 
 /** One call may take this long before it counts as TMDB being down. */
 const TIMEOUT_MS = 10_000
@@ -441,12 +468,11 @@ export class TmdbClient {
    * many there are, of one of the `UPCOMING_LISTS`.
    */
   async upcoming({ type, from, list, page }: TmdbClientUpcomingProps): Promise<DiscoveredPage> {
-    const route = TMDB_DISCOVER[type]
     return toDiscoveredPage(
       await this.get({
-        path: route.path,
+        path: TMDB_DISCOVER[type],
         params: {
-          [route.from]: from,
+          [LIST_FROM[type][list]]: from,
           ...LIST_PARAMS[list],
           sort_by: TMDB_MOST_POPULAR,
           include_adult: 'false',

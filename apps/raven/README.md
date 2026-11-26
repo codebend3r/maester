@@ -81,7 +81,7 @@ The index and thumbnails live in `./data` (mounted at `/config`). The image runs
 
 ### Running on Vhagar
 
-raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other five through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/` (Balerion's is its `Media` share). Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
+raven runs on Vhagar, the NAS with an Intel GPU, from `docker-compose.vhagar.yml`, which lives there as `/volume1/docker/raven/docker-compose.yml`. Every NAS's share is mounted read-write under `/media/<nas>`: Vhagar's own share directly, the other five through the cifs mounts Vhagar already has of them in `/volume1/Vhagar/`. Each share also holds folders for the others, so pick a library's folders inside one share rather than a whole share.
 
 Merges to `main` deploy themselves:
 
@@ -91,6 +91,12 @@ Merges to `main` deploy themselves:
 Nothing on Vhagar takes instructions from GitHub, and GitHub holds no NAS credentials: Vhagar only pulls a public image.
 
 To set the task up, in DSM: **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**. Name it `raven update` and run it as `root`; on **Schedule**, run daily, every 5 minutes, from 00:00 to a last run time of 23:55 (left at 00:00, it runs only just after midnight); on **Task Settings**, the script is `bash /volume1/docker/raven/update.sh`. DSM asks for your password, as it does for every task that runs as root.
+
+#### Secrets
+
+Container Manager and `docker inspect` show every environment variable a container has, and each ffmpeg raven starts inherits them, so a key or password never goes in `.env` on a NAS. It goes in `/volume1/docker/raven/secrets/`, one file per variable, named after it and holding only its value: `secrets/ADMIN_PASSWORD`, `secrets/TMDB_API_TOKEN`. The compose file binds the folder read-only at `/run/secrets`, and the server lays each file over the variable of its name as it starts (`withSecretFiles` in `@shared/server`; `SECRETS_DIR` moves the folder), without putting it in its environment. `update.sh` makes the folder, owned by `crivas` and closed to everyone else; keep each file `600`. A folder or file raven cannot read stops it from starting.
+
+The secrets are `ADMIN_PASSWORD`, `LIBRARY_PIN`, `RAVEN_PROXY_SECRET`, `RAVEN_MEDIA_SECRET`, `ANTHROPIC_API_KEY`, `TMDB_API_TOKEN`, `OMDB_API_KEY`, `MDBLIST_API_KEY`, `FANARTTV_API_KEY`, `THEAUDIODB_API_KEY`, `LASTFM_API_KEY`, `LASTFM_API_SECRET` and each `SONARR_*_API_KEY` and `RADARR_*_API_KEY`. What is not secret (origins, limits, languages, the Supabase URL and its publishable key) stays in `.env`, where it is easy to read.
 
 To go back to an earlier build, set `image:` to `ghcr.io/codebend3r/raven:<commit>` and run `update.sh`; put `latest` back to follow `main` again. A backup's files go back into `data/` with raven stopped.
 

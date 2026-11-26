@@ -511,9 +511,17 @@ describe('TV show metadata', () => {
     expect(next.json()).toMatchObject({ fileName: 'Severance - S01E02 - Half Loop.mp4' })
   })
 
-  it('searches shows and sorts them by year', async () => {
+  it('searches shows, sorts them by their newest episode, and by when they first aired', async () => {
     expect((await shows('?q=sev')).shows.map((entry) => entry.show.title)).toEqual(['Severance'])
-    expect((await shows('?sort=year-new')).shows.map((entry) => entry.show.year)).toEqual([
+    // Severance began in 2022, but its second season's premiere aired in January 2025.
+    expect((await shows('?sort=year-new')).shows.map((entry) => entry.show.title)).toEqual([
+      'Murderbot',
+      'Severance',
+      'Shōgun',
+      'Frieren',
+      'Fargo',
+    ])
+    expect((await shows('?sort=first-aired-new')).shows.map((entry) => entry.show.year)).toEqual([
       2025, 2024, 2023, 2022, 2014,
     ])
   })

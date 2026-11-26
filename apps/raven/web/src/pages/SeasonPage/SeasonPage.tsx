@@ -62,6 +62,7 @@ import { useSelectable } from '@/lib/useSelectable'
 import { useWatchedToggle } from '@/lib/useWatchedChange'
 import { SEASON_COPY } from '@/pages/SeasonPage/copy'
 import styles from '@/pages/SeasonPage/SeasonPage.module.scss'
+import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 
 /** A season's page plays the rest of that season, then stops. */
 const SEASON_SESSION: ViewingSession = { kind: SESSION_KINDS.season }
@@ -70,9 +71,7 @@ const STILL_KEYS = { picture: 'picture', number: 'number' } as const
 
 type StillPictureProps = { picture: string }
 
-const StillPicture = ({ picture }: StillPictureProps) => (
-  <img src={picture} alt="" loading="lazy" decoding="async" />
-)
+const StillPicture = ({ picture }: StillPictureProps) => <ViewportImage src={picture} alt="" />
 
 type StillNumberProps = { number: ReactNode }
 

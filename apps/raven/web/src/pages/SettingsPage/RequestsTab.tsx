@@ -1,4 +1,12 @@
-import { type TitleRequest, type TitleRequests, myRequestsOf, requestKeyOf } from '@raven/core'
+import {
+  REQUESTS_STATES,
+  type RequestsState,
+  type TitleRequest,
+  type TitleRequests,
+  myRequestsOf,
+  requestKeyOf,
+  requestsStateOf,
+} from '@raven/core'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { Link } from 'react-router-dom'
@@ -9,11 +17,6 @@ import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { REQUEST_COPY } from '@/pages/ComingSoonPage/requestCopy'
 import { RequestStatusPill } from '@/pages/ComingSoonPage/RequestStatusPill'
 import tableStyles from '@/pages/ComingSoonPage/RequestsTable.module.scss'
-import {
-  REQUESTS_STATES,
-  type RequestsState,
-  requestsStateOf,
-} from '@/pages/ComingSoonPage/requestsState'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import styles from '@/pages/SettingsPage/RequestsTab.module.scss'

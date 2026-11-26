@@ -30,9 +30,12 @@ services:
       - RAVEN_TRUSTED_PROXIES=172.30.84.1
     volumes:
       - /volume1/docker/raven/data:/config
+      # One file per secret, named after its variable (README, "Secrets"),
+      # so no key or password shows in the container's settings.
+      - /volume1/docker/raven/secrets:/run/secrets:ro
       # Every NAS's share under /media/<nas>, read-write so deleting in the
       # app removes the file. Vhagar's own share is local; the other five
-      # are its cifs mounts of theirs (Balerion's is its Media share).
+      # are its cifs mounts of theirs.
       - /volume1/Vhagar:/media/vhagar
       - /volume1/Vhagar/Balerion:/media/balerion
       - /volume1/Vhagar/Caraxes:/media/caraxes

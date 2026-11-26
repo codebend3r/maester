@@ -32,6 +32,7 @@ import styles from '@/components/MediaList/MediaList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { RATING_COLUMNS, RatingCells, ratingSortColumns } from '@/lib/ratingColumns'
 import { CARD_PICTURES, type CardPicture } from '@/lib/cardPictures'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
@@ -185,6 +186,7 @@ type MediaListProps = {
  */
 export const MediaList = ({ items, movies = false, matchType = null }: MediaListProps) => {
   const { sorted, toggle, ariaSort } = useTableSort({ rows: items, columns: COLUMNS })
+  const drawn = useDrawnFirst({ items: sorted })
   type HeaderProps = {
     key: Column
     label: string
@@ -249,7 +251,7 @@ export const MediaList = ({ items, movies = false, matchType = null }: MediaList
           </tr>
         </thead>
         <tbody>
-          {sorted.map((item) => (
+          {drawn.map((item) => (
             <MediaRow key={item.id} media={item} movies={movies} matchType={matchType} />
           ))}
         </tbody>

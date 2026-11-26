@@ -1,4 +1,4 @@
-import { myRequestsOf } from '@raven/core'
+import { myRequestCountOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, useId } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -208,7 +208,7 @@ const ViewerSettings = () => {
     access,
     hasHost,
     isDesktop,
-    requestCount: requests === undefined ? undefined : myRequestsOf(requests).length,
+    requestCount: myRequestCountOf(requests),
   })
   const asked = params.get(SETTINGS_TAB_PARAM)
   const tab =

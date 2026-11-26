@@ -27,6 +27,7 @@ import { ViewportImage } from '@/components/ViewportImage/ViewportImage'
 import { SHOW_CARD_COPY } from '@/components/ShowCard/copy'
 import styles from '@/components/ShowCard/ShowCard.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 type UseShowCardProps = {
   entry: ShowEntry
@@ -247,13 +248,16 @@ type ShowGridProps = {
 }
 
 /** The grid a TV library lays its shows out in, each a wide card. */
-export const ShowGrid = ({ shows, sort, note }: ShowGridProps) => (
-  <ul className={styles.grid}>
-    {shows.map((entry) => (
-      <WideShowCard key={entry.show.id} entry={entry} sort={sort} note={note?.(entry) ?? null} />
-    ))}
-  </ul>
-)
+export const ShowGrid = ({ shows, sort, note }: ShowGridProps) => {
+  const drawn = useDrawnFirst({ items: shows })
+  return (
+    <ul className={styles.grid}>
+      {drawn.map((entry) => (
+        <WideShowCard key={entry.show.id} entry={entry} sort={sort} note={note?.(entry) ?? null} />
+      ))}
+    </ul>
+  )
+}
 
 /** A wide show card on its way: its poster's place, a line for its title and one for its facts. */
 const WideShowSkeleton = () => (

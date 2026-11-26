@@ -4,6 +4,7 @@ import type { ComponentType } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { wrenVersion } from '@/about/version'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup'
 import { WREN_ROUTES, collectionPathOf, libraryHref } from '@/routes'
 import { CATEGORIES, type Category } from '@/screens/library/categories'
@@ -54,6 +55,12 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   active: { backgroundColor: colors.accentSoft },
   label: { ...TYPE.rowTitle, color: colors.text },
   activeLabel: { ...TYPE.rowTitle, color: colors.accentText, fontFamily: FONTS.bodySemiBold },
+  version: {
+    ...TYPE.small,
+    color: colors.text3,
+    paddingHorizontal: SPACE.s3,
+    paddingTop: SPACE.s2,
+  },
 }))
 
 /** One place the sidebar opens: its name, its drawing, its address and the path it shows at. */
@@ -136,10 +143,10 @@ function SidebarItem({ place, isRail }: SidebarItemProps) {
 }
 
 /**
- * The tablet's sidebar: the lockup, Home and Search, Library's categories, then Settings and
- * the server's status at its foot. Held upright, it folds to a rail: the same places with only
- * their words gone, the bird over them, every icon where the open sidebar has it, each still
- * named for a screen reader.
+ * The tablet's sidebar: the lockup, Home and Search, Library's categories, then Settings, the
+ * server's status and Wren's version at its foot, as the web's sidebar has them. Held upright,
+ * it folds to a rail: the same places with only their words gone, the bird over them, every
+ * icon where the open sidebar has it, each still named for a screen reader.
  */
 export function TabletSidebar() {
   const styles = useStyles()
@@ -175,6 +182,9 @@ export function TabletSidebar() {
           <ServerStatusChip session={session} />
         </Unseen>
       )}
+      <Unseen isUnseen={isRail}>
+        <Text style={styles.version}>{SETTINGS_COPY.versionOf(wrenVersion)}</Text>
+      </Unseen>
     </ScrollView>
   )
 }

@@ -54,7 +54,7 @@ export const subtitleLookOptions = ({ fontsDir }: SubtitleLookOptionsProps): Mpv
   { name: MPV_OPTIONS.subPos, value: SUBTITLE_POSITION },
 ]
 
-/** An account's look as mpv draws it: a multiple of its own subtitle size, and a `#rrggbb` colour. */
+/** A device's look as mpv draws it: a multiple of its own subtitle size, and a `#rrggbb` colour. */
 export const subtitleStyleOptions = ({ size, colour }: CaptionStyle): MpvOption[] => [
   { name: MPV_OPTIONS.subScale, value: CAPTION_SIZE_SCALES[size] },
   { name: MPV_OPTIONS.subColor, value: CAPTION_COLOUR_VALUES[colour] },

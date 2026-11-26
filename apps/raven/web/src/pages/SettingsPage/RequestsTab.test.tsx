@@ -1,18 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import {
-  DEFAULT_CAPTION_STYLE,
-  ITEM_TYPES,
-  REQUEST_STATUSES,
-  type TitleRequests,
-} from '@raven/core'
+import { ITEM_TYPES, REQUEST_STATUSES, type TitleRequests } from '@raven/core'
 import { api } from '@/lib/api'
 import { SettingsPage } from '@/pages/SettingsPage/SettingsPage'
 import { renderWithProviders } from '@/test/render'
 
 const listRequests = spyOn(api, 'listRequests')
-const captionStyle = spyOn(api, 'getCaptionStyle')
 
 const REQUESTS: TitleRequests = {
   requests: [
@@ -54,13 +48,9 @@ const openRequests = async () => {
 }
 
 describe("Settings' Requests tab", () => {
-  beforeEach(() => {
-    captionStyle.mockResolvedValue(DEFAULT_CAPTION_STYLE)
-  })
   afterEach(() => {
     cleanup()
     listRequests.mockReset()
-    captionStyle.mockReset()
   })
 
   it('opens on Playback, with the requests a tab away and counted', async () => {

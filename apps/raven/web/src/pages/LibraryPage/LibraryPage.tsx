@@ -54,8 +54,12 @@ const OpenLibrary = ({ library, section, titleId, lock, actions }: OpenLibraryPr
 
           <LibraryActionErrors actions={actions} className={styles.message} />
 
-          {/* Keyed by its tab, so moving to another starts its body afresh. */}
-          <section key={section} className={styles.section} aria-label={SECTIONS[section].label}>
+          {/* Keyed by its library and tab, so moving to another starts its body, and its drawn cards, afresh. */}
+          <section
+            key={`${library.id}:${section}`}
+            className={styles.section}
+            aria-label={SECTIONS[section].label}
+          >
             <SectionView library={library} section={section} />
           </section>
         </>

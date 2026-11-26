@@ -50,7 +50,10 @@ type Entry = {
   bitrate: number | null
   size: number | null
   resolution: Resolution | null
+  /** The year the release sorts go by: a show's newest episode's, a title's own. */
   year: number | null
+  /** The year a show first aired, or a title's own. */
+  firstAired: number | null
   /** Out of 10, as every source is kept. */
   score: number | null
   added: string | null
@@ -59,17 +62,21 @@ type Entry = {
 
 type FromMediaProps = { media: MediaItem; source: RatingSource }
 
-const fromMedia = ({ media, source }: FromMediaProps): Entry => ({
-  key: mediaEntryKey(media),
-  letter: mediaLetter(media),
-  bitrate: media.bitrate,
-  size: media.size,
-  resolution: resolutionLabel(media),
-  year: media.item?.year ?? media.year,
-  score: media.item ? (pickScore({ ratings: media.item.ratings, source })?.value ?? null) : null,
-  added: media.addedAt,
-  changed: media.changedAt,
-})
+const fromMedia = ({ media, source }: FromMediaProps): Entry => {
+  const year = media.item?.year ?? media.year
+  return {
+    key: mediaEntryKey(media),
+    letter: mediaLetter(media),
+    bitrate: media.bitrate,
+    size: media.size,
+    resolution: resolutionLabel(media),
+    year,
+    firstAired: year,
+    score: media.item ? (pickScore({ ratings: media.item.ratings, source })?.value ?? null) : null,
+    added: media.addedAt,
+    changed: media.changedAt,
+  }
+}
 
 type FromShowProps = { entry: ShowEntry; source: RatingSource }
 
@@ -79,7 +86,8 @@ const fromShow = ({ entry, source }: FromShowProps): Entry => ({
   bitrate: entry.bitrate,
   size: null,
   resolution: null,
-  year: entry.show.year,
+  year: firstYear(entry.latestAired ?? null) ?? entry.show.year,
+  firstAired: entry.show.year,
   score: pickScore({ ratings: entry.show.ratings, source })?.value ?? null,
   added: entry.addedAt,
   changed: null,
@@ -225,10 +233,10 @@ const scores = (source: RatingSource): Ruler => {
   }
 }
 
-/** Release years: each year across twenty or so, else decades. */
-const RELEASE: Ruler = {
+/** Years, or decades past twenty of them, along the year `value` reads. */
+const years = (value: Ruler['value']): Ruler => ({
   unit: null,
-  value: (entry) => entry.year,
+  value,
   cut: ({ low, high }) =>
     high - low <= 20
       ? { of: (year) => year, face: yearFace }
@@ -236,7 +244,11 @@ const RELEASE: Ruler = {
           of: (year) => Math.floor(year / 10),
           face: (decade) => ({ label: `${decade * 10}s`, name: `The ${decade * 10}s` }),
         },
-}
+})
+
+const RELEASE = years((entry) => entry.year)
+
+const FIRST_AIRED = years((entry) => entry.firstAired)
 
 /**
  * Album years, always as whole years counted back from `thisYear`, so this year is the newest
@@ -298,6 +310,7 @@ const rulers = ({ source, hasShows }: RulersProps): Record<JumpField, Ruler> => 
     face: (resolution) => ({ label: resolution.replace(/p$/, ''), name: resolution }),
   }),
   release: RELEASE,
+  firstAired: FIRST_AIRED,
   rating: scores(source),
 })
 
@@ -399,6 +412,7 @@ const fromAlbum = ({ album, by }: AlbumEntryProps): Entry => ({
   size: null,
   resolution: null,
   year: releaseYearOf(by === 'release' ? (firstYear(album.releaseDate) ?? album.year) : album.year),
+  firstAired: null,
   score: null,
   added: album.addedAt,
   changed: album.modifiedAt ?? null,

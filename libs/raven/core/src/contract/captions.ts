@@ -27,12 +27,10 @@ export type CaptionColour = (typeof CAPTION_COLOURS)[keyof typeof CAPTION_COLOUR
  */
 export const CAPTION_FLOOR_SHARE = 0.05
 
-/** Where an account's subtitle look is read and kept. */
-export const CAPTION_PATHS = { style: '/api/caption-style' } as const
-
 /**
- * `GET` and `PUT` on `CAPTION_PATHS.style`: how an account's subtitles look, the same for every video
- * on every device it signs in on. The face is always the display face; only these two vary.
+ * How subtitles look on one device, the same for every video it plays: each device keeps its own,
+ * so a TV across the room and a phone in the hand can differ. The face is always the display face;
+ * only these two vary.
  */
 export const isCaptionStyle = object({
   size: oneOf(Object.values(CAPTION_SIZES)),
@@ -41,7 +39,7 @@ export const isCaptionStyle = object({
 
 export type CaptionStyle = Infer<typeof isCaptionStyle>
 
-/** The look an account has until it picks one. */
+/** The look a device has until it picks one. */
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   size: CAPTION_SIZES.medium,
   colour: CAPTION_COLOURS.white,

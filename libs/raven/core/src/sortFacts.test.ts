@@ -73,6 +73,13 @@ describe('cardSortFact', () => {
     })
   })
 
+  it('says the date for a sort by when a show first aired, as for one by release', () => {
+    expect(cardSortFact({ media: released, sort: 'first-aired-new' })).toEqual({
+      sorted: formatAirDate('2026-03-07'),
+      isDateSaid: true,
+    })
+  })
+
   it('leaves the date to the card when there is no order or no day', () => {
     expect(cardSortFact({ media: released, sort: undefined })).toEqual({
       sorted: null,
@@ -87,7 +94,18 @@ describe('cardSortFact', () => {
 })
 
 describe('showSortFact', () => {
-  it('says the day a show first aired for a sort by release', () => {
+  it('says the day its newest episode aired for a sort by release, and the day it first aired for first aired', () => {
+    const entry = showEntry({
+      show: itemSummary({ released: '2019-05-12' }),
+      latestAired: '2025-01-17',
+    })
+    expect(showSortFact({ entry, sort: 'year-new', now: NOW })).toBe(formatAirDate('2025-01-17'))
+    expect(showSortFact({ entry, sort: 'first-aired-old', now: NOW })).toBe(
+      formatAirDate('2019-05-12'),
+    )
+  })
+
+  it("says the show's first day for a sort by release from a server that names no newest episode", () => {
     const entry = showEntry({ show: itemSummary({ released: '2019-05-12' }) })
     expect(showSortFact({ entry, sort: 'year-new', now: NOW })).toBe(formatAirDate('2019-05-12'))
   })

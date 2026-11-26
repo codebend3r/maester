@@ -292,7 +292,7 @@ export const Playing = ({
     shouldDrawCaptions,
     canDrawPictureSubtitles,
   })
-  const { style: captionStyle } = useCaptionStyle(session.api)
+  const { style: captionStyle } = useCaptionStyle()
   const { cues } = useTrackCues({
     video: {
       api: session.api,

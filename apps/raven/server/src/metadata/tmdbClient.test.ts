@@ -875,7 +875,7 @@ describe('toPerson and person', () => {
     expect(url.searchParams.get('with_genres')).toBe('99')
   })
 
-  it('asks for anime as animation made in Japanese, documentaries kept out', async () => {
+  it('asks for anime as animation made in Japanese, documentaries kept out, shows with an episode still to air', async () => {
     const asked: string[] = []
     const client = new TmdbClient(config(), async ({ url }) => {
       asked.push(url)
@@ -887,7 +887,10 @@ describe('toPerson and person', () => {
       list: UPCOMING_LISTS.anime,
       page: 1,
     })
-    expect(Object.fromEntries(new URL(asked[0] ?? '').searchParams)).toMatchObject({
+    const params = Object.fromEntries(new URL(asked[0] ?? '').searchParams)
+    expect(params).not.toHaveProperty('first_air_date.gte')
+    expect(params).toMatchObject({
+      'air_date.gte': '2026-11-10',
       with_genres: '16',
       with_original_language: 'ja',
       without_genres: '99',

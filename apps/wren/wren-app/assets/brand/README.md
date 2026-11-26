@@ -22,7 +22,8 @@ The design canvas with every lockup, size and mockup: https://claude.ai/artifact
 
 ## Rules
 
-- **Colours.** Night `#15201e`, Bark `#e6e1d6`, Ink `#131416`, Eye red `#c41725`, Leaf `#a8262f`, Paper `#f1ece2`. Bark on dark grounds, Ink on light ones. Red appears only in the eye; the one colour files have none.
+- **Colours.** Night `#15201e`, Bark `#e6e1d6`, Ink `#131416`, Eye red `#c41725`, Leaf `#a8262f`, Paper `#f1ece2`. Bark on dark grounds, Ink on light ones. On the mark files red appears only in the eye; the one colour files have none.
+- **Every icon wears Leaf.** The iPhone and iPad icon, the Android launcher icon (its ground is `BRAND.leaf` in `app.config.ts`) and the web favicon (`apps/wren/wren-web/public/favicon.svg`) are a Bark bird on a Leaf ground with a Night eye, as raven's splash page shows Wren (`wren-icon-on-leaf.svg`). Never another ground.
 - **The cutouts are holes.** The equalizer bars (and the eye, in the one colour files) are cut through the shape, so the ground shows through them. Never fill them in or put a backing shape behind the mark.
 - **Centring.** The mark files' box is centred on the bird's visual weight, not on its outline: the round body outweighs the thin tail, so centred by its outline the bird looks pushed right. Centre the file's box and the bird sits dead centre. The lockups are boxed on the outline, so their spacing to the wordmark is measured from the beak.
 - **Sizes.** The full mark from 64 px up, the small cut from 16 to 48 px (three wider bars, a bigger eye, heavier legs), the horizontal lockup from 24 px tall.

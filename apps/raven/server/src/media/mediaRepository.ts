@@ -334,7 +334,7 @@ export class MediaRepository {
                 (SELECT COUNT(*) FROM items e JOIN items s ON s.id = e.parent_id
                   WHERE s.parent_id = sh.id AND s.type = '${ITEM_TYPES.season}' AND e.type = '${ITEM_TYPES.episode}') AS total_episodes,
                 COUNT(DISTINCT CASE WHEN f.watched = 1 THEN f.episode_id END) AS watched_episodes,
-                MAX(f.added_at) AS added_at,
+                MAX(f.added_at) AS added_at, MAX(f.episode_released) AS latest_aired,
                 MAX(f.changed_at) AS changed_at, AVG(f.bitrate) AS bitrate,
                 ${score({ item: 'sh.id', source: 'l.ratings_source' })} AS score
            FROM files f
@@ -365,6 +365,7 @@ export class MediaRepository {
           watchedEpisodes: row.watched_episodes,
           endedYear: row.ended == null ? null : Number(row.ended.slice(0, 4)) || null,
           addedAt: row.added_at,
+          latestAired: row.latest_aired,
           bitrate: row.bitrate == null ? null : Math.round(row.bitrate),
           next: (nextId == null ? null : episodes.get(nextId)) ?? null,
         },

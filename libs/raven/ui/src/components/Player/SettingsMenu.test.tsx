@@ -319,7 +319,7 @@ describe('SettingsMenu subtitles', () => {
     expect(screen.getByRole('radio', { name: /English/ })).toBeDisabled()
   })
 
-  it("offers the account's subtitle size and colour, the ones it has checked", async () => {
+  it("offers this device's subtitle size and colour, the ones it has checked", async () => {
     const onPickCaption = jest.fn()
     renderSubtitles({ pictures: PICTURE_SUBTITLES.hidden, onPickCaption })
     const sizes = within(screen.getByRole('group', { name: 'Subtitle size' }))

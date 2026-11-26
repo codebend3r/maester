@@ -83,8 +83,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       adaptiveIcon: {
         foregroundImage: WREN_ICONS.adaptive,
         monochromeImage: WREN_ICONS.monochrome,
-        // The icon's ground is the brand's Night, the colour its foreground was drawn on.
-        backgroundColor: BRAND.night,
+        // The icon's ground is the brand's Leaf, the red every Wren icon wears.
+        backgroundColor: BRAND.leaf,
       },
       /*
        * The window's own colour, under the app. iOS reads its counterpart only through

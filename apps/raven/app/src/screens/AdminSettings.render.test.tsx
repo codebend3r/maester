@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { HTTP_METHODS, APP_CLIENT_CALLS, MEMBER_STATUSES, TRANSCODINGS, themeOf } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, MEMBER_STATUSES, TRANSCODINGS } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -46,6 +46,9 @@ const answerSheet = (answer: string) =>
     done(options.options.indexOf(answer))
   })
 
+/** Opens Settings' Admin tab once the account is known to be the owner's. */
+const openAdmin = async () => fireEvent.press(await screen.findByRole('tab', { name: 'Admin' }))
+
 const writes = () => mockServer.heard.filter(({ method }) => method !== HTTP_METHODS.get)
 
 describe("the owner's settings on a phone or tablet", () => {
@@ -64,8 +67,9 @@ describe("the owner's settings on a phone or tablet", () => {
     useAccountSession.setState({ session: SIGNED_IN })
   })
 
-  it("shows the owner the web's Admin sections, in its order, beside the theme", async () => {
+  it("shows the owner the web's Admin sections, in its order, under an Admin tab of their own", async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     await screen.findByRole('header', { name: 'Admin' })
     expect(
       screen
@@ -74,10 +78,8 @@ describe("the owner's settings on a phone or tablet", () => {
         .filter((name) =>
           ['Theme', 'Admin', 'Display', 'Remote Access', 'Library scans', 'Users'].includes(name),
         ),
-    ).toEqual(['Theme', 'Admin', 'Display', 'Remote Access', 'Library scans', 'Users'])
-    expect(
-      screen.getByRole('button', { name: `Theme: ${themeOf(DEFAULT_APP_PREFS.theme).name}` }),
-    ).toBeTruthy()
+    ).toEqual(['Admin', 'Display', 'Remote Access', 'Library scans', 'Users'])
+    expect(screen.getAllByRole('tab').at(-1)?.props.accessibilityLabel).toBe('Admin')
     expect(
       await screen.findByRole('button', { name: 'Server conversion: Remux and transcode' }),
     ).toBeTruthy()
@@ -85,6 +87,7 @@ describe("the owner's settings on a phone or tablet", () => {
 
   it('shows Remote Access to read only: the addresses in the fixed-width face, and nothing to switch or apply', async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     const address = await screen.findByText(/^192\.168\.1\.20:/u)
     expect(StyleSheet.flatten(address.props.style)?.fontFamily).toBe(CODE_FONT)
     expect(screen.getByLabelText(/^Private: 192\.168\.1\.20:/u)).toBeTruthy()
@@ -97,6 +100,7 @@ describe("the owner's settings on a phone or tablet", () => {
   it('saves a playback setting to the server and shows it at once', async () => {
     answerSheet('Remux only')
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     await fireEvent.press(
       await screen.findByRole('button', { name: 'Server conversion: Remux and transcode' }),
     )
@@ -116,6 +120,7 @@ describe("the owner's settings on a phone or tablet", () => {
 
   it('lists no library of its own: their scans are on the Libraries page, as on the web', async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     expect(await screen.findByRole('button', { name: 'Cancel all running scans' })).toBeTruthy()
     expect(screen.queryByRole('header', { name: FILMS.name })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Quick scan Films' })).toBeNull()
@@ -123,6 +128,7 @@ describe("the owner's settings on a phone or tablet", () => {
 
   it('approves an account waiting for it', async () => {
     await renderScreen({ ui: <Settings />, client })
+    await openAdmin()
     await fireEvent.press(await screen.findByRole('button', { name: `Approve ${WAITING.email}` }))
     await waitFor(() =>
       expect(writes()).toEqual([
@@ -135,18 +141,15 @@ describe("the owner's settings on a phone or tablet", () => {
     )
   })
 
-  it('shows a member no Admin and asks the server for none of it, the theme still there', async () => {
+  it('shows a member no Admin tab and asks the server for none of it', async () => {
     mockServer.account = { ...OWNER, isOwner: false }
     await renderScreen({ ui: <Settings />, client })
     await waitFor(() =>
       expect(mockServer.heard.map(({ path }) => path).toSorted()).toEqual(
-        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.getCaptionStyle.path].toSorted(),
+        [APP_CLIENT_CALLS.getMe.path, APP_CLIENT_CALLS.listRequests.path].toSorted(),
       ),
     )
-    expect(screen.queryByRole('header', { name: 'Admin' })).toBeNull()
+    expect(screen.queryByRole('tab', { name: 'Admin' })).toBeNull()
     expect(screen.queryByRole('header', { name: 'Remote Access' })).toBeNull()
-    expect(
-      screen.getByRole('button', { name: `Theme: ${themeOf(DEFAULT_APP_PREFS.theme).name}` }),
-    ).toBeTruthy()
   })
 })

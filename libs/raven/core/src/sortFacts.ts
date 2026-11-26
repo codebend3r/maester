@@ -38,6 +38,7 @@ const FIELD_FACTS: Record<SortFieldName, Fact> = {
   bitrate,
   resolution,
   release,
+  firstAired: release,
   rating: none,
   random: none,
 }
@@ -63,6 +64,12 @@ type ShowSortFactProps = {
   now?: Date
 }
 
+/** The fields whose fact is the card's release day. */
+const DATE_FIELDS: ReadonlySet<SortFieldName> = new Set([
+  SORT_FIELD_NAMES.release,
+  SORT_FIELD_NAMES.firstAired,
+])
+
 type CardSortFactProps = { media: MediaItem; sort: MediaSort | undefined }
 
 type CardSortFact = { sorted: string | null; isDateSaid: boolean }
@@ -76,12 +83,15 @@ export const cardSortFact = ({ media, sort }: CardSortFactProps): CardSortFact =
   const sorted = sort == null ? null : sortFact({ media, sort })
   return {
     sorted,
-    isDateSaid:
-      sorted != null && sort != null && sortParts(sort).field === SORT_FIELD_NAMES.release,
+    isDateSaid: sorted != null && sort != null && DATE_FIELDS.has(sortParts(sort).field),
   }
 }
 
-/** The same for a show: when its newest episode came, when it first aired, or its files' mean bitrate, for the sorts by those. */
+/**
+ * The same for a show: when its newest file came, the day its newest episode
+ * aired (the show's first day from an older server), the day it first aired,
+ * or its files' mean bitrate, for the sorts by those.
+ */
 export const showSortFact = ({
   entry,
   sort,
@@ -94,6 +104,8 @@ export const showSortFact = ({
     case SORT_FIELD_NAMES.bitrate:
       return formatBitrate(entry.bitrate)
     case SORT_FIELD_NAMES.release:
+      return formatAirDate(entry.latestAired ?? entry.show.released ?? null)
+    case SORT_FIELD_NAMES.firstAired:
       return formatAirDate(entry.show.released ?? null)
     case SORT_FIELD_NAMES.title:
     case SORT_FIELD_NAMES.changed:

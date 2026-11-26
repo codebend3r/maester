@@ -1,7 +1,11 @@
 import { MEMBER_STATUSES } from '@raven/core'
 import { EQ_PRESET_NAMES, LEVELLING_MODES } from '@raven/core'
-import { MUSIC_QUALITIES } from '@raven/ui/headless'
-type RangeHintProps = { min: number; max: number }
+import {
+  MUSIC_QUALITIES,
+  REQUESTS_COPY,
+  type RangeHintProps,
+  playbackPrefsCopy,
+} from '@raven/ui/headless'
 
 export const SETTINGS_COPY = {
   resetToDefaults: 'Reset to defaults',
@@ -11,16 +15,7 @@ export const SETTINGS_COPY = {
   resetFailed: 'Could not reset: ',
   thisApp: 'This app',
   thisBrowser: 'This browser',
-  secondsFor: (seconds: number) => `${seconds} seconds`,
-  autoplay: 'Autoplay',
-  autoplayHint:
-    "Plays the next episode, the saga's next film or the shuffle's next pick once the countdown at the end runs out. Off, the up next card waits for Play now.",
-  countdown: 'Count down to what is up next for',
-  countdownHint: ({ min, max }: RangeHintProps) =>
-    `How long before the end the up next card shows, and with autoplay on how long it counts down, from ${min} to ${max} seconds.`,
-  skipIntros: 'Skip intros automatically',
-  skipIntrosHint:
-    "Jumps past an episode's intro, once per episode, with a moment to undo it. Off, Skip intro waits for a click.",
+  ...playbackPrefsCopy({ press: 'click' }),
   openInRaven: 'Open videos in Raven',
   openInRavenHint:
     "Offers Raven for videos this browser cannot play, in the player's settings, and Download to Raven on a title's page. Turn it on only where Raven is installed.",
@@ -82,7 +77,7 @@ export const SETTINGS_COPY = {
   },
   captions: {
     heading: 'Subtitles',
-    help: 'How subtitles look for this account, on every video and on every device it is signed in on.',
+    help: 'How subtitles look on this device, on every video. Each device keeps its own.',
     size: 'Subtitle size',
     colour: 'Subtitle colour',
     sizeHints: {
@@ -186,11 +181,7 @@ export const SETTINGS_COPY = {
     requests: 'Requests',
   },
   requests: {
-    heading: 'Your requests',
-    help: 'The movies and TV shows you asked Coming soon to download, and where each one stands.',
-    reading: 'Reading your requests',
-    failed: 'Could not read your requests: ',
-    none: 'You have not requested anything yet. Ask for a title on its Coming soon page.',
+    ...REQUESTS_COPY,
     table: 'Your requests',
     columns: {
       title: 'Title',

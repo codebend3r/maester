@@ -10,26 +10,23 @@
   border-radius: var(--radius-md);
 
   /*
-   * Over a busy backdrop the words had nothing to stand on: focus fades the
-   * top of the page into the theme's ground, solid at the top and gone a
-   * quarter of the way down, darker on a dark theme and lighter on a light
-   * one. It spans the window, behind the field and the shell's corner.
+   * Focus dims the whole window behind the field at three quarters strength,
+   * so the field stands out, while the field is on the screen: scrolled away,
+   * the page fades back in. The shell lifts the search over the page, so this
+   * layer covers the page and the menu yet stays under the field.
    */
   &::before {
     position: fixed;
-    top: 0;
-    right: 0;
-    left: 0;
+    inset: 0;
     z-index: -1;
-    height: 25dvh;
-    background: linear-gradient(var(--color-night), transparent);
+    background: var(--color-night);
     opacity: 0;
     content: '';
     pointer-events: none;
   }
 
-  &:focus-within::before {
-    opacity: 1;
+  &.onScreen:focus-within::before {
+    opacity: 0.75;
   }
 
   @media (prefers-reduced-motion: no-preference) {

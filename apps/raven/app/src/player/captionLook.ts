@@ -19,13 +19,13 @@ type CaptionSizeOfProps = {
   style: CaptionStyle
 }
 
-/** How large the account's subtitles stand on a screen whose medium is `base`. */
+/** How large this device's subtitles stand on a screen whose medium is `base`. */
 export const captionSizeOf = ({ base, style }: CaptionSizeOfProps): number =>
   Math.round(base * CAPTION_SIZE_SCALES[style.size])
 
 /**
- * The account's subtitle look as the player draws it where the player draws the subtitles
- * (Android TV's ExoPlayer): the display face in the account's colour and size, the same for
+ * This device's subtitle look as the player draws it where the player draws the subtitles
+ * (Android TV's ExoPlayer): the display face in the device's colour and size, the same for
  * every track, whatever styles its file carries.
  */
 export const playerSubtitleStyleOf = (

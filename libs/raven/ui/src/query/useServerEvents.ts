@@ -9,7 +9,6 @@ import {
 import { useEffect } from 'react'
 import {
   afterBingeEvent,
-  afterCaptionStyle,
   afterLibraryEvent,
   afterNotification,
   afterReconnect,
@@ -66,8 +65,6 @@ const follow = ({ queryClient, event, onNotification }: FollowProps): Promise<un
       return afterWatched(queryClient)
     case SERVER_EVENT_TYPES.binge:
       return afterBingeEvent(queryClient)
-    case SERVER_EVENT_TYPES.captions:
-      return afterCaptionStyle(queryClient)
     // Logged already by the server, so it shows as it is and joins the log on screen.
     case SERVER_EVENT_TYPES.notification:
       onNotification(event.notification)
@@ -145,8 +142,8 @@ export const serverEventsFor = ({
    * with it, and whatever pages and favourites its videos show on; a spot,
    * play or mark from another of the account's devices reads Continue
    * watching and the listings again, unless this device is playing a video,
-   * whose own saves those mostly are; a binge change reads the list and Home,
-   * and a change of subtitle look the account's look. The
+   * whose own saves those mostly are; and a binge change reads the list and
+   * Home. The
    * source reconnects on its own when the stream drops, and everything is
    * read again once it is back, for the changes sent while it was down. A
    * stream the source closed is opened again after `EVENTS_RETRY_MS`, and a

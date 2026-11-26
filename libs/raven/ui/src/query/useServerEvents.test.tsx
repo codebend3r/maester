@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, it, jest } from 'bun:test'
 import { QueryClient } from '@tanstack/react-query'
 import { act, waitFor } from '@testing-library/react'
-import {
-  DEFAULT_CAPTION_STYLE,
-  NOTIFICATION_TONES,
-  type Notification,
-  SERVER_EVENT_TYPES,
-} from '@raven/core'
+import { NOTIFICATION_TONES, type Notification, SERVER_EVENT_TYPES } from '@raven/core'
 import { queryKeys } from '@/query/queryClient'
 import {
   EVENTS_RETRY_MS,
@@ -170,19 +165,6 @@ describe('useServerEvents', () => {
     await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
   })
 
-  it("reads the account's subtitle look again when another device changes it, and nothing else", async () => {
-    const { opened, stale, client } = setUp()
-    client.setQueryData(queryKeys.captionStyle, DEFAULT_CAPTION_STYLE)
-    opened[0]!.emit({
-      type: SERVER_STREAM_EVENTS.message,
-      data: JSON.stringify({ type: SERVER_EVENT_TYPES.captions }),
-    })
-    await waitFor(() =>
-      expect(client.getQueryState(queryKeys.captionStyle)?.isInvalidated).toBe(true),
-    )
-    expect(stale()).toEqual([])
-  })
-
   describe('while this device plays a video', () => {
     it('leaves a viewing change for the player to read again when it closes', async () => {
       const playing = { isWatching: true }
@@ -200,18 +182,12 @@ describe('useServerEvents', () => {
     })
 
     it('still follows every other event', async () => {
-      const { opened, stale, client } = setUp({ isWatching: () => true })
-      client.setQueryData(queryKeys.captionStyle, DEFAULT_CAPTION_STYLE)
+      const { opened, stale } = setUp({ isWatching: () => true })
       opened[0]!.emit({
         type: SERVER_STREAM_EVENTS.message,
         data: JSON.stringify({ type: SERVER_EVENT_TYPES.binge }),
       })
-      opened[0]!.emit({
-        type: SERVER_STREAM_EVENTS.message,
-        data: JSON.stringify({ type: SERVER_EVENT_TYPES.captions }),
-      })
       await waitFor(() => expect(stale()).toEqual([queryKeys.home]))
-      expect(client.getQueryState(queryKeys.captionStyle)?.isInvalidated).toBe(true)
     })
   })
 

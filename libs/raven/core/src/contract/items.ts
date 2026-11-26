@@ -338,6 +338,12 @@ export const isShowEntry = object({
   /** When its newest file arrived. */
   addedAt: isString,
   /**
+   * The day its newest episode on disk aired, as `YYYY-MM-DD`, which the
+   * release sorts go by; null when TMDB names no day for any of them. Left
+   * out by an older server, whose release sorts went by the show's first day.
+   */
+  latestAired: optional(nullable(isString)),
+  /**
    * The mean bitrate of its files in the library, in bits per second, which
    * the bitrate sorts go by; null until one of them is probed.
    */

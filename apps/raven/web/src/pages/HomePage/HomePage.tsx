@@ -27,6 +27,7 @@ import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { SectionHeading } from '@/components/SectionHeading/SectionHeading'
 import { ShowCard } from '@/components/ShowCard/ShowCard'
 import { usePinnedHere } from '@/lib/pins'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 import { POSTER_SIZES } from '@/lib/posters'
 import {
   heroQuery,
@@ -64,30 +65,37 @@ type FilledShelfProps = ShelfBodyProps
 
 const FilledShelf = ({ children }: FilledShelfProps) => <ul className={frames.row}>{children}</ul>
 
+/** How many of a shelf's cards draw before Home shows: as many as the widest screen shows at once (`--shelf-columns`). */
+const SHELF_FIRST_CARDS = 12
+
 const SHELF_BODIES = {
   [SHELF_STATES.empty]: EmptyShelf,
   [SHELF_STATES.filled]: FilledShelf,
 } as const satisfies Record<ShelfState, ComponentType<ShelfBodyProps>>
 
-type ShelfProps = {
+type ShelfProps<Item> = {
   title: ReactNode
   /** What sits at the heading's right: a library shelf's order toggle on Home. */
   aside?: ReactNode
-  isEmpty: boolean
-  /** The cards, each its own `li`. */
-  children: ReactNode
+  items: readonly Item[]
+  /** One item's card, its own `li`. */
+  renderCard: (item: Item) => ReactNode
 }
 
-/** A row of cards under its ruled heading, or a line saying it has none yet. */
-const Shelf = ({ title, aside, isEmpty, children }: ShelfProps) => {
+/**
+ * A row of cards under its ruled heading, or a line saying it has none yet.
+ * Its first cards draw with the page and the rest of its fifty after.
+ */
+const Shelf = <Item,>({ title, aside, items, renderCard }: ShelfProps<Item>) => {
   const id = useId()
-  const Body = SHELF_BODIES[isEmpty ? SHELF_STATES.empty : SHELF_STATES.filled]
+  const drawn = useDrawnFirst({ items, first: SHELF_FIRST_CARDS })
+  const Body = SHELF_BODIES[items.length === 0 ? SHELF_STATES.empty : SHELF_STATES.filled]
   return (
     <section className={frames.section} aria-labelledby={id}>
       <SectionHeading id={id} aside={aside}>
         {title}
       </SectionHeading>
-      <Body>{children}</Body>
+      <Body>{drawn.map(renderCard)}</Body>
     </section>
   )
 }
@@ -130,16 +138,19 @@ type ShowsShelfProps = ShelfContentProps & {
 }
 
 const ShowsShelf = ({ title, aside, shelf }: ShowsShelfProps) => (
-  <Shelf title={title} aside={aside} isEmpty={shelf.shows.length === 0}>
-    {shelf.shows.map((entry) => (
+  <Shelf
+    title={title}
+    aside={aside}
+    items={shelf.shows}
+    renderCard={(entry) => (
       <ShowCard
         key={entry.show.id}
         entry={entry}
         ratingsSource={HOME_RATINGS_SOURCE}
         sizes={POSTER_SIZES.row}
       />
-    ))}
-  </Shelf>
+    )}
+  />
 )
 
 type MediaShelfProps = ShelfContentProps & {
@@ -150,11 +161,12 @@ const MediaShelf = ({ title, aside, matchType, shelf }: MediaShelfProps) => {
   const Card =
     SHELF_CARDS[matchType === ITEM_TYPES.movie ? CARD_PICTURES.poster : CARD_PICTURES.frame]
   return (
-    <Shelf title={title} aside={aside} isEmpty={shelf.media.length === 0}>
-      {shelf.media.map((media) => (
-        <Card key={media.id} media={media} matchType={matchType} />
-      ))}
-    </Shelf>
+    <Shelf
+      title={title}
+      aside={aside}
+      items={shelf.media}
+      renderCard={(media) => <Card key={media.id} media={media} matchType={matchType} />}
+    />
   )
 }
 
@@ -238,12 +250,9 @@ const AlbumsShelf = ({ shelf, library, aside }: AlbumsShelfProps) => (
   <Shelf
     title={<ShelfHeadingLink to={libraryPath(library.id)}>{library.name}</ShelfHeadingLink>}
     aside={aside}
-    isEmpty={shelf.albums.length === 0}
-  >
-    {shelf.albums.map((album) => (
-      <AlbumCard key={album.id} album={album} />
-    ))}
-  </Shelf>
+    items={shelf.albums}
+    renderCard={(album) => <AlbumCard key={album.id} album={album} />}
+  />
 )
 
 type ShelfOrderToggleProps = { library: Library }

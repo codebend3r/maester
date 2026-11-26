@@ -1,3 +1,4 @@
+import { REQUESTS_STATES, type RequestsState, requestsStateOf } from '@raven/core'
 import {
   type AppPath,
   type RequestStatus,
@@ -20,11 +21,6 @@ import { requestsQuery, upcomingDetailsQuery } from '@/lib/queries'
 import { COMING_SOON_COPY } from '@/pages/ComingSoonPage/copy'
 import { REQUEST_COPY, REQUEST_STATUS_COPY } from '@/pages/ComingSoonPage/requestCopy'
 import { requestPathOf } from '@/pages/ComingSoonPage/requestPath'
-import {
-  REQUESTS_STATES,
-  type RequestsState,
-  requestsStateOf,
-} from '@/pages/ComingSoonPage/requestsState'
 import styles from '@/pages/ComingSoonPage/RequestsGrid.module.scss'
 import cardStyles from '@/pages/ComingSoonPage/UpcomingCard.module.scss'
 

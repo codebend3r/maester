@@ -18,9 +18,10 @@ export class EventsController {
   ) {}
 
   /**
-   * Server-sent events, each a `ServerEvent` as JSON: every library event, and the viewing,
-   * binge and captions events of the caller's own account alone. Completes, so the response ends cleanly,
-   * once the caller's account loses access; the client's reconnect then meets the account gate.
+   * Server-sent events, each a `ServerEvent` as JSON: every library event, and the viewing, binge
+   * and notification events of the caller's own account alone. Completes, so the response ends
+   * cleanly, once the caller's account loses access; the client's reconnect then meets the account
+   * gate.
    */
   @Sse()
   stream(

@@ -3,12 +3,14 @@ import {
   APP_CLIENT_CALLS,
   CAPTION_COLOURS,
   CAPTION_SIZES,
-  type CaptionStyle,
-  DEFAULT_CAPTION_STYLE,
+  ITEM_TYPES,
   MAX_HEIGHTS,
+  REQUEST_STATUSES,
   THEMES,
+  type TitleRequests,
   themeOf,
 } from '@raven/core'
+import { usePlayerPrefs } from '@raven/ui/headless'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
 import type { AppServer } from '@raven/native/headless'
@@ -30,17 +32,34 @@ const mockBack = jest.fn()
 const mockDismissTo = jest.fn()
 /** The paths each server was asked for, by its origin. */
 const mockAsked: string[] = []
-/** The subtitle looks the account was asked to keep, in order. */
-const mockSavedStyles: CaptionStyle[] = []
+/** What the server answers for the caller's requests. */
+const REQUESTS: TitleRequests = {
+  requests: [
+    {
+      type: ITEM_TYPES.movie,
+      tmdbId: '438631',
+      title: 'Dune',
+      status: REQUEST_STATUSES.searching,
+      requestedAt: '2026-11-20T15:00:00.000Z',
+      isMine: true,
+    },
+    {
+      type: ITEM_TYPES.show,
+      tmdbId: '1399',
+      title: 'Not mine',
+      status: REQUEST_STATUSES.downloading,
+      requestedAt: '2026-11-21T15:00:00.000Z',
+      isMine: false,
+    },
+  ],
+  budget: { limit: 5, left: 3, nextAt: null },
+  kinds: { movie: true, show: true },
+}
 const mockApi = jest.fn((server: AppServer) => {
   const api = homeApi(server)
   return {
     ...api,
-    getCaptionStyle: async () => mockSavedStyles.at(-1) ?? DEFAULT_CAPTION_STYLE,
-    setCaptionStyle: async (style: CaptionStyle) => {
-      mockSavedStyles.push(style)
-      return style
-    },
+    listRequests: async () => REQUESTS,
     getHome: async () => {
       mockAsked.push(`${server.origin}${APP_CLIENT_CALLS.getHome.path}`)
       return api.getHome()
@@ -73,6 +92,9 @@ const answerSheet = (answer: string) => {
   return asked
 }
 
+/** Opens one of Settings' tabs by its name. */
+const openTab = (name: string) => fireEvent.press(screen.getByRole('tab', { name }))
+
 /** The first light theme, which the default is not. */
 const LIGHT_THEME = THEMES.find((theme) => theme.tone !== themeOf(DEFAULT_APP_PREFS.theme).tone)
 
@@ -81,9 +103,9 @@ describe('Settings on a phone or tablet', () => {
     jest.restoreAllMocks()
     jest.clearAllMocks()
     mockAsked.length = 0
-    mockSavedStyles.length = 0
     useActiveServer.setState({ servers: [NAS, OTHER], activeId: NAS.id })
     useAppPrefs.setState(DEFAULT_APP_PREFS)
+    usePlayerPrefs.setState(usePlayerPrefs.getInitialState())
   })
 
   it('takes the viewer Home from the header without stacking another screen', async () => {
@@ -92,10 +114,83 @@ describe('Settings on a phone or tablet', () => {
     expect(mockDismissTo).toHaveBeenCalledWith(APP_ROUTES.home)
   })
 
+  it("lays its settings out in the web's tabs, opening on Playback", async () => {
+    await renderScreen({ ui: <Settings /> })
+    const tabs = await waitFor(() => {
+      const shown = screen.getAllByRole('tab')
+      expect(shown.at(-1)?.props.accessibilityLabel).toBe('Requests, 1')
+      return shown
+    })
+    expect(tabs.map((tab) => tab.props.accessibilityLabel)).toEqual([
+      'Playback',
+      'Subtitles',
+      'Servers',
+      'Account',
+      'This app',
+      'Advanced',
+      'Requests, 1',
+    ])
+    expect(screen.getByRole('tab', { name: 'Playback' }).props.accessibilityState).toMatchObject({
+      selected: true,
+    })
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+
+    await openTab('Account')
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+    expect(screen.queryByRole('switch', { name: 'Prefer direct play' })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'Account' }).props.accessibilityState).toMatchObject({
+      selected: true,
+    })
+  })
+
+  it("turns autoplay and skipping intros off, and sets the up next countdown, in the player's preferences", async () => {
+    const asked = answerSheet('30 seconds')
+    await renderScreen({ ui: <Settings /> })
+    await fireEvent(
+      screen.getByRole('switch', { name: 'Autoplay' }),
+      NATIVE_EVENTS.valueChange,
+      false,
+    )
+    await fireEvent(
+      screen.getByRole('switch', { name: 'Skip intros automatically' }),
+      NATIVE_EVENTS.valueChange,
+      false,
+    )
+    await fireEvent.press(
+      screen.getByRole('button', { name: /^Count down to what is up next for: / }),
+    )
+    expect(asked.at(-1)?.options.slice(0, 3)).toEqual(['5 seconds', '10 seconds', '15 seconds'])
+    expect(usePlayerPrefs.getState()).toMatchObject({
+      autoplay: false,
+      autoSkipIntro: false,
+      autoplayCountdownSeconds: 30,
+    })
+  })
+
+  it("sets how long the player's controls linger under Advanced", async () => {
+    answerSheet('8 seconds')
+    await renderScreen({ ui: <Settings /> })
+    await openTab('Advanced')
+    await fireEvent.press(
+      screen.getByRole('button', { name: /^Hide the player's controls after: / }),
+    )
+    expect(usePlayerPrefs.getState().controlsLingerSeconds).toBe(8)
+  })
+
+  it("lists the caller's own requests and where each stands", async () => {
+    await renderScreen({ ui: <Settings /> })
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Requests, 1' })).toBeTruthy())
+    await openTab('Requests, 1')
+    expect(await screen.findByLabelText(/^Dune: /u)).toBeTruthy()
+    expect(screen.queryByLabelText(/^Not mine: /u)).toBeNull()
+    expect(screen.getByText('3 of 5 requests left today')).toBeTruthy()
+  })
+
   it("picks the theme from the system's sheet, every theme offered", async () => {
     if (LIGHT_THEME === undefined) throw new Error('No light theme')
     const asked = answerSheet(LIGHT_THEME.name)
     await renderScreen({ ui: <Settings /> })
+    await openTab('This app')
     await fireEvent.press(
       screen.getByRole('button', { name: `Theme: ${themeOf(DEFAULT_APP_PREFS.theme).name}` }),
     )
@@ -125,6 +220,7 @@ describe('Settings on a phone or tablet', () => {
       ),
     })
     await screen.findByRole('header', { name: 'Films' })
+    await openTab('This app')
     expect(colourOf('Home')).toBe(before.palette.text)
     expect(colourOf('Settings')).toBe(before.palette.text)
     expect(markBody()).toMatchObject(
@@ -170,9 +266,10 @@ describe('Settings on a phone or tablet', () => {
     expect(useAppPrefs.getState().awayMaxHeight).toBe(MAX_HEIGHTS.hd)
   })
 
-  it('keeps the subtitle size and colour picked on the account, for every device it signs in on', async () => {
+  it('keeps the subtitle size and colour picked on this device alone', async () => {
     const asked = answerSheet('Largest')
     await renderScreen({ ui: <Settings /> })
+    await openTab('Subtitles')
     await fireEvent.press(await screen.findByRole('button', { name: 'Size: Medium' }))
     expect(asked.map(({ options }) => options)).toEqual([
       ['Small', 'Medium', 'Large', 'Largest', 'Cancel'],
@@ -181,7 +278,7 @@ describe('Settings on a phone or tablet', () => {
     answerSheet('Yellow')
     await fireEvent.press(screen.getByRole('button', { name: 'Colour: White' }))
     await waitFor(() =>
-      expect(mockSavedStyles.at(-1)).toEqual({
+      expect(usePlayerPrefs.getState().captionStyle).toEqual({
         size: CAPTION_SIZES.largest,
         colour: CAPTION_COLOURS.yellow,
       }),

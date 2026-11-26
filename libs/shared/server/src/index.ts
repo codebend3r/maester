@@ -11,5 +11,6 @@ export {
   wholeNumber,
 } from '@/env'
 export { sameSecret } from '@/secrets'
+export { SECRET_FILES_ENV, withSecretFiles } from '@/secretFiles'
 export { serveWebApp } from '@/serveWebApp'
 export { openSqlite, refreshStatistics } from '@/sqlite'

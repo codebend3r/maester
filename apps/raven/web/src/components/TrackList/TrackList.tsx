@@ -11,6 +11,7 @@ import { trackLength } from '@/lib/music'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import styles from '@/components/TrackList/TrackList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
+import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
 /** What a row's leading cell shows: a speaker while its track plays, else its number. */
 const LEAD_KINDS = { speaker: 'speaker', number: 'number' } as const
@@ -147,9 +148,10 @@ export const TrackList = ({
   const playing = useAudioQueue(playingTrackOf)
   const state = useAudioQueue((store) => store.state)
   const toggle = useAudioQueue((store) => store.toggle)
+  const drawn = useDrawnFirst({ items: tracks })
   return (
     <ol className={styles.list} aria-label={label}>
-      {tracks.map((track, index) => {
+      {drawn.map((track, index) => {
         const isCurrent =
           currentPlace === undefined ? (playing?.id ?? null) === track.id : index === currentPlace
         const isPlaying =

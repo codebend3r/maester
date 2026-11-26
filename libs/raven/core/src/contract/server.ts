@@ -74,22 +74,20 @@ export const SERVER_EVENT_TYPES = {
   library: 'library',
   viewing: 'viewing',
   binge: 'binge',
-  captions: 'captions',
   notification: 'notification',
 } as const
 
 /**
  * What the server tells a client as it happens, so whatever shows it is read again: a library's
  * videos changed; the account's viewing changed (a spot saved, a play counted, a mark made) on
- * any of its devices; the account's binge list changed; its subtitle look changed; or the account
- * was notified of something, already logged, for its screens to show as a toast. The last four go only to
+ * any of its devices; the account's binge list changed; or the account was notified of something,
+ * already logged, for its screens to show as a toast. The last three go only to
  * the account's own streams and name no account.
  */
 export const isServerEvent = union(
   object({ type: literal(SERVER_EVENT_TYPES.library), libraryId: isNumber }),
   object({ type: literal(SERVER_EVENT_TYPES.viewing) }),
   object({ type: literal(SERVER_EVENT_TYPES.binge) }),
-  object({ type: literal(SERVER_EVENT_TYPES.captions) }),
   object({ type: literal(SERVER_EVENT_TYPES.notification), notification: isNotification }),
 )
 

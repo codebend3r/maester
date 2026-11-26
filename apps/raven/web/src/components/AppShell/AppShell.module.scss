@@ -501,11 +501,6 @@
   }
 }
 
-// Over the fade the focused search lays across the page's top.
-.bar:has(.search:focus-within) .corner {
-  z-index: 4;
-}
-
 /*
  * A phone leaves the browsing places to its tab bar, so the search sits
  * beside the corner again.

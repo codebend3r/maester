@@ -1,3 +1,5 @@
+import { REQUESTS_COPY, type RangeHintProps, playbackPrefsCopy } from '@raven/ui/headless'
+
 import { LIBRARIES_ENTRY } from '@/layouts/copy'
 import { BINGE_COPY } from '@/queries/bingeCards'
 import { CONTINUE_WATCHING } from '@/queries/homeShelves'
@@ -142,9 +144,31 @@ export const SETTINGS_COPY = {
   /** What the away cap is called, as the web's server settings name the same heights. */
   heights: { uhd: '4K', fullHd: '1080p', hd: '720p' },
   subtitles: 'Subtitles',
-  subtitlesNote: 'How subtitles look on every video, on every device this account signs in on.',
+  subtitlesNote: 'How subtitles look on this device, on every video. Each device keeps its own.',
   subtitleSize: 'Size',
   subtitleColour: 'Colour',
+  /** Settings' tabs, the web's, each a group of related settings; the owner's Admin last. */
+  tabs: {
+    label: 'Settings',
+    playback: 'Playback',
+    subtitles: 'Subtitles',
+    servers: 'Servers',
+    account: 'Account',
+    thisApp: 'This app',
+    advanced: 'Advanced',
+    requests: 'Requests',
+    admin: 'Admin',
+  },
+  ...playbackPrefsCopy({ press: 'press' }),
+  upNext: 'Up next',
+  advanced: {
+    heading: 'Advanced',
+    help: 'For this device only.',
+    linger: "Hide the player's controls after",
+    lingerHint: ({ min, max }: RangeHintProps) =>
+      `How long the controls stay over the video once the screen or the remote goes quiet, from ${min} to ${max} seconds.`,
+  },
+  requests: REQUESTS_COPY,
 } as const
 
 /** Settings' Servers section, in the web's words but the https ones, which a device has no page to need. */

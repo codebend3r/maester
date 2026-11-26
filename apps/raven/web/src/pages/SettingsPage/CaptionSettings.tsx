@@ -1,7 +1,6 @@
 import { CAPTION_COLOURS, CAPTION_SIZES, type CaptionColour, type CaptionSize } from '@raven/core'
 import { CAPTION_COLOUR_NAMES, CAPTION_SIZE_NAMES, useCaptionStyle } from '@raven/ui/headless'
 import { useId } from 'react'
-import { api } from '@/lib/api'
 import { type Choices, Setting } from '@/pages/SettingsPage/Setting'
 import { Titled } from '@/pages/SettingsPage/Titled'
 import { SETTINGS_COPY } from '@/pages/SettingsPage/copy'
@@ -24,12 +23,12 @@ const COLOURS: Choices<CaptionColour> = {
 }
 
 /**
- * How subtitles look for the account: one size and one colour for every video, kept on the
- * server so every device it signs in on draws them the same. A pick saves at once.
+ * How subtitles look on this device: one size and one colour for every video it plays. Each
+ * device keeps its own, so the desktop and the TV can differ. A pick saves at once.
  */
 export const CaptionSettings = () => {
   const headingId = useId()
-  const { style, change } = useCaptionStyle(api)
+  const { style, change } = useCaptionStyle()
   return (
     <section className={styles.settings} aria-labelledby={headingId}>
       <header className={styles.setting}>
