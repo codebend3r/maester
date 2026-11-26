@@ -38,7 +38,7 @@ Each of these is intended. Anything else that differs is drift.
 - **Now Playing is the tablet's sideways layout always**: the player beside one pane of Up next and Lyrics.
 - **Home's shortcuts are the tablet's less Downloads**: Shuffle all and Playlists, beside Continue listening.
 - **The owner's artist background picker is left out**: it is a managing screen, which the TV leaves to the phone and the web.
-- **The Apple TV's Top Shelf is the TV's alone**, since no other Wren has a home screen to put one on: `src/topShelf/TopShelfSync.tsx`, mounted in `WrenTvRoot`, writes the latest releases (`HOME_COPY.latestReleases`, the newest `TOP_SHELF_ALBUMS` covers, each opening `wren-tv://album/<id>`) while the tabs are open, and the invitation to sign in (`TOP_SHELF_COPY.signIn` over `top-shelf-sign-in.png`) while they are not. `@raven/top-shelf` holds the module and the extension; raven's `plugins/withTvTopShelf.ts` adds the extension's target. The screen tests stand the sync in with nothing (`src/test/jestSetup.ts`), since jest runs as iOS.
+- **The Apple TV's Top Shelf is the TV's alone**, since no other Wren has a home screen to put one on: `@raven/top-shelf`'s `TopShelfSync`, mounted in `WrenTvRoot` with `src/topShelf/ReleasesShelf.tsx` as its signed in shelf, writes the latest releases (`HOME_COPY.latestReleases`, the newest `TOP_SHELF_ALBUMS` covers, each opening `wren-tv://album/<id>`) while the tabs are open, and the invitation to sign in (`TOP_SHELF_COPY.signIn` over `top-shelf-sign-in.png`) while they are not. `@raven/top-shelf` holds the module and the extension; raven's `plugins/withTvTopShelf.ts` adds the extension's target. The screen tests stand the sync in with nothing (`src/test/jestSetup.ts`), since jest runs as iOS.
 
 ## Running it
 

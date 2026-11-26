@@ -1,4 +1,4 @@
-import { type AlbumSummary, artistNames } from '@raven/core'
+import type { AlbumSummary } from '@raven/core'
 import { TOP_SHELF_KINDS, type TopShelf, deepLinkOf } from '@raven/top-shelf/contract'
 import { HOME_COPY, TOP_SHELF_COPY } from '@raven/wren'
 import type { CoverOf } from '@raven/wren-native'
@@ -33,7 +33,7 @@ export const releasesShelfOf = ({ albums, coverOf }: ReleasesShelfOfProps): TopS
       {
         id: `album-${album.id}`,
         title: album.title,
-        summary: artistNames(album),
+        summary: null,
         picture: cover,
         playUrl: null,
         openUrl: deepLinkOf({

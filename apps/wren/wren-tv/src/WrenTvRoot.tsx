@@ -6,6 +6,7 @@ import {
   tokenRenewalFor,
   useStoresLoaded,
 } from '@raven/native/headless'
+import { TopShelfSync } from '@raven/top-shelf'
 import { COLOR_SCHEMES, type ColorScheme } from '@raven/wren'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
@@ -27,7 +28,8 @@ import { WREN_ROUTES, WREN_SCREENS } from '@raven/wren-native/headless'
 import { configureWrenPrefs } from '@/stores/wrenPrefs'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { ToastHost } from '@/ui/Toast'
-import { TopShelfSync } from '@/topShelf/TopShelfSync'
+import { ReleasesShelf } from '@/topShelf/ReleasesShelf'
+import { SIGNED_OUT_SHELF } from '@/topShelf/topShelf'
 
 // The splash stays up until the stores are read, so the first screen drawn is the right one.
 preventAutoHideAsync().catch(IGNORED)
@@ -90,7 +92,11 @@ export function WrenTvRoot() {
           <StatusBar barStyle={BAR_STYLES[scheme]} />
           {session !== null && <VideoAudioHost key={session.server.id} session={session} />}
           {/* The Apple TV's Top Shelf: the latest releases while the tabs are open, else the invitation to sign in. */}
-          <TopShelfSync session={isOpen ? session : null} />
+          <TopShelfSync
+            session={isOpen ? session : null}
+            signedOut={SIGNED_OUT_SHELF}
+            SignedIn={ReleasesShelf}
+          />
           <Stack
             screenOptions={{
               headerShown: false,

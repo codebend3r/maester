@@ -33,7 +33,7 @@ describe("Wren's Top Shelf", () => {
         {
           id: 'album-7',
           title: 'OK Computer',
-          summary: 'Radiohead',
+          summary: null,
           picture: { uri: 'https://raven/api/albums/7/cover/c7', headers: HEADERS },
           playUrl: null,
           openUrl: 'wren-tv://album/7',

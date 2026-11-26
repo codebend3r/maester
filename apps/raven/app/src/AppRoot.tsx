@@ -9,6 +9,7 @@ import {
   tokenRenewalFor,
   useStoresLoaded,
 } from '@raven/native/headless'
+import { TopShelfSync } from '@raven/top-shelf'
 import { configureStorage, createQueryClient } from '@raven/ui/headless'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
@@ -40,7 +41,8 @@ import { followReduceMotion } from '@/stores/reduceMotion'
 import { returnScreen } from '@/stores/screenFocus'
 import type { AppTheme } from '@/theme/appTheme'
 import { followTheme, useTheme } from '@/theme/useTheme'
-import { TopShelfSync } from '@/topShelf/TopShelfSync'
+import { ContinueShelf } from '@/topShelf/ContinueShelf'
+import { SIGNED_OUT_SHELF } from '@/topShelf/topShelf'
 
 /** One cache for the app's life, emptied whenever the active server or the signed-in account changes. */
 const queryClient = createQueryClient()
@@ -145,7 +147,11 @@ const AppRoutes = () => {
     <QueryClientProvider client={queryClient}>
       <StatusBar barStyle={tone === THEME_TONES.light ? 'dark-content' : 'light-content'} />
       {/* The Apple TV's Top Shelf: Continue watching while the routes are open, else the invitation to sign in. */}
-      <TopShelfSync session={hasNav ? session : null} />
+      <TopShelfSync
+        session={hasNav ? session : null}
+        signedOut={SIGNED_OUT_SHELF}
+        SignedIn={ContinueShelf}
+      />
       {/* One key for both, so a server switch remounts them together and no two siblings share it. */}
       {session !== null && (
         <Fragment key={session.server.id}>

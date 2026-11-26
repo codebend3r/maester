@@ -37,4 +37,4 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
  * every screen would ask for them; a screen test counts its own requests, so the sync draws and
  * asks nothing here. `topShelf.test.ts` tests what it writes.
  */
-jest.mock('@/topShelf/TopShelfSync', () => ({ TopShelfSync: () => null }))
+jest.mock('@raven/top-shelf', () => ({ TopShelfSync: () => null }))
