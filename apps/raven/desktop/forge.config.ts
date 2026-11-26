@@ -1,5 +1,3 @@
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { MakerSquirrel } from '@electron-forge/maker-squirrel'
 import { MakerZIP } from '@electron-forge/maker-zip'
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
@@ -17,7 +15,7 @@ import {
   WEB_DIST,
   WINDOWS_ICON,
 } from './src/build/forgeOptions'
-import { type RunCommand, signAdHoc } from './src/build/machO'
+import { runCommand, signAdHoc } from './src/build/machO'
 import { MPV_STAGING } from './src/build/stageMpv'
 import { LINK_SCHEME } from '@raven/core'
 
@@ -36,8 +34,6 @@ const PLATFORMS = { darwin: 'darwin', win32: 'win32' } as const satisfies Record
   NodeJS.Platform
 >
 const signing = signingFrom(process.env)
-const execFileAsync = promisify(execFile)
-const run: RunCommand = ({ command, args }) => execFileAsync(command, args)
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -93,7 +89,7 @@ const config: ForgeConfig = {
      */
     postPackage: async (_forgeConfig, { platform, outputPaths }) => {
       await adHocApps({ platform, signing, outputPaths, appName: APP_NAME }).reduce<Promise<void>>(
-        (previous, app) => previous.then(() => signAdHoc({ app, run })),
+        (previous, app) => previous.then(() => signAdHoc({ app, run: runCommand })),
         Promise.resolve(),
       )
     },

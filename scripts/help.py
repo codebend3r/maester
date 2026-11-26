@@ -214,6 +214,16 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
+                "app:testflight:ios",
+                "Archives the iPhone and iPad app and uploads it to TestFlight.",
+                "Xcode",
+            ),
+            Command(
+                "app:testflight:tvos",
+                "Archives the Apple TV app and uploads it to TestFlight.",
+                "Xcode",
+            ),
+            Command(
                 "app:deploy:android-tv",
                 "Builds the Release APK and puts it on the Android TV over adb, found over mDNS.",
                 "Android SDK",
