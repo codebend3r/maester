@@ -2,18 +2,13 @@ import { AUDIO_BITRATES, type AudioBitrate, isAudioBitrate, isRecord, nullable }
 import { loadPersisted } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import {
-  COVER_SIZES,
-  type CoverSize,
-  DEFAULT_THEME_CHOICE,
-  RECENT_SORTS,
-  type RecentSort,
+  DEFAULT_SHARED_PREFS,
   type ThemeChoice,
   WREN_PREFS_KEY,
-  isCoverSize,
-  isLibraryPick,
-  isRecentSort,
+  WREN_PREFS_VERSION,
+  type WrenSharedPrefs,
+  sharedPrefsOf,
   themeChoiceIn,
-  themeChoiceOf,
 } from '@raven/wren'
 import { configureLibraryChoice } from '@raven/wren-native/headless'
 import { create } from 'zustand'
@@ -31,20 +26,14 @@ const isStorageLimitGb = (value: unknown): value is StorageLimitGb =>
 /** A cellular quality: a transcode's bitrate, or null for the file itself. */
 const isCellularKbps = nullable(isAudioBitrate)
 
-/** What this device keeps of the listener's choices: the themes, and the rest below. */
-type WrenPrefsValues = ThemeChoice & {
+/** What this device keeps of the listener's choices: every Wren's, and the rest below. */
+type WrenPrefsValues = WrenSharedPrefs & {
   /** The bitrate a download is transcoded to. */
   downloadKbps: AudioBitrate
   /** The bitrate a track streams at on a mobile network; null streams the file itself. */
   cellularKbps: AudioBitrate | null
   /** How much the downloads may take, in gigabytes; null for no limit. */
   storageLimitGb: StorageLimitGb
-  /** The order of Home's albums. */
-  homeSort: RecentSort
-  /** How large Albums draws its covers. */
-  coverSize: CoverSize
-  /** The music library picked in Settings, by its id; null wears the server's first. */
-  libraryId: number | null
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -61,10 +50,7 @@ export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   downloadKbps: AUDIO_BITRATES.standard,
   cellularKbps: null,
   storageLimitGb: null,
-  ...DEFAULT_THEME_CHOICE,
-  homeSort: RECENT_SORTS.added,
-  coverSize: COVER_SIZES.medium,
-  libraryId: null,
+  ...DEFAULT_SHARED_PREFS,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -80,21 +66,15 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
     storageLimitGb: isStorageLimitGb(kept.storageLimitGb)
       ? kept.storageLimitGb
       : DEFAULT_WREN_PREFS.storageLimitGb,
-    ...themeChoiceOf(saved),
-    homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
-    coverSize: isCoverSize(kept.coverSize) ? kept.coverSize : DEFAULT_WREN_PREFS.coverSize,
-    libraryId: isLibraryPick(kept.libraryId) ? kept.libraryId : DEFAULT_WREN_PREFS.libraryId,
+    ...sharedPrefsOf(saved),
   }
 }
 
 /*
- * The version the prefs are kept at. Version 0 defaulted the cellular stream to a 256 kbps
- * transcode, which the server makes whole before it answers, so away from home every track
- * waited on it; 1 moves those installs to the file itself.
+ * Prefs read back from an older version, brought to this one. Version 0 defaulted the cellular
+ * stream to a 256 kbps transcode, which the server makes whole before it answers, so away from
+ * home every track waited on it; 1 moves those installs to the file itself.
  */
-const WREN_PREFS_VERSION = 1
-
-/** Prefs read back from an older version, brought to this one. */
 const migratedPrefsOf = (saved: unknown, version: number): WrenPrefsValues =>
   version < WREN_PREFS_VERSION
     ? { ...prefsOf(saved), cellularKbps: DEFAULT_WREN_PREFS.cellularKbps }
@@ -113,8 +93,8 @@ export const useWrenPrefs = create<WrenPrefs>()(
       skipHydration: true,
       version: WREN_PREFS_VERSION,
       migrate: migratedPrefsOf,
-      // Everything the store holds but `change` is a preference, so all of it is kept.
-      partialize: ({ change: _change, ...values }): WrenPrefsValues => values,
+      // What is kept is what is read back: every value, through the same guard.
+      partialize: (state: WrenPrefs) => prefsOf(state),
       merge: (saved, current) => ({ ...current, ...prefsOf(saved) }),
     },
   ),

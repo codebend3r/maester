@@ -15,10 +15,10 @@ import { ArtistTileOf } from '@/components/ArtistTileOf'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { PlayButtons } from '@/components/PlayButtons'
+import { TileSection } from '@/screens/library/TileSection'
 import { TracksPage } from '@/screens/library/TracksPage'
 import { SIZE, SPACE } from '@/theme/tvTokens'
 import { SectionHeader } from '@/ui/Headers'
-import { TileGrid } from '@/ui/TileGrid'
 
 const useStyles = themedStyles(() => ({ actions: { flexDirection: 'row', gap: SPACE.s3 } }))
 
@@ -47,30 +47,22 @@ export function FavouritesCollection({ session }: CollectionPageProps) {
         <View style={page.section}>
           <CollectionHeader count={countLine} title={LIBRARY_PAGE_COPY.favourites} />
           {isEmpty && <ListNotice empty={LIBRARY_PAGE_COPY.noFavourites} listing={listing} />}
-          {artists.length > 0 && (
-            <View style={page.section}>
-              <SectionHeader title={LIBRARY_PAGE_COPY.artists} />
-              <TileGrid
-                items={artists}
-                keyOf={(artist) => artist.id}
-                renderTile={(artist) => (
-                  <ArtistTileOf artist={artist} photoOf={artistPhotoOf} width={SIZE.artistPhoto} />
-                )}
-              />
-            </View>
-          )}
-          {albums.length > 0 && (
-            <View style={page.section}>
-              <SectionHeader title={LIBRARY_PAGE_COPY.albums} />
-              <TileGrid
-                items={albums}
-                keyOf={(album) => album.id}
-                renderTile={(album) => (
-                  <AlbumTileOf album={album} coverOf={coverOf} width={SIZE.tile} />
-                )}
-              />
-            </View>
-          )}
+          <TileSection
+            items={artists}
+            keyOf={(artist) => artist.id}
+            renderTile={(artist) => (
+              <ArtistTileOf artist={artist} photoOf={artistPhotoOf} width={SIZE.artistPhoto} />
+            )}
+            title={LIBRARY_PAGE_COPY.artists}
+          />
+          <TileSection
+            items={albums}
+            keyOf={(album) => album.id}
+            renderTile={(album) => (
+              <AlbumTileOf album={album} coverOf={coverOf} width={SIZE.tile} />
+            )}
+            title={LIBRARY_PAGE_COPY.albums}
+          />
           {tracks.length > 0 && (
             <View style={page.section}>
               <SectionHeader title={LIBRARY_PAGE_COPY.songs} />

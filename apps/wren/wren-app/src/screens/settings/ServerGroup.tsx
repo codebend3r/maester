@@ -1,11 +1,8 @@
-import { RENAME_OUTCOMES, type RenameOutcome } from '@raven/native/headless'
-import { SETTINGS_COPY, NAME_SAVES, serverNameSaveOf } from '@raven/wren'
-import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { SETTINGS_COPY } from '@raven/wren'
+import { type WrenSession, useServerNameField } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
 import { NotedGroup } from '@/screens/settings/NotedGroup'
-import { accountServers, type WrenSession } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { FactRow } from '@/ui/FactRow'
@@ -27,13 +24,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   edit: { paddingVertical: SPACE.s3 },
 }))
 
-/** What a rename that did not take says under the field, by why; null once it did. */
-const RENAME_COPY = {
-  [RENAME_OUTCOMES.renamed]: null,
-  [RENAME_OUTCOMES.badName]: SETTINGS_COPY.serverNameError,
-  [RENAME_OUTCOMES.noAccount]: SETTINGS_COPY.serverNameNoAccount,
-} as const satisfies Record<RenameOutcome, string | null>
-
 type ServerGroupProps = { session: WrenSession }
 
 /**
@@ -44,31 +34,7 @@ type ServerGroupProps = { session: WrenSession }
 export function ServerGroup({ session }: ServerGroupProps) {
   const styles = useStyles()
   const { name } = session.server
-  // What is being typed, null while nothing is, when the field shows the account's name.
-  const [draft, setDraft] = useState<string | null>(null)
-  const [refusal, setRefusal] = useState<string | null>(null)
-  const rename = useMutation({
-    mutationFn: (typed: string) => accountServers.rename({ id: session.server.id, name: typed }),
-    onSuccess: (outcome) => {
-      setRefusal(RENAME_COPY[outcome])
-      if (outcome === RENAME_OUTCOMES.renamed) setDraft(null)
-    },
-  })
-  const saving = serverNameSaveOf({ text: draft ?? name, current: name })
-
-  const save = () => {
-    if (saving.kind === NAME_SAVES.saved) rename.mutate(saving.name)
-    if (saving.kind === NAME_SAVES.kept) setDraft(null)
-  }
-
-  const typed = (text: string) => {
-    setDraft(text)
-    setRefusal(null)
-  }
-
-  const problem = saving.kind === NAME_SAVES.refused ? SETTINGS_COPY.serverNameError : refusal
-  const error = rename.isError ? SETTINGS_COPY.serverNameFailed : problem
-
+  const field = useServerNameField({ session })
   return (
     <NotedGroup note={SETTINGS_COPY.serverNote}>
       <GroupedList heading={SETTINGS_COPY.server}>
@@ -83,14 +49,14 @@ export function ServerGroup({ session }: ServerGroupProps) {
           <TextField
             autoCapitalize="words"
             autoCorrect={false}
-            editable={!rename.isPending}
-            error={error}
+            editable={!field.isSaving}
+            error={field.error}
             label={SETTINGS_COPY.serverName}
-            onBlur={save}
-            onChangeText={typed}
-            onSubmitEditing={save}
+            onBlur={field.onSubmit}
+            onChangeText={field.onChangeText}
+            onSubmitEditing={field.onSubmit}
             returnKeyType="done"
-            value={draft ?? name}
+            value={field.value}
           />
         </View>
         <FactRow label={SETTINGS_COPY.serverAddress} value={session.server.origin} />

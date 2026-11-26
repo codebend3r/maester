@@ -1,5 +1,5 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 import {
   type ConfigPlugin,
@@ -8,10 +8,24 @@ import {
   withXcodeProject,
 } from 'expo/config-plugins'
 
+import {
+  TV_TARGET_SETTINGS,
+  XCODE,
+  type XcodeProjectApi,
+  addNativeTarget,
+  addTargetGroup,
+  hasTarget,
+  isRecord,
+  isXcodeProjectApi,
+  quoted,
+  targetOf,
+  unquoted,
+} from './xcodeTargets.ts'
+
 /** The invitation's picture a signed out Top Shelf shows, at 1x (1940 by 692) and 2x, from the app's folder. */
 type TvTopShelf = { signIn: { picture: string; picture2x: string } }
 
-/**
+/*
  * The extension's target, its folder in `ios/` and its product. Never the module's pod's name,
  * `RavenTopShelf`: the extension's Swift module would then answer the app's `import RavenTopShelf`.
  */
@@ -30,7 +44,14 @@ const SWIFT_SOURCES = [
 const SIGN_IN_FILES = {
   picture: 'RavenTopShelfSignIn.png',
   picture2x: 'RavenTopShelfSignIn-2x.png',
-}
+} as const satisfies Record<keyof TvTopShelf['signIn'], string>
+
+const SIGN_IN_SCALES = [
+  'picture',
+  'picture2x',
+] as const satisfies readonly (keyof typeof SIGN_IN_FILES)[]
+
+const SIGN_IN_PICTURES = SIGN_IN_SCALES.map((scale) => SIGN_IN_FILES[scale])
 
 /** Named for the target, since the `xcode` package reuses any file reference whose path matches. */
 const INFO_PLIST = `${TARGET}-Info.plist`
@@ -40,141 +61,26 @@ const ENTITLEMENTS = `${TARGET}.entitlements`
 const GROUP_KEY = 'RavenTopShelfGroup'
 const APP_GROUPS = 'com.apple.security.application-groups'
 
-const XCODE = {
+const XCODE_EXTENSION = {
   appExtension: 'com.apple.product-type.app-extension',
   application: 'com.apple.product-type.application',
-  productsGroup: 'Products',
-  builtProducts: 'BUILT_PRODUCTS_DIR',
-  sourcesPhase: 'PBXSourcesBuildPhase',
-  sourcesComment: 'Sources',
   resourcesPhase: 'PBXResourcesBuildPhase',
   resourcesComment: 'Resources',
-  frameworksPhase: 'PBXFrameworksBuildPhase',
-  frameworksComment: 'Frameworks',
   copyFilesPhase: 'PBXCopyFilesBuildPhase',
   embedComment: 'Embed Foundation Extensions',
   // The `xcode` package's word for a copy phase into the app's PlugIns folder.
   embedDestination: 'app_extension',
-  configuration: 'XCBuildConfiguration',
-  nativeTarget: 'PBXNativeTarget',
   targetDependency: 'PBXTargetDependency',
   itemProxy: 'PBXContainerItemProxy',
-  release: 'Release',
-  debug: 'Debug',
   png: 'image.png',
 } as const
 
-type BuildConfiguration = {
-  name: string
-  isa: typeof XCODE.configuration
-  buildSettings: Record<string, string>
-}
-
-type NativeTarget = {
-  uuid: string
-  pbxNativeTarget: {
-    isa: typeof XCODE.nativeTarget
-    name: string
-    productName: string
-    productReference: string
-    productType: string
-    buildConfigurationList: string
-    buildPhases: never[]
-    buildRules: never[]
-    dependencies: never[]
-  }
-}
-
-type ProductFile = { uuid: string; fileRef: string; basename: string; group: string }
-
-type AddProductFileProps = { group: string; target: string; sourceTree: string }
-
-type BuildPhaseFile = { value: string; comment: string }
-
-/**
- * The part of the `xcode` package's project Expo hands a mod that the plugin calls. The
- * package ships no types; these are its own methods, with their own positional signatures.
- */
-type XcodeProjectApi = {
-  generateUuid: () => string
-  addXCConfigurationList: (
-    configurations: BuildConfiguration[],
-    defaultName: string,
-    comment: string,
-  ) => { uuid: string }
-  addProductFile: (path: string, options: AddProductFileProps) => ProductFile
-  addToPbxBuildFileSection: (file: ProductFile) => void
-  addToPbxNativeTargetSection: (target: NativeTarget) => void
-  addToPbxProjectSection: (target: NativeTarget) => void
-  addTargetDependency: (target: string, dependencies: string[]) => unknown
-  addPbxGroup: (files: string[], name: string, path: string) => { uuid: string }
-  addToPbxGroup: (group: string, parent: string) => void
-  addBuildPhase: (
-    files: string[],
-    type: string,
-    comment: string,
-    target: string,
-    destination?: string,
-  ) => { buildPhase: { files: BuildPhaseFile[] } }
-  getFirstProject: () => { firstProject: { mainGroup: string } }
-  pbxNativeTargetSection: () => Record<string, unknown>
-  pbxFileReferenceSection: () => Record<string, unknown>
-  hash: { project: { objects: Record<string, unknown> } }
-}
-
-const XCODE_METHODS = [
-  'generateUuid',
-  'addXCConfigurationList',
-  'addProductFile',
-  'addToPbxBuildFileSection',
-  'addToPbxNativeTargetSection',
-  'addToPbxProjectSection',
-  'addTargetDependency',
-  'addPbxGroup',
-  'addToPbxGroup',
-  'addBuildPhase',
-  'getFirstProject',
-  'pbxNativeTargetSection',
-  'pbxFileReferenceSection',
-] as const satisfies readonly (keyof XcodeProjectApi)[]
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null
-
-const hasObjects = (value: unknown): boolean => {
-  const project: unknown = isRecord(value) && isRecord(value.hash) && value.hash.project
-  return isRecord(project) && isRecord(project.objects)
-}
-
-const isXcodeProjectApi = (value: unknown): value is XcodeProjectApi =>
-  isRecord(value) &&
-  XCODE_METHODS.every((method) => typeof Reflect.get(value, method) === 'function') &&
-  hasObjects(value)
-
-/** Quoted as a pbxproj value that holds a space, a slash or a hyphen must be. */
-const quoted = (value: string): string => `"${value}"`
-
-const unquoted = (value: unknown): unknown =>
-  typeof value === 'string' ? value.replace(/^"(.*)"$/, '$1') : value
-
-type TargetOfProps = {
-  project: XcodeProjectApi
-  matches: (target: Record<string, unknown>) => boolean
-}
-
-/** The uuid of the first native target `matches` picks; null when none does. */
-const targetOf = ({ project, matches }: TargetOfProps): string | null =>
-  Object.entries(project.pbxNativeTargetSection()).find(
-    ([, target]) => isRecord(target) && matches(target),
-  )?.[0] ?? null
-
 /** The app's own target, the one product of type application. */
 const appTargetOf = (project: XcodeProjectApi): string | null =>
-  targetOf({ project, matches: (target) => unquoted(target.productType) === XCODE.application })
-
-/** Whether a prebuild ran on this project before: a fresh `ios/` never has the extension. */
-const hasTopShelf = (project: XcodeProjectApi): boolean =>
-  targetOf({ project, matches: (target) => unquoted(target.name) === TARGET }) !== null
+  targetOf({
+    project,
+    matches: (target) => unquoted(target.productType) === XCODE_EXTENSION.application,
+  })
 
 type InfoPlistOfProps = { group: string; version: string; build: string; name: string }
 
@@ -233,7 +139,7 @@ const entitlementsOf = (group: string): string => `<?xml version="1.0" encoding=
 
 type ExtensionSettingsOfProps = { bundleId: string; team: string | null }
 
-/**
+/*
  * The extension's settings: a tvOS app extension, signed as the app is (the deploy scripts pass
  * the team and automatic signing on the command line, which reaches every target).
  */
@@ -244,12 +150,7 @@ const extensionSettingsOf = ({ bundleId, team }: ExtensionSettingsOfProps) => ({
   CODE_SIGN_ENTITLEMENTS: quoted(`${TARGET}/${ENTITLEMENTS}`),
   CODE_SIGN_STYLE: 'Automatic',
   ...(team === null ? {} : { DEVELOPMENT_TEAM: team }),
-  SDKROOT: 'appletvos',
-  SUPPORTED_PLATFORMS: quoted('appletvos appletvsimulator'),
-  TARGETED_DEVICE_FAMILY: '3',
-  // The app's own, so the extension loads on any Apple TV the app runs on.
-  TVOS_DEPLOYMENT_TARGET: '16.4',
-  SWIFT_VERSION: '5.0',
+  ...TV_TARGET_SETTINGS,
   SKIP_INSTALL: 'YES',
   APPLICATION_EXTENSION_API_ONLY: 'YES',
   LD_RUNPATH_SEARCH_PATHS: quoted(
@@ -260,7 +161,7 @@ const extensionSettingsOf = ({ bundleId, team }: ExtensionSettingsOfProps) => ({
 /** Makes sure the sections a target dependency is written into exist; a fresh Expo project has neither. */
 const withDependencySections = (project: XcodeProjectApi): void => {
   const { objects } = project.hash.project
-  ;[XCODE.targetDependency, XCODE.itemProxy]
+  ;[XCODE_EXTENSION.targetDependency, XCODE_EXTENSION.itemProxy]
     .filter((section) => !isRecord(objects[section]))
     .forEach((section) => Reflect.set(objects, section, {}))
 }
@@ -269,75 +170,56 @@ const withDependencySections = (project: XcodeProjectApi): void => {
 const markPictures = (project: XcodeProjectApi): void =>
   Object.values(project.pbxFileReferenceSection())
     .filter(isRecord)
-    .filter((file) => Object.values(SIGN_IN_FILES).some((name) => unquoted(file.path) === name))
-    .forEach((file) => Reflect.set(file, 'lastKnownFileType', XCODE.png))
+    .filter((file) => SIGN_IN_PICTURES.some((name) => unquoted(file.path) === name))
+    .forEach((file) => Reflect.set(file, 'lastKnownFileType', XCODE_EXTENSION.png))
 
 type AddTopShelfProps = {
   project: XcodeProjectApi
   app: string
   bundleId: string
   team: string | null
-  files: { swift: string[]; pictures: string[]; other: string[] }
+  swift: string[]
 }
 
 /** Adds the extension's target, builds it before the app and embeds it in the app's PlugIns. */
-const addTopShelf = ({ project, app, bundleId, team, files }: AddTopShelfProps): void => {
-  const uuid = project.generateUuid()
-  const configurations = project.addXCConfigurationList(
-    [XCODE.debug, XCODE.release].map((name) => ({
-      name,
-      isa: XCODE.configuration,
-      buildSettings: extensionSettingsOf({ bundleId, team }),
-    })),
-    XCODE.release,
-    `Build configuration list for PBXNativeTarget "${TARGET}"`,
-  )
-  const product = project.addProductFile(`${TARGET}.appex`, {
-    group: XCODE.embedComment,
-    target: uuid,
-    sourceTree: XCODE.builtProducts,
+const addTopShelf = ({ project, app, bundleId, team, swift }: AddTopShelfProps): void => {
+  const { uuid, product } = addNativeTarget({
+    project,
+    name: TARGET,
+    productType: XCODE_EXTENSION.appExtension,
+    productFile: `${TARGET}.appex`,
+    productGroup: XCODE_EXTENSION.embedComment,
+    buildSettings: extensionSettingsOf({ bundleId, team }),
   })
   project.addToPbxBuildFileSection(product)
-  const target: NativeTarget = {
-    uuid,
-    pbxNativeTarget: {
-      isa: XCODE.nativeTarget,
-      name: quoted(TARGET),
-      productName: quoted(TARGET),
-      productReference: product.fileRef,
-      productType: quoted(XCODE.appExtension),
-      buildConfigurationList: configurations.uuid,
-      buildPhases: [],
-      buildRules: [],
-      dependencies: [],
-    },
-  }
-  project.addToPbxNativeTargetSection(target)
-  project.addToPbxProjectSection(target)
 
-  const group = project.addPbxGroup(
-    [...files.swift, ...files.pictures, ...files.other],
-    TARGET,
-    TARGET,
-  )
-  project.addToPbxGroup(group.uuid, project.getFirstProject().firstProject.mainGroup)
+  addTargetGroup({
+    project,
+    name: TARGET,
+    files: [...swift, ...SIGN_IN_PICTURES, INFO_PLIST, ENTITLEMENTS],
+  })
   markPictures(project)
-  project.addBuildPhase(files.swift, XCODE.sourcesPhase, XCODE.sourcesComment, uuid)
-  project.addBuildPhase(files.pictures, XCODE.resourcesPhase, XCODE.resourcesComment, uuid)
+  project.addBuildPhase(swift, XCODE.sourcesPhase, XCODE.sourcesComment, uuid)
+  project.addBuildPhase(
+    SIGN_IN_PICTURES,
+    XCODE_EXTENSION.resourcesPhase,
+    XCODE_EXTENSION.resourcesComment,
+    uuid,
+  )
   project.addBuildPhase([], XCODE.frameworksPhase, XCODE.frameworksComment, uuid)
 
   withDependencySections(project)
   project.addTargetDependency(app, [uuid])
   const embed = project.addBuildPhase(
     [],
-    XCODE.copyFilesPhase,
-    XCODE.embedComment,
+    XCODE_EXTENSION.copyFilesPhase,
+    XCODE_EXTENSION.embedComment,
     app,
-    XCODE.embedDestination,
+    XCODE_EXTENSION.embedDestination,
   )
   embed.buildPhase.files.push({
     value: product.uuid,
-    comment: `${product.basename} in ${XCODE.embedComment}`,
+    comment: `${product.basename} in ${XCODE_EXTENSION.embedComment}`,
   })
 }
 
@@ -375,12 +257,13 @@ export const withTvTopShelf: ConfigPlugin<TvTopShelf> = (config, { signIn }) => 
     const folder = join(platformProjectRoot, TARGET)
     mkdirSync(folder, { recursive: true })
     const swift = SWIFT_SOURCES.map((source) => {
-      const file = source.split('/').at(-1) ?? source
+      const file = basename(source)
       copyFileSync(join(projectRoot, PACKAGE, source), join(folder, file))
       return file
     })
-    copyFileSync(join(projectRoot, signIn.picture), join(folder, SIGN_IN_FILES.picture))
-    copyFileSync(join(projectRoot, signIn.picture2x), join(folder, SIGN_IN_FILES.picture2x))
+    SIGN_IN_SCALES.forEach((scale) =>
+      copyFileSync(join(projectRoot, signIn[scale]), join(folder, SIGN_IN_FILES[scale])),
+    )
     writeFileSync(
       join(folder, INFO_PLIST),
       infoPlistOf({
@@ -391,15 +274,9 @@ export const withTvTopShelf: ConfigPlugin<TvTopShelf> = (config, { signIn }) => 
       }),
     )
     writeFileSync(join(folder, ENTITLEMENTS), entitlementsOf(group))
-    if (hasTopShelf(project)) return mod
+    if (hasTarget({ project, name: TARGET })) return mod
 
-    addTopShelf({
-      project,
-      app,
-      bundleId: `${appId}.top-shelf`,
-      team,
-      files: { swift, pictures: Object.values(SIGN_IN_FILES), other: [INFO_PLIST, ENTITLEMENTS] },
-    })
+    addTopShelf({ project, app, bundleId: `${appId}.top-shelf`, team, swift })
     return mod
   })
 }

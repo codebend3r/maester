@@ -2,12 +2,11 @@ import { plural } from '@raven/core'
 import { COUNTS_COPY, LIBRARY_PAGE_COPY, matchingArtists } from '@raven/wren'
 
 import { ListNotice } from '@/components/ListNotice'
-import { useCovers, useAllArtists } from '@raven/wren-native'
+import { useCovers, useAllArtists, useCollectionSearch } from '@raven/wren-native'
 import { ArtistTileOf } from '@/components/ArtistTileOf'
 import { CollectionGrid } from '@/screens/library/CollectionGrid'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
-import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 import { SIZE } from '@/theme/tvTokens'
 
 /**

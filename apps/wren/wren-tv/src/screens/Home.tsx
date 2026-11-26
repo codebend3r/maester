@@ -31,7 +31,7 @@ import {
   useMusicLibraries,
 } from '@raven/wren-native'
 import { WREN_ROUTES, libraryHref } from '@raven/wren-native/headless'
-import { CONTENT_WIDTH } from '@/shell/layout'
+import { TAB_TILE_COLUMNS } from '@/shell/layout'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { usePageStyles } from '@/ui/pageStyles'
@@ -39,7 +39,6 @@ import { themedStyles } from '@/theme/wrenTheme'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { Focusable } from '@/ui/Focusable'
 import { ChoiceRow } from '@/ui/ChoiceRow'
-import { columnsFitting } from '@/ui/grid'
 import { PageHeader, SectionHeader } from '@/ui/Headers'
 import { TileGrid } from '@/ui/TileGrid'
 
@@ -47,7 +46,7 @@ import { TileGrid } from '@/ui/TileGrid'
 const RECENT_ROWS = 6
 
 /** As many tiles as the page holds to a row, so the grid's rows are whole. */
-const RECENT_COLUMNS = columnsFitting({ width: CONTENT_WIDTH, tile: SIZE.tile, gap: SPACE.s4 })
+const RECENT_COLUMNS = TAB_TILE_COLUMNS
 
 /** The two orders of Home's albums, as its choices offer them, the phone's order. */
 const RECENT_CHOICES = [
@@ -144,13 +143,13 @@ function Shortcut({ title, value, onPress, isDisabled, hasPreferredFocus }: Shor
   )
 }
 
-type HomeSectionProps = { session: WrenSession }
+type CardsProps = { session: WrenSession }
 
 /**
  * Continue listening while something is queued, then Shuffle all and the account's Playlists, the
  * tablet's shortcuts; a TV keeps no downloads, so there is no Downloads card.
  */
-function Cards({ session }: HomeSectionProps) {
+function Cards({ session }: CardsProps) {
   const styles = useStyles()
   const covers = useCovers(session)
   const music = useMusicLibraries(session)
@@ -190,11 +189,13 @@ function Cards({ session }: HomeSectionProps) {
   )
 }
 
+type RecentAlbumsProps = { session: WrenSession }
+
 /**
  * Every music library's newest albums, six rows of them, by when they were added or when they
  * came out, as the choices under the title set; See all opens Albums.
  */
-function RecentAlbums({ session }: HomeSectionProps) {
+function RecentAlbums({ session }: RecentAlbumsProps) {
   const page = usePageStyles()
   const { coverOf } = useCovers(session)
   const sort = useWrenPrefs((state) => state.homeSort)
@@ -232,7 +233,9 @@ function RecentAlbums({ session }: HomeSectionProps) {
   )
 }
 
-function HomePage({ session }: HomeSectionProps) {
+type HomePageProps = { session: WrenSession }
+
+function HomePage({ session }: HomePageProps) {
   const page = usePageStyles()
   const styles = useStyles()
   const music = useMusicLibraries(session)

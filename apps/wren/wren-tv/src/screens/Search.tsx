@@ -9,7 +9,6 @@ import {
 } from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 import { View } from 'react-native'
-
 import {
   useCovers,
   useResultActions,
@@ -18,6 +17,7 @@ import {
   useWren,
   useSearchResults,
 } from '@raven/wren-native'
+
 import type { ResultsProps } from '@/screens/search/parts'
 import { Results } from '@/screens/search/Results'
 import { SearchIdle } from '@/screens/search/SearchIdle'

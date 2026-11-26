@@ -22,7 +22,7 @@ type NativeTopShelfModule = {
   show: (shelf: string) => Promise<void>
 }
 
-/**
+/*
  * Null on Android, which has no Top Shelf and builds no module of this package's. The pod builds
  * for iOS too, where `show` does nothing.
  */

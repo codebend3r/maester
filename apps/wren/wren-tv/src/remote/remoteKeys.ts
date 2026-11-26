@@ -31,17 +31,23 @@ export type QueueAction = (typeof QUEUE_ACTIONS)[MediaKey]
 
 const isMediaKey = (name: string): name is MediaKey => Object.hasOwn(QUEUE_ACTIONS, name)
 
-/** Android's `KeyEvent` actions, which the fork hands on with each key. */
-const KEY_ACTIONS = { up: 1 } as const
+// Android's `KeyEvent` action for a key coming up, which the fork hands on with each key.
+const KEY_UP = 1
 
 /**
- * The queue action a remote event asks for, once, or null for any other key. On Android TV the
+ * The key a remote event names, once, or null for an event that names none. On Android TV the
  * fork sends a key both as it goes down and as it comes up, so only its coming up counts; an
  * event that names no action (tvOS) counts as it comes.
  */
-export const queueActionOf = (event: unknown): QueueAction | null => {
+export const remoteKeyOf = (event: unknown): string | null => {
   if (!isRecord(event) || typeof event.eventType !== 'string') return null
   const action = event.eventKeyAction
-  if (action !== undefined && action !== null && Number(action) !== KEY_ACTIONS.up) return null
-  return isMediaKey(event.eventType) ? QUEUE_ACTIONS[event.eventType] : null
+  if (action !== undefined && action !== null && Number(action) !== KEY_UP) return null
+  return event.eventType
+}
+
+/** The queue action a remote event asks for, once, or null for any other key. */
+export const queueActionOf = (event: unknown): QueueAction | null => {
+  const key = remoteKeyOf(event)
+  return key !== null && isMediaKey(key) ? QUEUE_ACTIONS[key] : null
 }

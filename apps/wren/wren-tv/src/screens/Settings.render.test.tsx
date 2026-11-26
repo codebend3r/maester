@@ -9,14 +9,15 @@ import {
   STATUS_COPY,
   THEME_MODES,
   WREN_THEMES,
+  DEFAULT_SHARED_PREFS,
 } from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
+import { useWrenAccount, accountServers, useActiveServer } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 
 import { wrenVersion } from '@/about/version'
 import { queryClient } from '@/queryClient'
-import { useWrenAccount, accountServers, useActiveServer } from '@raven/wren-native'
-import { WREN_ROUTES } from '@raven/wren-native/headless'
-import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { LISTENER, MUSIC, musicApi } from '@/test/music'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
@@ -53,7 +54,7 @@ describe('Settings', () => {
     jest.clearAllMocks()
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
-    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
+    useWrenPrefs.setState(DEFAULT_SHARED_PREFS)
     mockApi.listLibraries.mockResolvedValue([MUSIC])
   })
 

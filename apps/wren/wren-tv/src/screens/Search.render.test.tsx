@@ -4,10 +4,10 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { KIT_COPY, LIBRARY_COPY, LIBRARY_SEGMENTS, RECENT_KINDS, SEARCH_COPY } from '@raven/wren'
 import { router as navigation } from 'expo-router'
 import { act, fireEvent, renderRouter, screen } from 'expo-router/testing-library'
-
-import { queryClient } from '@/queryClient'
 import { useWrenAccount, useRecentSearches } from '@raven/wren-native'
 import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
+
+import { queryClient } from '@/queryClient'
 import { AIRBAG, LISTENER, MUSIC, OK_COMPUTER, RADIOHEAD, musicApi } from '@/test/music'
 import type * as NativeMock from '@/test/nativeMock'
 import { pagePathOf } from '@/test/routes'

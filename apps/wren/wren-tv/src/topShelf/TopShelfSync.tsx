@@ -16,7 +16,7 @@ type AccountState = (typeof ACCOUNT_STATES)[keyof typeof ACCOUNT_STATES]
 
 type ReleasesShelfProps = { session: WrenSession }
 
-/**
+/*
  * Keeps the shelf on the latest releases once every music library has answered. It is built
  * afresh each render, as `coverOf` is; `useTopShelf` writes it only when its titles change.
  */

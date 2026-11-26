@@ -1,7 +1,7 @@
+import type { CollectionSearch } from '@raven/wren-native'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
 
-import type { CollectionSearch } from '@/screens/library/useCollectionSearch'
 import { SPACE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { PageHeader } from '@/ui/Headers'

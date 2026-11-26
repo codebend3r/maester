@@ -35,6 +35,12 @@ const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network
 /** Where `scripts/tv_apple_icons.sh` draws the Apple TV's icon layers and Top Shelf images. */
 const APPLE_TV_IMAGES = './assets/images/tv_apple'
 
+// The signed out Top Shelf's invitation, which `withTvTopShelf` copies into the extension.
+const TOP_SHELF_SIGN_IN = {
+  picture: `${APPLE_TV_IMAGES}/top-shelf-sign-in.png`,
+  picture2x: `${APPLE_TV_IMAGES}/top-shelf-sign-in-2x.png`,
+} as const
+
 type AppleTVIconLayers = { front: string; back: string }
 
 type AppleTVIconLayersProps = { name: string }
@@ -170,10 +176,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const withTests = isTv
     ? withoutTvAudioService(
         withTvTopShelf(withTvRemoteTests(withTvBannerDensities(app)), {
-          signIn: {
-            picture: `${APPLE_TV_IMAGES}/top-shelf-sign-in.png`,
-            picture2x: `${APPLE_TV_IMAGES}/top-shelf-sign-in-2x.png`,
-          },
+          signIn: TOP_SHELF_SIGN_IN,
         }),
       )
     : app

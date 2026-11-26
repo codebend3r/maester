@@ -9,7 +9,6 @@ import {
   sourceTitleOf,
 } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
-
 import { type NowPlayingTrack, useNowPlaying, type WrenSession } from '@raven/wren-native'
 
 /** Everything Now Playing draws the playing song from. */

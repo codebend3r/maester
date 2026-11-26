@@ -27,7 +27,7 @@ export function AlbumTileOf({
   album,
   coverOf,
   width = SIZE.tile,
-  line,
+  line = artistNames(album),
   detail = null,
   onOpen = openAlbum,
 }: AlbumTileOfProps) {
@@ -35,7 +35,7 @@ export function AlbumTileOf({
     <Tile
       cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
       detail={detail}
-      line={line === undefined ? artistNames(album) : line}
+      line={line}
       onPress={() => onOpen(album)}
       title={album.title}
       width={width}

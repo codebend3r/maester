@@ -1,4 +1,4 @@
-import type { LibrarySegment } from '@raven/wren'
+import { type LibrarySegment, RECENT_KINDS, type RecentPage } from '@raven/wren'
 
 /** Wren's route paths, one per file under `app/`. */
 export const WREN_ROUTES = {
@@ -61,3 +61,13 @@ export const pageHref = ({ page, id }: PageHrefProps) => ({
   pathname: page,
   params: { [WREN_ROUTE_PARAMS.id]: String(id) },
 })
+
+/** The page each kind of recent search opens. */
+const RECENT_PAGES = {
+  [RECENT_KINDS.artist]: WREN_PAGES.artist,
+  [RECENT_KINDS.album]: WREN_PAGES.album,
+} as const satisfies Record<RecentPage['kind'], WrenPage>
+
+/** Where a recent artist or album opens: its page. */
+export const recentPageHref = ({ kind, id }: RecentPage) =>
+  pageHref({ page: RECENT_PAGES[kind], id })

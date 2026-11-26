@@ -1,7 +1,7 @@
 import { SETTINGS_COPY } from '@raven/wren'
 import { Text, View } from 'react-native'
-
 import { useWrenAccount } from '@raven/wren-native'
+
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { FocusButton } from '@/ui/FocusButton'

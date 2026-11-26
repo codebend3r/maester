@@ -6,10 +6,11 @@ import {
   themeFor,
   themeSlotLabelOf,
   type Palette,
+  WREN_PALETTES,
 } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
-import { PALETTES, type WrenTheme, themedStyles, useSystemScheme } from '@/theme/wrenTheme'
+import { type WrenTheme, themedStyles, useSystemScheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, THEME_SIZES, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 
@@ -62,7 +63,7 @@ type ThemeSlotProps = {
 function ThemeSlot({ choice, scheme, isPicked, isShowing, onPress }: ThemeSlotProps) {
   const styles = useStyles()
   const theme = themeFor({ choice, scheme })
-  const palette = PALETTES[theme]
+  const palette = WREN_PALETTES[theme]
   return (
     <Pressable
       accessibilityLabel={themeSlotLabelOf({ choice, slot: scheme })}

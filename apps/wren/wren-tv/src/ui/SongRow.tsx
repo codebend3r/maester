@@ -1,4 +1,12 @@
-import { KIT_COPY, SONG_LEADS, type SongLeadOf, songLeadOf } from '@raven/wren'
+import {
+  KIT_COPY,
+  SONG_LEADS,
+  type ShownLead,
+  type SongLead,
+  type SongLeadOf,
+  songLeadOf,
+} from '@raven/wren'
+import { type ComponentType } from 'react'
 import { Text, View } from 'react-native'
 
 import { type Cover } from '@raven/wren-native'
@@ -31,22 +39,44 @@ const useStyles = themedStyles(({ colors }) => ({
   duration: { ...TYPE.time, color: colors.text3 },
 }))
 
-type SongLeadViewProps = { lead: SongLeadOf<Cover>; isCurrent: boolean; isPlaying: boolean }
+type LeadProps = { lead: ShownLead<Cover>; isPlaying: boolean }
 
-/** What leads the row: its cover or its number, with the equalizer while it is the queue's track. */
-function SongLeadView({ lead, isCurrent, isPlaying }: SongLeadViewProps) {
-  const styles = useStyles()
-  const shown = songLeadOf({ lead, isCurrent })
-  const hasCover = shown.kind === SONG_LEADS.art || shown.kind === SONG_LEADS.artEqualizer
-  const hasEqualizer = shown.kind === SONG_LEADS.equalizer || shown.kind === SONG_LEADS.artEqualizer
+function ArtLead({ lead }: LeadProps) {
   return (
-    <View style={styles.lead}>
-      {hasCover && <AlbumArt cover={shown.cover} radius={RADIUS.thumb} size={SIZE.rowArt} />}
-      {shown.kind === SONG_LEADS.number && <Text style={styles.number}>{shown.number}</Text>}
-      {hasEqualizer && <Equalizer isOnPicture={hasCover} isPlaying={isPlaying} />}
-    </View>
+    lead.kind === SONG_LEADS.art && (
+      <AlbumArt cover={lead.cover} radius={RADIUS.thumb} size={SIZE.rowArt} />
+    )
   )
 }
+
+/** The queue's track in a list of covers: its cover, the equalizer over it. */
+function ArtEqualizerLead({ lead, isPlaying }: LeadProps) {
+  return (
+    lead.kind === SONG_LEADS.artEqualizer && (
+      <>
+        <AlbumArt cover={lead.cover} radius={RADIUS.thumb} size={SIZE.rowArt} />
+        <Equalizer isOnPicture isPlaying={isPlaying} />
+      </>
+    )
+  )
+}
+
+function NumberLead({ lead }: LeadProps) {
+  const styles = useStyles()
+  return lead.kind === SONG_LEADS.number && <Text style={styles.number}>{lead.number}</Text>
+}
+
+function EqualizerLead({ isPlaying }: LeadProps) {
+  return <Equalizer isPlaying={isPlaying} />
+}
+
+/** What leads the row: its cover or its number, with the equalizer while it is the queue's track. */
+const LEAD_VIEWS = {
+  [SONG_LEADS.art]: ArtLead,
+  [SONG_LEADS.number]: NumberLead,
+  [SONG_LEADS.equalizer]: EqualizerLead,
+  [SONG_LEADS.artEqualizer]: ArtEqualizerLead,
+} as const satisfies Record<SongLead, ComponentType<LeadProps>>
 
 type SongRowProps = {
   title: string
@@ -85,6 +115,8 @@ export function SongRow({
   testID,
 }: SongRowProps) {
   const styles = useStyles()
+  const shown = songLeadOf({ lead, isCurrent })
+  const Lead = LEAD_VIEWS[shown.kind]
   return (
     <View style={styles.row}>
       <Focusable
@@ -98,7 +130,9 @@ export function SongRow({
         style={styles.main}
         testID={testID}
       >
-        <SongLeadView isCurrent={isCurrent} isPlaying={isPlaying} lead={lead} />
+        <View style={styles.lead}>
+          <Lead isPlaying={isPlaying} lead={shown} />
+        </View>
         <View style={styles.words}>
           <Text numberOfLines={1} style={[styles.title, isCurrent && styles.playing]}>
             {title}

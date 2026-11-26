@@ -13,9 +13,8 @@ import {
 import { libraryHref } from '@raven/wren-native/headless'
 import { AlbumTileOf } from '@/components/AlbumTileOf'
 import { CATEGORIES } from '@/screens/library/categories'
-import { CONTENT_WIDTH } from '@/shell/layout'
+import { TAB_TILE_COLUMNS } from '@/shell/layout'
 import { SIZE, SPACE } from '@/theme/tvTokens'
-import { columnsFitting } from '@/ui/grid'
 import { PageHeader, SectionHeader } from '@/ui/Headers'
 import { ListRow } from '@/ui/ListRow'
 import { TileGrid } from '@/ui/TileGrid'
@@ -25,12 +24,12 @@ import { themedStyles } from '@/theme/wrenTheme'
 const useStyles = themedStyles(() => ({ content: { gap: SPACE.s4, padding: SPACE.gutter } }))
 
 /** How many of the newest albums Library shows: two rows, as the tablet's grid does. */
-const RECENT_SHOWN = 2 * columnsFitting({ width: CONTENT_WIDTH, tile: SIZE.tile, gap: SPACE.s4 })
+const RECENT_SHOWN = 2 * TAB_TILE_COLUMNS
 
-type LibraryPageProps = { session: WrenSession }
+type RecentGridProps = { session: WrenSession }
 
 /** The newest albums of every music library, as a grid. */
-function RecentGrid({ session }: LibraryPageProps) {
+function RecentGrid({ session }: RecentGridProps) {
   const page = usePageStyles()
   const { coverOf } = useCovers(session)
   const { albums, listing } = useRecentAlbums({
@@ -50,6 +49,8 @@ function RecentGrid({ session }: LibraryPageProps) {
     </View>
   )
 }
+
+type LibraryPageProps = { session: WrenSession }
 
 function LibraryPage({ session }: LibraryPageProps) {
   const styles = useStyles()

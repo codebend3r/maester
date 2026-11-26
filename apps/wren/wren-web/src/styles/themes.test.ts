@@ -21,14 +21,6 @@ const colourOf = (value: string): string => {
   return [red, green, blue, Number(alpha) / (percent === '' ? 1 : 100)].join()
 }
 
-/** Each theme's colours as the apps paint them (`@raven/wren`'s palettes), by the theme's name. */
-const appPalettes: Record<string, Record<string, string>> = Object.fromEntries(
-  Object.entries(WREN_PALETTES).map(([theme, palette]) => [
-    theme,
-    Object.fromEntries(Object.entries(palette).map(([key, value]) => [key, colourOf(value)])),
-  ]),
-)
-
 const namesOf = (theme: string): string[] => Object.keys(blocks[theme] ?? {}).toSorted()
 
 describe("the stylesheet's themes", () => {
@@ -57,17 +49,15 @@ describe("the stylesheet's themes", () => {
 
   it("holds the same value as the apps' tokens for every colour of every theme", () => {
     const drifted = Object.values(WREN_THEMES).flatMap((theme) => {
-      const app = appPalettes[theme] ?? {}
       const web = Object.fromEntries(
         Object.entries(blocks[theme] ?? {}).map(([name, value]) => [
           appKeyOf(name),
           colourOf(value),
         ]),
       )
-      const keys = Object.keys(app)
-      return keys.length === 0
-        ? [`${theme}: no palette in the apps`]
-        : keys.filter((key) => web[key] !== app[key]).map((key) => `${theme}.${key}`)
+      return Object.entries(WREN_PALETTES[theme])
+        .filter(([key, value]) => web[key] !== colourOf(value))
+        .map(([key]) => `${theme}.${key}`)
     })
     expect(drifted).toEqual([])
   })

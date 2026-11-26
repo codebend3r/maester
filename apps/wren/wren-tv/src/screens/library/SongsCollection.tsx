@@ -8,13 +8,12 @@ import {
 } from '@raven/wren'
 import { useState } from 'react'
 
-import { useAllSongs, useSongCount } from '@raven/wren-native'
+import { useAllSongs, useSongCount, useCollectionSearch } from '@raven/wren-native'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { PlayButtons } from '@/components/PlayButtons'
 import { SortButton } from '@/screens/library/SortButton'
 import { TracksPage } from '@/screens/library/TracksPage'
-import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 
 /**
  * Songs: every music library's tracks a page at a time, in the order picked and found by what is

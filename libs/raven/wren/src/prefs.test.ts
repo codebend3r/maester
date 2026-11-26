@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'bun:test'
 
-import { COVER_SIZES, RECENT_SORTS, THEME_MODES, WREN_THEMES } from '@raven/wren'
+import { COVER_SIZES, DEFAULT_SHARED_PREFS, RECENT_SORTS, sharedPrefsOf } from '@/prefs'
+import { THEME_MODES, WREN_THEMES } from '@/themes'
 
-import { DEFAULT_WREN_PREFS, wrenPrefsOf } from '@/stores/wrenPrefs'
-
-describe('wrenPrefsOf', () => {
+describe('sharedPrefsOf', () => {
   it('starts a first run on the defaults', () => {
-    expect(wrenPrefsOf(null)).toEqual(DEFAULT_WREN_PREFS)
+    expect(sharedPrefsOf(null)).toEqual(DEFAULT_SHARED_PREFS)
   })
 
   it('keeps each choice that is one', () => {
-    const kept = wrenPrefsOf({
+    const kept = sharedPrefsOf({
       themeMode: THEME_MODES.single,
       theme: WREN_THEMES.ember,
       homeSort: RECENT_SORTS.release,
@@ -23,9 +22,9 @@ describe('wrenPrefsOf', () => {
     expect(kept.libraryId).toBe(4)
   })
 
-  it("reads a phone build's prefs, leaving what a TV has no use for", () => {
-    const kept = wrenPrefsOf({ downloadKbps: 256, cellularKbps: 128, coverSize: 'nonsense' })
-    expect(kept).toEqual(DEFAULT_WREN_PREFS)
+  it("reads a phone build's prefs, leaving what the TV and the web have no use for", () => {
+    const kept = sharedPrefsOf({ downloadKbps: 256, cellularKbps: 128, coverSize: 'nonsense' })
+    expect(kept).toEqual(DEFAULT_SHARED_PREFS)
     expect(Object.keys(kept)).not.toContain('downloadKbps')
   })
 })

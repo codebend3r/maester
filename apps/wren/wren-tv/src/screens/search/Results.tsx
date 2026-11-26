@@ -14,16 +14,14 @@ import {
 import type { ComponentType, ReactNode } from 'react'
 import { FlatList, ScrollView, View } from 'react-native'
 
-import { AlbumTileOf } from '@/components/AlbumTileOf'
-import { FoundArtist, FoundSong, type ResultsProps } from '@/screens/search/parts'
+import { AlbumGrid, ArtistGrid, FoundSong, type ResultsProps } from '@/screens/search/parts'
 import { TopResultCard } from '@/screens/search/TopResult'
 import { SPACE } from '@/theme/tvTokens'
-import { usePageStyles } from '@/ui/pageStyles'
 import { themedStyles } from '@/theme/wrenTheme'
 import { EmptyState } from '@/ui/EmptyState'
 import { SectionHeader } from '@/ui/Headers'
 import { Loading } from '@/ui/Loading'
-import { TileGrid } from '@/ui/TileGrid'
+import { usePageStyles } from '@/ui/pageStyles'
 import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
@@ -88,20 +86,10 @@ function AllResults({ results, query, onFilter, covers, actions }: ResultsProps)
         </View>
       </ResultSection>
       <ResultSection count={albums.length} filter={SEARCH_FILTERS.albums} onFilter={onFilter}>
-        <TileGrid
-          items={albums.slice(0, ALBUMS_IN_ALL)}
-          keyOf={(album) => album.id}
-          renderTile={(album) => (
-            <AlbumTileOf album={album} coverOf={covers.coverOf} onOpen={actions.openAlbum} />
-          )}
-        />
+        <AlbumGrid actions={actions} albums={albums.slice(0, ALBUMS_IN_ALL)} covers={covers} />
       </ResultSection>
       <ResultSection count={artists.length} filter={SEARCH_FILTERS.artists} onFilter={onFilter}>
-        <TileGrid
-          items={artists}
-          keyOf={(artist) => artist.id}
-          renderTile={(artist) => <FoundArtist actions={actions} artist={artist} covers={covers} />}
-        />
+        <ArtistGrid actions={actions} artists={artists} covers={covers} />
       </ResultSection>
     </ScrollView>
   )
@@ -144,37 +132,40 @@ function SongResults(props: ResultsProps) {
   )
 }
 
-/** Every album found, as a grid of tiles. */
-function AlbumResults(props: ResultsProps) {
-  const { results, covers, actions } = props
+type FilteredGridProps = ResultsProps & {
+  /** How many of the kind were found; none, and it says nothing matched. */
+  count: number
+  children: ReactNode
+}
+
+/** One kind of result a filter narrowed to, as a grid of tiles, or that none of that kind matched. */
+function FilteredGrid({ count, children, ...props }: FilteredGridProps) {
   const styles = useStyles()
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.scroller}>
-      {results.albums.length === 0 && <NoMatches {...props} />}
-      <TileGrid
-        items={results.albums}
-        keyOf={(album) => album.id}
-        renderTile={(album) => (
-          <AlbumTileOf album={album} coverOf={covers.coverOf} onOpen={actions.openAlbum} />
-        )}
-      />
+      {count === 0 && <NoMatches {...props} />}
+      {children}
     </ScrollView>
+  )
+}
+
+/** Every album found, as a grid of tiles. */
+function AlbumResults(props: ResultsProps) {
+  const { results, covers, actions } = props
+  return (
+    <FilteredGrid {...props} count={results.albums.length}>
+      <AlbumGrid actions={actions} albums={results.albums} covers={covers} />
+    </FilteredGrid>
   )
 }
 
 /** Every artist found, as a grid of round tiles. */
 function ArtistResults(props: ResultsProps) {
   const { results, covers, actions } = props
-  const styles = useStyles()
   return (
-    <ScrollView contentContainerStyle={styles.content} style={styles.scroller}>
-      {results.artists.length === 0 && <NoMatches {...props} />}
-      <TileGrid
-        items={results.artists}
-        keyOf={(artist) => artist.id}
-        renderTile={(artist) => <FoundArtist actions={actions} artist={artist} covers={covers} />}
-      />
-    </ScrollView>
+    <FilteredGrid {...props} count={results.artists.length}>
+      <ArtistGrid actions={actions} artists={results.artists} covers={covers} />
+    </FilteredGrid>
   )
 }
 

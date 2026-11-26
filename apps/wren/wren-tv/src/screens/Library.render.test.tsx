@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MUSIC_SORTS } from '@raven/core'
-import { KIT_COPY, LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS } from '@raven/wren'
+import { KIT_COPY, LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS, DEFAULT_SHARED_PREFS } from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
-import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { LISTENER, MUSIC, musicApi } from '@/test/music'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
@@ -28,7 +28,7 @@ describe('Library', () => {
     jest.clearAllMocks()
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
-    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
+    useWrenPrefs.setState(DEFAULT_SHARED_PREFS)
   })
 
   it('lists its categories with what each holds, and the newest albums', async () => {

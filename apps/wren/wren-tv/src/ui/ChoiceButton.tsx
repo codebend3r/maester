@@ -83,14 +83,14 @@ const OPTIONS = {
   [CHOICE_LOOKS.row]: RowOption,
 } as const satisfies Record<ChoiceLook, ComponentType<OptionProps<string>>>
 
-/** A pill said aloud as its choice's word, where nothing names it more. */
-const asSaid = (label: string): string => label
-
 type ChoiceButtonProps<Choice extends string> = {
   /** What it chooses: the sheet's title, and a row's name. */
   title: string
   icon: WrenIconName
-  /** A pill's spoken name, from the choice in use's word; a row reads its name and value. */
+  /**
+   * A pill's spoken name, from the choice in use's word; without one it says the word alone. A
+   * row reads its name and value.
+   */
   spokenLabelOf?: (label: string) => string
   options: readonly ChoiceOption<Choice>[]
   chosen: Choice
@@ -105,7 +105,7 @@ type ChoiceButtonProps<Choice extends string> = {
 export function ChoiceButton<Choice extends string>({
   title,
   icon,
-  spokenLabelOf = asSaid,
+  spokenLabelOf,
   options,
   chosen,
   onChoose,
@@ -125,7 +125,7 @@ export function ChoiceButton<Choice extends string>({
         chosenLabel={chosenLabel}
         icon={icon}
         onOpen={() => setIsOpen(true)}
-        spokenLabel={spokenLabelOf(chosenLabel)}
+        spokenLabel={spokenLabelOf?.(chosenLabel) ?? chosenLabel}
         title={title}
       />
       <Sheet isOpen={isOpen} onClose={() => setIsOpen(false)} title={title}>

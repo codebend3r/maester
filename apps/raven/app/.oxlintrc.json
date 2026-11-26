@@ -47,10 +47,10 @@
       }
     },
     {
-      // Expo loads app.config.ts with its own require hook, which reads no
-      // tsconfig `paths`, and Node adds no `.ts`, so it names its ./src module
-      // by relative path and extension.
-      "files": ["app.config.ts"],
+      // Expo loads app.config.ts and its plugins with its own require hook,
+      // which reads no tsconfig `paths`, and Node adds no `.ts`, so they name
+      // each other and the ./src modules by relative path and extension.
+      "files": ["app.config.ts", "plugins/**"],
       "rules": {
         "no-restricted-imports": "off"
       }

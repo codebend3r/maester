@@ -1,4 +1,5 @@
 import { SETTINGS_COPY } from '@raven/wren'
+import { useWren } from '@raven/wren-native'
 import { ScrollView, View } from 'react-native'
 
 import { AboutGroup } from '@/screens/settings/AboutGroup'
@@ -7,10 +8,9 @@ import { AppearanceGroup } from '@/screens/settings/AppearanceGroup'
 import { LibraryGroup } from '@/screens/settings/LibraryGroup'
 import { ServerGroup } from '@/screens/settings/ServerGroup'
 import { SPACE } from '@/theme/tvTokens'
-import { usePageStyles } from '@/ui/pageStyles'
 import { themedStyles } from '@/theme/wrenTheme'
 import { PageHeader } from '@/ui/Headers'
-import { useWren } from '@raven/wren-native'
+import { usePageStyles } from '@/ui/pageStyles'
 
 const useStyles = themedStyles(() => ({
   page: { gap: SPACE.s6, padding: SPACE.gutter },
@@ -33,8 +33,12 @@ export function Settings() {
       <View style={styles.columns}>
         <View style={styles.half}>
           <AccountGroup />
-          {session !== null && <ServerGroup session={session} />}
-          {session !== null && <LibraryGroup session={session} />}
+          {session !== null && (
+            <>
+              <ServerGroup session={session} />
+              <LibraryGroup session={session} />
+            </>
+          )}
         </View>
         <View style={styles.half}>
           <AppearanceGroup />

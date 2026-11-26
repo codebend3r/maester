@@ -33,6 +33,13 @@ const isRecentSearch = tagged({
 
 export type RecentSearch = Infer<typeof isRecentSearch>
 
+/** A recent search that opens a page when pressed: an artist or an album, by id. */
+export type RecentPage = Exclude<RecentSearch, { kind: typeof RECENT_KINDS.query }>
+
+/** Whether a press on a recent search opens its page, an artist's or an album's; words are searched again instead. */
+export const isRecentPage = (recent: RecentSearch): recent is RecentPage =>
+  recent.kind !== RECENT_KINDS.query
+
 /** A recent search's identity, so the same one searched again moves to the top rather than twice. */
 export const recentKeyOf = (recent: RecentSearch): string => {
   switch (recent.kind) {
