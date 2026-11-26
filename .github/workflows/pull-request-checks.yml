@@ -126,6 +126,11 @@ jobs:
             reports: wren-web
             dir: apps/wren/wren-web
             ffmpeg: true
+          # axe-core over every page of both web apps in Google Chrome, against the server's
+          # fixture, held to WCAG 2.2 A and AA. Fails on any violation and names the elements.
+          - name: ♿ axe-core
+            target: axe:ci
+            ffmpeg: true
           - name: 🧩 One command per script
             target: one-command-per-script
           - name: 🟦 Oxlint
@@ -198,6 +203,19 @@ jobs:
           path: ${{ matrix.check.dir }}/.lighthouseci
           # Lighthouse CI writes to `.lighthouseci`, which the action skips as a hidden folder by default.
           include-hidden-files: true
+          if-no-files-found: ignore
+
+      # Playwright's HTML report of the axe-core run, with a trace of each failing page.
+      - name: 📤 Upload the axe-core reports
+        if: failure() && matrix.check.target == 'axe:ci'
+        uses: actions/upload-artifact@v7
+        with:
+          name: axe-reports-${{ github.sha }}
+          path: |
+            apps/raven/web/playwright-report
+            apps/raven/web/test-results
+            apps/wren/wren-web/playwright-report
+            apps/wren/wren-web/test-results
           if-no-files-found: ignore
 
       - *native-cancel

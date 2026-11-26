@@ -88,6 +88,7 @@ STANDARD_CHECK_NAMES = {
     "🎨 Oxfmt",
     "🔦 Lighthouse Raven web",
     "🔦 Lighthouse Wren web",
+    "♿ axe-core",
     "🧩 One command per script",
     "🟦 Oxlint",
     "🐍 Python lint",

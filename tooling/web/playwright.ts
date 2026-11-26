@@ -4,11 +4,19 @@ import { FIXTURE_SERVER } from '@raven/core/fixtureServer'
 
 const SERVER_DIR = join(import.meta.dirname, '..', '..', 'apps', 'raven', 'server')
 
+/** The files each suite runs: the flows, and the accessibility scan of every page. */
+export const SUITE_MATCHES = {
+  e2e: '**/*.e2e.ts',
+  axe: '**/*.axe.ts',
+} as const
+
 type FixtureSuiteProps = {
   /** The web app's folder, which holds its `e2e` suite and its `dist` build. */
   projectDir: string
   /** The fixture's port, one per suite so the browser suites can run side by side. */
   port: number
+  /** Which files run, the flows by default. */
+  suite?: keyof typeof SUITE_MATCHES
 }
 
 /**
@@ -17,12 +25,12 @@ type FixtureSuiteProps = {
  * shares the one server, so they run one at a time and each test leaves the fixture as it found
  * it.
  */
-export const fixtureSuiteConfig = ({ projectDir, port }: FixtureSuiteProps) => {
+export const fixtureSuiteConfig = ({ projectDir, port, suite }: FixtureSuiteProps) => {
   const origin = `http://${FIXTURE_SERVER.host}:${port}`
   return defineConfig({
     testDir: 'e2e',
     // Bun's test runner never picks these up.
-    testMatch: '**/*.e2e.ts',
+    testMatch: SUITE_MATCHES[suite ?? 'e2e'],
     workers: 1,
     timeout: 60_000,
     retries: process.env.CI ? 1 : 0,

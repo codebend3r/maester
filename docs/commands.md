@@ -8,17 +8,17 @@ Every script in the root `package.json`, grouped. Run any of them from the repo 
 
 What to run before a push; the pre-push hook runs the same checks.
 
-| Command           | What it does                                                                                                                               | Needs |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
-| `verify`          | Every check at once: spelling, one command per script, dead code and CSS, lint, format, typecheck, unit and screen tests, and every build. |       |
-| `verify:uncached` | verify, ignoring Nx's cache, after a toolchain change.                                                                                     |       |
-| `verify:push`     | What the pre-push hook runs: verify without dead code and dead CSS, in one Nx run.                                                         |       |
-| `affected`        | The repo-wide checks, then lint, format, typecheck, tests and builds only for the projects your branch changed.                            |       |
-| `affected:tasks`  | The per-project half of affected, without the repo-wide checks.                                                                            |       |
-| `build`           | Builds every project.                                                                                                                      |       |
-| `test`            | Every project's unit tests.                                                                                                                |       |
-| `test:screens`    | The device app's render tests under jest-expo.                                                                                             |       |
-| `typecheck`       | Typechecks every TypeScript project.                                                                                                       |       |
+| Command           | What it does                                                                                                                                                    | Needs |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `verify`          | Every check at once: spelling, one command per script, dead code and CSS, lint, format, typecheck, unit and screen tests, every build, Lighthouse and axe-core. |       |
+| `verify:uncached` | verify, ignoring Nx's cache, after a toolchain change.                                                                                                          |       |
+| `verify:push`     | What the pre-push hook runs: verify without dead code, dead CSS, Lighthouse and axe-core, in one Nx run.                                                        |       |
+| `affected`        | The repo-wide checks, then lint, format, typecheck, tests and builds only for the projects your branch changed.                                                 |       |
+| `affected:tasks`  | The per-project half of affected, without the repo-wide checks.                                                                                                 |       |
+| `build`           | Builds every project.                                                                                                                                           |       |
+| `test`            | Every project's unit tests.                                                                                                                                     |       |
+| `test:screens`    | The device app's render tests under jest-expo.                                                                                                                  |       |
+| `typecheck`       | Typechecks every TypeScript project.                                                                                                                            |       |
 
 ## Lint and format
 
@@ -156,8 +156,11 @@ Each runs one CI job from pull-request-checks.yml on this machine.
 | `ci:desktop:e2e`                  | The 🎬 E2E Raven Mac desktop job.                                                                                      | macOS                       |
 | `web:e2e`                         | The 🌐 E2E Raven web job: Playwright drives the web app against a fixture server.                                      | Chrome + ffmpeg             |
 | `wren:web:e2e`                    | The 🎵 E2E Wren web job: Playwright drives Wren on the web against a fixture server.                                   | Chrome + ffmpeg             |
+| `lighthouse`                      | Lighthouse on both web apps, one after the other, against their floors.                                                | Chrome + ffmpeg             |
 | `raven:web:lighthouse`            | The 🔦 Lighthouse Raven web job: raven's web app against its floors, Nx cached.                                        | Chrome + ffmpeg             |
 | `wren:web:lighthouse`             | The 🔦 Lighthouse Wren web job: Wren on the web against its floors, Nx cached.                                         | Chrome + ffmpeg             |
+| `axe`                             | axe-core over both web apps' pages, locally: fails on any WCAG 2.2 A or AA violation.                                  | Chrome + ffmpeg             |
+| `axe:ci`                          | The ♿ axe-core job: the same scan with GitHub annotations and an HTML report.                                         | Chrome + ffmpeg             |
 | `e2e`                             | Every end to end job, one after another: web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV and Android TV. | macOS + Xcode + Android SDK |
 
 ## Help

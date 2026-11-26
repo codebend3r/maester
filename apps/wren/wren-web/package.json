@@ -8,6 +8,8 @@
     "#package": "./package.json"
   },
   "scripts": {
+    "axe": "playwright test --config playwright.axe.config.ts",
+    "axe:ci": "playwright test --config playwright.axe.config.ts --reporter=github,html",
     "build": "vite build",
     "dead-code": "knip --no-progress --directory ../../.. --workspace apps/wren/wren-web",
     "dead-css": "bun ../../../tooling/web/check-dead-css.ts .",
@@ -89,7 +91,9 @@
       "lint:py",
       "one-command-per-script",
       "spellcheck",
-      "lighthouse"
+      "lighthouse",
+      "axe",
+      "axe:ci"
     ],
     "targets": {
       "build": {
@@ -176,6 +180,43 @@
         ]
       },
       "lighthouse": {
+        "cache": true,
+        "parallelism": false,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
+        ]
+      },
+      "axe": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "^build",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer"
+        ]
+      },
+      "axe:ci": {
         "cache": true,
         "dependsOn": [
           "build",

@@ -6,7 +6,7 @@
     {
       /* Vite and Playwright read their config through a default export; ambient .d.ts files
          declare, they don't export. */
-      "files": ["vite.config.ts", "playwright.config.ts", "**/*.d.ts"],
+      "files": ["vite.config.ts", "playwright*.config.ts", "**/*.d.ts"],
       "rules": {
         "import/no-default-export": "off"
       }
