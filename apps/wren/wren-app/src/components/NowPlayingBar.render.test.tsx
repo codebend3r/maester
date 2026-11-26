@@ -8,7 +8,7 @@ import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testi
 import { Dimensions } from 'react-native'
 
 import { queryClient } from '@/queryClient'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, PARANOID, musicApi } from '@/test/music'
 import { WREN_TREE } from '@/test/wrenTree'

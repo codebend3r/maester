@@ -1,20 +1,19 @@
 import Svg, { Circle, Path } from 'react-native-svg'
 
-import { WREN_LOCKUP_COPY } from '@raven/wren'
-import { BRAND_INKS, LOCKUP_DRAWING, LOCKUP_VIEW_BOX } from '@/theme/wrenBrand'
+import {
+  BRAND,
+  BRAND_INKS,
+  LOCKUP_DRAWING,
+  LOCKUP_VIEW_BOX,
+  MARK_VIEW_BOX,
+  WREN_LOCKUP_COPY,
+} from '@raven/wren'
 import { useWrenTheme } from '@/theme/wrenTheme'
-import { BRAND } from '@/theme/wrenTokens'
 
 // 64 points tall, where the brand's rules give the mark its full cut.
 const LOCKUP_HEIGHT = 64
 
 const { x, y, width, height } = LOCKUP_VIEW_BOX
-
-/*
- * The mark alone, from assets/brand/wren-mark-on-dark.svg: the lockup's bird in the same
- * coordinates, in a box centred on its weight, not its outline.
- */
-const MARK_VIEW_BOX = { x: 30, y: 8, width: 460, height: 448 } as const
 
 type WrenLockupProps = {
   /** How tall it is drawn: 64 on sign-in, 34 atop the tablet's sidebar. */

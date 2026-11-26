@@ -9,7 +9,7 @@ import { SPACE } from '@/theme/wrenTokens'
 import { Button } from '@/ui/Button'
 import { TextField } from '@/ui/TextField'
 import { ICONS } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
+import { type WrenSession } from '@raven/wren-native'
 
 const useStyles = themedStyles(() => ({ form: { gap: SPACE.s3 } }))
 

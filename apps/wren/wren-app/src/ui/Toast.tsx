@@ -2,7 +2,7 @@ import { Text } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
 
 import { useToastOffset } from '@/shell/useShell'
-import { useToast } from '@/stores/toast'
+import { useToast } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'

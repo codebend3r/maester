@@ -1,8 +1,7 @@
 import { classNames } from '@raven/ui/headless'
-import { WREN_LOCKUP_COPY } from '@raven/wren'
+import { LOCKUP_DRAWING, LOCKUP_VIEW_BOX, MARK_VIEW_BOX, WREN_LOCKUP_COPY } from '@raven/wren'
 import type { ReactNode } from 'react'
 import type { Color, Size, TokenStyle } from '@/theme/tokens'
-import { LOCKUP_DRAWING, LOCKUP_VIEW_BOX, MARK_VIEW_BOX } from '@/theme/wrenBrand'
 import styles from '@/components/WrenLockup/WrenLockup.module.scss'
 
 type ViewBox = { x: number; y: number; width: number; height: number }

@@ -5,8 +5,8 @@ import type { ComponentType } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
 import { HOME_COPY } from '@raven/wren'
-import type { Covers } from '@/music/useCovers'
-import { WREN_ROUTES } from '@/routes'
+import { type Covers } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
   HOME_SIZES,

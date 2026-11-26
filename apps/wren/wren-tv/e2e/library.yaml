@@ -1,0 +1,24 @@
+appId: app.netlify.wren.tv
+name: The sidebar opens Library, whose Albums holds the fixture's album, and Back returns
+---
+- runFlow: steps/signIn.yaml
+- runFlow:
+    file: steps/sidebarPlace.yaml
+    env:
+      PLACE: Library
+# Library opens with the remote on its first category, Albums.
+- extendedWaitUntil:
+    visible:
+      text: Albums.*
+      focused: true
+    timeout: 30000
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Morning Chorus.*
+    timeout: 30000
+- pressKey: Back
+- extendedWaitUntil:
+    visible:
+      text: Albums.*
+      focused: true
+    timeout: 30000

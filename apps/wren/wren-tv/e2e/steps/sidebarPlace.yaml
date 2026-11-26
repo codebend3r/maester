@@ -1,0 +1,21 @@
+appId: app.netlify.wren.tv
+---
+# Takes the remote to the sidebar and down it to the place named ${PLACE}, then opens it. Left
+# from a page's leftmost control reaches the sidebar, which opens on the place showing.
+- repeat:
+    times: 4
+    while:
+      notVisible:
+        text: Home
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Left
+- repeat:
+    times: 4
+    while:
+      notVisible:
+        text: ${PLACE}
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Down
+- pressKey: Remote Dpad Center

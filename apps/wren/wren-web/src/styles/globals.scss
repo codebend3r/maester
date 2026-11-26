@@ -1,7 +1,7 @@
 /*
  * Wren's design tokens and the few true primitives, translated from the redesign handoff
  * (apps/wren/wren-app/design/redesign/tokens/tokens.css) and the phone and tablet apps'
- * apps/wren/wren-app/src/theme/wrenTokens.ts, value for value. Component styles live beside their
+ * apps/wren/wren-app/src/theme/wrenTokens.ts and @raven/wren's palettes.ts, value for value. Component styles live beside their
  * component as *.module.scss and use only these values.
  */
 
@@ -379,7 +379,7 @@
 /*
  * The themes: each gives the palette's names its own values, on the root (which `followTheme`
  * names from Settings' Appearance) or on any element inside it, as a theme's tile in Settings
- * and its panel on /design wear theirs. The apps' `COLORS` in `wrenTokens.ts` holds the same
+ * and its panel on /design wear theirs. The apps' `WREN_PALETTES` in `@raven/wren` holds the same
  * values under the same names, and `themes.test.ts` checks every theme declares every colour.
  */
 

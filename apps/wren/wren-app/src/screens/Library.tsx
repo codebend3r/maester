@@ -10,12 +10,18 @@ import {
 import { useRouter } from 'expo-router'
 import { ScrollView, View } from 'react-native'
 
-import { useCovers } from '@/music/useCovers'
+import {
+  useCovers,
+  type WrenSession,
+  useWren,
+  useLibraryValues,
+  useRecentAlbums,
+} from '@raven/wren-native'
+import { useDownloadsSummary } from '@/screens/library/downloadsSummary'
+import { WREN_ROUTES, libraryHref } from '@raven/wren-native/headless'
 import { CATEGORIES } from '@/screens/library/categories'
-import { useDownloadsSummary, useLibraryValues, useRecentAlbums } from '@/screens/library/listings'
 import { LIST_SHAPES } from '@/components/ListSkeleton'
 import { ListNotice } from '@/screens/library/ListNotice'
-import { WREN_ROUTES, libraryHref } from '@/routes'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
@@ -26,7 +32,6 @@ import { PageHeader } from '@/ui/PageHeader'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
 import { ICONS } from '@/ui/WrenIcon'
-import { type WrenSession, useWren } from '@/useWren'
 
 /** How many of the newest albums Library's grid shows: three rows on a phone, two on a tablet. */
 const RECENT_SHOWN = {

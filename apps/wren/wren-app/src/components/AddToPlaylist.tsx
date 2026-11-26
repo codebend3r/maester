@@ -6,7 +6,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY } from '@raven/wren'
 import { LoadingMark } from '@/components/LoadingMark'
 import { Notice } from '@/components/Notice'
-import { type PickedPlaylist, useAddToPlaylist } from '@/components/useAddToPlaylist'
+import { type PickedPlaylist, useAddToPlaylist, type WrenSession } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { DETAIL_SIZES, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
@@ -14,7 +14,6 @@ import { EmptyState } from '@/ui/EmptyState'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import { pressedStyleOf } from '@/ui/press'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   body: { gap: SPACE.s4, paddingHorizontal: SPACE.s3, paddingTop: SPACE.s4 },

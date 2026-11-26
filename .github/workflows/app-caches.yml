@@ -1,6 +1,6 @@
 name: 🗃️ App build caches
 
-# Builds raven's device app and Wren on main and saves what the next build reads: ccache's
+# Builds raven's device app, Wren and Wren on TV on main and saves what the next build reads: ccache's
 # objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
 # packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
 # to its own ref, so a PR saving its own would fill the repo's cache with copies;
@@ -20,6 +20,9 @@ on:
       - apps/wren/wren-app/package.json
       - apps/wren/wren-app/app.config.ts
       - apps/wren/wren-app/plugins/**
+      - apps/wren/wren-tv/package.json
+      - apps/wren/wren-tv/app.config.ts
+      - apps/wren/wren-tv/plugins/**
       - .github/actions/raven-app-setup/**
       - .github/actions/raven-xcode/**
       - .github/actions/raven-android-avd/**
@@ -69,6 +72,10 @@ jobs:
             id: ios
             project: apps/wren/wren-app
             target: '@wren/app:build:ios'
+          - name: 🎵 Wren Apple TV caches
+            id: tvos
+            project: apps/wren/wren-tv
+            target: '@wren/tv:build:tvos'
     steps: &build-steps
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -132,6 +139,10 @@ jobs:
             id: android-tv
             project: apps/wren/wren-app
             target: '@wren/app:build:android'
+          - name: 🎵 Wren Android TV caches
+            id: android-tv
+            project: apps/wren/wren-tv
+            target: '@wren/tv:build:android-tv'
     steps: *build-steps
 
   android-tv-avd:

@@ -1,7 +1,7 @@
 import type { AlbumSummary } from '@raven/core'
 import { FlatList, StyleSheet } from 'react-native'
 
-import type { CoverOf } from '@/music/useCovers'
+import { type CoverOf } from '@raven/wren-native'
 import { usePageInsets } from '@/shell/useShell'
 import { SIZE } from '@/theme/wrenTokens'
 import { AlbumTileOf } from '@/ui/AlbumTile'

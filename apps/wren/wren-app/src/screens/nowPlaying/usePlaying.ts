@@ -13,11 +13,10 @@ import { usePlayedQuality } from '@raven/native/headless'
 import { useRouter } from 'expo-router'
 import { Platform } from 'react-native'
 
-import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
+import { type NowPlayingTrack, useNowPlaying, type WrenSession } from '@raven/wren-native'
+import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { deviceOf } from '@/screens/nowPlaying/device'
-import { WREN_PAGES, pageHref } from '@/routes'
 import { useFormFactor } from '@/theme/wrenTheme'
-import type { WrenSession } from '@/useWren'
 
 /** Everything both layouts draw the playing song from. */
 export type Playing = NowPlayingTrack & {

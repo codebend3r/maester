@@ -5,11 +5,12 @@ import {
   type ThemeChoice,
   themeFor,
   themeSlotLabelOf,
+  type Palette,
 } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
 import { PALETTES, type WrenTheme, themedStyles, useSystemScheme } from '@/theme/wrenTheme'
-import { type Palette, RADIUS, SIZE, SPACE, THEME_SIZES, TYPE } from '@/theme/wrenTokens'
+import { RADIUS, SIZE, SPACE, THEME_SIZES, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 
 const SLOTS = [COLOR_SCHEMES.light, COLOR_SCHEMES.dark] as const

@@ -8,13 +8,12 @@ import {
 } from '@raven/wren'
 import { FlatList, Text, View } from 'react-native'
 
-import { useCovers } from '@/music/useCovers'
+import { useCovers, type WrenSession } from '@raven/wren-native'
 import { RepeatToggle, ShuffleToggle } from '@/player/QueueToggles'
 import { QueueRow } from '@/screens/nowPlaying/QueueRow'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { TextLink } from '@/ui/TextLink'
-import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   upNext: { flex: 1 },

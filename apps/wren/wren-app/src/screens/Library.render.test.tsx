@@ -26,9 +26,8 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@/routes'
-import { useWrenAccount } from '@/session'
-import { useToast } from '@/stores/toast'
+import { useWrenAccount, useToast } from '@raven/wren-native'
+import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   AIRBAG,

@@ -9,9 +9,7 @@ import {
 import { type ComponentType, type ReactNode } from 'react'
 import { FlatList, Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native'
 
-import type { Covers } from '@/music/useCovers'
-import type { ResultActions } from '@/screens/search/useResultActions'
-import type { SearchResults as Results } from '@/screens/search/useSearchResults'
+import { type Covers, type ResultActions, type SearchResults as Results } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { FORM_FACTORS, SEARCH_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'

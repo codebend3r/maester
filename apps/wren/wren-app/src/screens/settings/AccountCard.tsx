@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native'
 
 import { SETTINGS_COPY } from '@raven/wren'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'

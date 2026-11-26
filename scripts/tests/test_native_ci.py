@@ -32,6 +32,8 @@ DEVICES = {
     "android-phone": ("Android phone", "app", False),
     "wren-iphone": ("Wren iPhone", "music", True),
     "wren-android": ("Wren Android", "music", False),
+    "wren-apple-tv": ("Wren Apple TV", "music", True),
+    "wren-android-tv": ("Wren Android TV", "music", True),
 }
 # Each device with flows and its end to end job's name, which names the app it tests.
 E2E_NAMES = {
@@ -39,6 +41,8 @@ E2E_NAMES = {
     "apple-tv": "🎬 E2E Raven Apple TV",
     "android-tv": "🎬 E2E Raven Android TV",
     "wren-iphone": "🎵 E2E Wren iPhone",
+    "wren-apple-tv": "🎵 E2E Wren Apple TV",
+    "wren-android-tv": "🎵 E2E Wren Android TV",
 }
 # Each group's build job emoji: raven's jobs wear the clapperboard, Wren's its musical note.
 BUILD_EMOJI = {"app": "🎬", "music": "🎵"}
@@ -74,9 +78,13 @@ HANDOFF_SETTINGS = ("APP_SETUP", "APP_PROJECT", "APP_ARTIFACT", "APP_BUNDLE")
 HANDOFF = "${{ env.APP_ARTIFACT }}-${{ inputs.sha }}"
 FOUND_HANDOFF = "${{ env.APP_ARTIFACT }}-${{ env.BUILD_SHA }}"
 NATIVE_SHA = "${{ env.NATIVE_BUILD_SHA }}"
-END_TO_END_TARGETS = ("app:e2e", "@wren/app:e2e")
+END_TO_END_TARGETS = ("app:e2e", "@wren/app:e2e", "wren:tv:e2e")
 # Each app's folder and its Nx project.
-PROJECTS = {"apps/raven/app": "@raven/app", "apps/wren/wren-app": "@wren/app"}
+PROJECTS = {
+    "apps/raven/app": "@raven/app",
+    "apps/wren/wren-app": "@wren/app",
+    "apps/wren/wren-tv": "@wren/tv",
+}
 PLAN_SCRIPT = ROOT / "scripts/plan_native_builds.sh"
 FIND_SCRIPT = ROOT / "scripts/find_pr_builds.sh"
 # Every row of the pull request's one matrix, by the name its job carries.

@@ -1,4 +1,4 @@
-import { WREN_ROUTE_PARAMS, type pageHref } from '@/routes'
+import { WREN_ROUTE_PARAMS, type pageHref } from '@raven/wren-native/headless'
 
 type PagePathOfProps = {
   page: Parameters<typeof pageHref>[0]['page']

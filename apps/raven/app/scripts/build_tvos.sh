@@ -7,13 +7,21 @@
 #
 #   bun run app:build:tvos         through Nx, with its dependencies
 #   bun run ci:app:tvos:build      the command the Apple TV check runs, without them
+#
+# Wren on TV's build (apps/wren/wren-tv/scripts/build_tvos.sh) runs this script too, naming its own
+# folder and Xcode project through APP_DIR and APP_NAME.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+SCRIPTS="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$SCRIPTS/../../../.." && pwd)"
+cd "${APP_DIR:-$SCRIPTS/..}"
+APP_NAME="${APP_NAME:-Raven}"
+# The app's folder from the repo root, for the paths it prints.
+SHOWN_DIR="${PWD#"$REPO/"}"
 
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 DERIVED=build/tvos
 LOG="$DERIVED/xcodebuild.log"
-APP="$DERIVED/Build/Products/Release-appletvsimulator/Raven.app"
+APP="$DERIVED/Build/Products/Release-appletvsimulator/$APP_NAME.app"
 # How much of the log's end a failed build prints, where xcodebuild lists what failed and why.
 FAILURE_LINES="${BUILD_FAILURE_LINES:-100}"
 
@@ -43,10 +51,10 @@ brief() {
 }
 
 mkdir -p "$DERIVED"
-echo "Building raven for the Apple TV simulator (Release). Full log: apps/raven/app/$LOG"
+echo "Building $APP_NAME for the Apple TV simulator (Release). Full log: $SHOWN_DIR/$LOG"
 
 status=0
-xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release \
+xcodebuild -workspace "ios/$APP_NAME.xcworkspace" -scheme "$APP_NAME" -configuration Release \
   -sdk appletvsimulator -destination 'generic/platform=tvOS Simulator' \
   -derivedDataPath "$DERIVED" ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build 2>&1 | tee "$LOG" | brief || status=${PIPESTATUS[0]}
@@ -57,8 +65,8 @@ if ((status != 0)); then
   echo "Build failed after $(elapsed) (xcodebuild exited $status), with $warnings warnings in the log."
   echo "The last $FAILURE_LINES lines of the log:"
   tail -n "$FAILURE_LINES" "$LOG"
-  echo "Full log: apps/raven/app/$LOG"
+  echo "Full log: $SHOWN_DIR/$LOG"
   exit "$status"
 fi
 
-echo "Built in $(elapsed), with $warnings warnings in the log: apps/raven/app/$APP"
+echo "Built in $(elapsed), with $warnings warnings in the log: $SHOWN_DIR/$APP"

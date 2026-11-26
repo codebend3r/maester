@@ -382,6 +382,40 @@ jobs:
       APP_BUNDLE: ''
     steps: *build-steps
 
+  # Wren on TV (`@wren/tv`), its own app on the same React Native, built by the same steps: the
+  # tvOS build packs its Siri Remote XCUITest beside the app, as raven's Apple TV build does.
+  build-wren-apple-tv:
+    name: 🎵 Build Wren Apple TV
+    needs: [standard-checks, install-macos]
+    runs-on: macos-26
+    timeout-minutes: 60
+    permissions: *native-permissions
+    env:
+      APP_SETUP: tvos
+      APP_PROJECT: apps/wren/wren-tv
+      APP_BUILD: bun run ci:wren:tv:tvos:build
+      APP_ARTIFACT: wren-tv-tvos-simulator
+      APP_BUNDLE: build/tvos/Build/Products/Release-appletvsimulator/Wren.app
+      APP_RUNTIME: tvOS
+      APP_TEST_PROJECT: 'true'
+      APP_XCODE_PROJECT: Wren
+      APP_PODS_TARGET: Wren
+    steps: *build-steps
+
+  build-wren-android-tv:
+    name: 🎵 Build Wren Android TV
+    needs: standard-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions: *native-permissions
+    env:
+      APP_SETUP: android-tv
+      APP_PROJECT: apps/wren/wren-tv
+      APP_BUILD: bun run wren:tv:build:android-tv --excludeTaskDependencies
+      APP_ARTIFACT: wren-tv-android-tv
+      APP_BUNDLE: ''
+    steps: *build-steps
+
   # One native build feeds packaging, the player's tests and main's suite through an artifact.
   desktop-native:
     name: 🎬 Build Raven Mac native
@@ -463,6 +497,8 @@ jobs:
       - build-android-phone
       - build-wren-iphone
       - build-wren-android
+      - build-wren-apple-tv
+      - build-wren-android-tv
       - desktop-native
       - desktop-app
       - desktop-test

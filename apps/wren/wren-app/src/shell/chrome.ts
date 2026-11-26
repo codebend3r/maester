@@ -1,4 +1,4 @@
-import { WREN_SCREENS } from '@/routes'
+import { WREN_SCREENS } from '@raven/wren-native/headless'
 
 /**
  * What surrounds the screen showing: nothing on sign-in and Now Playing, the tab bar on a tab,

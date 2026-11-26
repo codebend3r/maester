@@ -14,12 +14,12 @@ import { ScrollView, View } from 'react-native'
 
 import { LoadingMark } from '@/components/LoadingMark'
 import { Notice } from '@/components/Notice'
-import { WREN_ROUTE_PARAMS } from '@/routes'
+import { type WrenSession, useWren } from '@raven/wren-native'
+import { WREN_ROUTE_PARAMS } from '@raven/wren-native/headless'
 import { BackButton } from '@/screens/detail/BackButton'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
-import { type WrenSession, useWren } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },

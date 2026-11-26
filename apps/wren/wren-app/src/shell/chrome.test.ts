@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 
-import { WREN_SCREENS } from '@/routes'
+import { WREN_SCREENS } from '@raven/wren-native/headless'
 import { CHROMES, chromeOf } from '@/shell/chrome'
 import { pageInsetsOf, toastOffsetOf } from '@/shell/pageInsets'
 import { SHELL_SIZES, SIZE, SPACE, FORM_FACTORS } from '@/theme/wrenTokens'

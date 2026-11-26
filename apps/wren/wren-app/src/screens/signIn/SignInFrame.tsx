@@ -2,17 +2,10 @@ import type { ComponentType, ReactNode } from 'react'
 import { KeyboardAvoidingView, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { SIGN_IN_COPY } from '@raven/wren'
+import { SIGN_IN_COPY, BRAND } from '@raven/wren'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
-import {
-  BRAND,
-  SIGN_IN_SIZES,
-  SPACE,
-  TYPE,
-  FORM_FACTORS,
-  type FormFactor,
-} from '@/theme/wrenTokens'
+import { SIGN_IN_SIZES, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { StatusChip } from '@/ui/StatusChip'
 
 /** The server sign-in names: its configured name, and whether the last try could not reach it. */

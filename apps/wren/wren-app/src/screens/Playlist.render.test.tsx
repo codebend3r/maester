@@ -6,9 +6,9 @@ import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { PLAYER_COPY, PLAYLIST_COPY } from '@raven/wren'
 import { queryClient } from '@/queryClient'
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
+import { WREN_PAGES } from '@raven/wren-native/headless'
 import { LISTENER, MIXTAPE, MIXTAPE_PAGE, musicApi } from '@/test/music'
-import { WREN_PAGES } from '@/routes'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'
 

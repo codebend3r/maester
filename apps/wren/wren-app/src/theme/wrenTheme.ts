@@ -5,6 +5,8 @@ import {
   type WrenThemeName,
   systemSchemeOf,
   themeFor,
+  WREN_PALETTES,
+  type Palette,
 } from '@raven/wren'
 import {
   type ImageStyle,
@@ -16,14 +18,7 @@ import {
 } from 'react-native'
 
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import {
-  BREAKPOINTS,
-  COLORS,
-  FORM_FACTORS,
-  type FormFactor,
-  type Palette,
-  type Shadow,
-} from '@/theme/wrenTokens'
+import { BREAKPOINTS, FORM_FACTORS, type FormFactor, type Shadow } from '@/theme/wrenTokens'
 
 type ShadowOfProps = { shadow: Shadow; color: string }
 
@@ -40,7 +35,7 @@ export const shadowOf = ({ shadow, color }: ShadowOfProps): ViewStyle => ({
 export type WrenTheme = { name: WrenThemeName; scheme: ColorScheme; colors: Palette }
 
 /** Every theme's palette by its name, so a theme `@raven/wren` names and the tokens lack is a compile error. */
-export const PALETTES = COLORS satisfies Record<WrenThemeName, Palette>
+export const PALETTES = WREN_PALETTES satisfies Record<WrenThemeName, Palette>
 
 const themeOf = (name: WrenThemeName): WrenTheme => ({
   name,

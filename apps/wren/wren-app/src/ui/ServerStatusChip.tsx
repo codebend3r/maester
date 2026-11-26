@@ -1,6 +1,5 @@
-import { useMusicLibraries } from '@/music/musicLibraries'
 import { StatusChip } from '@/ui/StatusChip'
-import type { WrenSession } from '@/useWren'
+import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 type ServerStatusChipProps = { session: WrenSession }
 

@@ -1,6 +1,7 @@
 /**
- * Wren's words and the facts it works out from raven's answers, with no React, React Native,
- * Expo or DOM in them, so the phone app and the web app say and compute the same from one source.
+ * Wren's words, its colours and the facts it works out from raven's answers, with no React,
+ * React Native, Expo or DOM in them, so the phone, TV and web apps say, paint and compute the
+ * same from one source.
  */
 export {
   DOWNLOAD_BUTTON_COPY,
@@ -175,3 +176,5 @@ export {
 } from '@/menuGroups'
 export { SONG_LEADS, type ShownLead, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
 export { TOP_RESULT_KINDS, type TopResult, topResultOf } from '@/search/topResult'
+export { ART, BRAND, ON_PICTURE, type Palette, WREN_PALETTES } from '@/palettes'
+export { BRAND_INKS, LOCKUP_DRAWING, LOCKUP_VIEW_BOX, MARK_VIEW_BOX } from '@/lockup'

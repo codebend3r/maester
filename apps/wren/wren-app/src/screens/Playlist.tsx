@@ -11,7 +11,7 @@ import { DownloadButton } from '@/components/DownloadButton'
 import { TracksMenu } from '@/components/TrackMenu'
 import { TrackRow } from '@/components/TrackRow'
 import { DOWNLOAD_SOURCES } from '@/downloads/downloadStore'
-import { useCovers } from '@/music/useCovers'
+import { useCovers, type WrenSession } from '@raven/wren-native'
 import { CollectionHead } from '@/screens/detail/CollectionHead'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
 import { DetailSplit } from '@/screens/detail/DetailSplit'
@@ -19,7 +19,6 @@ import { QueueAction } from '@/screens/detail/QueueAction'
 import { useTracklist } from '@/screens/detail/useTracklist'
 import { EmptyState } from '@/ui/EmptyState'
 import { ICONS } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
 
 type RenderRowProps = { item: PlaylistTrack }
 

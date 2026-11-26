@@ -3,7 +3,7 @@ import { playingIdOf, useAudioQueue } from '@raven/ui/headless'
 import { SONG_LEADS } from '@raven/wren'
 
 import { TrackRow } from '@/components/TrackRow'
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 
 type SongTrackRowProps = {
   track: Track

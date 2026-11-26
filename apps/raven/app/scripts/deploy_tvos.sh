@@ -8,17 +8,22 @@
 #   APP_VARIANT=production bun run app:deploy:tvos
 #   APPLE_TV=<name or UDID> ...             # which Apple TV, when more than one is paired
 #
+# Wren on TV's deploy (apps/wren/wren-tv/scripts/deploy_tvos.sh) runs this script too, naming its
+# own folder, Xcode project and bundle through APP_DIR, APP_NAME, APP_LABEL and TV_BUNDLE_ID.
+#
 # The Apple TV must already be paired with this Mac (Xcode's Devices window, or
 # `xcrun devicectl manage pair`), and a signing certificate must be in the keychain (sign in
 # to Xcode once). A Personal Team's profile lasts seven days; run this again to renew it.
 set -euo pipefail
 source "$(dirname "$0")/apple_team.sh"
-cd "$(dirname "$0")/.."
+cd "${APP_DIR:-$(dirname "$0")/..}"
 
 export APP_VARIANT="${APP_VARIANT:-development}"
-BUNDLE_ID=io.github.codebend3r.raven.app
+APP_NAME="${APP_NAME:-Raven}"
+APP_LABEL="${APP_LABEL:-raven}"
+BUNDLE_ID="${TV_BUNDLE_ID:-io.github.codebend3r.raven.app}"
 DERIVED=build/tvos-device
-APP="$DERIVED/Build/Products/Release-appletvos/Raven.app"
+APP="$DERIVED/Build/Products/Release-appletvos/$APP_NAME.app"
 
 # The paired Apple TV's hardware UDID, which xcodebuild and devicectl both take. A pairing id
 # (36 characters) is not a destination; the hardware one is 40 hex characters.
@@ -46,7 +51,7 @@ say "Regenerating the tvOS project for team $TEAM ($APP_VARIANT variant)"
 bun run prebuild:tvos
 
 say "Building the signed Release"
-xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release \
+xcodebuild -workspace "ios/$APP_NAME.xcworkspace" -scheme "$APP_NAME" -configuration Release \
   -destination 'generic/platform=tvOS' -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
   DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic build -quiet
@@ -64,7 +69,7 @@ say "Launching"
 if ! launch_log="$(xcrun devicectl device process launch --device "$UDID" "$BUNDLE_ID" --quiet 2>&1)"; then
   case "$launch_log" in
     *"System is asleep"*)
-      say "raven is installed on the Apple TV, which is asleep: it opens once the TV is woken"
+      say "$APP_LABEL is installed on the Apple TV, which is asleep: it opens once the TV is woken"
       exit 0
       ;;
     *)
@@ -73,4 +78,4 @@ if ! launch_log="$(xcrun devicectl device process launch --device "$UDID" "$BUND
       ;;
   esac
 fi
-say "raven is on the Apple TV"
+say "$APP_LABEL is on the Apple TV"

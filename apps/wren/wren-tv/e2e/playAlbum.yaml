@@ -1,0 +1,34 @@
+appId: app.netlify.wren.tv
+name: The remote plays the fixture's album from Home and steps through it with the media keys
+---
+- runFlow: steps/signIn.yaml
+# Down from Shuffle all, past the order's choices, to the album's tile.
+- repeat:
+    times: 4
+    while:
+      notVisible:
+        text: Morning Chorus.*
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Down
+- pressKey: Remote Dpad Center
+# The album's page opens with the remote on Play.
+- extendedWaitUntil:
+    visible:
+      text: Play
+      focused: true
+    timeout: 30000
+- assertVisible: First Light.*
+- pressKey: Remote Dpad Center
+# Back to Home, where the sidebar's foot names the track playing, as the phone's mini player does.
+- pressKey: Back
+- extendedWaitUntil:
+    visible: 'Now Playing: First Light, The Fixture Birds'
+    timeout: 30000
+# The remote's next key steps to the album's second track wherever the focus is.
+- pressKey: Remote Media Next
+- extendedWaitUntil:
+    visible: 'Now Playing: Dawn Song, The Fixture Birds'
+    timeout: 30000
+# And its play and pause key pauses it, so the twenty second track cannot run out meanwhile.
+- pressKey: Remote Media Play Pause

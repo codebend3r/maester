@@ -15,6 +15,7 @@ import {
   themeChoiceIn,
   themeChoiceOf,
 } from '@raven/wren'
+import { configureLibraryChoice } from '@raven/wren-native/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
@@ -128,3 +129,6 @@ type ConfigureWrenPrefsProps = { storage: StateStorage }
 export const configureWrenPrefs = async ({ storage }: ConfigureWrenPrefsProps) => {
   await loadPersisted({ store: useWrenPrefs, storage })
 }
+
+// The shared listings read the music library picked here, in this app's own prefs.
+configureLibraryChoice({ prefs: useWrenPrefs })

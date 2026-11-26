@@ -1,7 +1,7 @@
 import { accessTokenNow, cookieJar } from '@raven/native'
 import { type AppServer, cookieHeadersFor } from '@raven/native/headless'
 
-import { useWrenAccount } from '@/session'
+import { useWrenAccount } from '@raven/wren-native'
 
 type CoverHeadersOfProps = { server: AppServer; uri: string }
 

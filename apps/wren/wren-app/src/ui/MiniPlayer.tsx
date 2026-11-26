@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native'
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 
 import { PLAYER_COPY } from '@raven/wren'
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'

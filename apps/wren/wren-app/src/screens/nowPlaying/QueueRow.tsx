@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import type { Covers } from '@/music/useCovers'
+import { type Covers } from '@raven/wren-native'
 import { dropPlaceOf } from '@/screens/nowPlaying/dropPlace'
 import type { UpNextPlace } from '@/screens/nowPlaying/UpNext'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'

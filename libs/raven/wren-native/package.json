@@ -1,0 +1,96 @@
+{
+  "name": "@raven/wren-native",
+  "version": "0.10.1",
+  "private": true,
+  "description": "What Wren's apps on React Native share, the phone's and the TV's: its session, routes, stores and music hooks",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./headless": {
+      "types": "./dist/headless.d.ts",
+      "default": "./dist/headless.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run --sequential build:clean build:compile build:aliases",
+    "build:aliases": "tsc-alias -p tsconfig.build.json",
+    "build:clean": "rm -rf dist",
+    "build:compile": "tsc -p tsconfig.build.json",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "test": "bun test --dots src",
+    "typecheck": "bun run --parallel typecheck:src typecheck:test",
+    "typecheck:src": "tsgo --noEmit -p tsconfig.json",
+    "typecheck:test": "tsgo --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@raven/core": "workspace:*",
+    "@raven/native": "workspace:*",
+    "@raven/ui": "workspace:*",
+    "@raven/wren": "workspace:*"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "5.107.1",
+    "@types/bun": "1.4.4",
+    "@types/react": "19.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "expo-router": "58.0.30",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "react": "19.3.0",
+    "react-native": "npm:react-native-tvos@0.88.1-0",
+    "tsc-alias": "1.9.10",
+    "typescript": "6.0.3",
+    "zustand": "5.1.0"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "5.107.1",
+    "expo-router": "58.0.30",
+    "react": "19.3.0",
+    "zustand": "5.1.0"
+  },
+  "nx": {
+    "projectType": "library",
+    "tags": [
+      "scope:raven",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "format",
+      "format:check",
+      "test"
+    ],
+    "targets": {
+      "test": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "typecheck": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "build": {
+        "cache": true,
+        "dependsOn": [
+          "^build"
+        ],
+        "outputs": [
+          "{projectRoot}/dist"
+        ]
+      }
+    }
+  }
+}

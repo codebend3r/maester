@@ -1,7 +1,6 @@
 import { SETTINGS_COPY } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
-import { useMusicLibraries } from '@/music/musicLibraries'
 import { NotedGroup } from '@/screens/settings/NotedGroup'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
@@ -10,7 +9,7 @@ import { GroupedList } from '@/ui/GroupedList'
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
+import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s3, minHeight: SIZE.navRow },

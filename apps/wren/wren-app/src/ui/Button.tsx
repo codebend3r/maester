@@ -1,7 +1,8 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { RADIUS, SIZE, SPACE, TYPE, type Palette } from '@/theme/wrenTokens'
+import { type Palette } from '@raven/wren'
+import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
 import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'

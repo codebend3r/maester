@@ -6,24 +6,24 @@ The design canvas with every lockup, size and mockup: https://claude.ai/artifact
 
 ## Which file to use
 
-| Where                                                                                | File                                                                                                                                                |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The mark on a dark ground (Night, a dark theme, a photo's dark end)                  | `wren-mark-on-dark.svg`                                                                                                                             |
-| The mark on a light ground                                                           | `wren-mark-on-light.svg`                                                                                                                            |
-| One colour: print, engraving, a tint, anything that recolours the mark               | `wren-mark-mono.svg` (recolour its fill; the eye is a hole)                                                                                         |
-| The mark drawn 48 px or smaller: tab bars, list rows, a favicon, a notification      | `wren-mark-small-on-dark.svg`, `wren-mark-small-on-light.svg`, `wren-mark-small-mono.svg`                                                           |
-| A header, a sign-in screen, anywhere the name sits beside the mark                   | `wren-lockup-on-dark.svg`, `wren-lockup-on-light.svg`, `wren-lockup-mono.svg`; in the app, `WrenLockup` (`src/theme/wrenBrand.ts` holds its shapes) |
-| A launch screen, an about page, anywhere the logo stands centred alone with its name | `wren-stacked-on-dark.svg`, `wren-stacked-on-light.svg`, `wren-stacked-mono.svg`                                                                    |
-| The name alone, where the mark already shows nearby                                  | `wren-wordmark-on-dark.svg`, `wren-wordmark-on-light.svg`, `wren-wordmark-mono.svg`                                                                 |
-| The iPhone and iPad app icon                                                         | `../images/icon.png`, rendered from `wren-icon.svg`                                                                                                 |
-| The Android launcher icon and its themed layer                                       | `../images/adaptive-icon.png` and `../images/adaptive-icon-monochrome.png`, from `wren-adaptive-foreground.svg` and `wren-adaptive-monochrome.svg`  |
+| Where                                                                                | File                                                                                                                                                    |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The mark on a dark ground (Night, a dark theme, a photo's dark end)                  | `wren-mark-on-dark.svg`                                                                                                                                 |
+| The mark on a light ground                                                           | `wren-mark-on-light.svg`                                                                                                                                |
+| One colour: print, engraving, a tint, anything that recolours the mark               | `wren-mark-mono.svg` (recolour its fill; the eye is a hole)                                                                                             |
+| The mark drawn 48 px or smaller: tab bars, list rows, a favicon, a notification      | `wren-mark-small-on-dark.svg`, `wren-mark-small-on-light.svg`, `wren-mark-small-mono.svg`                                                               |
+| A header, a sign-in screen, anywhere the name sits beside the mark                   | `wren-lockup-on-dark.svg`, `wren-lockup-on-light.svg`, `wren-lockup-mono.svg`; in the apps, `WrenLockup` (`@raven/wren`'s `lockup.ts` holds its shapes) |
+| A launch screen, an about page, anywhere the logo stands centred alone with its name | `wren-stacked-on-dark.svg`, `wren-stacked-on-light.svg`, `wren-stacked-mono.svg`                                                                        |
+| The name alone, where the mark already shows nearby                                  | `wren-wordmark-on-dark.svg`, `wren-wordmark-on-light.svg`, `wren-wordmark-mono.svg`                                                                     |
+| The iPhone and iPad app icon                                                         | `../images/icon.png`, rendered from `wren-icon.svg`                                                                                                     |
+| The Android launcher icon and its themed layer                                       | `../images/adaptive-icon.png` and `../images/adaptive-icon-monochrome.png`, from `wren-adaptive-foreground.svg` and `wren-adaptive-monochrome.svg`      |
 
 `app.config.ts` names the three PNG files in `WREN_ICONS`, and `src/config/appConfig.test.ts` checks that they exist.
 
 ## Rules
 
 - **Colours.** Night `#15201e`, Bark `#e6e1d6`, Ink `#131416`, Eye red `#c41725`, Leaf `#a8262f`, Paper `#f1ece2`. Bark on dark grounds, Ink on light ones. On the mark files red appears only in the eye; the one colour files have none.
-- **Every icon wears Leaf.** The iPhone and iPad icon, the Android launcher icon (its ground is `BRAND.leaf` in `app.config.ts`) and the web favicon (`apps/wren/wren-web/public/favicon.svg`) are a Bark bird on a Leaf ground with a Night eye, as raven's splash page shows Wren (`wren-icon-on-leaf.svg`). Never another ground.
+- **Every icon wears Leaf.** The iPhone and iPad icon, the Android launcher icon (its ground is `BRAND.leaf` in `app.config.ts`), the Apple TV icon and Android TV banner (`apps/wren/wren-tv/scripts/tv_images.sh`) and the web favicon (`apps/wren/wren-web/public/favicon.svg`) are a Bark bird on a Leaf ground with a Night eye, as raven's splash page shows Wren (`wren-icon-on-leaf.svg`). Never another ground.
 - **The cutouts are holes.** The equalizer bars (and the eye, in the one colour files) are cut through the shape, so the ground shows through them. Never fill them in or put a backing shape behind the mark.
 - **Centring.** The mark files' box is centred on the bird's visual weight, not on its outline: the round body outweighs the thin tail, so centred by its outline the bird looks pushed right. Centre the file's box and the bird sits dead centre. The lockups are boxed on the outline, so their spacing to the wordmark is measured from the beak.
 - **Sizes.** The full mark from 64 px up, the small cut from 16 to 48 px (three wider bars, a bigger eye, heavier legs), the horizontal lockup from 24 px tall.

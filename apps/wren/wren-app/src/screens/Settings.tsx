@@ -12,7 +12,7 @@ import { usePageInsets } from '@/shell/useShell'
 import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { PageHeader } from '@/ui/PageHeader'
-import { useWren } from '@/useWren'
+import { useWren } from '@raven/wren-native'
 
 const useStyles = themedStyles(() => ({
   page: { gap: SPACE.s6 },

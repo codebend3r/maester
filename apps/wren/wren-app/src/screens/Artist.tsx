@@ -9,14 +9,17 @@ import { ACTION_SHAPES, DetailAction } from '@/components/DetailAction'
 import { FavouriteAction } from '@/components/FavouriteAction'
 import { Nothing } from '@/components/Nothing'
 import { TracksMenu } from '@/components/TrackMenu'
-import { useAlbumTracks } from '@/music/useAlbumTracks'
-import { useCovers } from '@/music/useCovers'
+import {
+  useAlbumTracks,
+  useCovers,
+  useWrenAccount,
+  toastFailure,
+  type WrenSession,
+} from '@raven/wren-native'
 import { ArtistHero, HeroActions } from '@/screens/detail/ArtistHero'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
 import { EditBackgroundSheet } from '@/screens/detail/EditBackgroundSheet'
 import { usePageInsets } from '@/shell/useShell'
-import { useWrenAccount } from '@/session'
-import { toastFailure } from '@/stores/toast'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
@@ -24,7 +27,6 @@ import { AlbumTileOf } from '@/ui/AlbumTile'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
 import { ICONS, WrenIcon } from '@/ui/WrenIcon'
-import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },

@@ -7,11 +7,12 @@ import {
   type SongLead,
   songLeadOf,
   type SongLeadOf,
+  ON_PICTURE,
 } from '@raven/wren'
 
-import type { Cover } from '@/music/useCovers'
+import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { ON_PICTURE, RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
+import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton'

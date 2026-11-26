@@ -1,0 +1,18 @@
+appId: app.netlify.wren.tv
+name: Wren opens on Home with the fixture's album under Recently added
+---
+- runFlow: steps/signIn.yaml
+- assertVisible: Morning Chorus.*
+# Latest released orders the albums by when they came out, and the title follows.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        text: Latest released
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Down
+- pressKey: Remote Dpad Center
+- extendedWaitUntil:
+    visible: Latest releases
+    timeout: 10000

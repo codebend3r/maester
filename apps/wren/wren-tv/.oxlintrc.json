@@ -1,0 +1,66 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/react.json"],
+  // React Native has no DOM: a browser global here is a bug.
+  "env": {
+    "browser": false
+  },
+  "ignorePatterns": ["ios", "android", "build", ".expo"],
+  "rules": {
+    /* React Native has no DOM: `autoFocus` on a TV focus guide hands the remote coming into it
+       to a control inside, which is how a TV is driven, not a page stealing the keyboard. */
+    "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+    /* The base config's patterns, repeated since a rule's options replace the base's, and the
+       ruling that tvOS's Menu stays with the native stack: `BackHandler` hears Menu only once the
+       fork's menu key is on (`TVEventControl.enableTVMenuKey()`), which takes the press from
+       UIKit, so Home could no longer leave Wren and the stack would no longer pop on Menu. */
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react-native",
+            "importNames": ["BackHandler", "TVEventControl"],
+            "message": "tvOS's Menu stays with the native stack: see \"Menu is the navigator's\" in apps/wren/wren-tv/CLAUDE.md."
+          }
+        ],
+        "patterns": [
+          {
+            "regex": "^\\.{1,2}(/|$)",
+            "message": "Import through the @/ alias, not a relative path."
+          },
+          {
+            "regex": "\\.(?:[cm]?[jt]sx?)$",
+            "message": "Leave the extension off: @/lib/api, not @/lib/api.js."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      /* expo-router reads each route from its file's default export, and Expo,
+         Metro and Babel read their configs the same way. */
+      "files": ["app/**", "app.config.ts", "metro.config.ts", "babel.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      /* Expo loads app.config.ts with its own require hook, which reads no
+         tsconfig `paths`, and Node adds no `.ts`, so it names its ./src module
+         by relative path and extension. */
+      "files": ["app.config.ts"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

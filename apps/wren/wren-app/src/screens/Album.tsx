@@ -14,17 +14,15 @@ import { FavouriteAction } from '@/components/FavouriteAction'
 import { TracksMenu } from '@/components/TrackMenu'
 import { TrackRow } from '@/components/TrackRow'
 import { DOWNLOAD_SOURCES } from '@/downloads/downloadStore'
-import { useCovers } from '@/music/useCovers'
+import { useCovers, toastFailure, type WrenSession } from '@raven/wren-native'
 import { ArtistLinks } from '@/screens/detail/ArtistLinks'
 import { CollectionHead } from '@/screens/detail/CollectionHead'
 import { DetailRoute } from '@/screens/detail/DetailRoute'
 import { DetailSplit } from '@/screens/detail/DetailSplit'
 import { QueueAction } from '@/screens/detail/QueueAction'
 import { useTracklist } from '@/screens/detail/useTracklist'
-import { toastFailure } from '@/stores/toast'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
-import type { WrenSession } from '@/useWren'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   disc: { ...TYPE.overline, color: colors.text3, paddingBottom: SPACE.s2, paddingTop: SPACE.s5 },
