@@ -10,14 +10,14 @@ brew trust maester-tv/tap
 brew install --cask raven
 ```
 
-`brew upgrade --cask raven` moves to the next release. The first launch asks for Open Anyway, as in step 4 below, until Raven is signed with a Developer ID.
+`brew upgrade --cask raven` moves to the next release.
 
 ### macOS
 
 1. Download `raven-player-<version>-arm64.dmg` (or the zip, `raven-player-<version>-arm64.zip`) and `SHA256SUMS` from the assets below.
 2. Check the download in Terminal, in the folder you saved it to: `shasum -a 256 -c SHA256SUMS --ignore-missing`. Each file you downloaded should say `OK`.
 3. Open the dmg and drag Raven to Applications (or unzip the zip and move Raven there).
-4. The first time you open it, macOS says it cannot verify the app, because Raven is signed ad hoc rather than by an identified developer. Open System Settings, then Privacy & Security, and choose Open Anyway beside Raven; macOS asks you to confirm, then for an administrator's password. You only do this once.
+4. Open it. Raven is signed with a Developer ID and notarized by Apple, so macOS opens it without asking you to approve it.
 
 ### Windows
 

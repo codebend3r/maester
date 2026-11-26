@@ -353,8 +353,7 @@ describe('updateDialogFor', () => {
     expect(updateDialogFor({ check: NEWER, current: CURRENT })).toEqual({
       type: 'info',
       message: 'Raven 0.6.0 is out.',
-      detail:
-        'Download it from its release page. While Raven is signed ad hoc it cannot update itself.',
+      detail: 'Download it from its release page and install it over this one.',
       buttons: ['See Release', 'Later'],
       defaultId: 0,
       cancelId: 1,

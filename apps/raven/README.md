@@ -459,9 +459,7 @@ Each release (`vX.Y.Z`) on the repo's [Releases page](https://github.com/codeben
 
 1. Download the dmg (or the zip) and `SHA256SUMS`, and check them in Terminal, in that folder: `shasum -a 256 -c SHA256SUMS --ignore-missing`. Each file you downloaded says `OK`.
 2. Open the dmg and drag Raven to Applications (or unzip the zip and move Raven there).
-3. Open it. The first time, macOS says it cannot verify the app, because Raven is signed ad hoc rather than by an identified developer. Open System Settings, then Privacy & Security, and choose Open Anyway beside Raven; macOS asks you to confirm, then for an administrator's password. You do this once.
-
-If you would rather use Terminal for step 3, `xattr -dr com.apple.quarantine "/Applications/Raven.app"` removes the download's quarantine, and the app then opens without asking.
+3. Open it. Raven is signed with a Developer ID and notarized by Apple, so macOS opens it without asking you to approve it.
 
 The app keeps its settings, resume points and downloads in `~/Library/Application Support/raven`.
 
@@ -518,7 +516,7 @@ Nothing leaves the Mac unless you send it.
 
 ### Updates
 
-Once a day at launch, Raven asks GitHub for the repo's releases and looks for a newer full release (`vX.Y.Z`, not a draft or a prerelease) with its dmg attached. GitHub lists the releases by tag name, so a run of `vX.Y.Z.N` builds can push the app's release off the first page; Raven reads up to five pages of 100. It says this is the newest release only when it found that release in what it read; when GitHub listed none with the app, it says so instead. It sends nothing else, and installs nothing. A newer release shows a toast, "Raven X.Y.Z is out. Settings has what's new.", and Settings, Updates offers **See what's new** (the release page). Check for Updates in the Raven menu and **Check now** in Settings, Updates, check at any time; turn off **Check for updates once a day** there to stop the daily check. While Raven is signed ad hoc it cannot update itself: download the new release and install it over the old one.
+Once a day at launch, Raven asks GitHub for the repo's releases and looks for a newer full release (`vX.Y.Z`, not a draft or a prerelease) with its dmg attached. GitHub lists the releases by tag name, so a run of `vX.Y.Z.N` builds can push the app's release off the first page; Raven reads up to five pages of 100. It says this is the newest release only when it found that release in what it read; when GitHub listed none with the app, it says so instead. It sends nothing else, and installs nothing. A newer release shows a toast, "Raven X.Y.Z is out. Settings has what's new.", and Settings, Updates offers **See what's new** (the release page). Check for Updates in the Raven menu and **Check now** in Settings, Updates, check at any time; turn off **Check for updates once a day** there to stop the daily check. Raven does not update itself: download the new release and install it over the old one.
 
 ### Build it
 
@@ -533,7 +531,7 @@ An unpackaged `dev` run reads both from the environment too, so a different serv
 
 ```bash
 RAVEN_DESKTOP_SERVER_ORIGIN=https://raven.example.synology.me:8443 bunx nx run @raven/desktop:dev   # builds, then runs electron . (unpackaged)
-bunx nx run @raven/desktop:make           # the signed-ad-hoc app, its dmg and zip, under apps/raven/desktop/out
+bunx nx run @raven/desktop:make           # the app (signed ad hoc without RAVEN_SIGN_IDENTITY), its dmg and zip, under apps/raven/desktop/out
 bunx nx run @raven/desktop:audit:bundle   # every Mach-O arm64, signed, linked only inside the app
 bunx nx run @raven/desktop:smoke:packaged # launches the packaged app, waits for its marks, quits it
 bunx nx run @raven/desktop:e2e            # Playwright against electron .
@@ -698,6 +696,6 @@ raven app imports `@raven/core` and `@raven/ui/headless` and answers the direct-
 - Raven plays from one server, the one it was built for: there is no way to add another, and no embedded server or local library.
 - Raven keeps its downloads in its own data folder, with no way to pick another.
 - Raven runs only on Apple Silicon Macs: no Intel Macs, Windows or Linux yet.
-- Raven is signed ad hoc, not with a Developer ID or notarized, so it needs Open Anyway once and cannot update itself.
+- Raven cannot update itself: each release is downloaded and installed over the old one.
 - raven app has no TestFlight, App Store or Play Store build: Apple devices install it from Xcode and reinstall it weekly, and Android TV sideloads the APK.
 - raven app's other known gaps are in its [device notes](app/docs/device-checklist.md#known-gaps).

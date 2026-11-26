@@ -93,7 +93,7 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
 
     case = Case.load(CASES_DIR / "setup_mac.yaml")
     store = Store(":memory:")
-    closing = ClosingModel.scripted(text_message("Choose Open Anyway."))
+    closing = ClosingModel.scripted(text_message("Download the newest release."))
     agent = Agent(
         model_client=closing,
         model="fake",
@@ -105,7 +105,7 @@ async def test_run_case_and_close_closes_the_client_inside_the_loop():
     await run_case_and_close(case, agent)
     assert closing.is_closed
 
-    agent.client = FakeModel.scripted(text_message("Choose Open Anyway."))
+    agent.client = FakeModel.scripted(text_message("Download the newest release."))
     await run_case_and_close(case, agent)
     store.close()
 
