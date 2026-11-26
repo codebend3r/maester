@@ -1,6 +1,6 @@
 {
   "name": "@wren/web",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "private": true,
   "description": "Wren on the web: raven's music app in a browser",
   "type": "module",
