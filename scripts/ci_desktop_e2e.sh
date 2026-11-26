@@ -2,7 +2,8 @@
 # Runs the 🎬 E2E Raven Mac desktop check, which CI runs on main (native-checks.yml), on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
-# from a recent run. `xcodebuild -version` is in the target's Nx cache key, which is
+# from a recent run; the e2e target's `@raven/mpv:build:native` dependency then rebuilds
+# whatever this checkout's native sources have outdated. `xcodebuild -version` is in the target's Nx cache key, which is
 # why DEVELOPER_DIR is set even though the tests never call Xcode.
 #
 #   bun run ci:desktop:e2e                         every step
