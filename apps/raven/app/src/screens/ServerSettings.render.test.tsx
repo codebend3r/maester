@@ -57,6 +57,7 @@ describe("Settings' Servers", () => {
       servers: [RAVEN_SERVER],
       activeId: RAVEN_SERVER.id,
       homeServerId: null,
+      homeName: null,
     })
     mockAccount = accountDataOf({ rows: [meleysRow()], health: { [CARAXES_ORIGIN]: CARAXES_ID } })
     signInTestAccount()
@@ -71,9 +72,12 @@ describe("Settings' Servers", () => {
     ).toBeTruthy()
     expect(serverNames()).toEqual([RAVEN_SERVER.name, MELEYS.name])
     expect(useActiveServer.getState().homeServerId).toBe(HOME_SERVER_ID)
-    // Home is the build's own: never renamed or removed here.
+    // Home is the build's own: renamed on the account like any other, never removed.
     expect(
-      screen.queryByRole('button', { name: SERVERS_COPY.renameName(RAVEN_SERVER.name) }),
+      screen.getByRole('button', { name: SERVERS_COPY.renameName(RAVEN_SERVER.name) }),
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole('button', { name: SERVERS_COPY.removeName(RAVEN_SERVER.name) }),
     ).toBeNull()
     expect(screen.getByRole('button', { name: SERVERS_COPY.renameName(MELEYS.name) })).toBeTruthy()
   })
@@ -118,6 +122,24 @@ describe("Settings' Servers", () => {
     await fireEvent.press(screen.getByRole('button', { name: SERVERS_COPY.save }))
     expect(await screen.findByLabelText(`Attic: ${MELEYS.origin}`)).toBeTruthy()
     expect(mockAccount.rows[0]?.name).toBe('Attic')
+  })
+
+  it('renames home on the account, by its own id, so every device wears the name', async () => {
+    await renderScreen({ ui: <ServerSettings /> })
+    await fireEvent.press(
+      await screen.findByRole('button', { name: SERVERS_COPY.renameName(RAVEN_SERVER.name) }),
+    )
+    await fireEvent.changeText(screen.getByLabelText(SERVERS_COPY.newName), 'Vhagar')
+    await fireEvent.press(screen.getByRole('button', { name: SERVERS_COPY.save }))
+    expect(await screen.findByLabelText(`Vhagar: ${RAVEN_SERVER.origin}`)).toBeTruthy()
+    expect(mockAccount.names).toEqual([{ serverId: HOME_SERVER_ID, name: 'Vhagar' }])
+  })
+
+  it('wears the name another device gave home, and offers home no Remove', async () => {
+    mockAccount.names = [{ serverId: HOME_SERVER_ID, name: 'Vhagar' }]
+    await renderScreen({ ui: <ServerSettings /> })
+    expect(await screen.findByLabelText(`Vhagar: ${RAVEN_SERVER.origin}`)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: SERVERS_COPY.removeName('Vhagar') })).toBeNull()
   })
 
   it('removes the server in use and goes back home', async () => {

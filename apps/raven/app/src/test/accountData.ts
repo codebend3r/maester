@@ -12,6 +12,7 @@ import {
   type LibraryPin,
   POSTGREST,
   ROUTES,
+  type ServerName,
   isRecord,
   isString,
 } from '@raven/core'
@@ -46,6 +47,8 @@ const MELEYS_ROW: AccountServer = {
 export type AccountData = {
   rows: AccountServer[]
   pins: LibraryPin[]
+  /** The names the account gave servers it keeps no row for: its home one. */
+  names: ServerName[]
   /** Each server's id on its open health, by origin; a server not named does not answer. */
   health: Record<string, string>
 }
@@ -53,8 +56,9 @@ export type AccountData = {
 export const accountDataOf = ({
   rows = [],
   pins = [],
+  names = [],
   health = {},
-}: Partial<AccountData> = {}): AccountData => ({ rows, pins, health })
+}: Partial<AccountData> = {}): AccountData => ({ rows, pins, names, health })
 
 /** The account's row for Meleys, as its database lists it. */
 export const meleysRow = (): AccountServer => ({ ...MELEYS_ROW })
@@ -93,6 +97,7 @@ const TABLE_STATUSES = { ...STATUSES, created: HTTP_STATUSES.created } as const
 const TABLES = {
   servers: `${SUPABASE_URL}${ACCOUNT_REST_PATH}${ACCOUNT_TABLES.servers}`,
   pins: `${SUPABASE_URL}${ACCOUNT_REST_PATH}${ACCOUNT_TABLES.pins}`,
+  names: `${SUPABASE_URL}${ACCOUNT_REST_PATH}${ACCOUNT_TABLES.serverNames}`,
 } as const
 
 type AnswerProps = { body: unknown; status?: number }
@@ -159,9 +164,18 @@ const pinsTable = ({ data, url, init }: TableProps) => {
   return answer({ body: null, status: TABLE_STATUSES.created })
 }
 
+/** The account's names: read whole, or one upserted by its server's id. */
+const namesTable = ({ data, init }: TableProps) => {
+  if ((init.method ?? HTTP_METHODS.get) === HTTP_METHODS.get) return answer({ body: data.names })
+  const body = bodyOf(init)
+  const named = { serverId: serverIdOf(body), name: isString(body.name) ? body.name : '' }
+  data.names = [...data.names.filter(({ serverId }) => serverId !== named.serverId), named]
+  return answer({ body: [named], status: TABLE_STATUSES.created })
+}
+
 /**
  * Answers the app's account calls as a device would hear them: home's auth config, each
- * server's open health and the account's two tables, which it keeps in `data` as the database
+ * server's open health and the account's three tables, which it keeps in `data` as the database
  * would. A test hands it to `accountServersFor` in place of the device's `fetch`.
  */
 export const accountFetchOf =
@@ -179,6 +193,9 @@ export const accountFetchOf =
     }
     if (url.startsWith(TABLES.pins)) {
       return pinsTable({ data, url, init })
+    }
+    if (url.startsWith(TABLES.names)) {
+      return namesTable({ data, url, init })
     }
     throw new TypeError('Network request failed')
   }

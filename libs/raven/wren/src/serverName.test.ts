@@ -1,28 +1,27 @@
 import { describe, expect, it } from 'bun:test'
-import { isServerNamePick, serverNameEditOf } from '@/serverName'
+import { NAME_SAVES, serverNameSaveOf } from '@/serverName'
 
-describe('serverNameEditOf', () => {
-  it('clears the name when the field is blank', () => {
-    expect(serverNameEditOf('   ')).toEqual({ isRefused: false, serverName: null })
+describe('serverNameSaveOf', () => {
+  it('keeps the name when the field is blank or holds it already', () => {
+    expect(serverNameSaveOf({ text: '   ', current: 'Vhagar' })).toEqual({ kind: NAME_SAVES.kept })
+    expect(serverNameSaveOf({ text: ' Vhagar ', current: 'Vhagar' })).toEqual({
+      kind: NAME_SAVES.kept,
+    })
   })
 
-  it('keeps a clean name, tidied', () => {
-    expect(serverNameEditOf('  Living   room ')).toEqual({
-      isRefused: false,
-      serverName: 'Living room',
+  it('saves a clean new name, tidied', () => {
+    expect(serverNameSaveOf({ text: '  Living   room ', current: 'Vhagar' })).toEqual({
+      kind: NAME_SAVES.saved,
+      name: 'Living room',
     })
   })
 
   it('refuses a name past the limit and one with a hidden character', () => {
-    expect(serverNameEditOf('a'.repeat(81))).toEqual({ isRefused: true })
-    expect(serverNameEditOf('Home‮')).toEqual({ isRefused: true })
-  })
-})
-
-describe('isServerNamePick', () => {
-  it('accepts a string or null only', () => {
-    expect(isServerNamePick('Home')).toBe(true)
-    expect(isServerNamePick(null)).toBe(true)
-    expect(isServerNamePick(4)).toBe(false)
+    expect(serverNameSaveOf({ text: 'a'.repeat(81), current: 'Vhagar' })).toEqual({
+      kind: NAME_SAVES.refused,
+    })
+    expect(serverNameSaveOf({ text: 'Home‮', current: 'Vhagar' })).toEqual({
+      kind: NAME_SAVES.refused,
+    })
   })
 })

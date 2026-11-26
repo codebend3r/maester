@@ -12,7 +12,6 @@ import {
   isCoverSize,
   isLibraryPick,
   isRecentSort,
-  isServerNamePick,
   themeChoiceIn,
   themeChoiceOf,
 } from '@raven/wren'
@@ -45,8 +44,6 @@ type WrenPrefsValues = ThemeChoice & {
   coverSize: CoverSize
   /** The music library picked in Settings, by its id; null wears the server's first. */
   libraryId: number | null
-  /** The name given the server on this device; null wears the server's own. */
-  serverName: string | null
 }
 
 type WrenPrefs = WrenPrefsValues & {
@@ -67,7 +64,6 @@ export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
   homeSort: RECENT_SORTS.added,
   coverSize: COVER_SIZES.medium,
   libraryId: null,
-  serverName: null,
 }
 
 /** What was read back, each preference kept only where it is one, the default otherwise. */
@@ -87,7 +83,6 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
     homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
     coverSize: isCoverSize(kept.coverSize) ? kept.coverSize : DEFAULT_WREN_PREFS.coverSize,
     libraryId: isLibraryPick(kept.libraryId) ? kept.libraryId : DEFAULT_WREN_PREFS.libraryId,
-    serverName: isServerNamePick(kept.serverName) ? kept.serverName : DEFAULT_WREN_PREFS.serverName,
   }
 }
 
@@ -133,11 +128,3 @@ type ConfigureWrenPrefsProps = { storage: StateStorage }
 export const configureWrenPrefs = async ({ storage }: ConfigureWrenPrefsProps) => {
   await loadPersisted({ store: useWrenPrefs, storage })
 }
-
-type UseServerNameProps<Fallback extends string | null> = { fallback: Fallback }
-
-/** The name Wren shows for its server: the one given in Settings, else the one the server is listed under. */
-export const useServerName = <Fallback extends string | null>({
-  fallback,
-}: UseServerNameProps<Fallback>): string | Fallback =>
-  useWrenPrefs((state) => state.serverName ?? fallback)

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AUDIO_BITRATES } from '@raven/core'
 import type * as Native from '@raven/native'
-import { RAVEN_SERVER } from '@raven/native/headless'
+import { RAVEN_SERVER, RENAME_OUTCOMES } from '@raven/native/headless'
 import {
   COLOR_SCHEMES,
   type ColorScheme,
@@ -26,6 +26,7 @@ import {
 import { queryClient } from '@/queryClient'
 import { WREN_ROUTES } from '@/routes'
 import { useWrenAccount } from '@/session'
+import { accountServers, useActiveServer } from '@/stores/activeServer'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import { PHONE_WINDOW } from '@/test/jestSetup'
 import { AIRBAG, LISTENER, MUSIC, OK_COMPUTER, PARANOID, musicApi } from '@/test/music'
@@ -122,24 +123,43 @@ describe('Settings', () => {
     expect(await screen.findByLabelText(STATUS_COPY.unreachable(RAVEN_SERVER.name))).toBeTruthy()
   })
 
-  it('names the server, and says that name wherever it says what it is connected to', async () => {
-    await openSettings()
-    await fireEvent.changeText(screen.getByLabelText(SETTINGS_COPY.serverName), 'Living room')
-    expect(useWrenPrefs.getState().serverName).toBe('Living room')
-    expect(await screen.findByLabelText(STATUS_COPY.connected('Living room'))).toBeTruthy()
-
-    await fireEvent.changeText(screen.getByLabelText(SETTINGS_COPY.serverName), '')
-    expect(useWrenPrefs.getState().serverName).toBeNull()
-    expect(await screen.findByLabelText(STATUS_COPY.connected(RAVEN_SERVER.name))).toBeTruthy()
-  })
-
-  it('refuses a name that is too long and keeps the last one that will do', async () => {
+  it("names the server on the account, and wears the account's name wherever it says what it is connected to", async () => {
+    const rename = jest.spyOn(accountServers, 'rename').mockImplementation(async ({ name }) => {
+      await useActiveServer.getState().follow({ servers: [], homeServerId: null, homeName: name })
+      return RENAME_OUTCOMES.renamed
+    })
     await openSettings()
     const field = screen.getByLabelText(SETTINGS_COPY.serverName)
-    await fireEvent.changeText(field, 'Home')
+    await fireEvent.changeText(field, '  Living   room ')
+    await fireEvent(field, 'submitEditing')
+    expect(rename).toHaveBeenCalledWith({ id: RAVEN_SERVER.id, name: 'Living room' })
+    expect(await screen.findByLabelText(STATUS_COPY.connected('Living room'))).toBeTruthy()
+    rename.mockRestore()
+    await useActiveServer.getState().follow({ servers: [], homeServerId: null, homeName: null })
+  })
+
+  it('keeps the name when the field is left blank, and refuses one that is too long', async () => {
+    const rename = jest.spyOn(accountServers, 'rename')
+    await openSettings()
+    const field = screen.getByLabelText(SETTINGS_COPY.serverName)
+    await fireEvent.changeText(field, '')
+    await fireEvent(field, 'blur')
+    expect(screen.getByDisplayValue(RAVEN_SERVER.name)).toBeTruthy()
     await fireEvent.changeText(field, 'x'.repeat(81))
+    await fireEvent(field, 'submitEditing')
     expect(screen.getByText(SETTINGS_COPY.serverNameError)).toBeTruthy()
-    expect(useWrenPrefs.getState().serverName).toBe('Home')
+    expect(rename).not.toHaveBeenCalled()
+    rename.mockRestore()
+  })
+
+  it('says so when there is no account to keep the name', async () => {
+    const rename = jest.spyOn(accountServers, 'rename').mockResolvedValue(RENAME_OUTCOMES.noAccount)
+    await openSettings()
+    const field = screen.getByLabelText(SETTINGS_COPY.serverName)
+    await fireEvent.changeText(field, 'Den')
+    await fireEvent(field, 'submitEditing')
+    expect(await screen.findByText(SETTINGS_COPY.serverNameNoAccount)).toBeTruthy()
+    rename.mockRestore()
   })
 
   it('switches the music library worn', async () => {

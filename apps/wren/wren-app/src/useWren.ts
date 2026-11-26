@@ -2,6 +2,7 @@ import type { ApiClient } from '@raven/core'
 import { apiFor } from '@raven/native'
 import { type AppServer, lastPerServer } from '@raven/native/headless'
 import { type RavenQueries, ravenQueriesFor } from '@raven/ui/headless'
+import { useMemo } from 'react'
 
 import { useWrenAccount } from '@/session'
 import { useActiveServer } from '@/stores/activeServer'
@@ -24,5 +25,6 @@ export const useWren = (): WrenSession | null => {
   const server = useActiveServer(
     (state) => state.servers.find(({ id }) => id === state.activeId) ?? null,
   )
-  return server === null ? null : wrenSessionFor(server)
+  // The client is made once per server, but the server's name may change while it stays active.
+  return useMemo(() => (server === null ? null : { ...wrenSessionFor(server), server }), [server])
 }

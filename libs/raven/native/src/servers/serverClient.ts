@@ -9,6 +9,7 @@ import { type KnownCookies, createCookieJar } from '@/servers/cookieJar'
 import {
   APP_STATES,
   APP_STATE_EVENTS,
+  type AppActivity,
   eventSourceFor,
   isForegroundState,
 } from '@/servers/eventSource'
@@ -67,6 +68,18 @@ const headersFor = async ({
 
 type OpenEventsForProps = ApiForProps
 
+/** Whether the app is in front, as React Native's `AppState` says, and the way to hear when that changes. */
+export const deviceActivity: AppActivity = {
+  // Before React Native has heard from the system it reports no state; the app is opening.
+  isForeground: () => isForegroundState(AppState.currentState ?? APP_STATES.active),
+  watch: (onChange) => {
+    const subscription = AppState.addEventListener(APP_STATE_EVENTS.change, (state) =>
+      onChange(isForegroundState(state)),
+    )
+    return () => subscription.remove()
+  },
+}
+
 /** The server's event stream, over `react-native-sse`, with its cookies, kept open while the app is. */
 export const openEventsFor = ({ server, session }: OpenEventsForProps) =>
   eventSourceFor({
@@ -76,16 +89,7 @@ export const openEventsFor = ({ server, session }: OpenEventsForProps) =>
       const timer = setTimeout(run, ms)
       return () => clearTimeout(timer)
     },
-    app: {
-      // Before React Native has heard from the system it reports no state; the app is opening.
-      isForeground: () => isForegroundState(AppState.currentState ?? APP_STATES.active),
-      watch: (onChange) => {
-        const subscription = AppState.addEventListener(APP_STATE_EVENTS.change, (state) =>
-          onChange(isForegroundState(state)),
-        )
-        return () => subscription.remove()
-      },
-    },
+    app: deviceActivity,
   })
 
 /** React Native's `fetch` for a call that carries no server's cookies, leaving the system's alone too. */

@@ -17,6 +17,7 @@ export {
   openEventsFor,
   openFetch,
 } from '@/servers/serverClient'
+export { followAccountServers } from '@/servers/followAccountServers'
 export { useServerUnlock } from '@/servers/serverUnlock'
 export { Icon } from '@/icons/Icon'
 export { useNativeAudioHost } from '@/music/useNativeAudioHost'

@@ -9,7 +9,6 @@ import { DownloadsGroup, RemoveAllDownloads } from '@/screens/settings/Downloads
 import { LibraryGroup } from '@/screens/settings/LibraryGroup'
 import { ServerGroup } from '@/screens/settings/ServerGroup'
 import { usePageInsets } from '@/shell/useShell'
-import { useServerName } from '@/stores/wrenPrefs'
 import { themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { PageHeader } from '@/ui/PageHeader'
@@ -86,7 +85,7 @@ export function Settings() {
   const styles = useStyles()
   const insets = usePageInsets()
   const session = useWren()
-  const serverName = useServerName({ fallback: session?.server.name ?? null })
+  const serverName = session?.server.name ?? null
   const Layout = LAYOUTS[useFormFactor()]
   const groups = {
     account: <AccountCard />,

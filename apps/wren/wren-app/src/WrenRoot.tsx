@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { followAccountServers } from '@raven/native'
 import {
   IGNORED,
   IS_SIGN_IN_BYPASSED,
@@ -23,7 +24,7 @@ import { WrenAudioHost } from '@/music/WrenAudioHost'
 import { forgetWrenAccount, keepDownloadsFor, queryClient } from '@/queryClient'
 import { WREN_ROUTES, WREN_SCREENS } from '@/routes'
 import { useWrenAccount } from '@/session'
-import { useActiveServer } from '@/stores/activeServer'
+import { accountServers, useActiveServer } from '@/stores/activeServer'
 import { configureRecentSearches } from '@/stores/recentSearches'
 import { configureWrenPrefs } from '@/stores/wrenPrefs'
 import { CHROMES } from '@/shell/chrome'
@@ -93,6 +94,13 @@ export function WrenRoot() {
   useEffect(() => {
     if (isLoaded) hideAsync().catch(IGNORED)
   }, [isLoaded])
+  useEffect(
+    () =>
+      isLoaded
+        ? followAccountServers({ sync: accountServers.sync, session: useWrenAccount })
+        : undefined,
+    [isLoaded],
+  )
 
   return (
     isLoaded && (

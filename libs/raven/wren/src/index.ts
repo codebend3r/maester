@@ -36,7 +36,7 @@ export {
   SIGN_IN_COPY,
   STORAGE_COPY,
 } from '@/copy/screens'
-export { isServerNamePick, serverNameEditOf } from '@/serverName'
+export { NAME_SAVES, type ServerNameSave, serverNameSaveOf } from '@/serverName'
 export { themePickerLabelOf, themeSlotLabelOf } from '@/themePickerLabel'
 export { aboutFactsOf, hasAbout } from '@/artistAbout'
 export { countValueOf, countsLineOf, lineValueOf } from '@/counts'

@@ -15,7 +15,7 @@ import { type NowPlayingTrack, useNowPlaying } from '@/player/useNowPlaying'
 import { useQuality } from '@/player/useQuality'
 import { WREN_ROUTES, artistPath } from '@/routes'
 import { useGoBack } from '@/shell/useGoBack'
-import { useServerName } from '@/stores/wrenPrefs'
+import { useServerName } from '@/lib/serverName'
 
 /** Whether the song's artists open a page. */
 export const ARTIST_KINDS = { linked: 'linked', plain: 'plain' } as const

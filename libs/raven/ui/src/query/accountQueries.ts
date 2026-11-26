@@ -1,5 +1,6 @@
 import { queryOptions, skipToken } from '@tanstack/react-query'
 import {
+  ACCOUNT_DATA_REFRESH_MS,
   type AccountDataClient,
   type ApiClient,
   DEFAULT_ACCOUNT_PREFERENCES,
@@ -14,18 +15,20 @@ type AccountDataQueryProps<TRead extends keyof AccountDataClient> = {
   userId: string | null
 }
 
-/** The account's extra servers, from its own database; it waits while there is no client or no one signed in. */
+/** The account's extra servers, from its own database, read again every `ACCOUNT_DATA_REFRESH_MS` so another device's change shows; it waits while there is no client or no one signed in. */
 export const accountServersQuery = ({ client, userId }: AccountDataQueryProps<'listServers'>) =>
   queryOptions({
     queryKey: queryKeys.accountServers(userId),
     queryFn: client === null || userId === null ? skipToken : () => client.listServers(),
+    refetchInterval: ACCOUNT_DATA_REFRESH_MS,
   })
 
-/** The names the account gave servers it keeps no row for: its home one. */
+/** The names the account gave servers it keeps no row for (its home one), read again as the servers are. */
 export const serverNamesQuery = ({ client, userId }: AccountDataQueryProps<'listServerNames'>) =>
   queryOptions({
     queryKey: queryKeys.serverNames(userId),
     queryFn: client === null || userId === null ? skipToken : () => client.listServerNames(),
+    refetchInterval: ACCOUNT_DATA_REFRESH_MS,
   })
 
 /** The account's choices; the defaults stand while there is no client or no one signed in. */

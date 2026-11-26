@@ -1,4 +1,10 @@
-import { type AddProblem, type AppServer, IGNORED, RENAME_OUTCOMES } from '@raven/native/headless'
+import {
+  type AddProblem,
+  type AppServer,
+  IGNORED,
+  RENAME_OUTCOMES,
+  type RenameOutcome,
+} from '@raven/native/headless'
 import { afterPins } from '@raven/ui/headless'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
@@ -11,18 +17,24 @@ import { accountServers, useActiveServer } from '@/stores/activeServer'
 
 const PROBLEM_COPY = SERVERS_COPY.problems satisfies Record<AddProblem, string>
 
+/** What a rename that did not take says, by why; null once it did. */
+const RENAME_COPY = {
+  [RENAME_OUTCOMES.renamed]: null,
+  [RENAME_OUTCOMES.badName]: SERVERS_COPY.badName,
+  [RENAME_OUTCOMES.noAccount]: SERVERS_COPY.noAccount,
+} as const satisfies Record<RenameOutcome, string | null>
+
 type RenameFormProps = { server: AppServer; onDone: () => void }
 
 /** A server's new name, tidied and checked as every client's list renames (`renamedServers`). */
 const RenameForm = ({ server, onDone }: RenameFormProps) => {
   const [name, setName] = useState(server.name)
-  const [isBadName, setBadName] = useState(false)
+  const [refusal, setRefusal] = useState<string | null>(null)
   const rename = useMutation({
     mutationFn: (typed: string) => accountServers.rename({ id: server.id, name: typed }),
     onSuccess: (outcome) => {
-      const isRenamed = outcome === RENAME_OUTCOMES.renamed
-      setBadName(!isRenamed)
-      if (isRenamed) onDone()
+      setRefusal(RENAME_COPY[outcome])
+      if (outcome === RENAME_OUTCOMES.renamed) onDone()
     },
   })
   return (
@@ -40,7 +52,7 @@ const RenameForm = ({ server, onDone }: RenameFormProps) => {
         text={SERVERS_COPY.save}
       />
       <SettingsButton isDisabled={false} onPress={onDone} text={SERVERS_COPY.cancel} />
-      {isBadName && <SettingsLine isAlert text={SERVERS_COPY.badName} />}
+      {refusal !== null && <SettingsLine isAlert text={refusal} />}
       {rename.isError && <SettingsLine isAlert text={SERVERS_COPY.failed(rename.error.message)} />}
     </>
   )
@@ -53,8 +65,9 @@ type ServerRowProps = {
 }
 
 /**
- * One server: its name and address, what it is (home, in use), Use for another one, and for
- * one the account added, Rename and Remove. Using another opens its Home, since the screens
+ * One server: its name and address, what it is (home, in use), Use for another one, Rename for
+ * any (home's name is the account's too, once its id is known), and Remove for one the account
+ * added. Using another opens its Home, since the screens
  * below were the last server's; removing the one in use goes home first.
  */
 const ServerRow = ({ server, canChange }: ServerRowProps) => {
@@ -64,8 +77,11 @@ const ServerRow = ({ server, canChange }: ServerRowProps) => {
   const homeId = useActiveServer((state) => state.home.id)
   const isActive = useActiveServer((state) => state.activeId === server.id)
   const activate = useActiveServer((state) => state.activate)
+  const homeServerId = useActiveServer((state) => state.homeServerId)
   const isHome = server.id === homeId
-  const canKeep = canChange && !isHome
+  const canRemove = canChange && !isHome
+  // Home's name is kept by its own id, which a server too old to say it has none of.
+  const canRename = canChange && (!isHome || homeServerId !== null)
   const remove = useMutation({
     mutationFn: () => accountServers.remove(server.id),
     onSuccess: () => afterPins(queryClient),
@@ -87,23 +103,23 @@ const ServerRow = ({ server, canChange }: ServerRowProps) => {
           text={SERVERS_COPY.use}
         />
       )}
-      {canKeep && !isRenaming && (
-        <>
-          <SettingsButton
-            isDisabled={false}
-            name={SERVERS_COPY.renameName(server.name)}
-            onPress={() => setRenaming(true)}
-            text={SERVERS_COPY.rename}
-          />
-          <SettingsButton
-            isDisabled={remove.isPending}
-            name={SERVERS_COPY.removeName(server.name)}
-            onPress={() => remove.mutate()}
-            text={SERVERS_COPY.remove}
-          />
-        </>
+      {canRename && !isRenaming && (
+        <SettingsButton
+          isDisabled={false}
+          name={SERVERS_COPY.renameName(server.name)}
+          onPress={() => setRenaming(true)}
+          text={SERVERS_COPY.rename}
+        />
       )}
-      {canKeep && isRenaming && <RenameForm onDone={() => setRenaming(false)} server={server} />}
+      {canRemove && !isRenaming && (
+        <SettingsButton
+          isDisabled={remove.isPending}
+          name={SERVERS_COPY.removeName(server.name)}
+          onPress={() => remove.mutate()}
+          text={SERVERS_COPY.remove}
+        />
+      )}
+      {canRename && isRenaming && <RenameForm onDone={() => setRenaming(false)} server={server} />}
       {remove.isError && <SettingsLine isAlert text={SERVERS_COPY.failed(remove.error.message)} />}
     </>
   )
@@ -146,9 +162,9 @@ const AddServer = () => {
 
 /**
  * Where the media comes from: home (the server this app was built for) first, then the account's
- * others, the one in use marked, each to switch to; the account's own can be renamed and
- * removed, and a new one added by its address. The list is the account's, so a change here shows
- * on every device it signs in on, and it is read again as the section opens.
+ * others, the one in use marked, each to switch to; every one can be renamed, the account's own
+ * removed, and a new one added by its address. The list and the names are the account's, so a
+ * change here shows on every device it signs in on, and they are read again as the section opens.
  */
 export const ServerSettings = () => {
   const servers = useActiveServer((state) => state.servers)

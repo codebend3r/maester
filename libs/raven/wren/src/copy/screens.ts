@@ -34,13 +34,15 @@ export const SETTINGS_COPY = {
   title: 'Settings',
   signOut: 'Sign out',
   server: 'Server',
-  /** The label of the field that names the server on this device. */
+  /** The label of the field that names the server on the account. */
   serverName: 'Name',
   serverNameError: 'Use up to 80 characters, with no hidden ones.',
+  serverNameNoAccount: 'Sign in to keep a name on your account.',
+  serverNameFailed: "Wren couldn't save the name. Try again.",
   /** The label of the server's address, which is shown and never edited. */
   serverAddress: 'Address',
   serverNote:
-    "Name the server anything you like; Wren shows it wherever it says what it is connected to. The address Wren plays from, with its port, can't be changed here.",
+    "Name the server anything you like; the name is your account's, so raven and Wren show it on every device you sign in on. The address Wren plays from, with its port, can't be changed here.",
   library: 'Library',
   libraryNote:
     'The music libraries on this server. Home, Search and your collection show the one you pick.',
