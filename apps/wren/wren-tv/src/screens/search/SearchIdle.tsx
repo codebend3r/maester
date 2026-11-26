@@ -2,7 +2,7 @@ import {
   ART,
   LIBRARY_SEGMENTS,
   type LibrarySegment,
-  RECENT_KINDS,
+  isRecentPage,
   type RecentSearch,
   SEARCH_COPY,
   recentKeyOf,
@@ -10,16 +10,16 @@ import {
 } from '@raven/wren'
 import { router } from 'expo-router'
 import { ScrollView, Text, View } from 'react-native'
-
 import { useRecentSearches } from '@raven/wren-native'
-import { WREN_PAGES, libraryHref, pageHref } from '@raven/wren-native/headless'
+import { libraryHref, recentPageHref } from '@raven/wren-native/headless'
+
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
-import { usePageStyles } from '@/ui/pageStyles'
 import { themedStyles } from '@/theme/wrenTheme'
-import { FocusButton } from '@/ui/FocusButton'
 import { FOCUS_ROLES, Focusable } from '@/ui/Focusable'
+import { FocusButton } from '@/ui/FocusButton'
 import { SectionHeader } from '@/ui/Headers'
 import { ListRow } from '@/ui/ListRow'
+import { usePageStyles } from '@/ui/pageStyles'
 import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
@@ -109,21 +109,11 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
   const { name, line } = recentTextOf(recent)
   const open = () => {
     remember(recent)
-    switch (recent.kind) {
-      case RECENT_KINDS.query:
-        onSearch(recent.text)
-        return
-      case RECENT_KINDS.artist:
-        router.push(pageHref({ page: WREN_PAGES.artist, id: recent.id }))
-        return
-      case RECENT_KINDS.album:
-        router.push(pageHref({ page: WREN_PAGES.album, id: recent.id }))
-        return
-      default: {
-        const unknownKind: never = recent
-        return unknownKind
-      }
+    if (isRecentPage(recent)) {
+      router.push(recentPageHref(recent))
+      return
     }
+    onSearch(recent.text)
   }
   return (
     <View style={styles.recent}>

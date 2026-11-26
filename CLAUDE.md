@@ -150,6 +150,7 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@raven/mpv`         | `libs/raven/mpv`         | N-API addon over our pinned libmpv build: macOS video surface, typed async wrapper                             |
 | `@raven/audio`       | `libs/raven/audio`       | Local Expo module for music on phones and tablets: `AVQueuePlayer` on iOS, Media3 on Android                   |
 | `@raven/native`      | `libs/raven/native`      | Sign-in and media access on React Native, shared by the device app and Wren: session, cookies, tickets         |
+| `@raven/top-shelf`   | `libs/raven/top-shelf`   | The Apple TV's Top Shelf for raven and Wren: an Expo module, the TV Services extension's Swift, the contract   |
 | `@raven/wren`        | `libs/raven/wren`        | Wren's words, palettes and pure models, shared by its phone, TV and web apps: copy, counts, sorts, queue facts |
 | `@raven/wren-native` | `libs/raven/wren-native` | What Wren's phone and TV apps share on React Native: session, server, routes, stores, music hooks              |
 | `@raven/desktop`     | `apps/raven/desktop`     | Raven: Electron 45 and Forge, serving `@raven/web`, libmpv through `@raven/mpv`, Playwright e2e                |

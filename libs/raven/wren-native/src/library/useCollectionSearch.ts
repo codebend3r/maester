@@ -24,7 +24,7 @@ type CollectionSearchState = {
   empty: string
 }
 
-/** A category page's search, the phone's: its box, the query it asks for, and what an empty list says. */
+/** A category page's search: its box, the query it asks for, and what an empty list says. */
 export const useCollectionSearch = ({
   placeholder,
   none,

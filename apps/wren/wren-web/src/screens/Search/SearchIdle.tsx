@@ -1,8 +1,10 @@
 import {
   KIT_COPY,
   RECENT_KINDS,
+  type RecentPage,
   type RecentSearch,
   SEARCH_COPY,
+  isRecentPage,
   recentKeyOf,
   recentTextOf,
 } from '@raven/wren'
@@ -82,21 +84,15 @@ function Browse() {
 
 type RecentViewProps = { recent: RecentSearch }
 
+/** The page each kind of recent search opens, by its id. */
+const RECENT_PATHS = {
+  [RECENT_KINDS.artist]: artistPath,
+  [RECENT_KINDS.album]: albumPath,
+} as const satisfies Record<RecentPage['kind'], (id: number) => string>
+
 /** The page a recent artist or album opens, a link's address; a search has none and runs here. */
-const recentHrefOf = ({ recent }: RecentViewProps): string | undefined => {
-  switch (recent.kind) {
-    case RECENT_KINDS.query:
-      return undefined
-    case RECENT_KINDS.artist:
-      return artistPath(recent.id)
-    case RECENT_KINDS.album:
-      return albumPath(recent.id)
-    default: {
-      const unknownKind: never = recent
-      return unknownKind
-    }
-  }
-}
+const recentHrefOf = ({ recent }: RecentViewProps): string | undefined =>
+  isRecentPage(recent) ? RECENT_PATHS[recent.kind](recent.id) : undefined
 
 type RecentRowProps = RecentViewProps & { onSearch: (text: string) => void }
 
@@ -110,7 +106,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
   const { name, line } = recentTextOf(recent)
   const open = () => {
     remember(recent)
-    if (recent.kind === RECENT_KINDS.query) onSearch(recent.text)
+    if (!isRecentPage(recent)) onSearch(recent.text)
   }
   return (
     <li className={styles.recent}>

@@ -18,11 +18,11 @@ const useStyles = themedStyles(({ colors }) => ({
 type DetailSplitProps = {
   /** The head, which keeps its column whole and scrolls on its own when it is taller. */
   head: ReactNode
-  /** The tracks, laid out in the rest of the width. */
+  /** The tracks, or an artist's albums, laid out in the rest of the width. */
   list: ReactNode
 }
 
-/** An album's or a playlist's page on a TV: the head in a column at the left, the tracks beside it. */
+/** An album's, a playlist's or an artist's page on a TV: the head at the left, the list beside it. */
 export function DetailSplit({ head, list }: DetailSplitProps) {
   const styles = useStyles()
   return (

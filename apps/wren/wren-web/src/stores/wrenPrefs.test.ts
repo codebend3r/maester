@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test'
-import { RECENT_SORTS, THEME_MODES, WREN_PREFS_KEY, WREN_THEMES } from '@raven/wren'
-import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import {
+  DEFAULT_SHARED_PREFS,
+  RECENT_SORTS,
+  THEME_MODES,
+  WREN_PREFS_KEY,
+  WREN_THEMES,
+} from '@raven/wren'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 
 const keep = (state: unknown): void =>
   window.localStorage.setItem(WREN_PREFS_KEY, JSON.stringify({ state, version: 1 }))
@@ -56,7 +62,7 @@ describe('useWrenPrefs', () => {
     await useWrenPrefs.persist.rehydrate()
 
     expect(useWrenPrefs.getState()).toMatchObject({
-      theme: DEFAULT_WREN_PREFS.theme,
+      theme: DEFAULT_SHARED_PREFS.theme,
       homeSort: RECENT_SORTS.release,
     })
     expect(useWrenPrefs.getState()).not.toHaveProperty('downloadKbps')
@@ -66,6 +72,6 @@ describe('useWrenPrefs', () => {
     window.localStorage.setItem(WREN_PREFS_KEY, '"nonsense"')
     await useWrenPrefs.persist.rehydrate()
 
-    expect(useWrenPrefs.getState()).toMatchObject(DEFAULT_WREN_PREFS)
+    expect(useWrenPrefs.getState()).toMatchObject(DEFAULT_SHARED_PREFS)
   })
 })

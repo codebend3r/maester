@@ -17,6 +17,8 @@ const useStyles = themedStyles(({ colors }) => ({
   lifted: { transform: [{ scale: SIZE.focusScale }] },
 }))
 
+const isWords = (words: string | null): words is string => words !== null
+
 type TileProps = {
   title: string
   /** The line under it: the artists, or a count. */
@@ -54,12 +56,9 @@ export function Tile({
   testID,
 }: TileProps) {
   const styles = useStyles()
+  const lines = [line, detail].filter(isWords)
   const label =
-    spoken ??
-    [line, detail].reduce<string>(
-      (said, value) => (value === null ? said : KIT_COPY.labelled({ label: said, value })),
-      title,
-    )
+    spoken ?? lines.reduce((said, value) => KIT_COPY.labelled({ label: said, value }), title)
   return (
     <Focusable
       hasPreferredFocus={hasPreferredFocus}
@@ -79,14 +78,11 @@ export function Tile({
             <Text numberOfLines={1} style={[styles.title, isFocused && styles.lit]}>
               {title}
             </Text>
-            {[line, detail].map(
-              (words) =>
-                words !== null && (
-                  <Text key={words} numberOfLines={1} style={styles.line}>
-                    {words}
-                  </Text>
-                ),
-            )}
+            {lines.map((words) => (
+              <Text key={words} numberOfLines={1} style={styles.line}>
+                {words}
+              </Text>
+            ))}
           </View>
         </>
       )}

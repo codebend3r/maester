@@ -61,6 +61,8 @@
   --color-track: color-mix(in srgb, var(--color-bark) 14%, transparent);
   // A row under the pointer that has no fill of its own.
   --color-hover: color-mix(in srgb, var(--color-bark) 5%, transparent);
+  // The side menu's Manage icons: the theme's bright leaf drawn into lichen, a step off their words.
+  --color-lichen-accent: color-mix(in srgb, var(--color-leaf-bright) 45%, var(--color-lichen));
   // Letterboxing around the video is real black, not a tint.
   --color-stage: #000000;
   --color-scrim: rgb(0 0 0 / 55%);

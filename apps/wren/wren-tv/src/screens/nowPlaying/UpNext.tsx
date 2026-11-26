@@ -7,8 +7,8 @@ import {
   upNextRowsOf,
 } from '@raven/wren'
 import { FlatList, Text, View } from 'react-native'
-
 import { useCovers, type WrenSession } from '@raven/wren-native'
+
 import { RepeatToggle, ShuffleToggle } from '@/player/Transport'
 import { QueueRow } from '@/screens/nowPlaying/QueueRow'
 import { SPACE, TYPE } from '@/theme/tvTokens'

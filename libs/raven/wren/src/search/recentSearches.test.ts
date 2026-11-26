@@ -6,6 +6,7 @@ import {
   RECENT_KINDS,
   RECENT_SEARCHES_KEPT,
   type RecentSearch,
+  isRecentPage,
   mergedRecentsOf,
   recentKeyOf,
   recentOfAlbum,
@@ -141,5 +142,18 @@ describe('recentTextOf', () => {
       name: 'Doo-Wops & Hooligans',
       line: SEARCH_COPY.recentAlbum({ kind: SEARCH_COPY.album, artists: 'Bruno Mars' }),
     })
+  })
+})
+
+describe('isRecentPage', () => {
+  it('opens the page of an artist or an album', () => {
+    expect(isRecentPage(SIA)).toBe(true)
+    expect(
+      isRecentPage({ kind: RECENT_KINDS.album, id: 7, title: 'OK Computer', artists: 'Radiohead' }),
+    ).toBe(true)
+  })
+
+  it('opens no page for words, which are searched again', () => {
+    expect(isRecentPage(LOVE)).toBe(false)
   })
 })

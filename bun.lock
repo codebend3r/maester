@@ -25,6 +25,7 @@
         "@raven/core": "workspace:*",
         "@raven/keys": "workspace:*",
         "@raven/native": "workspace:*",
+        "@raven/top-shelf": "workspace:*",
         "@raven/ui": "workspace:*",
         "@react-native-async-storage/async-storage": "2.2.0",
         "@shared/http": "workspace:*",
@@ -274,6 +275,7 @@
         "@raven/audio": "workspace:*",
         "@raven/core": "workspace:*",
         "@raven/native": "workspace:*",
+        "@raven/top-shelf": "workspace:*",
         "@raven/ui": "workspace:*",
         "@raven/wren": "workspace:*",
         "@raven/wren-native": "workspace:*",
@@ -451,6 +453,26 @@
       "peerDependencies": {
         "react": "19.3.0",
         "zustand": "5.1.0",
+      },
+    },
+    "libs/raven/top-shelf": {
+      "name": "@raven/top-shelf",
+      "version": "0.10.1",
+      "dependencies": {
+        "expo-modules-core": "58.0.30",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.4",
+        "@types/react": "19.3.0",
+        "@typescript/native-preview": "7.0.0-dev.20260707.2",
+        "oxfmt": "0.77.0",
+        "oxlint": "1.92.0",
+        "react-native": "npm:react-native-tvos@0.88.1-0",
+        "tsc-alias": "1.9.10",
+        "typescript": "6.0.3",
+      },
+      "peerDependencies": {
+        "react": "19.3.0",
       },
     },
     "libs/raven/ui": {
@@ -1424,6 +1446,8 @@
     "@raven/splash": ["@raven/splash@workspace:apps/raven/splash"],
 
     "@raven/supabase": ["@raven/supabase@workspace:apps/raven/supabase"],
+
+    "@raven/top-shelf": ["@raven/top-shelf@workspace:libs/raven/top-shelf"],
 
     "@raven/ui": ["@raven/ui@workspace:libs/raven/ui"],
 

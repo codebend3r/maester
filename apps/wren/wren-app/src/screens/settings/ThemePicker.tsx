@@ -1,7 +1,13 @@
-import { SETTINGS_COPY, THEME_SCHEMES, WREN_THEMES, type WrenThemeName } from '@raven/wren'
+import {
+  SETTINGS_COPY,
+  THEME_SCHEMES,
+  WREN_PALETTES,
+  WREN_THEMES,
+  type WrenThemeName,
+} from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
-import { PALETTES, type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
+import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { FORM_FACTORS, RADIUS, SIZE, SPACE, THEME_SIZES, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
@@ -66,7 +72,7 @@ type ThemePreviewProps = { theme: WrenThemeName }
 /** A small picture of a theme in its own colours: its ground, a rail, two lines and its accent. */
 function ThemePreview({ theme }: ThemePreviewProps) {
   const styles = useStyles()
-  const palette = PALETTES[theme]
+  const palette = WREN_PALETTES[theme]
   return (
     <View style={[styles.preview, { backgroundColor: palette.bg, borderColor: palette.line2 }]}>
       <View

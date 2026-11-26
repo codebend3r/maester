@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { MUSIC_SORTS, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { HOME_COPY, KIT_COPY, LIBRARY_PAGE_COPY, RECENT_SORTS, recentDateLineOf } from '@raven/wren'
+import {
+  HOME_COPY,
+  KIT_COPY,
+  LIBRARY_PAGE_COPY,
+  RECENT_SORTS,
+  recentDateLineOf,
+  DEFAULT_SHARED_PREFS,
+} from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_PAGES, WREN_ROUTES } from '@raven/wren-native/headless'
-import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
+import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { LISTENER, MUSIC, OK_COMPUTER, musicApi } from '@/test/music'
 import type * as NativeMock from '@/test/nativeMock'
 import { pagePathOf } from '@/test/routes'
@@ -39,7 +46,7 @@ describe('Home', () => {
     queryClient.clear()
     useAudioQueue.getState().clear()
     useWrenAccount.setState({ session: LISTENER })
-    useWrenPrefs.setState(DEFAULT_WREN_PREFS)
+    useWrenPrefs.setState(DEFAULT_SHARED_PREFS)
   })
 
   it("greets the listener and shows every music library's newest albums, and opens one", async () => {

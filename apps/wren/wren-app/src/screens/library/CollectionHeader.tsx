@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
+import { type CollectionSearch } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
 import { LIBRARY_PAGE_COPY } from '@raven/wren'
@@ -21,13 +22,6 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   // The tablet's field keeps to a short measure beside the title.
   tabletSearch: { width: SIZE.emptyMeasure },
 }))
-
-/** A list's search box: what is typed and what it asks for. */
-export type CollectionSearch = {
-  value: string
-  onChangeText: (text: string) => void
-  placeholder: string
-}
 
 type CollectionHeaderProps = {
   title: string

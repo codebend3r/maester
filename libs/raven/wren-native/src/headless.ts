@@ -11,5 +11,6 @@ export {
   collectionPathOf,
   libraryHref,
   pageHref,
+  recentPageHref,
 } from '@/routes'
 export { configureLibraryChoice } from '@/music/musicLibraries'

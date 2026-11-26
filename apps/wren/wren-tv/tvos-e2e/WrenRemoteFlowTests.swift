@@ -14,6 +14,7 @@ final class WrenRemoteFlowTests: XCTestCase {
   private enum Copy {
     static let shuffleAll = "Shuffle all"
     static let play = "Play"
+    static let home = "Home"
     static let library = "Library"
     static let albums = "Albums"
     static let recentlyAdded = "Recently added"
@@ -60,7 +61,7 @@ final class WrenRemoteFlowTests: XCTestCase {
 
     // Left reaches the sidebar; Down along it to Library, which opens on Albums.
     XCTAssertTrue(
-      waitForFocus(pressing: .left, tries: 4) { $0 == Copy.shuffleAll || $0 == "Home" },
+      waitForFocus(pressing: .left, tries: 4) { $0 == Copy.shuffleAll || $0 == Copy.home },
       "Left reaches the sidebar"
     )
     XCTAssertTrue(

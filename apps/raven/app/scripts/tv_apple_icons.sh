@@ -4,11 +4,14 @@
 # parallax, so each icon is a back layer (the ground) and a front layer (the mark on nothing), at
 # the sizes Apple asks: 400 by 240 and 800 by 480 for the home screen, 1280 by 768 for the store.
 # The Top Shelf images are the banner's mark and wordmark across 1920 by 720 and 2320 by 720, at
-# 1x and 2x. config-tv's `appleTVImages` reads them from `assets/images/tv_apple/`.
+# 1x and 2x. config-tv's `appleTVImages` reads them from `assets/images/tv_apple/`. The signed out
+# Top Shelf's invitation is the same lockup over a line asking to sign in, at the inset shelf's
+# 1940 by 692 and 3880 by 1384, which `withTvTopShelf` copies into the Top Shelf extension.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MARK=../web/public/brand/raven-mark-on-dark.svg
 FONT=assets/fonts/YoungSerif.ttf
+BODY_FONT=assets/fonts/InstrumentSans.ttf
 GROUND='#15201e'
 BARK='#e6e1d6'
 OUT=assets/images/tv_apple
@@ -34,6 +37,20 @@ shelf() {
   magick -size "${w}x${h}" "xc:${GROUND}" "$WORK/lockup.png" -gravity center -composite \
     -depth 8 -strip "$OUT/${name}.png"
 }
+invite() {
+  local name=$1 w=$2 h=$3
+  local mark_h=$((h * 40 / 100)) point=$((h * 17 / 100)) gap=$((h * 6 / 100)) line=$((h * 7 / 100))
+  magick -background none -density 1200 "$MARK" -resize "x${mark_h}" "$WORK/mark.png"
+  magick -background none -fill "$BARK" -font "$FONT" -pointsize "$point" label:Raven "$WORK/word.png"
+  magick "$WORK/mark.png" \( -size "${gap}x1" xc:none \) "$WORK/word.png" -background none \
+    -gravity center +append "$WORK/lockup.png"
+  magick -background none -fill "$BARK" -font "$BODY_FONT" -pointsize "$line" \
+    label:'Sign in to pick up where you left off' "$WORK/line.png"
+  magick "$WORK/lockup.png" \( -size "1x${gap}" xc:none \) "$WORK/line.png" -background none \
+    -gravity center -append "$WORK/invite.png"
+  magick -size "${w}x${h}" "xc:${GROUND}" "$WORK/invite.png" -gravity center -composite \
+    -depth 8 -strip "$OUT/${name}.png"
+}
 icon icon-small 400 240
 icon icon-small-2x 800 480
 icon icon-large 1280 768
@@ -41,3 +58,5 @@ shelf top-shelf 1920 720
 shelf top-shelf-2x 3840 1440
 shelf top-shelf-wide 2320 720
 shelf top-shelf-wide-2x 4640 1440
+invite top-shelf-sign-in 1940 692
+invite top-shelf-sign-in-2x 3880 1384

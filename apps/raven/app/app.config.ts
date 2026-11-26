@@ -10,11 +10,13 @@ import packageJson from '#package'
  * `paths`, and Node's resolver adds no `.ts`, so the modules it shares with
  * the app come in by their relative path and extension.
  */
+import { APP_SCHEME } from './src/config/linkScheme.ts'
 import { TV_ENV, isTvPrebuild } from './src/config/tvPrebuild.ts'
 import { PALETTE_TOKENS } from './src/theme/tokenNames.ts'
 import { withAndroidFonts } from './plugins/withAndroidFonts.ts'
 import { withTvBannerDensities } from './plugins/withTvBannerDensities.ts'
 import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
+import { withTvTopShelf } from './plugins/withTvTopShelf.ts'
 import { withoutTvAudioService } from './plugins/withoutTvAudioService.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
@@ -32,6 +34,12 @@ const LOCAL_NETWORK_USE = 'raven reaches your raven server on your local network
 
 /** Where `scripts/tv_apple_icons.sh` draws the Apple TV's icon layers and Top Shelf images. */
 const APPLE_TV_IMAGES = './assets/images/tv_apple'
+
+// The signed out Top Shelf's invitation, which `withTvTopShelf` copies into the extension.
+const TOP_SHELF_SIGN_IN = {
+  picture: `${APPLE_TV_IMAGES}/top-shelf-sign-in.png`,
+  picture2x: `${APPLE_TV_IMAGES}/top-shelf-sign-in-2x.png`,
+} as const
 
 type AppleTVIconLayers = { front: string; back: string }
 
@@ -73,7 +81,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     // What the home screen and the TV launcher write under the icon.
     name: 'Raven',
     slug: 'raven',
-    scheme: 'raven',
+    scheme: APP_SCHEME,
     version: packageJson.version,
     orientation: 'default',
     icon: './assets/images/icon.png',
@@ -161,12 +169,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ],
   }
   /*
-   * The Apple TV's remote-driven end to end test joins only the TV's native project, and the
-   * Android TV's banner at each density and its manifest without the phone's music service
-   * only the TV's.
+   * The Apple TV's remote-driven end to end test and its Top Shelf extension join only the TV's
+   * native project, and the Android TV's banner at each density and its manifest without the
+   * phone's music service only the TV's.
    */
   const withTests = isTv
-    ? withoutTvAudioService(withTvRemoteTests(withTvBannerDensities(app)))
+    ? withoutTvAudioService(
+        withTvTopShelf(withTvRemoteTests(withTvBannerDensities(app)), {
+          signIn: TOP_SHELF_SIGN_IN,
+        }),
+      )
     : app
   const withFonts = withAndroidFonts(withTests)
   return isDevelopment ? withCleartextTraffic(withFonts) : withFonts

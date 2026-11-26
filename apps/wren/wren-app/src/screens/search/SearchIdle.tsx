@@ -2,7 +2,7 @@ import {
   KIT_COPY,
   LIBRARY_SEGMENTS,
   type LibrarySegment,
-  RECENT_KINDS,
+  isRecentPage,
   recentKeyOf,
   type RecentSearch,
   recentTextOf,
@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
 import { useRecentSearches } from '@raven/wren-native'
-import { WREN_PAGES, libraryHref, pageHref } from '@raven/wren-native/headless'
+import { libraryHref, recentPageHref } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
   RADIUS,
@@ -148,21 +148,11 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
   const { name, line } = recentTextOf(recent)
   const open = () => {
     remember(recent)
-    switch (recent.kind) {
-      case RECENT_KINDS.query:
-        onSearch(recent.text)
-        return
-      case RECENT_KINDS.artist:
-        router.push(pageHref({ page: WREN_PAGES.artist, id: recent.id }))
-        return
-      case RECENT_KINDS.album:
-        router.push(pageHref({ page: WREN_PAGES.album, id: recent.id }))
-        return
-      default: {
-        const unknownKind: never = recent
-        return unknownKind
-      }
+    if (isRecentPage(recent)) {
+      router.push(recentPageHref(recent))
+      return
     }
+    onSearch(recent.text)
   }
   return (
     <View style={styles.recent}>

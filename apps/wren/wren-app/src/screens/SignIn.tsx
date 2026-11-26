@@ -1,17 +1,11 @@
-import { RAVEN_SERVER, SIGN_IN_ERRORS } from '@raven/native/headless'
+import { SIGN_IN_ERRORS } from '@raven/native/headless'
 import { useRouter } from 'expo-router'
 
-import { useActiveServer, useSignInFlow } from '@raven/wren-native'
+import { useActiveServerName, useSignInFlow } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { SIGN_IN_FRAMES } from '@/screens/signIn/SignInFrame'
 import { SIGN_IN_VIEWS } from '@/screens/signIn/StepForms'
 import { useFormFactor } from '@/theme/wrenTheme'
-
-type ActiveServerState = ReturnType<typeof useActiveServer.getState>
-
-/** The active server's configured name, or raven's before one is pinned. */
-const serverNameOf = ({ servers, activeId }: ActiveServerState): string =>
-  servers.find((server) => server.id === activeId)?.name ?? RAVEN_SERVER.name
 
 /**
  * The first launch: the raven account's email and password, over `@raven/native`'s
@@ -20,7 +14,7 @@ const serverNameOf = ({ servers, activeId }: ActiveServerState): string =>
  */
 export function SignIn() {
   const router = useRouter()
-  const serverName = useActiveServer(serverNameOf)
+  const serverName = useActiveServerName()
   const openTabs = () => router.replace(WREN_ROUTES.home)
   const flow = useSignInFlow({
     initial: { email: '', password: '' },

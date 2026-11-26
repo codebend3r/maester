@@ -4,19 +4,21 @@ import { usePlayedStreams } from '@raven/native/headless'
 import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { KIT_COPY, NOW_PLAYING_COPY, PLAYER_COPY, TRACK_MENU_COPY } from '@raven/wren'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
-
-import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
+
+import { queryClient } from '@/queryClient'
 import { AIRBAG, LISTENER, PARANOID, musicApi, trackFor } from '@/test/music'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
 
+type AudioQueue = ReturnType<typeof useAudioQueue.getState>
+
 const mockApi = musicApi()
-const seekTo = jest.fn<ReturnType<typeof useAudioQueue.getState>['seekTo']>()
-const move = jest.fn<ReturnType<typeof useAudioQueue.getState>['move']>()
-const remove = jest.fn<ReturnType<typeof useAudioQueue.getState>['remove']>()
-const jump = jest.fn<ReturnType<typeof useAudioQueue.getState>['jump']>()
+const seekTo = jest.fn<AudioQueue['seekTo']>()
+const move = jest.fn<AudioQueue['move']>()
+const remove = jest.fn<AudioQueue['remove']>()
+const jump = jest.fn<AudioQueue['jump']>()
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: async () => true,

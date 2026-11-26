@@ -1,7 +1,7 @@
 import { NOW_PLAYING_COPY, SONG_LEADS, type UpNextRow } from '@raven/wren'
 import { useState } from 'react'
-
 import { type Covers } from '@raven/wren-native'
+
 import { ListRow } from '@/ui/ListRow'
 import { Sheet } from '@/ui/Sheet'
 import { SongRow } from '@/ui/SongRow'

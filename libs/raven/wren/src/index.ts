@@ -36,6 +36,7 @@ export {
   SETTINGS_COPY,
   SIGN_IN_COPY,
   STORAGE_COPY,
+  TOP_SHELF_COPY,
 } from '@/copy/screens'
 export { NAME_SAVES, type ServerNameSave, serverNameSaveOf } from '@/serverName'
 export { themePickerLabelOf, themeSlotLabelOf } from '@/themePickerLabel'
@@ -121,11 +122,15 @@ export {
 export {
   COVER_SIZES,
   type CoverSize,
+  DEFAULT_SHARED_PREFS,
   isCoverSize,
   RECENT_SORTS,
   type RecentSort,
   WREN_PREFS_KEY,
+  WREN_PREFS_VERSION,
+  type WrenSharedPrefs,
   isRecentSort,
+  sharedPrefsOf,
 } from '@/prefs'
 export {
   COLOR_SCHEMES,
@@ -146,7 +151,9 @@ export {
 export {
   RECENT_KINDS,
   RECENT_SEARCHES_KEY,
+  type RecentPage,
   type RecentSearch,
+  isRecentPage,
   mergedRecentsOf,
   recentKeyOf,
   recentOfAlbum,

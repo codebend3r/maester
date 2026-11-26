@@ -17,17 +17,17 @@ import {
 } from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 import { Text, TVFocusGuideView, View } from 'react-native'
+import { useTrackLike, type WrenSession, useWren } from '@raven/wren-native'
 
 import { TrackMenu } from '@/components/TracksMenu'
-import { useTrackLike, type WrenSession, useWren } from '@raven/wren-native'
 import { LyricsView } from '@/screens/nowPlaying/LyricsView'
 import { PlayerColumn } from '@/screens/nowPlaying/PlayerColumn'
 import { UpNext } from '@/screens/nowPlaying/UpNext'
 import { type Playing, usePlaying } from '@/screens/nowPlaying/usePlaying'
 import { RADIUS, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
-import { FOCUS_ROLES } from '@/ui/Focusable'
 import { ChoiceRow } from '@/ui/ChoiceRow'
+import { FOCUS_ROLES } from '@/ui/Focusable'
 
 const useStyles = themedStyles(({ colors }) => ({
   screen: {

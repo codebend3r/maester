@@ -1,19 +1,13 @@
-import { isRecord } from '@raven/core'
 import { loadPersisted } from '@raven/native/headless'
 import { UNCONFIGURED_STORAGE } from '@raven/ui/headless'
 import {
-  COVER_SIZES,
-  type CoverSize,
-  DEFAULT_THEME_CHOICE,
-  RECENT_SORTS,
-  type RecentSort,
+  DEFAULT_SHARED_PREFS,
   type ThemeChoice,
   WREN_PREFS_KEY,
-  isCoverSize,
-  isLibraryPick,
-  isRecentSort,
+  WREN_PREFS_VERSION,
+  type WrenSharedPrefs,
+  sharedPrefsOf,
   themeChoiceIn,
-  themeChoiceOf,
 } from '@raven/wren'
 import { configureLibraryChoice } from '@raven/wren-native/headless'
 import { create } from 'zustand'
@@ -21,50 +15,19 @@ import { type StateStorage, createJSONStorage, persist } from 'zustand/middlewar
 import { useShallow } from 'zustand/react/shallow'
 
 /**
- * What the TV keeps of the listener's choices: the ones a TV has. The phone keeps the downloads'
- * and the cellular stream's too, which a TV has none of; the web keeps exactly these.
+ * What the TV keeps of the listener's choices: the ones every Wren has. The phone keeps the
+ * downloads' and the cellular stream's too, which a TV has none of; the web keeps exactly these.
  */
-type WrenPrefsValues = ThemeChoice & {
-  /** The order of Home's albums. */
-  homeSort: RecentSort
-  /** How large Albums draws its covers. */
-  coverSize: CoverSize
-  /** The music library picked in Settings, by its id; null wears the server's first. */
-  libraryId: number | null
-}
-
-type WrenPrefs = WrenPrefsValues & {
+type WrenPrefs = WrenSharedPrefs & {
   /** Changes any of the preferences and keeps them on the TV. */
-  change: (change: Partial<WrenPrefsValues>) => void
+  change: (change: Partial<WrenSharedPrefs>) => void
 }
-
-/** A first run: Paper and Night by the TV's scheme, Home's albums by when they were added, medium covers. */
-export const DEFAULT_WREN_PREFS: WrenPrefsValues = {
-  ...DEFAULT_THEME_CHOICE,
-  homeSort: RECENT_SORTS.added,
-  coverSize: COVER_SIZES.medium,
-  libraryId: null,
-}
-
-/** What was read back, each preference kept only where it is one, the default otherwise. */
-export const wrenPrefsOf = (saved: unknown): WrenPrefsValues => {
-  const kept = isRecord(saved) ? saved : {}
-  return {
-    ...themeChoiceOf(saved),
-    homeSort: isRecentSort(kept.homeSort) ? kept.homeSort : DEFAULT_WREN_PREFS.homeSort,
-    coverSize: isCoverSize(kept.coverSize) ? kept.coverSize : DEFAULT_WREN_PREFS.coverSize,
-    libraryId: isLibraryPick(kept.libraryId) ? kept.libraryId : DEFAULT_WREN_PREFS.libraryId,
-  }
-}
-
-/** The version the prefs are kept at, the phone's and the web's, so every Wren reads one shape. */
-const WREN_PREFS_VERSION = 1
 
 /** Settings' themes, Home's order, Albums' cover size and the library, persisted to AsyncStorage. */
 export const useWrenPrefs = create<WrenPrefs>()(
   persist(
     (set) => ({
-      ...DEFAULT_WREN_PREFS,
+      ...DEFAULT_SHARED_PREFS,
       change: (change) => set(change),
     }),
     {
@@ -73,9 +36,9 @@ export const useWrenPrefs = create<WrenPrefs>()(
       skipHydration: true,
       version: WREN_PREFS_VERSION,
       // Whatever an older version kept is read through the same guard.
-      migrate: wrenPrefsOf,
-      partialize: (state: WrenPrefs) => wrenPrefsOf(state),
-      merge: (saved, current) => ({ ...current, ...wrenPrefsOf(saved) }),
+      migrate: sharedPrefsOf,
+      partialize: (state: WrenPrefs) => sharedPrefsOf(state),
+      merge: (saved, current) => ({ ...current, ...sharedPrefsOf(saved) }),
     },
   ),
 )

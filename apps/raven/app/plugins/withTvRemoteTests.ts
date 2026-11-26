@@ -3,6 +3,16 @@ import { join } from 'node:path'
 
 import { type ConfigPlugin, withXcodeProject } from 'expo/config-plugins'
 
+import {
+  TV_TARGET_SETTINGS,
+  XCODE,
+  addNativeTarget,
+  addTargetGroup,
+  hasTarget,
+  isXcodeProjectApi,
+  quoted,
+} from './xcodeTargets.ts'
+
 /** The UI test target the plugin adds and its bundle: raven's unless the app names its own. */
 type RemoteTests = { target: string; bundleId: string }
 
@@ -14,116 +24,23 @@ const RAVEN_REMOTE_TESTS: RemoteTests = {
 /** Where the test's Swift lives in the app's folder. */
 const REMOTE_TEST_SOURCES = 'tvos-e2e'
 
-const XCODE = {
+const XCODE_TESTS = {
   uiTests: 'com.apple.product-type.bundle.ui-testing',
   productsGroup: 'Products',
-  builtProducts: 'BUILT_PRODUCTS_DIR',
-  sourcesPhase: 'PBXSourcesBuildPhase',
-  sourcesComment: 'Sources',
-  frameworksPhase: 'PBXFrameworksBuildPhase',
-  frameworksComment: 'Frameworks',
   schemesFolder: join('xcshareddata', 'xcschemes'),
-  configuration: 'XCBuildConfiguration',
-  nativeTarget: 'PBXNativeTarget',
-  release: 'Release',
-  debug: 'Debug',
 } as const
 
 const SWIFT = '.swift'
 
-type BuildConfiguration = {
-  name: string
-  isa: typeof XCODE.configuration
-  buildSettings: Record<string, string>
-}
-
-type NativeTarget = {
-  uuid: string
-  pbxNativeTarget: {
-    isa: typeof XCODE.nativeTarget
-    name: string
-    productName: string
-    productReference: string
-    productType: string
-    buildConfigurationList: string
-    buildPhases: never[]
-    buildRules: never[]
-    dependencies: never[]
-  }
-}
-
-type AddProductFileProps = { group: string; target: string; sourceTree: string }
-
-/**
- * The part of the `xcode` package's project Expo hands a mod that the plugin calls. The
- * package ships no types; these are its own methods, with their own positional signatures.
- */
-type XcodeProjectApi = {
-  generateUuid: () => string
-  addXCConfigurationList: (
-    configurations: BuildConfiguration[],
-    defaultName: string,
-    comment: string,
-  ) => { uuid: string }
-  addProductFile: (path: string, options: AddProductFileProps) => { fileRef: string }
-  addToPbxNativeTargetSection: (target: NativeTarget) => void
-  addToPbxProjectSection: (target: NativeTarget) => void
-  addPbxGroup: (files: string[], name: string, path: string) => { uuid: string }
-  addToPbxGroup: (group: string, parent: string) => void
-  addBuildPhase: (files: string[], type: string, comment: string, target: string) => unknown
-  getFirstProject: () => { firstProject: { mainGroup: string } }
-  pbxNativeTargetSection: () => Record<string, unknown>
-}
-
-const XCODE_METHODS = [
-  'generateUuid',
-  'addXCConfigurationList',
-  'addProductFile',
-  'addToPbxNativeTargetSection',
-  'addToPbxProjectSection',
-  'addPbxGroup',
-  'addToPbxGroup',
-  'addBuildPhase',
-  'getFirstProject',
-  'pbxNativeTargetSection',
-] as const satisfies readonly (keyof XcodeProjectApi)[]
-
-const isXcodeProjectApi = (value: unknown): value is XcodeProjectApi =>
-  typeof value === 'object' &&
-  value !== null &&
-  XCODE_METHODS.every((method) => typeof Reflect.get(value, method) === 'function')
-
-/** Quoted as a pbxproj value that holds a space, a slash or a hyphen must be. */
-const quoted = (value: string): string => `"${value}"`
-
-/**
- * Whether the project has the test target already: the mod has run on this project before. A
- * prebuild, with `--clean` or without, hands it a fresh project file, so only a second run on
- * the same one finds it.
- */
-type HasRemoteTestsProps = { project: XcodeProjectApi; tests: RemoteTests }
-
-const hasRemoteTests = ({ project, tests }: HasRemoteTestsProps): boolean =>
-  Object.values(project.pbxNativeTargetSection()).some((target) => {
-    const name: unknown =
-      typeof target === 'object' && target !== null && Reflect.get(target, 'name')
-    return name === tests.target || name === quoted(tests.target)
-  })
-
-/**
+/*
  * The test bundle's settings: a tvOS UI test bundle that drives the installed app by its bundle
  * id, so it names no app target, and building it never builds the app.
  */
 const testSettingsOf = (tests: RemoteTests) => ({
   PRODUCT_NAME: quoted(tests.target),
   PRODUCT_BUNDLE_IDENTIFIER: quoted(tests.bundleId),
-  SDKROOT: 'appletvos',
-  SUPPORTED_PLATFORMS: quoted('appletvos appletvsimulator'),
-  TARGETED_DEVICE_FAMILY: '3',
-  // The app's own, so the tests run on any Apple TV the app does; unset, it is the newest SDK's.
-  TVOS_DEPLOYMENT_TARGET: '16.4',
+  ...TV_TARGET_SETTINGS,
   GENERATE_INFOPLIST_FILE: 'YES',
-  SWIFT_VERSION: '5.0',
   CODE_SIGN_STYLE: 'Manual',
   LD_RUNPATH_SEARCH_PATHS: quoted(
     '$(inherited) @executable_path/Frameworks @loader_path/Frameworks',
@@ -181,46 +98,21 @@ export const withTvRemoteTests: ConfigPlugin<RemoteTests | void> = (config, name
     const files = readdirSync(sources).filter((file) => file.endsWith(SWIFT))
     mkdirSync(copied, { recursive: true })
     files.forEach((file) => copyFileSync(join(sources, file), join(copied, file)))
-    if (hasRemoteTests({ project, tests })) return mod
+    if (hasTarget({ project, name: tests.target })) return mod
 
-    const uuid = project.generateUuid()
-    const configurations = project.addXCConfigurationList(
-      [XCODE.debug, XCODE.release].map((name) => ({
-        name,
-        isa: XCODE.configuration,
-        buildSettings: testSettingsOf(tests),
-      })),
-      XCODE.release,
-      `Build configuration list for PBXNativeTarget "${tests.target}"`,
-    )
-    const product = project.addProductFile(`${tests.target}.xctest`, {
-      group: XCODE.productsGroup,
-      target: uuid,
-      sourceTree: XCODE.builtProducts,
+    const { uuid } = addNativeTarget({
+      project,
+      name: tests.target,
+      productType: XCODE_TESTS.uiTests,
+      productFile: `${tests.target}.xctest`,
+      productGroup: XCODE_TESTS.productsGroup,
+      buildSettings: testSettingsOf(tests),
     })
-    const target: NativeTarget = {
-      uuid,
-      pbxNativeTarget: {
-        isa: XCODE.nativeTarget,
-        name: quoted(tests.target),
-        productName: quoted(tests.target),
-        productReference: product.fileRef,
-        productType: quoted(XCODE.uiTests),
-        buildConfigurationList: configurations.uuid,
-        buildPhases: [],
-        buildRules: [],
-        dependencies: [],
-      },
-    }
-    project.addToPbxNativeTargetSection(target)
-    project.addToPbxProjectSection(target)
-
-    const group = project.addPbxGroup(files, tests.target, tests.target)
-    project.addToPbxGroup(group.uuid, project.getFirstProject().firstProject.mainGroup)
+    addTargetGroup({ project, name: tests.target, files })
     project.addBuildPhase(files, XCODE.sourcesPhase, XCODE.sourcesComment, uuid)
     project.addBuildPhase([], XCODE.frameworksPhase, XCODE.frameworksComment, uuid)
 
-    const schemes = join(platformProjectRoot, `${projectName}.xcodeproj`, XCODE.schemesFolder)
+    const schemes = join(platformProjectRoot, `${projectName}.xcodeproj`, XCODE_TESTS.schemesFolder)
     mkdirSync(schemes, { recursive: true })
     writeFileSync(
       join(schemes, `${tests.target}.xcscheme`),

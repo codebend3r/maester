@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
 import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
 import { fireEvent, render, screen } from '@testing-library/react-native'
-
 import { useWrenAccount, useActiveServer } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
+
 import { SignIn } from '@/screens/SignIn'
 import type * as NativeMock from '@/test/nativeMock'
 

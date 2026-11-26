@@ -27,16 +27,15 @@ export function ArtistTileOf({
   artist,
   photoOf,
   width = SIZE.artistPhoto,
-  line,
+  line = shownWords(countsLineOf({ albums: artist.albumCount, tracks: artist.trackCount })),
   onOpen = openArtist,
 }: ArtistTileOfProps) {
-  const counts = shownWords(countsLineOf({ albums: artist.albumCount, tracks: artist.trackCount }))
   return (
     <Tile
       cover={photoOf(artist)}
       isRound
       label={artist.name}
-      line={line === undefined ? counts : line}
+      line={line}
       onPress={() => onOpen(artist)}
       title={artist.name}
       width={width}

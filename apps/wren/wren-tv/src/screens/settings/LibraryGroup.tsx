@@ -1,11 +1,11 @@
 import { SETTINGS_COPY } from '@raven/wren'
+import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 import { SettingsGroup } from '@/screens/settings/parts'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { FOCUS_ROLES } from '@/ui/Focusable'
 import { ListRow } from '@/ui/ListRow'
 import { ICONS } from '@/ui/WrenIcon'
-import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 type LibraryGroupProps = { session: WrenSession }
 

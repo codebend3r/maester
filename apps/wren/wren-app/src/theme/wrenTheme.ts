@@ -34,13 +34,10 @@ export const shadowOf = ({ shadow, color }: ShadowOfProps): ViewStyle => ({
 /** What a screen paints with: the theme showing, its scheme and its palette. */
 export type WrenTheme = { name: WrenThemeName; scheme: ColorScheme; colors: Palette }
 
-/** Every theme's palette by its name, so a theme `@raven/wren` names and the tokens lack is a compile error. */
-export const PALETTES = WREN_PALETTES satisfies Record<WrenThemeName, Palette>
-
 const themeOf = (name: WrenThemeName): WrenTheme => ({
   name,
   scheme: THEME_SCHEMES[name],
-  colors: PALETTES[name],
+  colors: WREN_PALETTES[name],
 })
 
 const THEMES = {

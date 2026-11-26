@@ -23,10 +23,10 @@ const useStyles = themedStyles(({ colors }) => ({
   notice: { ...TYPE.body, color: colors.text2 },
 }))
 
-type DetailNoticeProps = { text: string }
+type DetailLoadingProps = { text: string }
 
 /** The page while it is read: the loading mark, its words said aloud. */
-function DetailLoading({ text }: DetailNoticeProps) {
+function DetailLoading({ text }: DetailLoadingProps) {
   const styles = useStyles()
   return (
     <View accessibilityLabel={text} style={styles.ground}>
@@ -34,6 +34,8 @@ function DetailLoading({ text }: DetailNoticeProps) {
     </View>
   )
 }
+
+type DetailNoticeProps = { text: string }
 
 /** The page missing from the server or not read: its words. Back leaves it. */
 function DetailNotice({ text }: DetailNoticeProps) {
@@ -61,7 +63,7 @@ const DETAIL_VIEW_KEYS = { loading: 'loading', notice: 'notice', ready: 'ready' 
 type DetailViewKey = (typeof DETAIL_VIEW_KEYS)[keyof typeof DETAIL_VIEW_KEYS]
 
 type DetailViewsProps = {
-  [DETAIL_VIEW_KEYS.loading]: DetailNoticeProps
+  [DETAIL_VIEW_KEYS.loading]: DetailLoadingProps
   [DETAIL_VIEW_KEYS.notice]: DetailNoticeProps
   [DETAIL_VIEW_KEYS.ready]: DetailReadyProps
 }

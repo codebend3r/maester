@@ -31,3 +31,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
     removeItem: async () => undefined,
   },
 }))
+
+/*
+ * `WrenTvRoot` keeps the Apple TV's Top Shelf on the latest releases, and jest runs as iOS, so
+ * every screen would ask for them; a screen test counts its own requests, so the sync draws and
+ * asks nothing here. `topShelf.test.ts` tests what it writes.
+ */
+jest.mock('@raven/top-shelf', () => ({ TopShelfSync: () => null }))

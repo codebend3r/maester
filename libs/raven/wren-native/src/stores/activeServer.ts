@@ -10,6 +10,15 @@ export const useActiveServer: ReturnType<typeof createActiveServerStore> = creat
   home: RAVEN_SERVER,
 })
 
+type ActiveServerState = ReturnType<typeof useActiveServer.getState>
+
+/** The active server's configured name, or raven's before one is pinned. */
+const serverNameOf = ({ servers, activeId }: ActiveServerState): string =>
+  servers.find((server) => server.id === activeId)?.name ?? RAVEN_SERVER.name
+
+/** The active server's name as sign-in shows it, redrawn when it changes. */
+export const useActiveServerName = (): string => useActiveServer(serverNameOf)
+
 /**
  * The account's servers and the names it gave them, kept in its database and followed into
  * `useActiveServer`, so the server's name in Wren is the one raven shows on every device.

@@ -1,14 +1,14 @@
-import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { type Track, artistNames } from '@raven/core'
+import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { KIT_COPY, SEARCH_COPY, TOP_RESULT_KINDS, type TopResult } from '@raven/wren'
+import { type Cover, type Covers, type ResultActions } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
-import { type Cover, type Covers, type ResultActions } from '@raven/wren-native'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { AlbumArt } from '@/ui/AlbumArt'
-import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
 import { Focusable } from '@/ui/Focusable'
+import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
 import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
@@ -43,19 +43,20 @@ type TopCardProps = {
 /** The top result as a card: its picture, what it is, its title and line, and Play. */
 function TopCard({ cover, isRound, kind, title, line, onOpen, onPlay }: TopCardProps) {
   const styles = useStyles()
+  const overline = SEARCH_COPY.topResult({ kind })
   return (
     <View style={styles.card}>
       <Focusable
         focusedStyle={styles.lit}
         hasRing={false}
-        label={KIT_COPY.labelled({ label: SEARCH_COPY.topResult({ kind }), value: title })}
+        label={KIT_COPY.labelled({ label: overline, value: title })}
         onPress={onOpen}
         style={styles.main}
       >
         <AlbumArt cover={cover} isRound={isRound} size={SIZE.tileSmall} />
         <View style={styles.words}>
           <Text numberOfLines={1} style={styles.overline}>
-            {SEARCH_COPY.topResult({ kind })}
+            {overline}
           </Text>
           <Text numberOfLines={1} style={styles.title}>
             {title}

@@ -413,3 +413,6 @@ export const NOW_PLAYING_COPY = {
   entry: ({ title, line }: QueueEntryLabelProps) =>
     KIT_COPY.labelled({ label: title, value: line }),
 } as const
+
+/** What the Apple TV's Top Shelf says above Wren's tile while nobody is signed in; signed in, it is `HOME_COPY.latestReleases`. */
+export const TOP_SHELF_COPY = { signIn: 'Sign in to Wren' } as const

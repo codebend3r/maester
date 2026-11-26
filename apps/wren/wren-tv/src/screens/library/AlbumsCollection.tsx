@@ -13,14 +13,13 @@ import {
 import { useState } from 'react'
 
 import { ListNotice } from '@/components/ListNotice'
-import { useCovers, useAllAlbums } from '@raven/wren-native'
+import { useCovers, useAllAlbums, useCollectionSearch } from '@raven/wren-native'
 import { AlbumTileOf } from '@/components/AlbumTileOf'
 import { CollectionGrid } from '@/screens/library/CollectionGrid'
 import { CollectionHeader } from '@/screens/library/CollectionHeader'
 import type { CollectionPageProps } from '@/screens/library/CollectionPage'
 import { CoverSizeButton } from '@/screens/library/CoverSizeButton'
 import { SortButton } from '@/screens/library/SortButton'
-import { useCollectionSearch } from '@/screens/library/useCollectionSearch'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { SIZE } from '@/theme/tvTokens'
 

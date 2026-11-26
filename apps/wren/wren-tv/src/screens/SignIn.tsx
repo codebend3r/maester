@@ -1,10 +1,10 @@
-import { RAVEN_SERVER, SIGN_IN_ERRORS } from '@raven/native/headless'
+import { SIGN_IN_ERRORS } from '@raven/native/headless'
 import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
 import { useRouter } from 'expo-router'
+import { useActiveServerName, useSignInFlow } from '@raven/wren-native'
+import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { Text, View } from 'react-native'
 
-import { useActiveServer, useSignInFlow } from '@raven/wren-native'
-import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { SIGN_IN_VIEWS } from '@/screens/signIn/StepForms'
 import { SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
@@ -28,17 +28,11 @@ const useStyles = themedStyles(({ colors }) => ({
   down: { color: colors.accentText },
 }))
 
-type ActiveServerState = ReturnType<typeof useActiveServer.getState>
-
-/** The active server's configured name, or raven's before one is pinned. */
-const serverNameOf = ({ servers, activeId }: ActiveServerState): string =>
-  servers.find((server) => server.id === activeId)?.name ?? RAVEN_SERVER.name
-
 /**
  * The first launch: the raven account's email and password, over `@raven/native`'s
  * `signInFlowFor`, the phone's own flow, with the server it signs in to and whether it answered.
- * It never asks for a PIN. The TV lays the brand and the
- * welcome beside the form, as the tablet does.
+ * It never asks for a PIN. The TV lays the brand and the welcome beside the form, as the tablet
+ * does.
  */
 export function SignIn() {
   const styles = useStyles()
@@ -46,7 +40,7 @@ export function SignIn() {
   const openTabs = () => router.replace(WREN_ROUTES.home)
   const flow = useSignInFlow({ initial: { email: '', password: '' }, onDone: openTabs })
   const StepForm = SIGN_IN_VIEWS[flow.step.kind]
-  const serverName = useActiveServer(serverNameOf)
+  const serverName = useActiveServerName()
   const isDown = (flow.error?.kind ?? null) === SIGN_IN_ERRORS.unreachable
   const status = isDown ? STATUS_COPY.unreachable(serverName) : STATUS_COPY.connected(serverName)
   return (

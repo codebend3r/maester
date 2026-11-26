@@ -30,7 +30,6 @@ export const RADIUS = {
   thumb: tvSize(12),
   item: tvSize(18),
   card: tvSize(24),
-  art: tvSize(28),
   pill: 999,
 } as const
 
@@ -90,8 +89,7 @@ export const SIZE = {
   sheetWidth: tvSize(760),
   scrubber: tvSize(10),
   scrubberThumb: tvSize(28),
-  chip: tvSize(40),
   equalizer: tvSize(28),
 } as const
 
-export const OPACITIES = { disabled: 0.4, sung: 0.5, unfocused: 0.92 } as const
+export const OPACITIES = { disabled: 0.4, sung: 0.5 } as const
