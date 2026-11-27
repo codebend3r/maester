@@ -41,6 +41,19 @@ static void deliver(const std::shared_ptr<RavenNowPlayingState> &shared, const c
     if (handler) handler(RavenRemoteCommand{name, time});
 }
 
+/*
+ * Adds a handler that delivers `name`. The block copies `shared` from the parameter and so
+ * keeps the state alive: the system calls the handler long after `listen` has returned, and a
+ * block that reaches a variable through a by-reference lambda holds only the reference.
+ */
+static id addTarget(MPRemoteCommand *command, std::shared_ptr<RavenNowPlayingState> shared, const char *name) {
+    command.enabled = YES;
+    return [command addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *) {
+        deliver(shared, name, 0);
+        return MPRemoteCommandHandlerStatusSuccess;
+    }];
+}
+
 void RavenNowPlaying::listen(std::function<void(const RavenRemoteCommand &)> onCommand) {
     auto shared = state;
     {
@@ -52,20 +65,16 @@ void RavenNowPlaying::listen(std::function<void(const RavenRemoteCommand &)> onC
     onMain(^{
         MPRemoteCommandCenter *center = [MPRemoteCommandCenter sharedCommandCenter];
         std::vector<std::pair<MPRemoteCommand *, id>> targets;
-        auto take = [&](MPRemoteCommand *command, const char *name) {
-            command.enabled = YES;
-            id target = [command addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *) {
-                deliver(shared, name, 0);
-                return MPRemoteCommandHandlerStatusSuccess;
-            }];
-            targets.emplace_back(command, target);
+        const std::pair<MPRemoteCommand *, const char *> commands[] = {
+            {center.playCommand, "play"},
+            {center.pauseCommand, "pause"},
+            {center.togglePlayPauseCommand, "toggle"},
+            {center.nextTrackCommand, "next"},
+            {center.previousTrackCommand, "previous"},
+            {center.stopCommand, "stop"},
         };
-        take(center.playCommand, "play");
-        take(center.pauseCommand, "pause");
-        take(center.togglePlayPauseCommand, "toggle");
-        take(center.nextTrackCommand, "next");
-        take(center.previousTrackCommand, "previous");
-        take(center.stopCommand, "stop");
+        for (const auto &entry : commands)
+            targets.emplace_back(entry.first, addTarget(entry.first, shared, entry.second));
         MPRemoteCommand *position = center.changePlaybackPositionCommand;
         position.enabled = YES;
         id seekTarget = [position addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) {

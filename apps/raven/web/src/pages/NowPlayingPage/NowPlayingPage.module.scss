@@ -60,13 +60,14 @@
     'controls controls'
     'volume volume'
     'book book';
-  justify-self: center;
-  inline-size: min(100%, 22rem);
   gap: var(--space-3);
 }
 
+// The cover keeps its own size in the middle; every row under it runs the stage's full width.
 .cover {
   grid-area: cover;
+  justify-self: center;
+  inline-size: min(100%, var(--cover-size-large));
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: var(--radius-xl);
