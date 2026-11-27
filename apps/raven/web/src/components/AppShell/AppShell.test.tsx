@@ -12,13 +12,12 @@ import {
   type LibraryPin,
   PAGE_PATHS,
 } from '@raven/core'
-import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { cleanup, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell/AppShell'
 import { api, apiAt } from '@/lib/api'
 import { ravenVersion } from '@/lib/version'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { useAuthSession } from '@/stores/authSession'
 import { useDesktopBridge } from '@/stores/desktop'
 import { useDownloadsHostStore } from '@/stores/downloadsHost'
@@ -438,22 +437,6 @@ describe('AppShell', () => {
 
     await userEvent.click(toggle())
     expect(within(nav()).queryByText(`v${ravenVersion}`)).toBeNull()
-  })
-
-  it("frosts over once a card's picture is behind the page, and clears after", () => {
-    spies.list.mockImplementation(async () => [])
-    const { container } = renderShell({ route: '/' })
-    expect(nav()).not.toHaveClass('frosted')
-
-    // Asked for but still loading, nothing is behind the page yet.
-    act(() => usePageBackdrop.getState().show('/api/items/1/backdrop'))
-    expect(nav()).not.toHaveClass('frosted')
-
-    fireEvent.load(container.querySelector('img[src="/api/items/1/backdrop"]') ?? document.body)
-    expect(nav()).toHaveClass('frosted')
-
-    act(() => usePageBackdrop.getState().hide('/api/items/1/backdrop'))
-    expect(nav()).not.toHaveClass('frosted')
   })
 
   it('collapses and expands with B, but not while typing or with a modifier held', async () => {

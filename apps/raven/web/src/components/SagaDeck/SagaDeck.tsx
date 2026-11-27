@@ -20,8 +20,7 @@ type SagaDeckProps = { saga: Saga; to: string }
 
 /**
  * A saga as a deck of its posters, the first movie on top. Pointed at or
- * focused, the deck fans out like a hand of cards, and the saga's cover
- * comes in behind the page; it opens the saga's page.
+ * focused, the deck fans out like a hand of cards; it opens the saga's page.
  * Each poster's place in the deck, and the deck's size, ride in custom
  * properties the fan is worked out from. The posters hidden under a stacked
  * deck are asked for only once it first fans out, so a long saga costs the

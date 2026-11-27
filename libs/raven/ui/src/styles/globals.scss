@@ -89,8 +89,6 @@
   --color-night-veil: color-mix(in srgb, var(--color-night) 78%, transparent);
   // The ground as glass under floating chrome: the tab bar, the theme button.
   --color-night-haze: color-mix(in srgb, var(--color-night) 85%, transparent);
-  // Frost on glass: the side menu over a card's picture, blurred behind it.
-  --color-frost-glass: rgb(150 185 235 / 12%);
   // The canopy over the page: a popover, a menu.
   --color-canopy-glass: color-mix(in srgb, var(--color-canopy) 96%, transparent);
   --color-canopy-haze: color-mix(in srgb, var(--color-canopy) 85%, transparent);

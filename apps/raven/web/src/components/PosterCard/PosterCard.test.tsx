@@ -3,7 +3,6 @@ import { cleanup, fireEvent, screen } from '@testing-library/react'
 import { PosterCard } from '@/components/PosterCard/PosterCard'
 import { POSTER_SIZES } from '@/lib/posters'
 import { RELEASED_LABEL, itemSummary, matchedMovie, mediaItem } from '@/test/fixtures'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { atPixelRatio, restorePixelRatio } from '@/test/pixelRatio'
 import { renderWithProviders } from '@/test/render'
 import { reported } from '@/test/viewport'
@@ -13,55 +12,6 @@ const picture = (container: HTMLElement): HTMLImageElement | null => container.q
 describe('PosterCard', () => {
   afterEach(() => {
     restorePixelRatio()
-  })
-
-  const shownBehind = () => usePageBackdrop.getState().current
-
-  it('does not load a page backdrop when the card is hovered', () => {
-    const { container } = renderWithProviders({
-      ui: (
-        <PosterCard
-          sizes={POSTER_SIZES.grid}
-          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-        />
-      ),
-    })
-    const card = container.querySelector('li') ?? document.body
-    fireEvent.pointerEnter(card, { pointerType: 'mouse' })
-    expect(shownBehind()).toBeNull()
-  })
-
-  it('does not load a page backdrop when the card is focused', () => {
-    renderWithProviders({
-      ui: (
-        <PosterCard
-          sizes={POSTER_SIZES.grid}
-          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-        />
-      ),
-    })
-    fireEvent.focus(screen.getByRole('link', { name: 'Busboys' }))
-    expect(shownBehind()).toBeNull()
-  })
-
-  it('leaves the page alone for a touch, and for a movie with no backdrop', async () => {
-    const { container } = renderWithProviders({
-      ui: (
-        <PosterCard
-          sizes={POSTER_SIZES.grid}
-          media={matchedMovie({ item: itemSummary({ backdropVersion: 'b9' }) })}
-        />
-      ),
-    })
-    fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
-      pointerType: 'touch',
-    })
-    renderWithProviders({
-      ui: <PosterCard sizes={POSTER_SIZES.grid} media={matchedMovie({ id: 8 })} />,
-    })
-    fireEvent.focus(screen.getAllByRole('link', { name: 'Busboys' })[1] ?? document.body)
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    expect(shownBehind()).toBeNull()
   })
 
   it('shows the value its listing is sorted by', () => {
