@@ -1,6 +1,6 @@
 {
   "name": "@raven/top-shelf",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "description": "The Apple TV's Top Shelf for raven and Wren: what the home screen shows above each app's tile",
   "type": "module",

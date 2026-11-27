@@ -1,6 +1,6 @@
 {
   "name": "@raven/wren-native",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "description": "What Wren's apps on React Native share, the phone's and the TV's: its session, routes, stores and music hooks",
   "type": "module",

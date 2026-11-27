@@ -1,6 +1,6 @@
 {
   "name": "@wren/desktop",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "description": "Wren for Mac: raven's music app on the desktop",
   "type": "module",
