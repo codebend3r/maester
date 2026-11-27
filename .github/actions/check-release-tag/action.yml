@@ -1,0 +1,31 @@
+name: 🏷️ Check the release tag
+description: >-
+  Fails before a long build when the tag is not a vX.Y.Z release or the app's package.json
+  names another version.
+
+# Shared by device-release.yml's jobs, each naming the app folder whose version it ships.
+inputs:
+  tag:
+    description: The release's tag, vX.Y.Z
+    required: true
+  folder:
+    description: The app's folder, whose package.json holds its version
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: 🏷️ Check the tag
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+        FOLDER: ${{ inputs.folder }}
+      run: |
+        if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::$TAG is not a vX.Y.Z release tag."
+          exit 1
+        fi
+        version=$(jq -r .version "$FOLDER/package.json")
+        if [ "$TAG" != "v$version" ]; then
+          echo "::error::$TAG is not v$version, the version in $FOLDER/package.json."
+          exit 1
+        fi

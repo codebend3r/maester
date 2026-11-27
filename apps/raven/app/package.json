@@ -19,6 +19,9 @@
     "deploy:android-tv": "./scripts/deploy_android_tv.sh",
     "testflight:ios": "./scripts/testflight.sh ios",
     "testflight:tvos": "./scripts/testflight.sh tvos",
+    "play:android-tv": "./scripts/play_bundle.sh android-tv",
+    "play:android": "./scripts/play_bundle.sh android",
+    "play:upload-key": "./scripts/play_upload_key.sh",
     "build:android-tv:test-account": "bun --env-file=.env.test-account run build:android-tv",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Raven.xcworkspace -scheme Raven -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "build:tvos": "./scripts/build_tvos.sh",
@@ -168,7 +171,10 @@
       "deploy:android-tv",
       "deploy:android",
       "testflight:ios",
-      "testflight:tvos"
+      "testflight:tvos",
+      "play:android-tv",
+      "play:android",
+      "play:upload-key"
     ],
     "namedInputs": {
       "nativeApp": [
@@ -441,6 +447,21 @@
         "dependsOn": [
           "^build"
         ],
+        "cache": false
+      },
+      "play:android-tv": {
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
+      },
+      "play:android": {
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
+      },
+      "play:upload-key": {
         "cache": false
       },
       "check:patches": {
