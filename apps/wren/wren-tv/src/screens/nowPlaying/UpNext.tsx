@@ -14,6 +14,7 @@ import { QueueRow } from '@/screens/nowPlaying/QueueRow'
 import { SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { FocusButton } from '@/ui/FocusButton'
+import { ListFrame } from '@/ui/ListFrame'
 
 const useStyles = themedStyles(({ colors }) => ({
   upNext: { flex: 1, gap: SPACE.s3 },
@@ -23,7 +24,6 @@ const useStyles = themedStyles(({ colors }) => ({
   line: { ...TYPE.meta, color: colors.text3 },
   // What changes the queue: Shuffle, Repeat and Clear.
   modes: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s2 },
-  list: { flex: 1 },
   rows: { gap: SPACE.s1 },
   empty: { ...TYPE.body, color: colors.text2, paddingVertical: SPACE.s4 },
 }))
@@ -76,24 +76,28 @@ export function UpNext({ session, sourceName }: UpNextProps) {
           )}
         </View>
       </View>
-      <FlatList
-        contentContainerStyle={styles.rows}
-        data={rows}
-        keyExtractor={(row) => row.key}
-        ListEmptyComponent={<Text style={styles.empty}>{NOW_PLAYING_COPY.nothingNext}</Text>}
-        renderItem={({ item }) => (
-          <QueueRow
-            first={first}
-            last={last}
-            onJump={jump}
-            onMove={move}
-            onRemove={remove}
-            row={item}
-            trackCoverOf={trackCoverOf}
+      <ListFrame>
+        {(fill) => (
+          <FlatList
+            contentContainerStyle={styles.rows}
+            data={rows}
+            keyExtractor={(row) => row.key}
+            ListEmptyComponent={<Text style={styles.empty}>{NOW_PLAYING_COPY.nothingNext}</Text>}
+            renderItem={({ item }) => (
+              <QueueRow
+                first={first}
+                last={last}
+                onJump={jump}
+                onMove={move}
+                onRemove={remove}
+                row={item}
+                trackCoverOf={trackCoverOf}
+              />
+            )}
+            style={fill}
           />
         )}
-        style={styles.list}
-      />
+      </ListFrame>
     </View>
   )
 }

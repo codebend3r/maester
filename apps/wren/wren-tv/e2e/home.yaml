@@ -3,15 +3,29 @@ name: Wren opens on Home with the fixture's album under Recently added
 ---
 - runFlow: steps/signIn.yaml
 - assertVisible: Morning Chorus.*
-# Latest released orders the albums by when they came out, and the title follows.
+# Down from Shuffle all passes See all, at the row's right end, and so reaches the order's
+# right hand choice, Date added; Left from there is Latest released.
 - repeat:
     times: 3
     while:
       notVisible:
-        text: Latest released
+        text: (Latest released|Date added)
         focused: true
     commands:
       - pressKey: Remote Dpad Down
+- runFlow:
+    when:
+      visible:
+        text: Date added
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Left
+- extendedWaitUntil:
+    visible:
+      text: Latest released
+      focused: true
+    timeout: 10000
+# Latest released orders the albums by when they came out, and the title follows.
 - pressKey: Remote Dpad Center
 - extendedWaitUntil:
     visible: Latest releases

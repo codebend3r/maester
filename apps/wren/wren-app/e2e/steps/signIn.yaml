@@ -6,3 +6,8 @@ name: Open the fixture server on a clean install
 - launchApp:
     clearState: true
     clearKeychain: true
+# On a loaded CI simulator XCTest's first look at a launching app can hold it for close to a
+# minute before Wren asks the fixture for anything, so Home gets two minutes to show.
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 120000

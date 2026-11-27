@@ -10,6 +10,24 @@ name: Search finds the fixture's album by a word of its title
 - pressKey: Remote Dpad Center
 - inputText: Morning
 - pressKey: Enter
+# Every song of the album matches too, so a song leads All; the Albums filter shows the album.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        text: All
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Down
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        text: Albums
+        focused: true
+    commands:
+      - pressKey: Remote Dpad Right
+- pressKey: Remote Dpad Center
 - extendedWaitUntil:
     visible: Morning Chorus.*
     timeout: 30000

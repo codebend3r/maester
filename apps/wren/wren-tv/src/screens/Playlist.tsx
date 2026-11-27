@@ -15,6 +15,7 @@ import { DetailSplit } from '@/screens/detail/DetailSplit'
 import { QueueButton } from '@/screens/detail/QueueButton'
 import { useTracklistRows } from '@/screens/detail/useTracklistRows'
 import { EmptyState } from '@/ui/EmptyState'
+import { ListFrame } from '@/ui/ListFrame'
 
 type RenderRowProps = { item: PlaylistTrack }
 
@@ -58,18 +59,23 @@ function PlaylistPage({ session, details }: PlaylistPageProps) {
         />
       }
       list={
-        <FlatList
-          ListEmptyComponent={
-            <EmptyState
-              body={PLAYLIST_COPY.empty(playlist.name)}
-              icon={WREN_ICONS.playlist}
-              title={PLAYLIST_COPY.emptyTitle}
+        <ListFrame>
+          {(fill) => (
+            <FlatList
+              ListEmptyComponent={
+                <EmptyState
+                  body={PLAYLIST_COPY.empty(playlist.name)}
+                  icon={WREN_ICONS.playlist}
+                  title={PLAYLIST_COPY.emptyTitle}
+                />
+              }
+              data={playlistTracksOf({ tracks })}
+              keyExtractor={(row) => row.key}
+              renderItem={renderRow}
+              style={fill}
             />
-          }
-          data={playlistTracksOf({ tracks })}
-          keyExtractor={(row) => row.key}
-          renderItem={renderRow}
-        />
+          )}
+        </ListFrame>
       }
     />
   )
