@@ -51,7 +51,7 @@ import { errorText } from '@/main/log/errorText'
 import { DONE, refused } from '@/main/replies'
 import type { ServerInUse } from '@/main/servers/activeServer'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /** The `downloads` event goes out at most once in this long, so progress cannot flood the page. */
 export const DOWNLOADS_EVENT_MS = 250

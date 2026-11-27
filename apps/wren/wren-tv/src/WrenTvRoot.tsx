@@ -23,6 +23,7 @@ import {
   accountServers,
   useActiveServer,
   configureRecentSearches,
+  configureSongProgress,
   useWren,
 } from '@raven/wren-native'
 import { WREN_ROUTES, WREN_SCREENS, configureLibraryChoice } from '@raven/wren-native/headless'
@@ -56,6 +57,7 @@ const loadStores = async (): Promise<void> => {
     useWrenAccount.persist.rehydrate(),
     configureWrenPrefs({ storage: AsyncStorage }),
     configureRecentSearches({ storage: AsyncStorage }),
+    configureSongProgress({ storage: AsyncStorage }),
   ])
 }
 

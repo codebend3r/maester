@@ -15,7 +15,8 @@ import {
 } from '@/main/servers/accountTickets'
 import { API_PATHS, MEDIA_FILE_PATH, subtitlePathOf } from '@/main/servers/allowlist'
 import type { OriginPicks } from '@/main/servers/originPicks'
-import { TIMER_MAX_MS, type Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
+import { TIMER_MAX_MS } from '@/main/timers'
 
 /**
  * The most account tickets a server's downloads mint in any `windowMs`, a ticket's life on the

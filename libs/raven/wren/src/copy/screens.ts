@@ -401,8 +401,8 @@ export const NOW_PLAYING_COPY = {
   output: ({ server, device }: OutputProps) => KIT_COPY.facts([server, `This ${device}`]),
   /** The tablet's output status: "Playing on this iPad". */
   playingOn: (device: string) => `Playing on this ${device}`,
-  /** The device Wren plays on, by what it runs on; the web app says the browser it is open in. */
-  devices: { iPhone: 'iPhone', iPad: 'iPad', android: 'Android', browser: 'browser' },
+  /** The device Wren plays on, by what it runs on; the web app says the browser it is open in, or the Mac in Wren for Mac. */
+  devices: { iPhone: 'iPhone', iPad: 'iPad', android: 'Android', browser: 'browser', mac: 'Mac' },
   /** A queued song's line: "Sia · 3:36". */
   rowLine: ({ artists, length }: RowLineProps) => KIT_COPY.facts([artists, length]),
   /** A book's speed: "1.25×". */

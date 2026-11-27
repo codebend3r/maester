@@ -4,10 +4,10 @@ import { KIT_COPY, LIBRARY_PAGE_COPY, LIBRARY_SEGMENTS, DEFAULT_SHARED_PREFS } f
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { useWrenAccount } from '@raven/wren-native'
+import { useSongProgress, useWrenAccount } from '@raven/wren-native'
 import { WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import { LISTENER, MUSIC, musicApi } from '@raven/wren-native/testing'
+import { AIRBAG, LISTENER, LUCKY, MUSIC, keepSongs, musicApi } from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { WREN_TREE } from '@/test/wrenTree'
 
@@ -29,6 +29,7 @@ describe('Library', () => {
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
     useWrenPrefs.setState(DEFAULT_SHARED_PREFS)
+    useSongProgress.setState({ songs: [] })
   })
 
   it('lists its categories with what each holds, and the newest albums', async () => {
@@ -47,6 +48,21 @@ describe('Library', () => {
     expect(mockApi.listAlbums).toHaveBeenCalledWith(
       expect.objectContaining({ libraryId: MUSIC.id, sort: MUSIC_SORTS.added }),
     )
+  })
+
+  it("counts In progress and Recently finished from this TV's own songs", async () => {
+    keepSongs({ partway: [AIRBAG], finished: [LUCKY] })
+    await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
+    expect(
+      await screen.findByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.inProgress, value: '1' }),
+      }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.finished, value: '1' }),
+      }),
+    ).toBeTruthy()
   })
 
   it('leaves Downloads out, since a TV keeps none', async () => {

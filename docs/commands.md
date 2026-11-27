@@ -116,6 +116,17 @@ Expo on react-native-tvos: Wren, raven's music app, on Apple TV and Android TV.
 | `wren:tv:e2e:tvos`          | The Siri Remote XCUITest on the Apple TV simulator.                              | Xcode       |
 | `wren:tv:e2e:android-tv`    | The remote's Maestro flows on the Android TV emulator.                           | emulator    |
 
+## Wren for Mac
+
+Wren's web app in an Electron window on macOS.
+
+| Command               | What it does                                                                        | Needs |
+| --------------------- | ----------------------------------------------------------------------------------- | ----- |
+| `wren:desktop:dev`    | Wren for Mac unpackaged, on the web app's build.                                    | macOS |
+| `wren:desktop:build`  | Builds Wren for Mac's main process and the web app.                                 |       |
+| `wren:desktop:make`   | Packages Wren for Mac: the dmg and zip.                                             | macOS |
+| `wren:desktop:deploy` | Replaces /Applications/Wren.app with what wren:desktop:make packaged, and opens it. | macOS |
+
 ## Raven desktop
 
 The Electron app on macOS and Windows, with libmpv.

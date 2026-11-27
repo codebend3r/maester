@@ -1,7 +1,7 @@
 import { DESKTOP_EVENTS, DESKTOP_REPLIES, PLAYER_SOURCE_KINDS, TITLE_REFUSALS } from '@raven/core'
 import { describe, expect, it } from 'bun:test'
 import { createOpenBatch, eventForOpen, linksFromArgv } from '@/main/openBatch'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
 const FILM = '00000000-0000-4000-8000-000000000001'

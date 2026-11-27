@@ -24,13 +24,16 @@ const answered = ({ data }: AnsweredProps) => ({ data, isSuccess: true })
 
 const PENDING = { data: undefined, isSuccess: false }
 
+const NO_PROGRESS = { inProgress: 0, finished: 0 }
+
 describe('libraryValuesOf', () => {
-  it("adds every music library's counts up beside its category", () => {
+  it("adds every music library's counts up beside its category, and this device's progress", () => {
     const values = libraryValuesOf({
       music: READ,
       counts: [answered({ data: COUNTS }), answered({ data: { ...COUNTS, albums: 20 } })],
       playlists: 4,
       songs: 9000,
+      progress: { inProgress: 4, finished: 60 },
     })
     expect(values).toEqual({
       [LIBRARY_SEGMENTS.albums]: '2,000',
@@ -50,10 +53,25 @@ describe('libraryValuesOf', () => {
       counts: [answered({ data: COUNTS }), PENDING],
       playlists: 0,
       songs: null,
+      progress: NO_PROGRESS,
     })
     expect(values[LIBRARY_SEGMENTS.albums]).toBeUndefined()
     expect(values[LIBRARY_SEGMENTS.songs]).toBeUndefined()
     expect(values[LIBRARY_SEGMENTS.playlists]).toBe(LIBRARY_PAGE_COPY.noneYet)
+    expect(values[LIBRARY_SEGMENTS.inProgress]).toBeUndefined()
+    expect(values[LIBRARY_SEGMENTS.finished]).toBeUndefined()
+  })
+
+  it('counts the progress kept on this device whatever the server counts', () => {
+    const values = libraryValuesOf({
+      music: READ,
+      counts: [answered({ data: { ...COUNTS, inProgress: 0, finished: 0 } })],
+      playlists: null,
+      songs: null,
+      progress: { inProgress: 3, finished: 12 },
+    })
+    expect(values[LIBRARY_SEGMENTS.inProgress]).toBe('3')
+    expect(values[LIBRARY_SEGMENTS.finished]).toBe('12')
   })
 
   it('leaves a count out that an older server does not send', () => {
@@ -63,6 +81,7 @@ describe('libraryValuesOf', () => {
       counts: [answered({ data: older })],
       playlists: null,
       songs: 3,
+      progress: NO_PROGRESS,
     })
     expect(values[LIBRARY_SEGMENTS.albums]).toBeUndefined()
     expect(values[LIBRARY_SEGMENTS.artists]).toBe('412')
@@ -74,6 +93,7 @@ describe('libraryValuesOf', () => {
       counts: [],
       playlists: null,
       songs: null,
+      progress: { inProgress: 2, finished: 5 },
     })
     expect(Object.values(values).every((value) => value === undefined)).toBe(true)
   })

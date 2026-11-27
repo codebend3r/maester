@@ -9,20 +9,11 @@ import {
   type ServerResponse,
 } from 'node:http'
 import { createServer as createNetServer } from 'node:net'
-import { join } from 'node:path'
 import { text } from 'node:stream/consumers'
 import { HTTP_METHODS, WEB_HOST, AUTH_PATHS, ROUTES, WEB_HOST_ERRORS } from '@raven/core'
-import { ERROR_CODES } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
-import {
-  contentSecurityPolicy,
-  createWebHostHandler,
-  inlineHashesOf,
-  listenWebHost,
-  LOOPBACK_ADDRESSES,
-  webHostFailureText,
-  webRootFor,
-} from '@/main/webHost'
+import { type InlineHashes, type Timers, ERROR_CODES, contentSecurityPolicy } from '@shared/desktop'
+import { ERROR_CODES as STATE_ERROR_CODES } from '@/main/stateStore'
+import { createRavenHostHandler, policySourcesFor, webHostFailureText } from '@/main/webHost'
 import { HEADERS } from '@shared/http'
 
 const ROOT = '/opt/raven/web'
@@ -154,7 +145,7 @@ const host = async ({
   const reads: string[] = []
   const warnings: string[] = []
   const notes: string[] = []
-  const handler = createWebHostHandler({
+  const handler = createRavenHostHandler({
     root: ROOT,
     serverOrigin: originOf ?? (() => serverOrigin),
     homeOrigin: serverOrigin,
@@ -162,7 +153,8 @@ const host = async ({
     readFile: async (path) => {
       reads.push(path)
       const body = FILES[path]
-      if (body === undefined) throw Object.assign(new Error('ENOENT'), { code: ERROR_CODES.enoent })
+      if (body === undefined)
+        throw Object.assign(new Error('ENOENT'), { code: STATE_ERROR_CODES.enoent })
       return new TextEncoder().encode(body)
     },
     timers,
@@ -173,10 +165,16 @@ const host = async ({
   return { port, reads, warnings, notes }
 }
 
+type RavenPolicyProps = { inlineHashes: InlineHashes; authOrigin: string | null }
+
+/** Raven's page policy: the shared one over Raven's sources. */
+const ravenPolicy = ({ inlineHashes, authOrigin }: RavenPolicyProps): string =>
+  contentSecurityPolicy({ inlineHashes, sources: policySourcesFor({ authOrigin }) })
+
 describe('contentSecurityPolicy', () => {
   it('allows the page its own origin, Supabase Auth, raven-file media and its inline scripts and styles', () => {
     expect(
-      contentSecurityPolicy({
+      ravenPolicy({
         inlineHashes: { scripts: ['abc='], styles: ['def='] },
         authOrigin: null,
       }),
@@ -186,46 +184,21 @@ describe('contentSecurityPolicy', () => {
   })
 
   it('allows no inline script or style when there is none', () => {
-    const policy = contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: null })
+    const policy = ravenPolicy({
+      inlineHashes: NO_HASHES,
+      authOrigin: null,
+    })
     expect(policy).toContain("script-src 'self';")
     expect(policy).toContain("style-src 'self';")
   })
 
   it("lets the page call the test hook's Auth origin beside Supabase", () => {
     expect(
-      contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: 'http://127.0.0.1:9000' }),
-    ).toContain("connect-src 'self' https://*.supabase.co http://127.0.0.1:9000;")
-  })
-})
-
-describe('inlineHashesOf', () => {
-  it('recognises script and style tags in any case without changing the body being hashed', () => {
-    expect(
-      inlineHashesOf(`<SCRIPT>${THEME_SCRIPT}</sCrIpT><STYLE>${LOADER_STYLE}</sTyLe>`),
-    ).toEqual(INDEX_HASHES)
-  })
-  it('hashes each inline script and style and skips the ones loaded from a file', () => {
-    expect(inlineHashesOf(INDEX)).toEqual(INDEX_HASHES)
-    expect(inlineHashesOf('<script>a</script><p></p><script>b</script><style>c</style>')).toEqual({
-      scripts: [sha256('a'), sha256('b')],
-      styles: [sha256('c')],
-    })
-    expect(inlineHashesOf('<html></html>')).toEqual(NO_HASHES)
-  })
-})
-
-describe('webRootFor', () => {
-  it('reads the packaged copy from the resources and the web project build otherwise', () => {
-    expect(webRootFor({ isPackaged: true, appPath: '/app', resourcesPath: '/Resources' })).toBe(
-      join('/Resources', 'dist'),
-    )
-    expect(
-      webRootFor({
-        isPackaged: false,
-        appPath: '/repo/apps/raven/desktop',
-        resourcesPath: '/Resources',
+      ravenPolicy({
+        inlineHashes: NO_HASHES,
+        authOrigin: 'http://127.0.0.1:9000',
       }),
-    ).toBe('/repo/apps/raven/web/dist')
+    ).toContain("connect-src 'self' https://*.supabase.co http://127.0.0.1:9000;")
   })
 })
 
@@ -274,7 +247,10 @@ describe('the web host: the web app', () => {
     expect(reply.body).toBe(INDEX)
     expect(reply.headers[HEADERS.contentType]).toBe('text/html; charset=utf-8')
     expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: null }),
+      ravenPolicy({
+        inlineHashes: INDEX_HASHES,
+        authOrigin: null,
+      }),
     )
     expect(reply.headers[HEADERS.contentTypeOptions]).toBe('nosniff')
     expect(reply.headers[HEADERS.cacheControl]).toBe('no-cache')
@@ -284,7 +260,10 @@ describe('the web host: the web app', () => {
     const { port } = await host({ authOrigin: 'http://127.0.0.1:9000' })
     const reply = await ask({ port, path: '/' })
     expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ inlineHashes: INDEX_HASHES, authOrigin: 'http://127.0.0.1:9000' }),
+      ravenPolicy({
+        inlineHashes: INDEX_HASHES,
+        authOrigin: 'http://127.0.0.1:9000',
+      }),
     )
   })
 
@@ -299,7 +278,10 @@ describe('the web host: the web app', () => {
     expect(reply.headers[HEADERS.contentType]).toBe(type)
     expect(reply.headers[HEADERS.cacheControl]).toBe('public, max-age=31536000, immutable')
     expect(reply.headers[HEADERS.contentSecurityPolicy]).toBe(
-      contentSecurityPolicy({ inlineHashes: NO_HASHES, authOrigin: null }),
+      ravenPolicy({
+        inlineHashes: NO_HASHES,
+        authOrigin: null,
+      }),
     )
   })
 
@@ -715,120 +697,5 @@ describe('webHostFailureText', () => {
     expect(webHostFailureText(refused)).toBe(
       'Raven could not start serving its page: listen EACCES',
     )
-  })
-})
-
-describe('listenWebHost', () => {
-  const freePort = async () => {
-    const server = createServer()
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const port = portOf(server)
-    await new Promise<void>((resolve) => server.close(() => resolve()))
-    return port
-  }
-
-  const tracked = (handler: (request: IncomingMessage, response: ServerResponse) => void) => {
-    const server = createServer(handler)
-    servers.push(server)
-    return server
-  }
-
-  it('listens on both loopback addresses', async () => {
-    const port = await freePort()
-    await listenWebHost({
-      createServer: tracked,
-      handler: (_request, response) => response.end('raven'),
-      port,
-      addresses: LOOPBACK_ADDRESSES,
-      warn: () => {},
-    })
-    const answers = await Promise.all(
-      ['127.0.0.1', '::1'].map(
-        (address) =>
-          new Promise<string>((resolve, reject) => {
-            const outgoing = request({ host: address, port, path: '/' }, (response) => {
-              text(response).then(resolve, reject)
-            })
-            outgoing.on('error', reject)
-            outgoing.end()
-          }),
-      ),
-    )
-    expect(answers).toEqual(['raven', 'raven'])
-  })
-
-  /** A server that fails to listen on `::1` as a Mac with IPv6 off does, and on nothing else. */
-  const withoutIpv6 = (handler: (request: IncomingMessage, response: ServerResponse) => void) => {
-    const server = tracked(handler)
-    const listenForReal = server.listen.bind(server)
-    const failOnIpv6 = (port: number, address: string, onListening: () => void) => {
-      if (address !== '::1') return listenForReal(port, address, onListening)
-      const missing = Object.assign(new Error('listen EADDRNOTAVAIL'), {
-        code: ERROR_CODES.addressNotAvailable,
-      })
-      queueMicrotask(() => server.emit('error', missing))
-      return server
-    }
-    Object.defineProperty(server, 'listen', { value: failOnIpv6 })
-    return server
-  }
-
-  it('leaves out an address this computer does not have, with a warning', async () => {
-    const port = await freePort()
-    const warnings: string[] = []
-    await listenWebHost({
-      createServer: withoutIpv6,
-      handler: (_request, response) => response.end('raven'),
-      port,
-      addresses: LOOPBACK_ADDRESSES,
-      warn: (message) => warnings.push(message),
-    })
-    const answer = await new Promise<string>((resolve, reject) => {
-      const outgoing = request({ host: '127.0.0.1', port, path: '/' }, (response) => {
-        text(response).then(resolve, reject)
-      })
-      outgoing.on('error', reject)
-      outgoing.end()
-    })
-    expect(answer).toBe('raven')
-    expect(warnings).toEqual(['the web host left out ::1, which this computer does not have'])
-  })
-
-  it('fails when it has no address at all', async () => {
-    const failure = await listenWebHost({
-      createServer: withoutIpv6,
-      handler: (_request, response) => response.end(),
-      port: await freePort(),
-      addresses: ['::1'],
-      warn: () => {},
-    })
-      .then(() => null)
-      .catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(Error)
-  })
-
-  it('fails when the port is taken, and keeps nothing open', async () => {
-    const port = await freePort()
-    const taken = createServer()
-    servers.push(taken)
-    // The second address, so the first has to be let go again.
-    await new Promise<void>((resolve) => taken.listen(port, '::1', resolve))
-    const failure = await listenWebHost({
-      createServer: tracked,
-      handler: (_request, response) => response.end(),
-      port,
-      addresses: LOOPBACK_ADDRESSES,
-      warn: () => {},
-    })
-      .then(() => null)
-      .catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(Error)
-    expect(failure).toHaveProperty('code', ERROR_CODES.addressInUse)
-    const free = createServer()
-    servers.push(free)
-    await new Promise<void>((resolve, reject) => {
-      free.once('error', reject)
-      free.listen(port, '127.0.0.1', resolve)
-    })
   })
 })

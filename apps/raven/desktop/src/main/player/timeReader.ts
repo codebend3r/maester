@@ -1,6 +1,6 @@
 import { MPV_TIME_THROTTLE_MS } from '@raven/mpv'
 import { createThrottle } from '@/main/player/throttle'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { messageOf } from '@/shared/messageOf'
 
 /** The quiet page hears `time` at most this often, whichever path sends it: the addon's own pace. */

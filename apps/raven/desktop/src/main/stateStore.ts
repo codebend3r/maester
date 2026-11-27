@@ -1,5 +1,5 @@
 import { parseJson } from '@/main/parseJson'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { EMPTY_STATE, isPlayerState, type PlayerState, upgradeState } from '@/main/playerState'
 
 type WriteFileProps = { path: string; data: string }
@@ -36,9 +36,6 @@ export type JsonStoreOptions<T> = {
 export const ERROR_CODES = {
   enoent: 'ENOENT',
   noSpace: 'ENOSPC',
-  addressInUse: 'EADDRINUSE',
-  addressNotAvailable: 'EADDRNOTAVAIL',
-  familyNotSupported: 'EAFNOSUPPORT',
 } as const
 
 /** The `code` a Node system error carries; null for an error without one, or anything else thrown. */

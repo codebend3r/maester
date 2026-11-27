@@ -10,6 +10,7 @@ export {
   WREN_LOCKUP_COPY,
 } from '@/copy/components'
 export { DESIGN_COPY } from '@/copy/design'
+export { WREN_HOST, WREN_HOST_META, WREN_HOST_PORT, WREN_PAGE_ORIGIN } from '@/desktop'
 export { isLibraryPick, wornLibrariesOf } from '@/library/wornLibrary'
 export {
   COUNTS_COPY,
@@ -64,9 +65,25 @@ export {
   albumIdsOf,
   inLibraryOrder,
   listedTracksOf,
-  recentlyFinished,
   unmatchedAlbumsOf,
 } from '@/library/listedTracks'
+export {
+  SONG_PROGRESS_KEY,
+  type HeardSong,
+  type SongProgress,
+  type SongSave,
+  finishedSongsOf,
+  inProgressSongsOf,
+  isSongSaveDue,
+  mergedSongProgressOf,
+  resumeAtOf,
+  songAlbumIdsOf,
+  songCountsOf,
+  songLeftOf,
+  songNoteOf,
+  songStepOf,
+  withSongNote,
+} from '@/library/songProgress'
 export {
   LIBRARY_ICONS,
   LIBRARY_LABELS,

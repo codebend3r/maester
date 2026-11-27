@@ -16,6 +16,7 @@ import { useQuality } from '@/player/useQuality'
 import { WREN_ROUTES, artistPath } from '@/routes'
 import { useGoBack } from '@/shell/useGoBack'
 import { useServerName } from '@/lib/serverName'
+import { isOnDesktop } from '@/lib/desktopHost'
 
 /** Whether the song's artists open a page. */
 export const ARTIST_KINDS = { linked: 'linked', plain: 'plain' } as const
@@ -34,7 +35,7 @@ export type Playing = NowPlayingTrack & {
   /** The song's lyrics, or that they are still being read. */
   lyrics: ShownLyrics
   isAudiobook: boolean
-  /** "raven · This browser". */
+  /** "raven · This browser", or "raven · This Mac" in Wren for Mac. */
   output: string
   /** "Playing on this browser". */
   playingOn: string
@@ -62,7 +63,7 @@ export const usePlaying = ({ track }: UsePlayingProps): Playing => {
     queries.artistQuery(sourceIdOf({ source, kind: QUEUE_SOURCE_KINDS.artist })),
   )
   const quality = useQuality({ track })
-  const device = NOW_PLAYING_COPY.devices.browser
+  const device = isOnDesktop() ? NOW_PLAYING_COPY.devices.mac : NOW_PLAYING_COPY.devices.browser
   const serverName = useServerName()
   const [firstArtist] = track.artists
   return {

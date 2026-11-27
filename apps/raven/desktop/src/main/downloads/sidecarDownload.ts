@@ -9,7 +9,7 @@ import { parseJson } from '@/main/parseJson'
 import { CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
 import { sidecarTracksOf } from '@/main/servers/sidecarTracks'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { HTTP_STATUSES } from '@shared/http'
 
 /** The most of a subtitle kept; a larger one is skipped rather than read whole into memory. */

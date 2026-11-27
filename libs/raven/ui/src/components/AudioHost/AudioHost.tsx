@@ -5,7 +5,11 @@ import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
 import { useTrackListening } from '@/components/AudioHost/useTrackListening'
-import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
+import {
+  type DeviceSpotOf,
+  startOf,
+  useAudiobookSpot,
+} from '@/components/AudioHost/useAudiobookSpot'
 import {
   type Crossfade,
   type ElementLoads,
@@ -307,7 +311,11 @@ const useAudioElement = ({
   useVideoEvents({ videoRef: second, on })
 }
 
-type AudioHostProps = { api: ApiClient }
+type AudioHostProps = {
+  api: ApiClient
+  /** Where the device left a song, which it starts from; none starts every song at its top. */
+  deviceSpotOf?: DeviceSpotOf
+}
 
 /**
  * Whether the elements' sound goes through Web Audio: from the first time
@@ -337,10 +345,11 @@ const useIsRouted = (): boolean => {
  * at the end. It tells the media session what plays and counts a listen at
  * half the track or four minutes. An audiobook plays at the speed the prefs
  * hold, starts where it was left and saves its spot as it plays, and never
- * crossfades, in or out; music saves none. The chrome (the bar, Now Playing, the queue
- * page) reads and drives the store, never this.
+ * crossfades, in or out; music saves none, and starts where `deviceSpotOf`
+ * says the device left it. The chrome (the bar, Now Playing, the queue page)
+ * reads and drives the store, never this.
  */
-export const AudioHost = ({ api }: AudioHostProps) => {
+export const AudioHost = ({ api, deviceSpotOf }: AudioHostProps) => {
   const first = useRef<HTMLAudioElement>(null)
   const second = useRef<HTMLAudioElement>(null)
   const elements = useMemo(() => [first, second] as const, [])
@@ -352,7 +361,7 @@ export const AudioHost = ({ api }: AudioHostProps) => {
   const rate = useTrackRate({ api, track })
   const isAudiobook = useIsAudiobook({ api, track })
   const isNextAudiobook = useIsAudiobook({ api, track: upNext })
-  const start = startOf(useAudiobookSpot({ api, track, watchHide: watchPageHide }))
+  const start = startOf(useAudiobookSpot({ api, track, watchHide: watchPageHide, deviceSpotOf }))
   const isRouted = useIsRouted()
   const gains = usePlayerPrefs((prefs) => prefs.equalizer.gains)
   const seconds = usePlayerPrefs((prefs) => prefs.crossfade)

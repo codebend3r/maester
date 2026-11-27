@@ -3,7 +3,7 @@ import { IGNORED, forgetOnAccountChange } from '@raven/native/headless'
 import { createQueryClient } from '@raven/ui/headless'
 
 import { useDownloads } from '@/downloads/downloadStore'
-import { useWrenAccount } from '@raven/wren-native'
+import { forgetSongProgressOnAccountChange, useWrenAccount } from '@raven/wren-native'
 
 /** Wren's one cache: it talks to one server. */
 export const queryClient = createQueryClient()
@@ -26,13 +26,20 @@ export const keepDownloadsFor = async ({ accountId }: KeepDownloadsForProps): Pr
  * downloads are their owner's: another account signing in removes them, files and all, since
  * they hold its playlists and the tracks its PIN unlocked; a sign-out, a refresh the server
  * refused and the same account signing back in keep them, out of reach behind sign-in
- * meanwhile. Hands back the way to stop.
+ * meanwhile. Each song's progress on the device goes once an account signed in signs out or
+ * gives way to another (`forgetSongProgressOnAccountChange`). Hands back the way to stop.
  */
-export const forgetWrenAccount = (): (() => void) =>
-  forgetOnAccountChange({
+export const forgetWrenAccount = (): (() => void) => {
+  const stopForgetting = forgetOnAccountChange({
     session: useWrenAccount,
     cache: queryClient,
     alsoForget: ({ accountId }) => {
       keepDownloadsFor({ accountId }).catch(IGNORED)
     },
   })
+  const stopProgress = forgetSongProgressOnAccountChange({ session: useWrenAccount })
+  return () => {
+    stopForgetting()
+    stopProgress()
+  }
+}

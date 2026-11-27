@@ -27,6 +27,7 @@ import {
   accountServers,
   useActiveServer,
   configureRecentSearches,
+  configureSongProgress,
   useWren,
 } from '@raven/wren-native'
 import { WREN_ROUTES, WREN_SCREENS, configureLibraryChoice } from '@raven/wren-native/headless'
@@ -71,6 +72,7 @@ const loadStores = async (): Promise<void> => {
     useWrenAccount.persist.rehydrate(),
     configureWrenPrefs({ storage: AsyncStorage }),
     configureRecentSearches({ storage: AsyncStorage }),
+    configureSongProgress({ storage: AsyncStorage }),
     configureDownloads({ storage: AsyncStorage, disk: deviceDisk, ...downloadSources }),
   ])
   // The account read back may not be the downloads' owner, whatever order the stores loaded in.

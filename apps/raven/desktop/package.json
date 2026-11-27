@@ -34,11 +34,11 @@
   "dependencies": {
     "@raven/core": "workspace:*",
     "@raven/mpv": "workspace:*",
+    "@shared/desktop": "workspace:*",
     "@shared/http": "workspace:*"
   },
   "devDependencies": {
     "@electron-forge/cli": "8.0.1",
-    "@electron-forge/maker-base": "8.0.1",
     "@electron-forge/maker-squirrel": "8.0.1",
     "@electron-forge/maker-zip": "8.0.1",
     "@electron-forge/plugin-fuses": "8.0.1",

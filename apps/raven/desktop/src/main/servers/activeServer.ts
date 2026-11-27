@@ -3,7 +3,7 @@ import { type AccountSignal, createAccountSignal } from '@/main/accounts/account
 import type { ServerEntry } from '@/main/desktopConfig'
 import { DONE, refused } from '@/main/replies'
 import type { ServerDirectory } from '@/main/servers/serverDirectory'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /**
  * How long a switch waits for the page's sign-in: at launch the page may name the server it was

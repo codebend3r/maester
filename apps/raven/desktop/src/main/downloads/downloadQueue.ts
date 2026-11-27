@@ -52,7 +52,7 @@ import { createSidecarDownload } from '@/main/downloads/sidecarDownload'
 import { removeFolder, sweepDownloads } from '@/main/downloads/sweep'
 import { errorText } from '@/main/log/errorText'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 export const DOWNLOAD_CONCURRENCY = 2
 

@@ -48,7 +48,7 @@ import {
   type Upstream,
   type UpstreamFetch,
 } from '@/main/servers/relayUpstream'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** The relay listens here alone, so nothing off this Mac can reach it. */

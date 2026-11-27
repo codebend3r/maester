@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { errorCodeOf, isMissingFile } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 export const LOG_FILE = 'raven.log'
 export const LOG_MAX_BYTES = 1_048_576

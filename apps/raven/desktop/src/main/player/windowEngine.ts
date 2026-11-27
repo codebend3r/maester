@@ -20,7 +20,7 @@ import {
 import { createEngineSlot, type WatchedService, watchService } from '@/main/player/engineSlot'
 import type { PortLike, PortRequest, PortService } from '@/main/player/playerPort'
 import { isPageUrl } from '@/main/security'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import type { IPC_CHANNELS } from '@/shared/hostNames'
 
 // A test hook too: an unpackaged run reads `RAVEN_DESKTOP_MPV` (`headless` or `off`).

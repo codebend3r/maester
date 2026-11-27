@@ -17,7 +17,7 @@ import type {
 } from '@/main/player/loadTarget'
 import { OK, type PlayerOutcome } from '@/main/player/outcomes'
 import type { PlayerService } from '@/main/player/playerService'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 const NO_SERVERS_MESSAGE = 'This player knows no servers.'
 

@@ -35,7 +35,7 @@ function TracksPage({ title, empty, tracks, listing }: TracksPageProps) {
   )
 }
 
-/** In progress: the songs left partway through in every music library, as raven's tab lists them. */
+/** In progress: the songs this device left partway through, in the music library worn. */
 export function InProgressCollection() {
   const { tracks, listing } = useInProgressTracks()
   return (
@@ -48,7 +48,7 @@ export function InProgressCollection() {
   )
 }
 
-/** Recently finished: the songs played to their end most recently in every music library. */
+/** Recently finished: the songs this device played to their end most recently, in the music library worn. */
 export function FinishedCollection() {
   const { tracks, listing } = useFinishedTracks()
   return (

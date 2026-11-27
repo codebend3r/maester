@@ -3,7 +3,8 @@ import { entryById, type DownloadEntry } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
 import { errorText } from '@/main/log/errorText'
 import { loggable } from '@/main/servers/serverCalls'
-import { TIMER_MAX_MS, type Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
+import { TIMER_MAX_MS } from '@/main/timers'
 
 /** A download set to delete once watched goes this long after it counts as watched. */
 export const AUTO_DELETE_DELAY_MS = 600_000

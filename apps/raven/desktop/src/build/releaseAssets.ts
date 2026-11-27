@@ -4,7 +4,8 @@ import { copyFile, mkdir, readFile, rm } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { NATIVE_TARGETS, type NativeTarget, nativeTargetOf } from '@raven/mpv'
-import { dmgFileName, versionOf } from '@/build/dmgMaker'
+import { dmgFileName, versionOf } from '@shared/desktop/build'
+import { DMG_FILE_STEM } from '@/build/forgeOptions'
 import { appAssetNameFor } from '@/main/updates'
 
 const RELEASE_DIR = join('out', 'release')
@@ -56,7 +57,12 @@ export const madeFilesFor = ({ version, target }: MadeFilesForProps) => {
   switch (target) {
     case NATIVE_TARGETS.darwinArm64:
       return {
-        app: join('dmg', 'darwin', 'arm64', dmgFileName({ version, arch: 'arm64' })),
+        app: join(
+          'dmg',
+          'darwin',
+          'arm64',
+          dmgFileName({ fileStem: DMG_FILE_STEM, version, arch: 'arm64' }),
+        ),
         zip: join('zip', 'darwin', 'arm64', `Raven-darwin-arm64-${version}.zip`),
       } as const
     // Squirrel's maker names the setup exe `<app name>-<version> Setup.exe`.

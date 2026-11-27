@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { MUSIC_SORTS } from '@raven/core'
 import { KIT_COPY, LIBRARY_COPY, LIBRARY_PAGE_COPY, SHARED_ORDER } from '@raven/wren'
 import { screen, waitFor, within } from '@testing-library/react'
@@ -6,8 +6,9 @@ import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { COLLECTION_KINDS, WREN_ROUTES, albumPath, collectionPath } from '@/routes'
 import { Library } from '@/screens/Library/Library'
-import { MUSIC, OK_COMPUTER, OK_COMPUTER_TILE, mockMusicApiEach } from '@/test/music'
+import { AIRBAG, LUCKY, MUSIC, OK_COMPUTER, OK_COMPUTER_TILE, mockMusicApiEach } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
+import { forgetSongs, keepSongs } from '@/test/songProgress'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 
 const SEARCH_MARK = 'Search is showing'
@@ -31,6 +32,7 @@ const renderLibrary = ({ formFactor = FORM_FACTORS.tablet }: RenderLibraryProps 
 
 describe('Library', () => {
   const music = mockMusicApiEach()
+  afterEach(forgetSongs)
 
   it('lists its categories with what each holds, and the newest albums', async () => {
     renderLibrary()
@@ -65,7 +67,8 @@ describe('Library', () => {
     )
   })
 
-  it("lists raven's seven music tabs in raven's order, then Songs, each with the server's count", async () => {
+  it("lists raven's seven music tabs in raven's order, then Songs, each with its count", async () => {
+    keepSongs({ partway: [AIRBAG], finished: [LUCKY] })
     renderLibrary()
     await screen.findByRole('link', {
       name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),

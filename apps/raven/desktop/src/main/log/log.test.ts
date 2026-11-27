@@ -21,7 +21,7 @@ import {
   type LogFs,
 } from '@/main/log/log'
 import { ERROR_CODES, isMissingFile } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 const DIR = '/logs'
 const FILE = `${DIR}/${LOG_FILE}`

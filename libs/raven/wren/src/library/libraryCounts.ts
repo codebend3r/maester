@@ -19,9 +19,7 @@ const TALLIES = {
   albums: 'albums',
   artists: 'artists',
   unmatchedAlbums: 'unmatchedAlbums',
-  inProgress: 'inProgress',
   favourites: 'favourites',
-  finished: 'finished',
 } as const satisfies Record<string, Tally>
 
 type TallyOfProps = {
@@ -52,18 +50,21 @@ type LibraryValuesOfProps = {
   playlists: number | null
   /** Every music library's songs, or null until they are counted. */
   songs: number | null
+  /** The songs left partway and played to their end on this device, in the libraries worn. */
+  progress: { inProgress: number; finished: number }
 }
 
 /**
  * What each category Wren shares with the web holds, beside its row: its count over every music
- * library, "None yet" beside Playlists, and nothing while a count is on its way, failed or none,
- * so a zero is never shown.
+ * library (In progress and Recently finished from this device's own), "None yet" beside
+ * Playlists, and nothing while a count is on its way, failed or none, so a zero is never shown.
  */
 export const libraryValuesOf = ({
   music,
   counts,
   playlists,
   songs,
+  progress,
 }: LibraryValuesOfProps): Record<SharedSegment, string | undefined> => {
   const valueOf = (tally: Tally) => countValueOf({ n: tallyOf({ music, counts, tally }) })
   return {
@@ -71,10 +72,10 @@ export const libraryValuesOf = ({
     [LIBRARY_SEGMENTS.artists]: valueOf(TALLIES.artists),
     [LIBRARY_SEGMENTS.playlists]: countValueOf({ n: playlists, none: LIBRARY_PAGE_COPY.noneYet }),
     [LIBRARY_SEGMENTS.unmatchedAlbums]: valueOf(TALLIES.unmatchedAlbums),
-    [LIBRARY_SEGMENTS.inProgress]: valueOf(TALLIES.inProgress),
+    [LIBRARY_SEGMENTS.inProgress]: countValueOf({ n: music.isRead ? progress.inProgress : null }),
     [LIBRARY_SEGMENTS.favourites]: valueOf(TALLIES.favourites),
     [LIBRARY_SEGMENTS.finished]: countValueOf({
-      n: tallyOf({ music, counts, tally: TALLIES.finished }),
+      n: music.isRead ? progress.finished : null,
       most: FINISHED_SHOWN,
     }),
     [LIBRARY_SEGMENTS.songs]: countValueOf({ n: songs }),

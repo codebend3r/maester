@@ -13,6 +13,9 @@ const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.
  */
 export const WEB_DIST = join('..', 'web', 'dist')
 
+/** What the dmg is named by: `raven-player-<version>-<arch>.dmg`. */
+export const DMG_FILE_STEM = 'raven-player'
+
 /**
  * The fonts mpv draws subtitles with, from this project's folder. Forge copies the folder into
  * the app's resources under its own name, and unpackaged mpv reads it from here.

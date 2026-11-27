@@ -12,7 +12,6 @@ import type * as Native from '@raven/native'
 import {
   COUNTS_COPY,
   COVER_SIZES,
-  FINISHED_SHOWN,
   KIT_COPY,
   LIBRARY_LABELS,
   LIBRARY_ORDER,
@@ -26,7 +25,7 @@ import { useAudioQueue } from '@raven/ui/headless'
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { useWrenAccount, useToast } from '@raven/wren-native'
+import { useSongProgress, useWrenAccount, useToast } from '@raven/wren-native'
 import { WREN_PAGES, WREN_ROUTES, collectionPathOf } from '@raven/wren-native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import {
@@ -39,6 +38,7 @@ import {
   OK_COMPUTER,
   PARANOID,
   RADIOHEAD,
+  keepSongs,
   musicApi,
   trackFor,
 } from '@raven/wren-native/testing'
@@ -109,6 +109,7 @@ describe('Library', () => {
     queryClient.clear()
     useWrenAccount.setState({ session: LISTENER })
     useWrenPrefs.setState(DEFAULT_WREN_PREFS)
+    useSongProgress.setState({ songs: [] })
   })
 
   it('lists its categories with what each holds, and the newest albums', async () => {
@@ -147,7 +148,8 @@ describe('Library', () => {
     expect(await screen.findByRole('button', { name: ALBUM_TILE })).toBeTruthy()
   })
 
-  it("lists raven's seven music tabs in raven's order, then Songs and Downloads, with the server's counts", async () => {
+  it("lists raven's seven music tabs in raven's order, then Songs and Downloads, with their counts", async () => {
+    keepSongs({ partway: [AIRBAG], finished: [LUCKY] })
     await renderRouter(WREN_TREE, { initialUrl: WREN_ROUTES.library })
     await screen.findByRole('button', {
       name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.albums, value: '1' }),
@@ -159,6 +161,11 @@ describe('Library', () => {
       .flatMap((name) => labels.filter((label) => name === label || name.startsWith(`${label}, `)))
     expect(rows).toEqual(labels)
     expect(mockApi.getLibraryCounts).toHaveBeenCalledWith(MUSIC.id)
+    expect(
+      screen.getByRole('button', {
+        name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.inProgress, value: '1' }),
+      }),
+    ).toBeTruthy()
     expect(
       screen.getByRole('button', {
         name: KIT_COPY.labelled({ label: LIBRARY_PAGE_COPY.finished, value: '1' }),
@@ -308,25 +315,29 @@ describe('Library', () => {
     expect(await screen.findByText(LIBRARY_PAGE_COPY.noUnmatchedAlbums)).toBeTruthy()
   })
 
-  it('lists the songs in progress as their albums keep them, and plays from one', async () => {
+  it('lists the songs this device left partway as their albums keep them, and plays from one', async () => {
+    keepSongs({ partway: [PARANOID] })
     await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.inProgress) })
     await fireEvent.press(await screen.findByRole('button', { name: PARANOID.title }))
-    expect(mockApi.listInProgress).toHaveBeenCalledWith(MUSIC.id)
+    expect(mockApi.listInProgress).not.toHaveBeenCalled()
     expect(mockApi.getAlbum).toHaveBeenCalledWith(OK_COMPUTER.id)
     expect(useAudioQueue.getState().queue.items).toHaveLength(1)
   })
 
-  it('lists the favourite songs and the songs finished most recently', async () => {
+  it('lists the favourite songs and the songs this device finished most recently', async () => {
+    keepSongs({ finished: [LUCKY], partway: [PARANOID] })
     await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.favourites) })
     expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeTruthy()
     expect(mockApi.listLibraryFavourites).toHaveBeenCalledWith(MUSIC.id)
     await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.finished) })
     expect(await screen.findByRole('button', { name: LUCKY.title })).toBeTruthy()
-    expect(mockApi.listHistory).toHaveBeenCalledWith({
-      libraryId: MUSIC.id,
-      limit: FINISHED_SHOWN,
-      watchedOnly: true,
-    })
+    expect(screen.queryByRole('button', { name: PARANOID.title })).toBeNull()
+    expect(mockApi.listHistory).not.toHaveBeenCalled()
+  })
+
+  it('says so when this device has left no song partway', async () => {
+    await renderRouter(WREN_TREE, { initialUrl: collectionPathOf(LIBRARY_SEGMENTS.inProgress) })
+    expect(await screen.findByText(LIBRARY_PAGE_COPY.noInProgress)).toBeTruthy()
   })
 
   it('says so when there are no favourites, with no Play to press', async () => {

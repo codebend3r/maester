@@ -158,15 +158,19 @@ Shared tool config lives at the root, so every project lints and compiles by the
 | `@wren/app`          | `apps/wren/wren-app`     | Wren, raven's music app for iPhone, iPad and Android phones: Expo 58 on react-native-tvos, expo-router         |
 | `@wren/tv`           | `apps/wren/wren-tv`      | Wren on Apple TV and Android TV, driven by the remote: Expo 58 on react-native-tvos, expo-router, jest-expo    |
 | `@wren/web`          | `apps/wren/wren-web`     | Wren on the web: React 19, Vite 8, TanStack Query, zustand, SCSS modules, bun test + happy-dom                 |
+| `@wren/desktop`      | `apps/wren/wren-desktop` | Wren for Mac: `@wren/web` in an Electron 45 window on macOS arm64, served from a loopback host, Forge          |
 | `@sparrow/web`       | `apps/sparrow/web`       | sparrow's chat page, and the sandbox for testing its answers: React 19, Vite 8, TanStack Query, zustand        |
 | `@shared/http`       | `libs/shared/http`       | The suite's HTTP vocabulary and helpers, for every runtime: headers, statuses, cookies, bearer                 |
 | `@shared/server`     | `libs/shared/server`     | Node server scaffolding: web app serving, SQLite migrations, env                                               |
+| `@shared/desktop`    | `libs/shared/desktop`    | What the Electron apps share: the loopback web host and its CSP, the timers, the dmg maker                     |
 | `scripts`            | `scripts`                | Repo tooling; its Python is linted with sparrow's pinned ruff and config                                       |
 | `@tooling/web`       | `tooling/web`            | The web apps' shared test harness and Vite helpers, read as TypeScript source; no scripts, no targets          |
 
 Python projects declare `package.json` scripts that call uv (`uv run pytest -q`, `uv run ruff check .`); Nx runs them in the project's folder. There is no Python Nx plugin and no uv workspace.
 
 `@shared/http` is dependency-free, with no DOM and no Node types, so browsers, Node, Bun and React Native all import it: `HEADERS`, `HTTP_METHODS`, `HTTP_STATUSES`, `CONTENT_TYPES`, `CACHE_POLICIES`, `isRecord`, `parseCookies`, `readCookie`, `serializeCookie` and `bearerToken`. `sameSecret` stays in `@shared/server`, since it compares with `node:crypto`'s `timingSafeEqual`. A header name, method, status or content type is read from it, never declared again in a project; a project keeps only the names that are its own (`RAVEN_HEADERS.accelBuffering`, Netlify's headers). `@raven/core` re-exports `HTTP_METHODS` and `isRecord` from it. The supabase Edge Function is the exception, since Deno resolves its imports through the function's own `deno.json` and reads no Bun workspace package.
+
+`@shared/desktop` holds what the Electron apps' main processes and Forge configs share: the loopback web host (`createWebHostHandler`, `listenWebHost`, `contentSecurityPolicy`), each app's own host, page origin, CSP sources and page passed in; the `Timers` seam; and `MakerDmg` at `@shared/desktop/build`, a separate entry so no main bundle takes in Forge. It imports only `@shared/http`, never a product's lib.
 
 `@shared/server` holds the Node server scaffolding raven's server builds on, and re-exports `@shared/http` for it: `serveWebApp` (the built web app and its SPA fallback), `compressResponses` (Brotli or gzip for JSON and text, SVG and HLS playlists included; never video, JPEG or PNG pictures, ranges or server-sent events), `openSqlite` (the `user_version` migration runner), `readListenConfig`, `wholeNumber` and `flag` for the environment. A helper a second server would copy goes there; one only a single product uses stays in that product.
 

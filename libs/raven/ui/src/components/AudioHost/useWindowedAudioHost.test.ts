@@ -12,6 +12,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, waitFor } from '@testing-library/react'
 import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
+import type { DeviceSpotOf } from '@/components/AudioHost/useAudiobookSpot'
 import {
   UnplayableTrackError,
   type WindowedPlayer,
@@ -104,15 +105,21 @@ const fakePlayer = ({ loadFails = null, unplayable = [] }: FakePlayerProps = {})
 /** A host that never hides, as these tests leave the page alone. */
 const neverHides: WatchHide = () => () => undefined
 
-type RenderHostProps = { player: WindowedPlayer; client?: QueryClient; hostApi?: ApiClient }
+type RenderHostProps = {
+  player: WindowedPlayer
+  client?: QueryClient
+  hostApi?: ApiClient
+  deviceSpotOf?: DeviceSpotOf
+}
 
 const renderHost = ({
   player,
   client = clientWith(LIBRARY_KINDS.music),
   hostApi = api,
+  deviceSpotOf,
 }: RenderHostProps) =>
   renderQueryHook({
-    hook: () => useWindowedAudioHost({ api: hostApi, player, watchHide: neverHides }),
+    hook: () => useWindowedAudioHost({ api: hostApi, player, watchHide: neverHides, deviceSpotOf }),
     client,
   })
 
@@ -256,6 +263,19 @@ describe('useWindowedAudioHost and the spot', () => {
     act(() => store().engine.time({ position: 60, duration: 200 }))
     act(() => store().pause())
     act(() => store().next())
+    expect(media).not.toHaveBeenCalled()
+    expect(saves).toEqual([])
+  })
+
+  it('loads a song where the device left it, and never saves its spot', () => {
+    const { hostApi, media, saves } = bookApi()
+    const { calls, player } = fakePlayer()
+    renderHost({ player, hostApi, deviceSpotOf: (playing) => (playing.id === 1 ? 42 : null) })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    expect(calls[0]).toBe('load 1 2 at 42')
+    act(() => store().engine.state(AUDIO_STATES.playing))
+    act(() => store().engine.time({ position: 60, duration: 200 }))
+    act(() => store().pause())
     expect(media).not.toHaveBeenCalled()
     expect(saves).toEqual([])
   })

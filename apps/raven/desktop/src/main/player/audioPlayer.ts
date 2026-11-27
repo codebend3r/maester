@@ -16,7 +16,7 @@ import { createSleepGuard } from '@/main/player/sleepGuard'
 import { attachWindowEngine, engineMode, openAppMpv } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { ServerSources } from '@/main/servers/serverSources'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 
 type MusicEngine = { mpv: Mpv; service: AudioService }

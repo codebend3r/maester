@@ -2,6 +2,7 @@ import type { ApiClient, Track, TrackStream } from '@raven/core'
 import {
   AUDIO_HOST_COPY,
   AUDIO_STATES,
+  type DeviceSpotOf,
   playingTrackOf,
   startOf,
   useAudiobookSpot,
@@ -43,7 +44,7 @@ type VideoTrackProps = {
   track: Track
   /** How fast it plays: an audiobook's speed, or 1 for music. */
   rate: number
-  /** Where it starts: an audiobook's saved spot, or 0. */
+  /** Where it starts: an audiobook's saved spot, a song's spot on this TV, or 0. */
   start: number
 }
 
@@ -118,20 +119,24 @@ type VideoAudioHostProps = {
   session: MusicSession
   /** Where each track plays from; kept stable across renders, as each track asks it once. */
   sourceOf: VideoTrackSourceOf
+  /** Where this TV left a song, which it starts from; none starts every song at its top. */
+  deviceSpotOf?: DeviceSpotOf
 }
 
 /**
  * Music on a TV, raven's and Wren's: `react-native-video` out of sight, following the shared
  * queue store one track at a time, an audiobook at the prefs' speed from its saved spot and music
- * at 1 from its top. Background play and the lock screen matter little on a TV, so the TVs keep
+ * at 1 from where the TV left it, when the app hands that, else its top. Background play and the lock screen matter little on a TV, so the TVs keep
  * the player they have for video.
  */
-export const VideoAudioHost = ({ session, sourceOf }: VideoAudioHostProps) => {
+export const VideoAudioHost = ({ session, sourceOf, deviceSpotOf }: VideoAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
   const rate = useTrackRate({ api: session.api, track })
   useTrackListening({ api: session.api, track })
   // A book waits for its spot, so it never starts from the top and saves that over it.
-  const start = startOf(useAudiobookSpot({ api: session.api, track, watchHide: watchAppHide }))
+  const start = startOf(
+    useAudiobookSpot({ api: session.api, track, watchHide: watchAppHide, deviceSpotOf }),
+  )
   return (
     track !== null &&
     start !== null && (

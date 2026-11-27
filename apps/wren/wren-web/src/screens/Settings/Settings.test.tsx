@@ -20,6 +20,7 @@ import { WREN_ROUTES } from '@/routes'
 import { Settings } from '@/screens/Settings/Settings'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { SIGNED_IN, fakeAuthClient, readyConfig } from '@/test/authClient'
+import { DESKTOP_SERVER, servedByDesktop } from '@/test/desktopHost'
 import { MUSIC, mockMusicApiEach } from '@/test/music'
 import { renderWithProviders, signedIn } from '@/test/render'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
@@ -184,6 +185,14 @@ describe('Settings', () => {
     expect(within(server!).queryByRole('button')).toBeNull()
     expect(within(server!).queryByRole('link')).toBeNull()
     expect(within(server!).getAllByRole('textbox')).toHaveLength(1)
+  })
+
+  it('shows the server Wren for Mac names, not the page it serves from', async () => {
+    const untag = servedByDesktop()
+    renderSignedIn()
+    const server = screen.getByRole('heading', { name: SETTINGS_COPY.server }).closest('section')
+    expect(within(server!).getByText(DESKTOP_SERVER)).toBeInTheDocument()
+    untag()
   })
 
   it('switches the music library worn', async () => {

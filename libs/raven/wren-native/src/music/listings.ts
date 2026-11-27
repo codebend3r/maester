@@ -1,11 +1,11 @@
 import { type Library, MUSIC_SORTS, type MediaItem, type Track } from '@raven/core'
-import { HISTORY_SHOWS } from '@raven/ui/headless'
 import {
   albumIdsOf,
   albumsByTitle,
   artistsByName,
-  FINISHED_SHOWN,
+  finishedSongsOf,
   inLibraryOrder,
+  inProgressSongsOf,
   libraryValuesOf,
   type ListOrder,
   type ListState,
@@ -16,8 +16,9 @@ import {
   RECENT_SERVER_SORTS,
   type RecentSort,
   recentAlbums,
-  recentlyFinished,
+  songAlbumIdsOf,
   songCountOf,
+  songCountsOf,
   tracksOfPages,
   unmatchedAlbumsOf,
 } from '@raven/wren'
@@ -30,6 +31,7 @@ import {
 } from '@tanstack/react-query'
 
 import { useMusicLibraries } from '@/music/musicLibraries'
+import { useSongProgress } from '@/stores/songProgress'
 import { type WrenSession } from '@/useWren'
 
 /** The query one music library is asked. */
@@ -210,15 +212,36 @@ const useListedTracks = ({ session, media, listing }: UseListedTracksProps) => {
   return listedTracksOf({ media, listing, albums })
 }
 
-/** The songs left partway through in every music library, each library's most recent first. */
-export const useInProgressTracks = (session: WrenSession) => {
-  const { entries, listing } = useMergedListing({
-    session,
-    build: (library) => session.queries.inProgressQuery(library.id),
-    order: inLibraryOrder,
+/** Picks some of this device's songs, of the server and libraries worn: In progress's or Recently finished's. */
+type SongsPick = typeof inProgressSongsOf
+
+type UseDeviceSongsProps = { session: WrenSession; pick: SongsPick }
+
+/**
+ * Songs this device keeps the progress of, as `pick` lists them from the music libraries worn,
+ * each the track its album's page holds; read once the libraries and those albums are.
+ */
+const useDeviceSongs = ({ session, pick }: UseDeviceSongsProps) => {
+  const music = useMusicLibraries(session)
+  const kept = useSongProgress((state) => state.songs)
+  const songs = pick({
+    songs: kept,
+    serverId: session.server.id,
+    libraryIds: music.libraries.map(({ id }) => id),
   })
-  return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
+  const albums = useQueries({
+    queries: songAlbumIdsOf(songs).map((id) => session.queries.albumQuery(id)),
+  })
+  return listedTracksOf({
+    media: songs.map(({ trackId }) => ({ id: trackId })),
+    listing: listStateOf({ music, failure: null, isRead: true }),
+    albums,
+  })
 }
+
+/** The songs left partway through on this device, in the libraries worn, the most recently left first. */
+export const useInProgressTracks = (session: WrenSession) =>
+  useDeviceSongs({ session, pick: inProgressSongsOf })
 
 const NO_ENTRIES: readonly never[] = []
 
@@ -269,24 +292,14 @@ export const useFavouriteTracks = (session: WrenSession) => {
   return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
 }
 
-/** The songs played to their end most recently in every music library, the newest first. */
-export const useFinishedTracks = (session: WrenSession) => {
-  const { entries, listing } = useMergedListing({
-    session,
-    build: (library) =>
-      session.queries.historyQuery({
-        libraryId: library.id,
-        show: HISTORY_SHOWS.watched,
-        limit: FINISHED_SHOWN,
-      }),
-    order: recentlyFinished,
-  })
-  return useListedTracks({ session, media: entries.map(({ media }) => media), listing })
-}
+/** The songs played to their end on this device, in the libraries worn, the newest first. */
+export const useFinishedTracks = (session: WrenSession) =>
+  useDeviceSongs({ session, pick: finishedSongsOf })
 
 /**
  * What each category the web shares holds, added up over every music library from the server's
- * counts, the playlists and the songs; a count still on its way, failed or none is left out.
+ * counts, the playlists and the songs, and In progress and Recently finished from this device's
+ * own; a count still on its way, failed or none is left out.
  */
 export const useLibraryValues = (session: WrenSession) => {
   const { music, listings } = usePerLibrary({
@@ -295,10 +308,16 @@ export const useLibraryValues = (session: WrenSession) => {
   })
   const playlists = usePlaylists(session)
   const songs = useSongCount({ session, search: '' })
+  const kept = useSongProgress((state) => state.songs)
   return libraryValuesOf({
     music,
     counts: listings,
     playlists: playlists.data?.length ?? null,
     songs,
+    progress: songCountsOf({
+      songs: kept,
+      serverId: session.server.id,
+      libraryIds: music.libraries.map(({ id }) => id),
+    }),
   })
 }

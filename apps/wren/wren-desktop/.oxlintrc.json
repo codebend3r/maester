@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../../tooling/oxlint/node.json"],
+  "ignorePatterns": ["dist", "out"],
+  "overrides": [
+    {
+      /*
+       * Forge reads its config through a default export, and loads it with jiti, which does not
+       * read tsconfig `paths`, so forge.config.ts imports its ./src/build files relatively.
+       */
+      "files": ["forge.config.ts"],
+      "rules": {
+        "import/no-default-export": "off",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "unicorn/consistent-function-scoping": "off"
+      }
+    }
+  ]
+}

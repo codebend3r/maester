@@ -1,7 +1,7 @@
 import type { monitorEventLoopDelay } from 'node:perf_hooks'
 import { PLAYER_COMMANDS } from '@raven/core'
 import type { PlayerService } from '@/main/player/playerService'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 export const LOOP_LAG_MS = 5000
 

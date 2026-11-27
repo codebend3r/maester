@@ -2,7 +2,11 @@ import { type ApiClient, REMOTE_COMMANDS, type RemoteCommand, type Track } from 
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 import { useTrackListening } from '@/components/AudioHost/useTrackListening'
-import { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
+import {
+  type DeviceSpotOf,
+  startOf,
+  useAudiobookSpot,
+} from '@/components/AudioHost/useAudiobookSpot'
 import type { WatchHide } from '@/components/Player/useProgressReport'
 import { nextTrackOf, playingTrackOf, useAudioQueue } from '@/stores/audioQueue'
 import { usePlayerPrefs } from '@/stores/playerPrefs'
@@ -89,6 +93,8 @@ type UseWindowedAudioHostProps = {
   player: WindowedPlayer
   /** Calls its save as the host is about to go away, so an audiobook's spot is kept: the desktop's page hide. */
   watchHide: WatchHide
+  /** Where the device left a song, which it loads at; none loads every song at its top. */
+  deviceSpotOf?: DeviceSpotOf
 }
 
 /** What the player's own events tell the host: it moved on to the next track, or ran out. */
@@ -98,14 +104,16 @@ export type WindowedAudioHost = { advanced: () => void; ended: () => void }
  * Drives a windowed player from the shared queue store: the playing track and the one after it,
  * play and pause, seeks and the volume. The player says when it moved on by itself (`advanced`)
  * or ran out (`ended`), and the queue steps with it. An audiobook loads at its saved spot, read
- * before the load, and saves its spot as it plays; music starts at its top and saves none. A
- * track the player moved on to by itself plays from its top, as the seam allows nothing else.
+ * before the load, and saves its spot as it plays; music starts at its top, or where
+ * `deviceSpotOf` says the device left it, and saves none. A track the player moved on to by
+ * itself plays from its top, as the seam allows nothing else.
  * A track the player cannot decode (`UnplayableTrackError`) is said and passed over.
  */
 export const useWindowedAudioHost = ({
   api,
   player,
   watchHide,
+  deviceSpotOf,
 }: UseWindowedAudioHostProps): WindowedAudioHost => {
   const track = useAudioQueue(playingTrackOf)
   const shouldPlay = useAudioQueue((store) => store.shouldPlay)
@@ -123,7 +131,7 @@ export const useWindowedAudioHost = ({
   const trackId = track?.id ?? null
   const nextId = useAudioQueue((store) => nextTrackOf(store)?.id ?? null)
   useTrackListening({ api, track })
-  const start = startOf(useAudiobookSpot({ api, track, watchHide }))
+  const start = startOf(useAudiobookSpot({ api, track, watchHide, deviceSpotOf }))
 
   const passOver = useEffectEvent((id: number) => {
     const store = useAudioQueue.getState()

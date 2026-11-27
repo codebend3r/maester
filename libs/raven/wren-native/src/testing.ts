@@ -1,6 +1,6 @@
 /**
  * What the screen tests of Wren's apps on React Native build their fake raven from: the
- * listener, and raven's music as the screens ask for it. Nothing here is bundled into an app;
+ * listener, raven's music as the screens ask for it, and the device's song progress. Nothing here is bundled into an app;
  * only tests import it.
  */
 export {
@@ -21,3 +21,4 @@ export {
   musicApi,
   trackFor,
 } from '@/test/music'
+export { keepSongs } from '@/test/songProgress'

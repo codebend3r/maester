@@ -14,7 +14,7 @@ import { errorText } from '@/main/log/errorText'
 import type { ServerInUse } from '@/main/servers/activeServer'
 import { CALL_NAMES, type AllowedCall } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** A play or a position waits this long before it goes out, so a playing download reports as a stream would. */

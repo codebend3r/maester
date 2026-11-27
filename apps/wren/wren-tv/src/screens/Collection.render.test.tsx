@@ -12,15 +12,17 @@ import {
 import { fireEvent, renderRouter, screen } from 'expo-router/testing-library'
 
 import { queryClient } from '@/queryClient'
-import { useWrenAccount } from '@raven/wren-native'
+import { useSongProgress, useWrenAccount } from '@raven/wren-native'
 import { WREN_PAGES, collectionPathOf } from '@raven/wren-native/headless'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import {
   AIRBAG,
   LISTENER,
+  LUCKY,
   MIXTAPE,
   OK_COMPUTER,
   RADIOHEAD,
+  keepSongs,
   musicApi,
 } from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
@@ -64,6 +66,7 @@ describe('Collection', () => {
     useAudioQueue.getState().clear()
     useWrenAccount.setState({ session: LISTENER })
     useWrenPrefs.setState(DEFAULT_SHARED_PREFS)
+    useSongProgress.setState({ songs: [] })
   })
 
   it('lists the albums as tiles that open their page', async () => {
@@ -120,6 +123,22 @@ describe('Collection', () => {
     await open(LIBRARY_SEGMENTS.songs)
     await fireEvent.press(await screen.findByRole('button', { name: AIRBAG.title }))
     expect(playingTrackOf(useAudioQueue.getState())?.id).toBe(AIRBAG.id)
+  })
+
+  it('lists the songs this TV left partway, and plays from one', async () => {
+    keepSongs({ partway: [AIRBAG] })
+    await open(LIBRARY_SEGMENTS.inProgress)
+    await fireEvent.press(await screen.findByRole('button', { name: AIRBAG.title }))
+    expect(playingTrackOf(useAudioQueue.getState())?.id).toBe(AIRBAG.id)
+    expect(mockApi.listInProgress).not.toHaveBeenCalled()
+  })
+
+  it('lists the songs this TV played to their end, and none it left partway', async () => {
+    keepSongs({ finished: [AIRBAG], partway: [LUCKY] })
+    await open(LIBRARY_SEGMENTS.finished)
+    expect(await screen.findByRole('button', { name: AIRBAG.title })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: LUCKY.title })).toBeNull()
+    expect(mockApi.listHistory).not.toHaveBeenCalled()
   })
 
   it('makes a playlist from New playlist and opens it', async () => {

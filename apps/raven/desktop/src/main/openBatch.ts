@@ -5,7 +5,7 @@ import {
   type DesktopReply,
   URL_PROTOCOLS,
 } from '@raven/core'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { MAX_QUEUE } from '@/shared/hostNames'
 
 // The first item plays and the rest queue, so a batch past this has nowhere to go.

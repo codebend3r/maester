@@ -1,6 +1,6 @@
 import { SYNC_RETRY_MS } from '@/main/downloads/sync'
 import type { PlayerActivity } from '@/main/player/playerService'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /** How long a page with no video, or a pause, lasts before its mark (Ruling 13). */
 export const BUDGET_WINDOW_MS = 60_000

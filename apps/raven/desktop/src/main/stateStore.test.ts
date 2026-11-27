@@ -12,7 +12,7 @@ import {
   loadState,
   type StateFs,
 } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 const EMPTY_CONFIG = configFor(SERVER)
 const FILE = '/data/player-state.json'

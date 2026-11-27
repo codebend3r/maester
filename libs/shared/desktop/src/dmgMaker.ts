@@ -3,14 +3,13 @@ import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
-import { type EmptyConfig, MakerBase, type MakerOptions } from '@electron-forge/maker-base'
+import { MakerBase, type MakerOptions } from '@electron-forge/maker-base'
 import type { ForgePlatform } from '@electron-forge/shared-types'
 
 /*
  * Makes the dmg with macOS's own `ditto` and `hdiutil` rather than
  * `@electron-forge/maker-dmg`, whose `appdmg` backend needs node-gyp addons that Bun never
- * builds. forge.config.ts imports this file through jiti, which does not read tsconfig
- * `paths`, so it imports nothing from the project.
+ * builds. Each desktop app's forge.config.ts makes one with its own file stem.
  */
 
 export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, NodeJS.Platform>
@@ -18,10 +17,11 @@ export const PLATFORMS = { darwin: 'darwin' } as const satisfies Record<string, 
 /** The macOS tools the dmg is made with. */
 export const DMG_TOOLS = { ditto: 'ditto', hdiutil: 'hdiutil' } as const
 
-type DmgFileNameProps = { version: string; arch: string }
+/** What a dmg's file is named from: `<stem>-<version>-<arch>.dmg`. */
+type DmgFileNameProps = { fileStem: string; version: string; arch: string }
 
-export const dmgFileName = ({ version, arch }: DmgFileNameProps): string =>
-  `raven-player-${version}-${arch}.dmg`
+export const dmgFileName = ({ fileStem, version, arch }: DmgFileNameProps): string =>
+  `${fileStem}-${version}-${arch}.dmg`
 
 type HdiutilArgsProps = {
   volumeName: string
@@ -63,6 +63,7 @@ const execFileAsync = promisify(execFile)
 const runCommand: RunCommand = ({ command, args }) => execFileAsync(command, args)
 
 type MakeDmgProps = {
+  fileStem: string
   dir: string
   makeDir: string
   appName: string
@@ -72,6 +73,7 @@ type MakeDmgProps = {
 }
 
 export const makeDmg = async ({
+  fileStem,
   dir,
   makeDir,
   appName,
@@ -79,11 +81,14 @@ export const makeDmg = async ({
   targetArch,
   run,
 }: MakeDmgProps): Promise<string[]> => {
-  const outputDir = join(makeDir, 'dmg', 'darwin', targetArch)
-  const output = join(outputDir, dmgFileName({ version: versionOf(packageJSON), arch: targetArch }))
+  const outputDir = join(makeDir, 'dmg', PLATFORMS.darwin, targetArch)
+  const output = join(
+    outputDir,
+    dmgFileName({ fileStem, version: versionOf(packageJSON), arch: targetArch }),
+  )
   const bundle = `${appName}.app`
   await mkdir(outputDir, { recursive: true })
-  const stage = await mkdtemp(join(tmpdir(), 'raven-dmg-'))
+  const stage = await mkdtemp(join(tmpdir(), `${fileStem}-dmg-`))
   try {
     // ditto keeps the signatures, extended attributes and framework symlinks intact.
     await run({ command: DMG_TOOLS.ditto, args: [join(dir, bundle), join(stage, bundle)] })
@@ -98,7 +103,10 @@ export const makeDmg = async ({
   return [output]
 }
 
-export class MakerDmg extends MakerBase<EmptyConfig> {
+/** What a desktop app's dmg maker is made with: the stem its files are named by. */
+export type DmgConfig = { fileStem: string }
+
+export class MakerDmg extends MakerBase<DmgConfig> {
   name = 'dmg'
 
   defaultPlatforms: ForgePlatform[] = [PLATFORMS.darwin]
@@ -116,6 +124,14 @@ export class MakerDmg extends MakerBase<EmptyConfig> {
     packageJSON,
     targetArch,
   }: MakerOptions): Promise<string[]> {
-    return makeDmg({ dir, makeDir, appName, packageJSON, targetArch, run: runCommand })
+    return makeDmg({
+      fileStem: this.config.fileStem,
+      dir,
+      makeDir,
+      appName,
+      packageJSON,
+      targetArch,
+      run: runCommand,
+    })
   }
 }

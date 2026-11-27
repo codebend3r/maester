@@ -21,7 +21,7 @@ import {
   WINDOWS_LOCK,
   windowsBundleProblems,
 } from '@/build/bundleAudit'
-import { versionOf } from '@/build/dmgMaker'
+import { versionOf } from '@shared/desktop/build'
 import { signingFrom } from '@/build/forgeOptions'
 import { listSignables, SIGNABLE_KINDS } from '@/build/machO'
 

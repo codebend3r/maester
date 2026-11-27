@@ -1,6 +1,6 @@
 import { isWaitingOnOutage } from '@/main/downloads/downloadState'
 import type { DownloadsStore } from '@/main/downloads/downloadStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /** How often the files waiting on an outage are tried again, while any waits. */
 export const OUTAGE_RETRY_MS = 300_000
