@@ -25,6 +25,7 @@ import { type AppQueries, useAppQueries } from '@/queries/useAppQueries'
 import { stripEdge } from '@/layouts'
 import { STRIP_EDGES } from '@/layouts/musicKit'
 import { DrawnSheetHost } from '@/layouts/DrawnSheet.touch'
+import { DEVICE_LAUNCHES } from '@/layouts/Launch'
 import { TouchMenu } from '@/layouts/TouchMenu'
 import { TouchTabs, useIsTabBarShown } from '@/layouts/TouchTabs'
 import { MusicHost } from '@/music/MusicHost'
@@ -47,8 +48,12 @@ import { SIGNED_OUT_SHELF } from '@/topShelf/topShelf'
 /** One cache for the app's life, emptied whenever the active server or the signed-in account changes. */
 const queryClient = createQueryClient()
 
-// The splash stays up until the stores are read, so the theme picked is the first thing drawn; one the system cannot hold leaves the app as it is.
+// The splash stays up until the stores are read (a TV's until its intro draws over it), so the theme picked is the first thing drawn; one the system cannot hold leaves the app as it is.
 preventAutoHideAsync().catch(IGNORED)
+
+const hideSplash = () => {
+  hideAsync().catch(IGNORED)
+}
 
 const useTokenRenewal = tokenRenewalFor({ session: useAccountSession })
 
@@ -217,7 +222,9 @@ const styles = StyleSheet.create({ frame: { flex: 1 } })
  * route but sign-in needs a server, so without one they send the viewer to sign in. Until the
  * prefs are read the splash stays up and the app paints nothing, so the first frame of a theme
  * is the one picked, never the default's on its way to it; the splash goes once that frame is
- * drawn, and after that a theme picked in Settings repaints everything at once.
+ * drawn, and after that a theme picked in Settings repaints everything at once. A TV opens on
+ * raven's mark instead, which takes over from the splash at once and fades and takes itself off
+ * once the routes are drawn under it (`DEVICE_LAUNCHES`).
  */
 export const AppRoot = () => {
   const isLoaded = useStoresLoaded({ load: loadStores })
@@ -227,9 +234,6 @@ export const AppRoot = () => {
   useEffect(() => clearOnServerSwitch({ client: queryClient, store: useActiveServer }), [])
   useEffect(() => followReduceMotion(), [])
   useEffect(() => (isLoaded ? followTheme({ apply: wearSystemLook }) : undefined), [isLoaded])
-  useEffect(() => {
-    if (isLoaded) hideAsync().catch(IGNORED)
-  }, [isLoaded])
   useEffect(
     () =>
       isLoaded
@@ -238,5 +242,12 @@ export const AppRoot = () => {
     [isLoaded],
   )
 
-  return isLoaded && <AppRoutes />
+  const Launch = DEVICE_LAUNCHES[deviceNavKind()]
+
+  return (
+    <>
+      {isLoaded && <AppRoutes />}
+      <Launch isReady={isLoaded} onShown={hideSplash} />
+    </>
+  )
 }

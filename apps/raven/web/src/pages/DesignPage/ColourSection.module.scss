@@ -105,9 +105,10 @@
   line-height: var(--line-body);
 }
 
+// The pills wrap, so a narrow card stacks them instead of pushing its chip and pills past its edge.
 .ratios {
   display: grid;
-  grid-auto-flow: column;
+  grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 100%), max-content));
   justify-content: start;
   gap: var(--space-1);
   padding: 0 var(--space-0);

@@ -84,6 +84,8 @@ export const SIZE = {
   sidebarOpen: tvSize(360),
   sidebarClosed: tvSize(128),
   logo: tvSize(56),
+  /** The lockup's height as Wren opens, over the splash. */
+  launchLogo: tvSize(200),
   field: tvSize(84),
   fieldWidth: tvSize(760),
   sheetWidth: tvSize(760),

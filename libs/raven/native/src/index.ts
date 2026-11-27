@@ -1,6 +1,6 @@
 /**
  * What reaches the device itself: the keychain, React Native's app state and event stream, and
- * NetInfo, react-native-svg, `@raven/audio`'s player and `react-native-video`. What runs anywhere, bun's tests included, is in `headless.ts`.
+ * NetInfo, react-native-svg, `@raven/audio`'s player, `react-native-video` and the TV apps' launch intro. What runs anywhere, bun's tests included, is in `headless.ts`.
  */
 export {
   type AccountSessionStore,
@@ -20,6 +20,7 @@ export {
 export { followAccountServers } from '@/servers/followAccountServers'
 export { useServerUnlock } from '@/servers/serverUnlock'
 export { Icon } from '@/icons/Icon'
+export { LAUNCH_INTRO_TEST_ID, LaunchIntro, type LaunchProps } from '@/launch/LaunchIntro'
 export { DEVICE_AUDIO_PLATFORM, useNativeAudioHost } from '@/music/useNativeAudioHost'
 export {
   VideoAudioHost,
