@@ -1,5 +1,5 @@
 import type { PlaylistSummary, Track } from '@raven/core'
-import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY } from '@raven/wren'
+import { countsLineOf, NEW_PLAYLIST_COPY, TRACK_MENU_COPY, WREN_ICONS } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Text, View } from 'react-native'
@@ -12,7 +12,6 @@ import { ListRow } from '@/ui/ListRow'
 import { Loading } from '@/ui/Loading'
 import { NewPlaylistForm } from '@/ui/NewPlaylistForm'
 import { shownWords } from '@/ui/words'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   body: { gap: SPACE.s2 },
@@ -48,7 +47,7 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
       {!isNaming && (
         <ListRow
           hasPreferredFocus
-          icon={ICONS.plus}
+          icon={WREN_ICONS.plus}
           onPress={() => setIsNaming(true)}
           title={NEW_PLAYLIST_COPY.title}
         />
@@ -59,13 +58,13 @@ export function AddToPlaylist({ session, tracksOf, name, onDone }: AddToPlaylist
       {isEmpty && (
         <EmptyState
           body={TRACK_MENU_COPY.noPlaylistsHint(name)}
-          icon={ICONS.playlist}
+          icon={WREN_ICONS.playlist}
           title={TRACK_MENU_COPY.noPlaylists}
         />
       )}
       {list.map((playlist) => (
         <ListRow
-          icon={ICONS.playlist}
+          icon={WREN_ICONS.playlist}
           key={playlist.id}
           onPress={() => add(playlist)}
           title={playlist.name}

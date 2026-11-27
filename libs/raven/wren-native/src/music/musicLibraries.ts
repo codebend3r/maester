@@ -15,13 +15,30 @@ type ReadOnlyStore<State> = Pick<StoreApi<State>, 'getState' | 'getInitialState'
 
 type LibraryChoice = { prefs: ReadOnlyStore<LibraryPick> }
 
-const useLibraryChoice = create<LibraryChoice>()(() => ({
-  prefs: createStore<LibraryPick>()(() => ({ libraryId: null })),
-}))
+/** The app's prefs once its root has handed them over; null until then. */
+type ConfiguredChoice = { prefs: ReadOnlyStore<LibraryPick> | null }
 
-/** Hands the listings the app's prefs, which keep its pick of music library. */
+const useLibraryChoice = create<ConfiguredChoice>()(() => ({ prefs: null }))
+
+/** What a release build reads when no prefs were handed over: no pick, so the server's first. */
+const NO_PICK = createStore<LibraryPick>()(() => ({ libraryId: null }))
+
+/**
+ * Hands the listings the app's prefs, which keep its pick of music library. Each app's root
+ * calls it as it loads its stores, before any route mounts.
+ */
 export const configureLibraryChoice = (choice: LibraryChoice): void => {
   useLibraryChoice.setState(choice)
+}
+
+/*
+ * The prefs the listings read. A development build fails loudly when the root never handed
+ * them over, since the listings would quietly ignore the library picked in Settings.
+ */
+const pickedPrefsOf = (prefs: ConfiguredChoice['prefs']): ReadOnlyStore<LibraryPick> => {
+  if (prefs !== null) return prefs
+  if (__DEV__) throw new Error('useMusicLibraries ran before configureLibraryChoice was called')
+  return NO_PICK
 }
 
 type UseMusicLibrariesProps = Pick<WrenSession, 'queries'>
@@ -34,7 +51,7 @@ type UseMusicLibrariesProps = Pick<WrenSession, 'queries'>
  */
 export const useMusicLibraries = ({ queries }: UseMusicLibrariesProps) => {
   const libraries = useQuery(queries.librariesQuery)
-  const prefs = useLibraryChoice((state) => state.prefs)
+  const prefs = pickedPrefsOf(useLibraryChoice((state) => state.prefs))
   const libraryId = useStore(prefs, (state) => state.libraryId)
   const all = musicLibrariesOf(libraries.data ?? NO_LIBRARIES)
   return {

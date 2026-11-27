@@ -1,17 +1,16 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { KIT_COPY, LIBRARY_PAGE_COPY } from '@raven/wren'
+import { KIT_COPY, LIBRARY_PAGE_COPY, WREN_ICONS } from '@raven/wren'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderKitWithRoutes } from '@/test/render'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow/NavigationRow'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 describe('NavigationRow', () => {
   it('reads a navigation row with its value, and opens what it leads to', async () => {
     const onPress = mock()
     renderKitWithRoutes(
       <NavigationRow
-        icon={ICONS.song}
+        icon={WREN_ICONS.song}
         label={LIBRARY_PAGE_COPY.songs}
         onPress={onPress}
         value="1,980"

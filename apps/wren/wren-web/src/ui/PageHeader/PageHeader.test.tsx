@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'bun:test'
-import { KIT_COPY, LIBRARY_PAGE_COPY } from '@raven/wren'
+import { KIT_COPY, LIBRARY_PAGE_COPY, WREN_ICONS } from '@raven/wren'
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WREN_ROUTES } from '@/routes'
 import { KIT_PAGES, renderKitWithRoutes } from '@/test/render'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { PageHeader } from '@/ui/PageHeader/PageHeader'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 describe('PageHeader', () => {
   it('titles a page, with the way back above it and its actions beside it', async () => {
     renderKitWithRoutes(
       <PageHeader
-        actions={<IconButton icon={ICONS.search} label="Search" onPress={() => undefined} />}
+        actions={<IconButton icon={WREN_ICONS.search} label="Search" onPress={() => undefined} />}
         back={{ to: LIBRARY_PAGE_COPY.title, href: WREN_ROUTES.library }}
         title={LIBRARY_PAGE_COPY.albums}
       />,

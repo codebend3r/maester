@@ -1,14 +1,15 @@
+import { WREN_ICONS } from '@raven/wren'
 import { hasPlayingTrackOf, shuffledTracksOf, useAudioQueue } from '@raven/ui/headless'
 import {
   countsLineOf,
   greetingOf,
   HOME_COPY,
+  HOME_RECENT_CHOICES,
+  HOME_RECENT_TITLES,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
   lineValueOf,
   OFFLINE_COPY,
-  RECENT_SORTS,
-  type RecentSort,
   recentDateLineOf,
 } from '@raven/wren'
 import { useRouter } from 'expo-router'
@@ -43,10 +44,9 @@ import { AlbumTileOf } from '@/ui/AlbumTile'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { Card } from '@/ui/Card'
 import { SectionHeader } from '@/ui/SectionHeader'
-import { type Choice, SegmentedControl } from '@/ui/SegmentedControl'
+import { SegmentedControl } from '@/ui/SegmentedControl'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
 import { GRID_COLUMNS, type GridColumns, TileGrid } from '@/ui/TileGrid'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** How many rows of albums Home's grid shows. */
 const RECENT_ROWS = 6
@@ -56,18 +56,6 @@ const RECENT_COLUMNS = {
   [FORM_FACTORS.phone]: GRID_COLUMNS[FORM_FACTORS.phone],
   [FORM_FACTORS.tablet]: 6,
 } as const satisfies GridColumns
-
-/** The two orders of Home's albums, as its control offers them. */
-const RECENT_CHOICES = [
-  { key: RECENT_SORTS.release, label: HOME_COPY.sorts.release },
-  { key: RECENT_SORTS.added, label: HOME_COPY.sorts.added },
-] as const satisfies readonly Choice<RecentSort>[]
-
-/** What the section is called under each order. */
-const RECENT_TITLES = {
-  [RECENT_SORTS.added]: LIBRARY_PAGE_COPY.recent,
-  [RECENT_SORTS.release]: HOME_COPY.latestReleases,
-} as const satisfies Record<RecentSort, string>
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -109,7 +97,7 @@ function Offline({ message }: OfflineProps) {
         </Text>
         <Notice text={message} />
         <Button
-          icon={ICONS.downloads}
+          icon={WREN_ICONS.downloads}
           label={OFFLINE_COPY.playDownloads}
           onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
           variant={BUTTON_VARIANTS.secondary}
@@ -138,7 +126,7 @@ function PlaylistsShortcut({ session }: PlaylistsShortcutProps) {
   const playlists = usePlaylists(session)
   return (
     <ShortcutCard
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.playlists))}
       title={LIBRARY_PAGE_COPY.playlists}
       value={lineValueOf({
@@ -181,7 +169,7 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
   return (
     <View style={isBesideContinue ? besideStyles[formFactor] : styles.shortcuts}>
       <ShortcutCard
-        icon={ICONS.shuffle}
+        icon={WREN_ICONS.shuffle}
         isAccent
         isDisabled={songs === 0}
         onPress={() => {
@@ -194,7 +182,7 @@ function Shortcuts({ session, formFactor }: ShortcutsProps) {
         })}
       />
       <ShortcutCard
-        icon={ICONS.downloads}
+        icon={WREN_ICONS.downloads}
         onPress={() => router.push(libraryHref(LIBRARY_SEGMENTS.downloads))}
         title={LIBRARY_PAGE_COPY.downloads}
         value={lineValueOf({
@@ -224,10 +212,10 @@ function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
     <View style={styles.section}>
       <SectionHeader
         onSeeAll={() => router.push(libraryHref(LIBRARY_SEGMENTS.albums))}
-        title={RECENT_TITLES[sort]}
+        title={HOME_RECENT_TITLES[sort]}
       />
       <SegmentedControl
-        choices={RECENT_CHOICES}
+        choices={HOME_RECENT_CHOICES}
         label={HOME_COPY.sortAlbums}
         onSelect={(homeSort) => change({ homeSort })}
         selected={sort}

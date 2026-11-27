@@ -1,8 +1,15 @@
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, STEPS, type Step, TRANSPORTS, type TransportKind } from '@raven/wren'
+import {
+  PLAYER_COPY,
+  STEPS,
+  type Step,
+  TRANSPORTS,
+  type TransportKind,
+  WREN_ICONS,
+  type WrenIconName,
+} from '@raven/wren'
 import { COLORS, type Size, SIZES } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import styles from '@/player/Transport/Transport.module.scss'
 
 type PlayButtonProps = { size: Size; isLifted: boolean }
@@ -15,7 +22,7 @@ function PlayButton({ size, isLifted }: PlayButtonProps) {
     <IconButton
       color={COLORS.bg}
       fill={COLORS.text}
-      icon={isPlaying ? ICONS.pause : ICONS.play}
+      icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
       isLifted={isLifted}
       isProminent
       label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
@@ -28,8 +35,8 @@ function PlayButton({ size, isLifted }: PlayButtonProps) {
 type StepSpec = { icon: WrenIconName; label: string }
 
 const STEP_SPECS = {
-  [STEPS.previous]: { icon: ICONS.previous, label: PLAYER_COPY.previous },
-  [STEPS.next]: { icon: ICONS.next, label: PLAYER_COPY.next },
+  [STEPS.previous]: { icon: WREN_ICONS.previous, label: PLAYER_COPY.previous },
+  [STEPS.next]: { icon: WREN_ICONS.next, label: PLAYER_COPY.next },
 } as const satisfies Record<Step, StepSpec>
 
 type StepButtonProps = { step: Step; size: Size }

@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type Artist, type Track, artistNames } from '@raven/core'
 import {
   KIT_COPY,
@@ -20,7 +21,6 @@ import { EmptyState } from '@/ui/EmptyState'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { GRID_COLUMNS, type GridColumns } from '@/ui/TileGrid'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** What every view of a search's results is handed. */
 export type ResultsProps = {
@@ -52,7 +52,7 @@ export function NoMatches({ query, onClear, contentStyle }: ResultsProps) {
           variant: BUTTON_VARIANTS.secondary,
         }}
         body={SEARCH_COPY.noMatchesHint}
-        icon={ICONS.search}
+        icon={WREN_ICONS.search}
         title={SEARCH_COPY.noMatches(query)}
       />
     </View>
@@ -120,7 +120,7 @@ function TopCard({ art, kind, title, subtitle, onOpen, onPlay }: TopCardProps) {
         <IconButton
           color={colors.accentInk}
           fill={colors.accent}
-          icon={ICONS.play}
+          icon={WREN_ICONS.play}
           label={SEARCH_COPY.play(title)}
           onPress={onPlay}
           size={SIZE.playButton}

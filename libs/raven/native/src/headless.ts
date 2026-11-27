@@ -48,9 +48,22 @@ export {
   tracksForBrowse,
 } from '@/music/browseTree'
 export type { TrackPlan } from '@/music/audioItem'
+export { type TrackStreamPlan, trackStreamOf } from '@/music/trackStream'
 export { TRACK_STREAM_KINDS, type TrackStream } from '@raven/core'
 export type { BrowseRequest, CarBrowse, PlayRequest } from '@/music/carBrowse'
 export { nativePlayerOf } from '@/music/nativePlayer'
+export {
+  KEY_ACTIONS,
+  LONG_PRESSES,
+  LONG_PRESS_NAMES,
+  MEDIA_SKIP_KEYS,
+  type MediaSkipKey,
+  REMOTE_KEYS,
+  type RemoteKey,
+  isLongPress,
+  keyUpNameOf,
+  pressedKeyOf,
+} from '@/remote/remoteKeys'
 export {
   type AddProblem,
   RENAME_OUTCOMES,
@@ -87,3 +100,4 @@ export { keepPlayedStream, usePlayedQuality, usePlayedStreams } from '@/stores/p
 export { useStoresLoaded } from '@/stores/storesLoaded'
 export { bumpCookieVersion, useCookieVersion } from '@/stores/cookieVersion'
 export { nativeTokens, tokenReaderOf } from '@/theme/nativeTokens'
+export { TV_DESIGN_WIDTH, tvScaleOf } from '@/theme/tvScale'

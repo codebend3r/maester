@@ -1,11 +1,11 @@
 import { Pressable, Text, View } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, type WrenIconName } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { Card } from '@/ui/Card'
 import { pressedStyleOf } from '@/ui/press'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   card: { flex: 1 },

@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import type { SourceTitle } from '@raven/wren'
 import { Text, View } from 'react-native'
 
@@ -5,7 +6,6 @@ import { NOW_PLAYING_COPY } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   header: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s2 },
@@ -39,7 +39,7 @@ export function CloseButton({ onClose }: CloseButtonProps) {
   return (
     <IconButton
       color={colors.text}
-      icon={ICONS.chevronDown}
+      icon={WREN_ICONS.chevronDown}
       label={NOW_PLAYING_COPY.close}
       onPress={onClose}
     />
@@ -63,7 +63,7 @@ export function PlayerHeader({ title, onClose, onMore }: PlayerHeaderProps) {
       <SourceName title={title} />
       <IconButton
         color={colors.text}
-        icon={ICONS.more}
+        icon={WREN_ICONS.more}
         label={NOW_PLAYING_COPY.more}
         onPress={onMore}
       />

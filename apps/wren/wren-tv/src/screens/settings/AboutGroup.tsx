@@ -1,4 +1,4 @@
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { useState } from 'react'
 import { Text, View } from 'react-native'
 
@@ -8,7 +8,6 @@ import { SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { ListRow } from '@/ui/ListRow'
 import { Sheet } from '@/ui/Sheet'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   font: { gap: SPACE.s1 },
@@ -24,7 +23,7 @@ export function AboutGroup() {
     <SettingsGroup heading={SETTINGS_COPY.about}>
       <FactRow label={SETTINGS_COPY.version} value={SETTINGS_COPY.versionOf(wrenVersion)} />
       <ListRow
-        icon={ICONS.info}
+        icon={WREN_ICONS.info}
         onPress={() => setIsShowingLicenses(true)}
         canOpen
         title={SETTINGS_COPY.licenses}

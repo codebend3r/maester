@@ -1,10 +1,11 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { useState } from 'react'
 import { Text, TextInput, type TextInputProps, View } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   field: { gap: SPACE.s2 },
@@ -80,7 +81,7 @@ export function TextField({
       </View>
       {hasError && (
         <View accessibilityLiveRegion="polite" style={styles.error}>
-          <WrenIcon color={colors.accentText} name={ICONS.alert} size={SIZE.smallIcon} />
+          <WrenIcon color={colors.accentText} name={WREN_ICONS.alert} size={SIZE.smallIcon} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}

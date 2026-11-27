@@ -18,8 +18,8 @@ import { watchAppHide } from '@/player/watchAppHide'
 import type { MediaSources } from '@/servers/mediaAccess'
 import type { AppServer } from '@/servers/serverList'
 
-/** The player the music comes out of here: ExoPlayer on Android, AVPlayer on an iPhone or iPad. */
-const PLATFORM = Platform.select({
+/** The player the music comes out of here: ExoPlayer on Android, AVPlayer on Apple's devices. */
+export const DEVICE_AUDIO_PLATFORM = Platform.select({
   android: AUDIO_PLATFORMS.android,
   default: AUDIO_PLATFORMS.apple,
 })
@@ -61,7 +61,7 @@ export const useNativeAudioHost = ({
           audioItemOf({
             server: { api, sources: sourcesFor(server) },
             track,
-            platform: PLATFORM,
+            platform: DEVICE_AUDIO_PLATFORM,
             plan,
           }),
       }),

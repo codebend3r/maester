@@ -1,7 +1,6 @@
-import { type MenuLike, TRACK_MENU_COPY } from '@raven/wren'
+import { type MenuLike, TRACK_MENU_COPY, WREN_ICONS } from '@raven/wren'
 import { COLORS, type Color, type Size } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type LikeButtonProps = {
   /** Whether the song is a favourite, and the press that flips it. */
@@ -19,7 +18,7 @@ export function LikeButton({ like, title, idleColor, size }: LikeButtonProps) {
   return (
     <IconButton
       color={like.isLiked ? COLORS.accentText : idleColor}
-      icon={like.isLiked ? ICONS.heartFilled : ICONS.heart}
+      icon={like.isLiked ? WREN_ICONS.heartFilled : WREN_ICONS.heart}
       isSelected={like.isLiked}
       label={TRACK_MENU_COPY.likeSong(title)}
       onPress={like.onToggle}

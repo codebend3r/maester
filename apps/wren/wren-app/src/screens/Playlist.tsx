@@ -4,7 +4,7 @@ import {
   QUEUE_SOURCE_KINDS,
   playlistTracksOf,
 } from '@raven/core'
-import { PLAYLIST_COPY, playlistMetaOf, SONG_LEADS } from '@raven/wren'
+import { PLAYLIST_COPY, playlistMetaOf, SONG_LEADS, WREN_ICONS } from '@raven/wren'
 import { FlatList } from 'react-native'
 
 import { DownloadButton } from '@/components/DownloadButton'
@@ -18,7 +18,6 @@ import { DetailSplit } from '@/screens/detail/DetailSplit'
 import { QueueAction } from '@/screens/detail/QueueAction'
 import { useTracklist } from '@/screens/detail/useTracklist'
 import { EmptyState } from '@/ui/EmptyState'
-import { ICONS } from '@/ui/WrenIcon'
 
 type RenderRowProps = { item: PlaylistTrack }
 
@@ -78,7 +77,7 @@ function PlaylistPage({ session, details }: PlaylistPageProps) {
             ListEmptyComponent={
               <EmptyState
                 body={PLAYLIST_COPY.empty(playlist.name)}
-                icon={ICONS.playlist}
+                icon={WREN_ICONS.playlist}
                 title={PLAYLIST_COPY.emptyTitle}
               />
             }

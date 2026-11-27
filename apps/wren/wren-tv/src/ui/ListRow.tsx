@@ -1,12 +1,12 @@
 import { type ReactNode } from 'react'
 import { Text, View } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS, type WrenIconName } from '@raven/wren'
 
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { Focusable, type FocusableProps } from '@/ui/Focusable'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   row: {
@@ -79,7 +79,7 @@ export function ListRow({
           </View>
           {value !== null && <Text style={styles.value}>{value}</Text>}
           {canOpen && (
-            <WrenIcon color={colors.text3} name={ICONS.chevronRight} size={SIZE.iconSmall} />
+            <WrenIcon color={colors.text3} name={WREN_ICONS.chevronRight} size={SIZE.iconSmall} />
           )}
         </>
       )}

@@ -2,11 +2,10 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { type FetchLike, type Hero, type Home as HomeAnswer, isRecord } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
-import type { AppServer } from '@raven/native/headless'
+import { type AppServer, KEY_ACTIONS, LONG_PRESS_NAMES } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
 
-import { KEY_ACTIONS, LONG_PRESS_NAMES } from '@/layouts/remoteKeys'
 import { APP_ROUTES, APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf, itemTarget } from '@/routes'
 import { Home } from '@/screens/Home'
 import { useActiveServer } from '@/stores/activeServer'
@@ -477,6 +476,35 @@ describe('Home on a TV', () => {
     await returnToTestScreen()
     expect(askedFor()).toEqual([])
     expect(preferred()).toEqual([BUSBOYS])
+  })
+
+  /** Where a view is laid out down its parent, for the layout events a test fires. */
+  type LaidOut = { y: number; height: number }
+
+  it('stands a shelf far from the view in as an empty box its height, and draws it again as it comes near', async () => {
+    await renderHome()
+    const films = await screen.findByTestId(`library:${FILMS.id}`)
+    const slot = films.parent
+    if (slot === null || slot === undefined) throw new Error('No slot round the Films shelf')
+    const [shelves] = screen.container.queryAll(
+      (node) => typeof node.props.onScroll === 'function' && node.props.horizontal !== true,
+    )
+    if (shelves === undefined) throw new Error('No shelves')
+    const layout = (box: LaidOut) => ({
+      nativeEvent: { layout: { x: 0, width: 1920, ...box } },
+    })
+    const scrollTo = (y: number) => ({ nativeEvent: { contentOffset: { x: 0, y } } })
+
+    await fireEvent(shelves, NATIVE_EVENTS.layout, layout({ y: 0, height: 1000 }))
+    await fireEvent(slot, NATIVE_EVENTS.layout, layout({ y: 400, height: 300 }))
+    await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(2000))
+    expect(screen.queryByTestId(`library:${FILMS.id}`)).toBeNull()
+    expect(screen.queryByRole('button', { name: NIGHT_TRAIN })).toBeNull()
+    expect(StyleSheet.flatten(slot.props.style)).toEqual({ height: 300 })
+
+    await fireEvent(shelves, NATIVE_EVENTS.scroll, scrollTo(0))
+    expect(screen.getByTestId(`library:${FILMS.id}`)).toBeTruthy()
+    expect(screen.getByRole('button', { name: NIGHT_TRAIN })).toBeTruthy()
   })
 })
 

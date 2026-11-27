@@ -1,4 +1,4 @@
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { type WrenSession, useServerNameField } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
@@ -10,7 +10,6 @@ import { GroupedList } from '@/ui/GroupedList'
 import { IconTile, TILE_TONES } from '@/ui/IconTile'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
 import { TextField } from '@/ui/TextField'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: {
@@ -39,7 +38,7 @@ export function ServerGroup({ session }: ServerGroupProps) {
     <NotedGroup note={SETTINGS_COPY.serverNote}>
       <GroupedList heading={SETTINGS_COPY.server}>
         <View style={styles.row}>
-          <IconTile icon={ICONS.server} tone={TILE_TONES.accent} />
+          <IconTile icon={WREN_ICONS.server} tone={TILE_TONES.accent} />
           <Text numberOfLines={1} style={styles.name}>
             {name}
           </Text>

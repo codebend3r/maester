@@ -1,14 +1,13 @@
 import { Pressable, Text, View } from 'react-native'
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   card: {
@@ -100,13 +99,13 @@ export function MiniPlayer({
           </Pressable>
           <IconButton
             color={colors.text}
-            icon={isPlaying ? ICONS.pause : ICONS.play}
+            icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
             label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
             onPress={onToggle}
           />
           <IconButton
             color={colors.text}
-            icon={ICONS.next}
+            icon={WREN_ICONS.next}
             label={PLAYER_COPY.next}
             onPress={onNext}
           />

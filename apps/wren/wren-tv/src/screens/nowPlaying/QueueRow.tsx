@@ -1,11 +1,10 @@
-import { NOW_PLAYING_COPY, SONG_LEADS, type UpNextRow } from '@raven/wren'
+import { NOW_PLAYING_COPY, SONG_LEADS, type UpNextRow, WREN_ICONS } from '@raven/wren'
 import { useState } from 'react'
 import { type Covers } from '@raven/wren-native'
 
 import { ListRow } from '@/ui/ListRow'
 import { Sheet } from '@/ui/Sheet'
 import { SongRow } from '@/ui/SongRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** A row's move, from its place to another. */
 type RowMove = { from: number; to: number }
@@ -61,7 +60,7 @@ export function QueueRow({
         {place > first && (
           <ListRow
             hasPreferredFocus
-            icon={ICONS.chevronUp}
+            icon={WREN_ICONS.chevronUp}
             onPress={act(() => onMove({ from: place, to: place - 1 }))}
             title={NOW_PLAYING_COPY.moveUp}
           />
@@ -69,14 +68,14 @@ export function QueueRow({
         {place < last && (
           <ListRow
             hasPreferredFocus={place === first}
-            icon={ICONS.chevronDown}
+            icon={WREN_ICONS.chevronDown}
             onPress={act(() => onMove({ from: place, to: place + 1 }))}
             title={NOW_PLAYING_COPY.moveDown}
           />
         )}
         <ListRow
           hasPreferredFocus={first === last}
-          icon={ICONS.trash}
+          icon={WREN_ICONS.trash}
           onPress={act(() => onRemove(place))}
           title={NOW_PLAYING_COPY.remove}
         />

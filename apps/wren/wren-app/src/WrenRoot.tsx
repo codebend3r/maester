@@ -29,8 +29,8 @@ import {
   configureRecentSearches,
   useWren,
 } from '@raven/wren-native'
-import { WREN_ROUTES, WREN_SCREENS } from '@raven/wren-native/headless'
-import { configureWrenPrefs } from '@/stores/wrenPrefs'
+import { WREN_ROUTES, WREN_SCREENS, configureLibraryChoice } from '@raven/wren-native/headless'
+import { configureWrenPrefs, useWrenPrefs } from '@/stores/wrenPrefs'
 import { CHROMES } from '@/shell/chrome'
 import { TabletPlayerBar } from '@/shell/TabletPlayerBar'
 import { TabletSidebar } from '@/shell/TabletSidebar'
@@ -60,6 +60,8 @@ const NOW_PLAYING_OPTIONS = {
 const useTokenRenewal = tokenRenewalFor({ session: useWrenAccount })
 
 const loadStores = async (): Promise<void> => {
+  // The shared listings read the music library picked in this app's own prefs.
+  configureLibraryChoice({ prefs: useWrenPrefs })
   /*
    * A store whose keychain or AsyncStorage cannot be read starts empty rather than holding
    * Wren on the splash.

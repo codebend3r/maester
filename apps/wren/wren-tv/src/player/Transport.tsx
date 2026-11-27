@@ -1,12 +1,18 @@
 import { REPEAT_MODES } from '@raven/core'
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, STEPS, type Step, repeatIconOf } from '@raven/wren'
+import {
+  PLAYER_COPY,
+  STEPS,
+  type Step,
+  repeatIconOf,
+  WREN_ICONS,
+  type WrenIconName,
+} from '@raven/wren'
 import { View } from 'react-native'
 
 import { SPACE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
   row: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s3 },
@@ -22,7 +28,7 @@ function PlayButton({ hasPreferredFocus }: PlayButtonProps) {
   return (
     <FocusButton
       hasPreferredFocus={hasPreferredFocus}
-      icon={isPlaying ? ICONS.pause : ICONS.play}
+      icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
       label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
       onPress={toggle}
       tone={BUTTON_TONES.primary}
@@ -33,8 +39,8 @@ function PlayButton({ hasPreferredFocus }: PlayButtonProps) {
 type StepSpec = { icon: WrenIconName; label: string }
 
 const STEP_SPECS = {
-  [STEPS.previous]: { icon: ICONS.previous, label: PLAYER_COPY.previous },
-  [STEPS.next]: { icon: ICONS.next, label: PLAYER_COPY.next },
+  [STEPS.previous]: { icon: WREN_ICONS.previous, label: PLAYER_COPY.previous },
+  [STEPS.next]: { icon: WREN_ICONS.next, label: PLAYER_COPY.next },
 } as const satisfies Record<Step, StepSpec>
 
 type StepButtonProps = { step: Step }
@@ -52,7 +58,7 @@ export function ShuffleToggle() {
   const toggleShuffle = useAudioQueue((store) => store.toggleShuffle)
   return (
     <FocusButton
-      icon={ICONS.shuffle}
+      icon={WREN_ICONS.shuffle}
       isSelected={isShuffled}
       label={PLAYER_COPY.shuffle}
       onPress={toggleShuffle}
@@ -69,7 +75,7 @@ export function RepeatToggle() {
   const cycleRepeat = useAudioQueue((store) => store.cycleRepeat)
   return (
     <FocusButton
-      icon={repeatIconOf({ repeat, icons: ICONS })}
+      icon={repeatIconOf({ repeat, icons: WREN_ICONS })}
       isSelected={repeat !== REPEAT_MODES.off}
       label={PLAYER_COPY.repeat[repeat]}
       onPress={cycleRepeat}

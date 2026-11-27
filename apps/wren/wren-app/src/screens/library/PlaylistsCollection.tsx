@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type PlaylistSummary, plural, playlistFactsOf } from '@raven/core'
 import { useRouter } from 'expo-router'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
@@ -28,7 +29,6 @@ import { SPACE } from '@/theme/wrenTokens'
 import { AlbumTile } from '@/ui/AlbumTile'
 import { EmptyState } from '@/ui/EmptyState'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -53,7 +53,7 @@ function NoPlaylists({ onNew }: NoPlaylistsProps) {
     <EmptyState
       action={{ label: NEW_PLAYLIST_COPY.title, onPress: onNew }}
       body={LIBRARY_PAGE_COPY.noPlaylistsHint}
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       title={LIBRARY_PAGE_COPY.noPlaylists}
     />
   )
@@ -117,7 +117,7 @@ export function PlaylistsCollection({ session, onBack }: CollectionPageProps) {
             actions={
               <IconButton
                 color={colors.accentText}
-                icon={ICONS.plus}
+                icon={WREN_ICONS.plus}
                 label={NEW_PLAYLIST_COPY.title}
                 onPress={onNew}
               />

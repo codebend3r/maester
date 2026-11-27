@@ -1,10 +1,9 @@
-import { SIGN_IN_COPY, signInErrorsOf } from '@raven/wren'
+import { SIGN_IN_COPY, signInErrorsOf, WREN_ICONS } from '@raven/wren'
 import { type FormEvent, useState } from 'react'
 import type { SignInFlow } from '@/screens/SignIn/useSignInFlow'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { BUTTON_SIZES, Button } from '@/ui/Button/Button'
 import { TextField } from '@/ui/TextField/TextField'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/SignIn/AccountForm.module.scss'
 
@@ -14,7 +13,7 @@ type AlertBannerProps = { text: string }
 function AlertBanner({ text }: AlertBannerProps) {
   return (
     <p className={styles.banner} role="alert">
-      <WrenIcon color={COLORS.accentText} name={ICONS.alert} size={SIZES.smallIcon} />
+      <WrenIcon color={COLORS.accentText} name={WREN_ICONS.alert} size={SIZES.smallIcon} />
       <span>{text}</span>
     </p>
   )
@@ -22,8 +21,8 @@ function AlertBanner({ text }: AlertBannerProps) {
 
 /** The password field's end button, and how the field shows what is typed, by whether the password shows. */
 const PASSWORD_TOGGLES = {
-  show: { icon: ICONS.eye, label: SIGN_IN_COPY.showPassword, type: 'password' },
-  hide: { icon: ICONS.eyeOff, label: SIGN_IN_COPY.hidePassword, type: 'text' },
+  show: { icon: WREN_ICONS.eye, label: SIGN_IN_COPY.showPassword, type: 'password' },
+  hide: { icon: WREN_ICONS.eyeOff, label: SIGN_IN_COPY.hidePassword, type: 'text' },
 } as const
 
 type AccountFormProps = { flow: SignInFlow }
@@ -47,7 +46,7 @@ export function AccountForm({ flow }: AccountFormProps) {
         autoCorrect="off"
         enterKeyHint="go"
         error={errors.email}
-        icon={ICONS.mail}
+        icon={WREN_ICONS.mail}
         inputMode="email"
         label={SIGN_IN_COPY.email}
         name="email"
@@ -63,7 +62,7 @@ export function AccountForm({ flow }: AccountFormProps) {
         autoCorrect="off"
         enterKeyHint="go"
         error={errors.password}
-        icon={ICONS.lock}
+        icon={WREN_ICONS.lock}
         label={SIGN_IN_COPY.password}
         name="password"
         onChangeText={setPassword}

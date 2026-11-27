@@ -1,4 +1,5 @@
 import { type SkipStep, formatDuration } from '@raven/core'
+import { pressedKeyOf } from '@raven/native/headless'
 import { usePreventRemove } from 'expo-router'
 import { type ComponentType, useEffect, useRef, useState } from 'react'
 import {
@@ -41,13 +42,7 @@ import {
   surfaceStateOf,
   type VideoSurface,
 } from '@/layouts/playerKit'
-import {
-  REMOTE_HOLDERS,
-  isSeekingWith,
-  pressedKeyOf,
-  remoteAnswerOf,
-  remoteHolderOf,
-} from '@/layouts/remoteKeys'
+import { REMOTE_HOLDERS, isSeekingWith, remoteAnswerOf, remoteHolderOf } from '@/layouts/remoteKeys'
 import { PlateButton } from '@/layouts/tvControls'
 import { requestTVFocus } from '@/layouts/tvFocus'
 import { useControlsLinger } from '@/layouts/useControlsLinger'

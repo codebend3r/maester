@@ -43,8 +43,8 @@ import {
 } from '@/test/playerServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
 import { appThemeOf } from '@/theme/appTheme'
-import type * as VideoMock from '@/test/videoMock'
-import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
+import type * as VideoMock from '@raven/native/testing/video'
+import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@raven/native/testing/video'
 
 const mockPush = jest.fn()
 const mockPathname = jest.fn((): string => APP_ROUTES.play)
@@ -85,7 +85,7 @@ jest.mock('@raven/native', () => ({
   },
 }))
 jest.mock('react-native-video', () =>
-  jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
+  jest.requireActual<typeof VideoMock>('@raven/native/testing/video').videoModuleMock(),
 )
 
 const shown = { client: createScreenClient() }

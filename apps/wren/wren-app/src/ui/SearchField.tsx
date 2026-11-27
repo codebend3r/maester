@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   row: { alignItems: 'center', flexDirection: 'row', gap: SPACE.s3 },
@@ -62,7 +62,7 @@ export function SearchField({
   return (
     <View style={styles.row}>
       <View style={[styles.box, isCompact && styles.compact, isFocused && styles.focused]}>
-        <WrenIcon color={colors.text3} name={ICONS.search} size={SIZE.navIcon} />
+        <WrenIcon color={colors.text3} name={WREN_ICONS.search} size={SIZE.navIcon} />
         <TextInput
           accessibilityLabel={label}
           accessibilityRole="search"
@@ -82,7 +82,7 @@ export function SearchField({
         {isFocused && value !== '' && (
           <IconButton
             color={colors.text3}
-            icon={ICONS.close}
+            icon={WREN_ICONS.close}
             label={KIT_COPY.clearSearch}
             onPress={() => onChangeText('')}
             size={SIZE.smallButton}

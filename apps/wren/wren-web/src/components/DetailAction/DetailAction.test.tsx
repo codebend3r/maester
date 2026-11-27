@@ -1,11 +1,10 @@
 import { describe, expect, it, mock } from 'bun:test'
-import { PLAYER_COPY } from '@raven/wren'
+import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ACTION_SHAPES, DetailAction } from '@/components/DetailAction/DetailAction'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
-const ICON = ICONS.queueAdd
+const ICON = WREN_ICONS.queueAdd
 
 describe('DetailAction', () => {
   it('is a button named by its word, and does what a press asks', async () => {

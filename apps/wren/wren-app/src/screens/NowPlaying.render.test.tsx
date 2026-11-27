@@ -13,7 +13,14 @@ import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { ROW_ACTIONS } from '@/screens/nowPlaying/QueueRow'
 import { usePlayedStreams } from '@raven/native/headless'
 import { PHONE_WINDOW } from '@/test/jestSetup'
-import { AIRBAG, AUDIOBOOKS, LISTENER, PARANOID, musicApi, trackFor } from '@/test/music'
+import {
+  AIRBAG,
+  AUDIOBOOKS,
+  LISTENER,
+  PARANOID,
+  musicApi,
+  trackFor,
+} from '@raven/wren-native/testing'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()

@@ -1,10 +1,10 @@
 import { Pressable, Text } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   back: {
@@ -33,7 +33,7 @@ export function BackLink({ to, onPress }: BackLinkProps) {
       onPress={onPress}
       style={pressedStyleOf({ style: styles.back })}
     >
-      <WrenIcon color={colors.accentText} name={ICONS.back} size={SIZE.icon} />
+      <WrenIcon color={colors.accentText} name={WREN_ICONS.back} size={SIZE.icon} />
       <Text style={styles.label}>{to ?? KIT_COPY.backAlone}</Text>
     </Pressable>
   )

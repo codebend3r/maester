@@ -1,4 +1,4 @@
-import { DETAIL_COPY } from '@raven/wren'
+import { DETAIL_COPY, WREN_ICONS } from '@raven/wren'
 import type { ComponentType, ReactNode } from 'react'
 import { DetailAction } from '@/components/DetailAction/DetailAction'
 import { Nothing } from '@/components/Nothing/Nothing'
@@ -12,14 +12,13 @@ import { COLORS, RADII } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { BackLink } from '@/ui/BackLink/BackLink'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/detail/CollectionHead.module.scss'
 
 type MoreActionProps = { onMore: () => void }
 
 /** The wide layout's More, among the head's actions; the narrow one's sits in its nav bar instead. */
 function WideMore({ onMore }: MoreActionProps) {
-  return <DetailAction icon={ICONS.more} label={DETAIL_COPY.more} onPress={onMore} />
+  return <DetailAction icon={WREN_ICONS.more} label={DETAIL_COPY.more} onPress={onMore} />
 }
 
 const MORE_ACTIONS = {
@@ -34,7 +33,12 @@ function NarrowTop({ onMore }: HeadTopProps) {
   return (
     <nav className={styles.nav}>
       <BackButton />
-      <IconButton color={COLORS.text} icon={ICONS.more} label={DETAIL_COPY.more} onPress={onMore} />
+      <IconButton
+        color={COLORS.text}
+        icon={WREN_ICONS.more}
+        label={DETAIL_COPY.more}
+        onPress={onMore}
+      />
     </nav>
   )
 }

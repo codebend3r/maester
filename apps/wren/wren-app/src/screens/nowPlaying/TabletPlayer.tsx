@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   NOW_PLAYING_COPY,
   PANES,
@@ -17,7 +18,7 @@ import type { Playing } from '@/screens/nowPlaying/usePlaying'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { SegmentedControl } from '@/ui/SegmentedControl'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** The player column's share of the screen's width; the pane of Up next and Lyrics takes the rest. */
 const PLAYER_COLUMN_SHARE = 0.4
@@ -126,7 +127,7 @@ export function TabletPlayer({ playing, actions }: TabletPlayerProps) {
             />
           </View>
           <View accessible style={styles.output}>
-            <WrenIcon color={colors.text2} name={ICONS.output} size={SIZE.smallIcon} />
+            <WrenIcon color={colors.text2} name={WREN_ICONS.output} size={SIZE.smallIcon} />
             <Text numberOfLines={1} style={styles.outputText}>
               {playing.playingOn}
             </Text>

@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import {
   NOW_PLAYING_COPY,
   PANES,
@@ -13,7 +14,6 @@ import { UP_NEXT_PLACES, UpNext } from '@/screens/NowPlaying/UpNext'
 import type { Playing } from '@/screens/NowPlaying/usePlaying'
 import { COLORS, SIZES } from '@/theme/tokens'
 import { SegmentedControl } from '@/ui/SegmentedControl/SegmentedControl'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/NowPlaying/TabletPlayer.module.scss'
 
@@ -62,7 +62,7 @@ export function TabletPlayer({ playing, actions }: TabletPlayerProps) {
             selected={pane}
           />
           <p className={styles.output}>
-            <WrenIcon color={COLORS.text2} name={ICONS.output} size={SIZES.smallIcon} />
+            <WrenIcon color={COLORS.text2} name={WREN_ICONS.output} size={SIZES.smallIcon} />
             <span className={styles.outputText}>{playing.playingOn}</span>
           </p>
         </div>

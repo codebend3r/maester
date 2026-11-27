@@ -3,7 +3,7 @@ import { Dimensions } from 'react-native'
 import { DEVICE_INPUT } from '@/platform/devicePlatform'
 import { INPUT_KINDS } from '@/platform/platform'
 import { SIZES, type Sizes } from '@/theme/appTheme'
-import { tvScaleOf } from '@/theme/tvScale'
+import { tvScaleOf } from '@raven/native/headless'
 
 /**
  * The TV layouts' scale on this device: 1 on Apple TV, a half on a 1080p Android TV, 1 under

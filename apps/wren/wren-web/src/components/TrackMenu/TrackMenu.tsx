@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type Track, artistNames } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import {
@@ -17,7 +18,6 @@ import { albumPath, artistPath } from '@/routes'
 import { toastFailure } from '@/stores/toast'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { SheetActions } from '@/ui/SheetActions/SheetActions'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 type SheetHead = ComponentProps<typeof BottomSheet>['head']
 
@@ -65,7 +65,7 @@ function MenuActions({
     navigate(path)
   }
   const groups = menuGroupsOf({
-    icons: ICONS,
+    icons: WREN_ICONS,
     like,
     canAddToPlaylist,
     places,

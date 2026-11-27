@@ -1,17 +1,16 @@
 import { describe, expect, it } from 'bun:test'
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { screen } from '@testing-library/react'
 import { renderKitWithRoutes } from '@/test/render'
 import { FactRow } from '@/ui/FactRow/FactRow'
 import { GroupedList } from '@/ui/GroupedList/GroupedList'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow/NavigationRow'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 describe('GroupedList', () => {
   it('groups rows in a card under its heading', () => {
     renderKitWithRoutes(
       <GroupedList heading={SETTINGS_COPY.about}>
-        <FactRow icon={ICONS.info} label={SETTINGS_COPY.version} value="0.9.0" />
+        <FactRow icon={WREN_ICONS.info} label={SETTINGS_COPY.version} value="0.9.0" />
         <NavigationRow
           label={SETTINGS_COPY.licenses}
           onPress={() => undefined}

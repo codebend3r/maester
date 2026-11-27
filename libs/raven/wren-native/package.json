@@ -12,6 +12,10 @@
     "./headless": {
       "types": "./dist/headless.d.ts",
       "default": "./dist/headless.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "scripts": {
@@ -35,6 +39,7 @@
     "@raven/wren": "workspace:*"
   },
   "devDependencies": {
+    "@jest/globals": "30.5.2",
     "@tanstack/react-query": "5.107.1",
     "@types/bun": "1.4.4",
     "@types/react": "19.3.0",

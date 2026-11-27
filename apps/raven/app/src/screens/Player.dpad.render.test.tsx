@@ -17,7 +17,7 @@ import {
 } from '@raven/core'
 import type { ApiForProps } from '@raven/native'
 import type * as Native from '@raven/native'
-import type { AppServer } from '@raven/native/headless'
+import { type AppServer, KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@raven/native/headless'
 import { CONTROLS_LINGER_SECONDS, PLAYBACK_MODE_NAMES, usePlayerPrefs } from '@raven/ui/headless'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { StyleSheet } from 'react-native'
@@ -28,7 +28,6 @@ import { type HeardRequest, pathWithId } from '@raven/native/testing'
 import { BACK_ACTIONS } from '@/layouts/PlayerChrome.dpad'
 import { PLAYER_COPY, SKIP_SECONDS } from '@/layouts/playerKit'
 import { APP_ROUTES, PLAY_FROM } from '@/routes'
-import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@/layouts/remoteKeys'
 import type * as PlatformModule from '@/platform/platform'
 import { APP_ROUTE_PARAMS } from '@/routes'
 import { Player } from '@/screens/Player'
@@ -58,8 +57,8 @@ import type * as NavigationFocus from '@/test/navigationFocus'
 import { askedFor, resetTestScreen } from '@/test/navigationFocus'
 import type * as RemoteModule from '@/test/tvRemote'
 import { holdRemote, pressRemote } from '@/test/tvRemote'
-import type * as VideoMockModule from '@/test/videoMock'
-import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@/test/videoMock'
+import type * as VideoMockModule from '@raven/native/testing/video'
+import { drawnVideo, moveVideoTo, resetDrawnVideo, startVideo } from '@raven/native/testing/video'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 
 const mockBack = jest.fn()
@@ -105,7 +104,7 @@ jest.mock(
   () => jest.requireActual<typeof NavigationFocus>('@/test/navigationFocus').tvFocusMocks,
 )
 jest.mock('react-native-video', () =>
-  jest.requireActual<typeof VideoMockModule>('@/test/videoMock').videoModuleMock(),
+  jest.requireActual<typeof VideoMockModule>('@raven/native/testing/video').videoModuleMock(),
 )
 jest.mock('expo-router', () => ({
   usePreventRemove: (isPrevented: boolean, onPrevent?: (call: RemoveCall) => void) =>

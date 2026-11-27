@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { Text } from 'react-native'
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated'
 
@@ -5,7 +6,7 @@ import { useToastOffset } from '@/shell/useShell'
 import { useToast } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   toast: {
@@ -42,7 +43,7 @@ export function ToastHost() {
         pointerEvents="none"
         style={[styles.toast, { bottom }]}
       >
-        <WrenIcon color={colors.bg} name={ICONS.check} size={SIZE.smallIcon} />
+        <WrenIcon color={colors.bg} name={WREN_ICONS.check} size={SIZE.smallIcon} />
         <Text style={styles.message}>{message}</Text>
       </Animated.View>
     )

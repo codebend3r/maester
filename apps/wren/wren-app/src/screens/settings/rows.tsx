@@ -1,10 +1,10 @@
+import { type WrenIconName } from '@raven/wren'
 import { Text, View } from 'react-native'
 
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { IconTile } from '@/ui/IconTile'
 import { type Choice, SegmentedControl } from '@/ui/SegmentedControl'
-import type { WrenIconName } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   choice: { gap: SPACE.s3, paddingBottom: SPACE.s4, paddingTop: SPACE.s3 },

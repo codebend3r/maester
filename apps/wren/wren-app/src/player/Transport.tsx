@@ -1,11 +1,18 @@
 import { isPlayingOf, useAudioQueue } from '@raven/ui/headless'
 import { StyleSheet, View } from 'react-native'
 
-import { PLAYER_COPY, type Step, STEPS, type TransportKind, TRANSPORTS } from '@raven/wren'
+import {
+  PLAYER_COPY,
+  type Step,
+  STEPS,
+  type TransportKind,
+  TRANSPORTS,
+  WREN_ICONS,
+  type WrenIconName,
+} from '@raven/wren'
 import { useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES, SIZE, SPACE } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 /** How much of Play's circle its glyph fills: well over half, past the 26 the other buttons stop at. */
 const PLAY_GLYPH_SHARE = 0.7
@@ -21,7 +28,7 @@ function PlayButton({ size, isLifted }: PlayButtonProps) {
     <IconButton
       color={colors.bg}
       fill={colors.text}
-      icon={isPlaying ? ICONS.pause : ICONS.play}
+      icon={isPlaying ? WREN_ICONS.pause : WREN_ICONS.play}
       iconSize={Math.round(size * PLAY_GLYPH_SHARE)}
       isLifted={isLifted}
       label={isPlaying ? PLAYER_COPY.pause : PLAYER_COPY.play}
@@ -34,8 +41,8 @@ function PlayButton({ size, isLifted }: PlayButtonProps) {
 type StepSpec = { icon: WrenIconName; label: string }
 
 const STEP_SPECS = {
-  [STEPS.previous]: { icon: ICONS.previous, label: PLAYER_COPY.previous },
-  [STEPS.next]: { icon: ICONS.next, label: PLAYER_COPY.next },
+  [STEPS.previous]: { icon: WREN_ICONS.previous, label: PLAYER_COPY.previous },
+  [STEPS.next]: { icon: WREN_ICONS.next, label: PLAYER_COPY.next },
 } as const satisfies Record<Step, StepSpec>
 
 type StepButtonProps = { step: Step; size: number }

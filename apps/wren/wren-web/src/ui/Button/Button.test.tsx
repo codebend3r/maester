@@ -1,8 +1,8 @@
+import { WREN_ICONS } from '@raven/wren'
 import { describe, expect, it, mock } from 'bun:test'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BUTTON_VARIANTS, Button } from '@/ui/Button/Button'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 /** What the form hands its submit handler, as far as the test reads it. */
 type Submitted = { preventDefault: () => void }
@@ -10,7 +10,7 @@ type Submitted = { preventDefault: () => void }
 describe('Button', () => {
   it('is named by its label and does what a press asks', async () => {
     const onPress = mock()
-    render(<Button icon={ICONS.play} label="Play" onPress={onPress} />)
+    render(<Button icon={WREN_ICONS.play} label="Play" onPress={onPress} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Play' }))
 

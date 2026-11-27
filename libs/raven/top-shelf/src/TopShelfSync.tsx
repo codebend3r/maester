@@ -1,36 +1,38 @@
 import type { ComponentType, ReactNode } from 'react'
 import { Platform } from 'react-native'
 
-import type { TopShelf } from '@/contract'
+import type { TopShelfInvitation } from '@/contract'
 import { useTopShelf } from '@/useTopShelf'
 
-const SYSTEMS = { ios: 'ios' } as const
+/** The system whose TVs have a Top Shelf: tvOS reports itself as iOS. */
+const TOP_SHELF_OS = { ios: 'ios' } as const
 
-/** Only the Apple TV has a Top Shelf; Android TV's home screen shows none of an app's own. */
-const HAS_TOP_SHELF = Platform.OS === SYSTEMS.ios && Platform.isTV
+/** Only the Apple TV has a Top Shelf; an iPhone, an iPad and Android TV's home screen show none of an app's own. */
+const HAS_TOP_SHELF = Platform.OS === TOP_SHELF_OS.ios && Platform.isTV
 
 const ACCOUNT_STATES = { signedIn: 'signedIn', signedOut: 'signedOut' } as const
 
 type AccountState = (typeof ACCOUNT_STATES)[keyof typeof ACCOUNT_STATES]
 
-/** What an app's signed in shelf is handed: the session it reads its titles through. */
+/** What the app's own signed-in shelf is handed: the session it reads its titles through. */
 export type SignedInShelfProps<Session> = { session: Session }
 
 type TopShelfSyncProps<Session> = {
-  /** The active session while the app's screens are open to the viewer; null shows the invitation. */
+  /** The session while the app is open to the viewer; null shows the invitation. */
   session: Session | null
-  /** The invitation to sign in. */
-  signedOut: TopShelf
-  /** Keeps the shelf on the app's titles, through `useTopShelf`, while a session is open. */
+  /** The invitation to sign in, shown while nobody is. */
+  signedOut: TopShelfInvitation
+  /** The app's own shelf while an account is signed in, which writes it through `useTopShelf`. */
   SignedIn: ComponentType<SignedInShelfProps<Session>>
 }
 
-type Shelf = <Session>(props: TopShelfSyncProps<Session>) => ReactNode
+/** One account state's shelf, for any app's session. */
+type AccountShelf = <Session>(props: TopShelfSyncProps<Session>) => ReactNode
 
-const SignedInShelf: Shelf = ({ session, SignedIn }) =>
+const SignedInShelf: AccountShelf = ({ session, SignedIn }) =>
   session !== null && <SignedIn session={session} />
 
-const SignedOutShelf: Shelf = ({ signedOut }) => {
+const SignedOutShelf: AccountShelf = ({ signedOut }) => {
   useTopShelf(signedOut)
   return null
 }
@@ -38,12 +40,12 @@ const SignedOutShelf: Shelf = ({ signedOut }) => {
 const SHELVES = {
   [ACCOUNT_STATES.signedIn]: SignedInShelf,
   [ACCOUNT_STATES.signedOut]: SignedOutShelf,
-} as const satisfies Record<AccountState, Shelf>
+} as const satisfies Record<AccountState, AccountShelf>
 
 /**
- * What the Apple TV's home screen shows above the app's tile: the app's own titles while a
- * session is open, the invitation to sign in while none is. It draws nothing; it writes the
- * shelf the Top Shelf extension reads, and on any other device it does nothing at all.
+ * What the Apple TV's home screen shows above the app's tile: the app's own shelf while an
+ * account is signed in, the invitation to sign in while none is. It draws nothing; it writes the
+ * shelf the Top Shelf extension reads, and does nothing on any other device.
  */
 export const TopShelfSync = <Session,>(props: TopShelfSyncProps<Session>) => {
   const Shelf = SHELVES[props.session === null ? ACCOUNT_STATES.signedOut : ACCOUNT_STATES.signedIn]

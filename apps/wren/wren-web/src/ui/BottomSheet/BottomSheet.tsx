@@ -1,12 +1,11 @@
 import { classNames } from '@raven/ui/headless'
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type ReactNode, useId } from 'react'
 import type { Cover } from '@/music/useCovers'
 import { COLORS, RADII, SIZES } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { ICON_BUTTON_VARIANTS, IconButton } from '@/ui/IconButton/IconButton'
 import { useModalDialog } from '@/ui/useModalDialog'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/ui/BottomSheet/BottomSheet.module.scss'
 
 /** What a sheet is about, at its top: a track's cover, its title and its line. */
@@ -49,7 +48,7 @@ function SheetBody({ onClose, head, isWide = false, titleId, children }: SheetBo
           </div>
           <IconButton
             color={COLORS.text2}
-            icon={ICONS.close}
+            icon={WREN_ICONS.close}
             label={KIT_COPY.close}
             onPress={onClose}
             size={SIZES.smallButton}

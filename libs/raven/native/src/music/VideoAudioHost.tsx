@@ -1,5 +1,4 @@
-import { PLAYBACK_MODES, TRACK_STREAM_KINDS, type Track } from '@raven/core'
-import { watchAppHide } from '@raven/native'
+import type { ApiClient, Track, TrackStream } from '@raven/core'
 import {
   AUDIO_HOST_COPY,
   AUDIO_STATES,
@@ -7,27 +6,40 @@ import {
   startOf,
   useAudiobookSpot,
   useAudioQueue,
-  useTrackListening,
   usePlayerPrefs,
+  useTrackListening,
   useTrackRate,
 } from '@raven/ui/headless'
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { StyleSheet } from 'react-native'
 import Video, { type VideoRef } from 'react-native-video'
 
-import { mediaSourcesFor } from '@/player/mediaSources'
-import type { AppQueries } from '@/queries/useAppQueries'
-import { usePlayedStreams } from '@raven/native/headless'
+import { watchAppHide } from '@/player/watchAppHide'
+import type { SourceOutcome } from '@/servers/mediaAccess'
+import type { AppServer } from '@/servers/serverList'
+import { usePlayedStreams } from '@/stores/playedStreams'
+
+/** What a TV's music host reads of the active server. */
+type MusicSession = { server: AppServer; api: ApiClient }
 
 /** The cache key a track's ticketed address sits under, with the server and the track. */
-const MUSIC_SOURCE_KEY = 'musicSource'
+const TRACK_SOURCE_KEYS = { tv: 'tvTrackSource' } as const
 
-/** What a music host reads of the active server. */
-type MusicSession = Pick<AppQueries, 'server' | 'api'>
+/** Where a track plays from on a TV, as the app asks for it. */
+export type VideoTrackSource = {
+  /** Makes its ticketed address, or says why the server would not play it. */
+  load: () => Promise<SourceOutcome>
+  /** What it plays from once the address is made, for a player that shows it. */
+  stream: TrackStream
+}
+
+/** Where each track plays from: made by the app, which knows what its server is asked. */
+export type VideoTrackSourceOf = (track: Track) => VideoTrackSource
 
 type VideoTrackProps = {
   session: MusicSession
+  sourceOf: VideoTrackSourceOf
   track: Track
   /** How fast it plays: an audiobook's speed, or 1 for music. */
   rate: number
@@ -36,24 +48,20 @@ type VideoTrackProps = {
 }
 
 /** The playing track in `react-native-video`, out of sight, from its ticketed address. */
-const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
+const VideoTrack = ({ session, sourceOf, track, rate, start }: VideoTrackProps) => {
   const shouldPlay = useAudioQueue((store) => store.shouldPlay)
   const seek = useAudioQueue((store) => store.seek)
   const engine = useAudioQueue((store) => store.engine)
   const volume = usePlayerPrefs((prefs) => prefs.volume)
   const isMuted = usePlayerPrefs((prefs) => prefs.muted)
+  const heard = usePlayedStreams((played) => played.heard)
   const video = useRef<VideoRef>(null)
+  const plan = useMemo(() => sourceOf(track), [sourceOf, track])
 
   // The track's ticketed address: server data, so it lives in the query cache, read once per track.
   const source = useQuery({
-    queryKey: [MUSIC_SOURCE_KEY, session.server.id, track.id],
-    queryFn: () =>
-      mediaSourcesFor(session.server).source({
-        media: { id: track.id },
-        mode: PLAYBACK_MODES.direct,
-        audio: null,
-        burn: null,
-      }),
+    queryKey: [TRACK_SOURCE_KEYS.tv, session.server.id, track.id],
+    queryFn: plan.load,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: 0,
     retry: false,
@@ -63,12 +71,10 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
     if (source.error !== null) engine.failed(AUDIO_HOST_COPY.couldNotPlay)
   }, [source.data, source.error, engine])
 
-  // A TV asks for the file itself, in direct mode, so once its address is made that is the stream.
-  const heard = usePlayedStreams((played) => played.heard)
   const hasSource = !!source.data?.ok
   useEffect(() => {
-    if (hasSource) heard({ trackId: track.id, stream: { kind: TRACK_STREAM_KINDS.file } })
-  }, [hasSource, heard, track.id])
+    if (hasSource) heard({ trackId: track.id, stream: plan.stream })
+  }, [hasSource, heard, track.id, plan.stream])
 
   useEffect(() => {
     if (seek === null) return
@@ -108,15 +114,19 @@ const VideoTrack = ({ session, track, rate, start }: VideoTrackProps) => {
   )
 }
 
-type VideoAudioHostProps = { session: MusicSession }
+type VideoAudioHostProps = {
+  session: MusicSession
+  /** Where each track plays from; kept stable across renders, as each track asks it once. */
+  sourceOf: VideoTrackSourceOf
+}
 
 /**
- * Music on a TV: `react-native-video` out of sight, following the shared queue store one track
- * at a time, an audiobook at the prefs' speed from its saved spot and music at 1 from its top.
- * Background play and the lock screen matter little on a TV, so the TVs keep the player they have
- * for video.
+ * Music on a TV, raven's and Wren's: `react-native-video` out of sight, following the shared
+ * queue store one track at a time, an audiobook at the prefs' speed from its saved spot and music
+ * at 1 from its top. Background play and the lock screen matter little on a TV, so the TVs keep
+ * the player they have for video.
  */
-export const VideoAudioHost = ({ session }: VideoAudioHostProps) => {
+export const VideoAudioHost = ({ session, sourceOf }: VideoAudioHostProps) => {
   const track = useAudioQueue(playingTrackOf)
   const rate = useTrackRate({ api: session.api, track })
   useTrackListening({ api: session.api, track })
@@ -125,7 +135,14 @@ export const VideoAudioHost = ({ session }: VideoAudioHostProps) => {
   return (
     track !== null &&
     start !== null && (
-      <VideoTrack key={track.id} rate={rate} session={session} start={start} track={track} />
+      <VideoTrack
+        key={track.id}
+        rate={rate}
+        session={session}
+        sourceOf={sourceOf}
+        start={start}
+        track={track}
+      />
     )
   )
 }

@@ -1,6 +1,6 @@
 import { type Track, artistNames } from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
-import { KIT_COPY, SEARCH_COPY, TOP_RESULT_KINDS, type TopResult } from '@raven/wren'
+import { KIT_COPY, SEARCH_COPY, TOP_RESULT_KINDS, type TopResult, WREN_ICONS } from '@raven/wren'
 import { type Cover, type Covers, type ResultActions } from '@raven/wren-native'
 import { Text, View } from 'react-native'
 
@@ -9,7 +9,6 @@ import { themedStyles } from '@/theme/wrenTheme'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { Focusable } from '@/ui/Focusable'
 import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   card: {
@@ -70,7 +69,7 @@ function TopCard({ cover, isRound, kind, title, line, onOpen, onPlay }: TopCardP
       </Focusable>
       {onPlay !== undefined && (
         <FocusButton
-          icon={ICONS.play}
+          icon={WREN_ICONS.play}
           label={SEARCH_COPY.play(title)}
           onPress={onPlay}
           tone={BUTTON_TONES.primary}

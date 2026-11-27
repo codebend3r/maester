@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'bun:test'
-import { HOME_COPY, LIBRARY_PAGE_COPY, TAB_COPY } from '@raven/wren'
+import { HOME_COPY, LIBRARY_PAGE_COPY, TAB_COPY, WREN_ICONS } from '@raven/wren'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { WREN_ROUTES } from '@/routes'
 import { TabBar } from '@/ui/TabBar/TabBar'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 const ITEMS = [
-  { key: 'home', label: HOME_COPY.title, icon: ICONS.home, href: WREN_ROUTES.home },
+  { key: 'home', label: HOME_COPY.title, icon: WREN_ICONS.home, href: WREN_ROUTES.home },
   {
     key: 'library',
     label: LIBRARY_PAGE_COPY.title,
-    icon: ICONS.library,
+    icon: WREN_ICONS.library,
     href: WREN_ROUTES.library,
   },
 ] as const

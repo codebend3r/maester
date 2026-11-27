@@ -5,6 +5,7 @@ import {
   type ComponentRef,
   type ComponentType,
   memo,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -25,7 +26,7 @@ import type { ShelfView } from '@/queries/homeShelves'
 
 import { FocusBand } from '@/layouts/FocusBand'
 import { focusCardWidthOf, FocusCard } from '@/layouts/FocusCard'
-import { useOpeningFocus, useScreenFocusScope, useShelfBand } from '@/layouts/focus'
+import { useOpeningFocus, useScreenFocusScope } from '@/layouts/focus'
 import {
   type BingeShelfProps,
   NOTHING_HERE,
@@ -48,12 +49,19 @@ import { SHELF_LAYOUTS, type ShelfLayout } from '@/queries/homeShelves'
 import { HomePlate } from '@/layouts/HomePlate.focus'
 import { Logo } from '@/layouts/Logo'
 import { PlateButton } from '@/layouts/tvControls'
-import { type ShelfViewport, scrollTargetOf } from '@/layouts/shelfScroll'
+import { scrollTargetOf } from '@/layouts/shelfScroll'
+import { ShelfSlot } from '@/layouts/ShelfSlot'
 import { SCROLL_AXES, useScrollWindow } from '@/layouts/useScrollWindow'
 import { SideMenu, useSideMenuRoom } from '@/layouts/SideMenu.focus'
 import { restoreIn, restoringCardOf, useScreenFocus } from '@/stores/screenFocus'
-import { HOME_BANDS, shelfBandOf } from '@/stores/shelfBands'
-import { TV_DESIGN_WIDTH } from '@/theme/tvScale'
+import {
+  HOME_BANDS,
+  forgetShelfView,
+  shelfBandOf,
+  shelfViewOf,
+  viewShelves,
+} from '@/stores/shelfBands'
+import { TV_DESIGN_WIDTH } from '@raven/native/headless'
 import { TV_GUTTER, TV_SIZES, tvSize } from '@/theme/tvSizes'
 import { themedStyles } from '@/theme/useTheme'
 
@@ -73,31 +81,30 @@ const SHELF_MARGIN = TV_SIZES.space4
  * above while Home was covered can push the card the screen was opened from below the view,
  * so the shelves scroll as the engine would have for a card in view, as little as it takes. A
  * layout effect, so it runs before the card's own effect asks in the same commit. Each shelf
- * says where it stands through `useShelfBand`; the view's height and offset are kept here.
+ * says where it stands through `useShelfBand`, and the view's height and offset go to the same
+ * store, where each shelf also reads whether it is near enough to the view to draw (`ShelfSlot`).
  */
 const useReturningShelf = () => {
   const screen = useRoute().key
   const scroller = useRef<ComponentRef<typeof ScrollView>>(null)
-  const view = useRef<ShelfViewport>({ offset: 0, viewport: 0 })
   const restore = useScreenFocus((state) => restoreIn({ state, screen }))
+  useEffect(() => () => forgetShelfView({ screen }), [screen])
   useLayoutEffect(() => {
     const shelf = restoringCardOf(restore)?.shelf ?? null
     if (shelf === null) return
     const band = shelfBandOf({ screen, shelf })
     if (band === null) return
-    const target = scrollTargetOf({ band, ...view.current, margin: SHELF_MARGIN })
+    const target = scrollTargetOf({ band, ...shelfViewOf({ screen }), margin: SHELF_MARGIN })
     if (target === null) return
     scroller.current?.scrollTo({ y: target, animated: false })
-    view.current = { ...view.current, offset: target }
+    viewShelves({ screen, view: { offset: target } })
   }, [restore, screen])
   return {
     scroller,
-    onLayout: ({ nativeEvent }: LayoutChangeEvent) => {
-      view.current = { ...view.current, viewport: nativeEvent.layout.height }
-    },
-    onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
-      view.current = { ...view.current, offset: nativeEvent.contentOffset.y }
-    },
+    onLayout: ({ nativeEvent }: LayoutChangeEvent) =>
+      viewShelves({ screen, view: { viewport: nativeEvent.layout.height } }),
+    onScroll: ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) =>
+      viewShelves({ screen, view: { offset: nativeEvent.contentOffset.y } }),
   }
 }
 
@@ -341,23 +348,24 @@ const SHELF_ROWS = {
  */
 const ShelfBody = (props: ShelfProps) => {
   const styles = useStyles()
-  const band = useShelfBand(props.shelf.key)
   const Row = SHELF_ROWS[shelfStateOf(props.shelf)]
   return (
-    /*
-     * The key names the shelf to the e2e flows: the side menu also has a row named Continue
-     * watching, and the remote on a card below can scroll the title off the screen, so the
-     * whole shelf carries it.
-     */
-    <View onLayout={band.onLayout} style={styles.shelf} testID={props.shelf.key}>
-      <ShelfTitle
-        onOpenContinue={props.onOpenContinue}
-        onOpenLibrary={props.onOpenLibrary}
-        onTurnOrder={props.onTurnOrder}
-        shelf={props.shelf}
-      />
-      <Row {...props} />
-    </View>
+    <ShelfSlot shelf={props.shelf.key}>
+      {/*
+       * The key names the shelf to the e2e flows: the side menu also has a row named Continue
+       * watching, and the remote on a card below can scroll the title off the screen, so the
+       * whole shelf carries it.
+       */}
+      <View style={styles.shelf} testID={props.shelf.key}>
+        <ShelfTitle
+          onOpenContinue={props.onOpenContinue}
+          onOpenLibrary={props.onOpenLibrary}
+          onTurnOrder={props.onTurnOrder}
+          shelf={props.shelf}
+        />
+        <Row {...props} />
+      </View>
+    </ShelfSlot>
   )
 }
 
@@ -373,12 +381,11 @@ const Shelf = memo(ShelfBody, isSameDrawing<ShelfProps>)
 const BingeShelfBody = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
   const { width, onLayout } = useMeasuredWidth()
-  const band = useShelfBand(HOME_BANDS.binge)
   const styles = useStyles()
   return (
     cards.length > 0 && (
       // Measured outside the band: the guide is a view of its own, which the grid's place would be read against.
-      <View onLayout={band.onLayout}>
+      <ShelfSlot shelf={HOME_BANDS.binge}>
         <FocusBand>
           <View onLayout={onLayout} style={styles.bingeGrid}>
             {width > 0 &&
@@ -399,7 +406,7 @@ const BingeShelfBody = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
               )}
           </View>
         </FocusBand>
-      </View>
+      </ShelfSlot>
     )
   )
 }
@@ -438,11 +445,10 @@ const ShelfPage = ({ title, note, children }: ShelfPageProps) => {
  */
 const BingeRows = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
   const { isOpening } = useOpeningFocus()
-  const band = useShelfBand(HOME_BANDS.binge)
   const styles = useStyles()
   return (
     cards.length > 0 && (
-      <View onLayout={band.onLayout}>
+      <ShelfSlot shelf={HOME_BANDS.binge}>
         <FocusBand>
           <View style={styles.bingeRows}>
             {cards.map((card, index) => (
@@ -457,7 +463,7 @@ const BingeRows = ({ cards, onOpen, isFirst }: BingeShelfProps) => {
             ))}
           </View>
         </FocusBand>
-      </View>
+      </ShelfSlot>
     )
   )
 }

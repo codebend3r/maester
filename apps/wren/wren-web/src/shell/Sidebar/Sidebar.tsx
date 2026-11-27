@@ -1,6 +1,12 @@
 import { useKeyShortcut } from '@raven/ui'
 import { classNames } from '@raven/ui/headless'
-import { LIBRARY_PAGE_COPY, SETTINGS_COPY, SIDEBAR_COPY, SIDEBAR_KEY } from '@raven/wren'
+import {
+  LIBRARY_PAGE_COPY,
+  SETTINGS_COPY,
+  SIDEBAR_COPY,
+  SIDEBAR_KEY,
+  WREN_ICONS,
+} from '@raven/wren'
 import type { ComponentType } from 'react'
 import { WrenLockup, WrenMark } from '@/components/WrenLockup/WrenLockup'
 import { wrenVersion } from '@/lib/version'
@@ -11,7 +17,6 @@ import { MEDIA_QUERIES, useMatchesMedia } from '@/theme/media'
 import { SIZES } from '@/theme/tokens'
 import { Pressable } from '@/ui/Pressable/Pressable'
 import { ServerStatusChip } from '@/ui/ServerStatusChip/ServerStatusChip'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/shell/Sidebar/Sidebar.module.scss'
 
@@ -107,7 +112,7 @@ export function Sidebar() {
               title={isCollapsed ? SIDEBAR_COPY.expand : SIDEBAR_COPY.collapse}
               type="button"
             >
-              <WrenIcon name={ICONS.sidebar} size={SIZES.navIcon} />
+              <WrenIcon name={WREN_ICONS.sidebar} size={SIZES.navIcon} />
             </button>
             {!isCollapsed && (
               <p className={styles.version}>{SETTINGS_COPY.versionOf(wrenVersion)}</p>

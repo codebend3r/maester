@@ -1,9 +1,8 @@
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { WREN_ROUTES } from '@/routes'
 import { useGoBack } from '@/shell/useGoBack'
 import { COLORS, type Color } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 
 /** The icon's colour and the circle's fill over a picture. */
 type OnPicture = { ink: Color; veil: Color }
@@ -24,7 +23,7 @@ export function BackButton({ onPicture = null }: BackButtonProps) {
     <IconButton
       color={COLORS.text}
       {...picture}
-      icon={ICONS.back}
+      icon={WREN_ICONS.back}
       label={KIT_COPY.backAlone}
       onPress={goBack}
     />

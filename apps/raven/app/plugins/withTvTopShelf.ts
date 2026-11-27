@@ -7,6 +7,7 @@ import {
   withInfoPlist,
   withXcodeProject,
 } from 'expo/config-plugins'
+import { isRecord } from '@shared/http'
 
 import {
   TV_TARGET_SETTINGS,
@@ -15,7 +16,6 @@ import {
   addNativeTarget,
   addTargetGroup,
   hasTarget,
-  isRecord,
   isXcodeProjectApi,
   quoted,
   targetOf,
@@ -40,18 +40,15 @@ const SWIFT_SOURCES = [
   join('ios', 'RavenTopShelfStore.swift'),
 ] as const
 
-/** The names the provider looks the invitation's picture up by in its bundle. */
-const SIGN_IN_FILES = {
-  picture: 'RavenTopShelfSignIn.png',
-  picture2x: 'RavenTopShelfSignIn-2x.png',
-} as const satisfies Record<keyof TvTopShelf['signIn'], string>
+/** One of the invitation's pictures: the scale the app names it under, and the file the provider looks it up by in its bundle. */
+type SignInPicture = { scale: keyof TvTopShelf['signIn']; file: string }
 
-const SIGN_IN_SCALES = [
-  'picture',
-  'picture2x',
-] as const satisfies readonly (keyof typeof SIGN_IN_FILES)[]
+const SIGN_IN_PICTURES = [
+  { scale: 'picture', file: 'RavenTopShelfSignIn.png' },
+  { scale: 'picture2x', file: 'RavenTopShelfSignIn-2x.png' },
+] as const satisfies readonly SignInPicture[]
 
-const SIGN_IN_PICTURES = SIGN_IN_SCALES.map((scale) => SIGN_IN_FILES[scale])
+const SIGN_IN_FILES = SIGN_IN_PICTURES.map(({ file }) => file)
 
 /** Named for the target, since the `xcode` package reuses any file reference whose path matches. */
 const INFO_PLIST = `${TARGET}-Info.plist`
@@ -170,7 +167,7 @@ const withDependencySections = (project: XcodeProjectApi): void => {
 const markPictures = (project: XcodeProjectApi): void =>
   Object.values(project.pbxFileReferenceSection())
     .filter(isRecord)
-    .filter((file) => SIGN_IN_PICTURES.some((name) => unquoted(file.path) === name))
+    .filter((file) => SIGN_IN_FILES.some((name) => unquoted(file.path) === name))
     .forEach((file) => Reflect.set(file, 'lastKnownFileType', XCODE_EXTENSION.png))
 
 type AddTopShelfProps = {
@@ -196,12 +193,12 @@ const addTopShelf = ({ project, app, bundleId, team, swift }: AddTopShelfProps):
   addTargetGroup({
     project,
     name: TARGET,
-    files: [...swift, ...SIGN_IN_PICTURES, INFO_PLIST, ENTITLEMENTS],
+    files: [...swift, ...SIGN_IN_FILES, INFO_PLIST, ENTITLEMENTS],
   })
   markPictures(project)
   project.addBuildPhase(swift, XCODE.sourcesPhase, XCODE.sourcesComment, uuid)
   project.addBuildPhase(
-    SIGN_IN_PICTURES,
+    SIGN_IN_FILES,
     XCODE_EXTENSION.resourcesPhase,
     XCODE_EXTENSION.resourcesComment,
     uuid,
@@ -261,8 +258,8 @@ export const withTvTopShelf: ConfigPlugin<TvTopShelf> = (config, { signIn }) => 
       copyFileSync(join(projectRoot, PACKAGE, source), join(folder, file))
       return file
     })
-    SIGN_IN_SCALES.forEach((scale) =>
-      copyFileSync(join(projectRoot, signIn[scale]), join(folder, SIGN_IN_FILES[scale])),
+    SIGN_IN_PICTURES.forEach(({ scale, file }) =>
+      copyFileSync(join(projectRoot, signIn[scale]), join(folder, file)),
     )
     writeFileSync(
       join(folder, INFO_PLIST),

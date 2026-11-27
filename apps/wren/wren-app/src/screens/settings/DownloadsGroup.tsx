@@ -3,7 +3,7 @@ import { IGNORED } from '@raven/native/headless'
 import { useState } from 'react'
 import { Text, View } from 'react-native'
 
-import { KIT_COPY, SETTINGS_COPY } from '@raven/wren'
+import { KIT_COPY, SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { usedBytesOf, useDownloads } from '@/downloads/downloadStore'
 import { ChoiceRow } from '@/screens/settings/rows'
 import { StorageLimitSheet, storageLimitLabelOf } from '@/screens/settings/StorageLimitSheet'
@@ -17,7 +17,6 @@ import { Card } from '@/ui/Card'
 import { GroupedList } from '@/ui/GroupedList'
 import { MeterBar } from '@/ui/MeterBar'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** The cellular choice that streams the file itself, which the prefs keep as null. */
 const CELLULAR_ORIGINAL = { key: 'original' } as const
@@ -78,7 +77,7 @@ export function DownloadsGroup() {
         <ChoiceRow
           accessibilityLabel={SETTINGS_COPY.inKbps(SETTINGS_COPY.downloadQuality)}
           choices={BITRATE_CHOICES}
-          icon={ICONS.download}
+          icon={WREN_ICONS.download}
           label={SETTINGS_COPY.downloadQuality}
           onSelect={(kbps) => change({ downloadKbps: kbps })}
           selected={downloadKbps}
@@ -87,14 +86,14 @@ export function DownloadsGroup() {
         <ChoiceRow
           accessibilityLabel={SETTINGS_COPY.inKbps(SETTINGS_COPY.cellularQuality)}
           choices={CELLULAR_CHOICES}
-          icon={ICONS.quality}
+          icon={WREN_ICONS.quality}
           label={SETTINGS_COPY.cellularQuality}
           onSelect={(key) => change({ cellularKbps: cellularKbpsOf(key) })}
           selected={cellularKeyOf(cellularKbps)}
           unit={SETTINGS_COPY.kbps}
         />
         <NavigationRow
-          icon={ICONS.storage}
+          icon={WREN_ICONS.storage}
           label={SETTINGS_COPY.storageLimit}
           onPress={() => setIsPickingLimit(true)}
           value={storageLimitLabelOf(storageLimitGb)}
@@ -121,7 +120,7 @@ export function RemoveAllDownloads({ serverName }: RemoveAllDownloadsProps) {
   return (
     <Card>
       <Button
-        icon={ICONS.trash}
+        icon={WREN_ICONS.trash}
         isDisabled={!hasDownloads}
         label={SETTINGS_COPY.removeAll}
         onPress={() => setIsAsking(true)}
@@ -134,7 +133,7 @@ export function RemoveAllDownloads({ serverName }: RemoveAllDownloadsProps) {
           server: serverName ?? SETTINGS_COPY.theServer,
         })}
         confirmLabel={SETTINGS_COPY.remove}
-        icon={ICONS.trash}
+        icon={WREN_ICONS.trash}
         isOpen={isAsking}
         onCancel={() => setIsAsking(false)}
         onConfirm={() => {

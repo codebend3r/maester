@@ -20,6 +20,10 @@
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
+    },
+    "./testing/video": {
+      "types": "./dist/testingVideo.d.ts",
+      "default": "./dist/testingVideo.js"
     }
   },
   "scripts": {
@@ -51,6 +55,8 @@
     "react-native-svg": "15.16.1"
   },
   "devDependencies": {
+    "@jest/globals": "30.5.2",
+    "@testing-library/react-native": "14.1.0",
     "@types/bun": "1.4.4",
     "@types/react": "19.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -61,7 +67,9 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "5.107.1",
     "react": "19.3.0",
+    "react-native-video": "6.19.3",
     "zustand": "5.1.0"
   },
   "nx": {

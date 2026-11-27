@@ -97,6 +97,15 @@ export const RADIOHEAD_BACKGROUNDS: ArtistBackgrounds = {
   chosen: '0f9e8d7c6b5a',
 }
 
+/** What `jest.fn` takes: a function to mock. */
+type Mockable = NonNullable<Parameters<typeof jest.fn>[0]>
+
+/*
+ * `jest.fn`, typed through `@jest/globals`' own `jest.Mock`, so the built declarations name the
+ * mocks without reaching into jest-mock, which this package does not depend on.
+ */
+const mockOf = <T extends Mockable>(implementation: T): jest.Mock<T> => jest.fn(implementation)
+
 /** raven's own address builders, which ask the network nothing. */
 const addresses = createApiClient({
   baseUrl: 'https://raven.example',
@@ -109,30 +118,30 @@ const addresses = createApiClient({
  * listener's Mixtape.
  */
 export const musicApi = () => ({
-  listLibraries: jest.fn(async (): Promise<Library[]> => [FILMS, MUSIC]),
-  listAlbums: jest.fn(async (_props: ListProps): Promise<AlbumSummary[]> => [OK_COMPUTER]),
-  listArtists: jest.fn(async (_props: ListProps): Promise<Artist[]> => [RADIOHEAD]),
-  listTracks: jest.fn(async (_props: ListProps): Promise<TrackPage> => SONGS),
-  getAlbum: jest.fn(async (_id: number): Promise<AlbumDetails> => OK_COMPUTER_PAGE),
-  getArtist: jest.fn(async (_id: number): Promise<ArtistDetails> => RADIOHEAD_PAGE),
-  listPlaylists: jest.fn(async (): Promise<PlaylistSummary[]> => [MIXTAPE]),
-  getPlaylist: jest.fn(async (_id: number): Promise<PlaylistDetails> => MIXTAPE_PAGE),
-  appendPlaylistTracks: jest.fn(async ({ mediaIds }: AppendProps): Promise<PlaylistDetails> => ({
+  listLibraries: mockOf(async (): Promise<Library[]> => [FILMS, MUSIC]),
+  listAlbums: mockOf(async (_props: ListProps): Promise<AlbumSummary[]> => [OK_COMPUTER]),
+  listArtists: mockOf(async (_props: ListProps): Promise<Artist[]> => [RADIOHEAD]),
+  listTracks: mockOf(async (_props: ListProps): Promise<TrackPage> => SONGS),
+  getAlbum: mockOf(async (_id: number): Promise<AlbumDetails> => OK_COMPUTER_PAGE),
+  getArtist: mockOf(async (_id: number): Promise<ArtistDetails> => RADIOHEAD_PAGE),
+  listPlaylists: mockOf(async (): Promise<PlaylistSummary[]> => [MIXTAPE]),
+  getPlaylist: mockOf(async (_id: number): Promise<PlaylistDetails> => MIXTAPE_PAGE),
+  appendPlaylistTracks: mockOf(async ({ mediaIds }: AppendProps): Promise<PlaylistDetails> => ({
     playlist: { ...MIXTAPE, trackCount: MIXTAPE.trackCount + mediaIds.length },
     tracks: [...MIXTAPE_PAGE.tracks, AIRBAG],
   })),
-  setAlbumFavourite: jest.fn(async ({ favourite }: AlbumFavouriteProps): Promise<AlbumDetails> => ({
+  setAlbumFavourite: mockOf(async ({ favourite }: AlbumFavouriteProps): Promise<AlbumDetails> => ({
     ...OK_COMPUTER_PAGE,
     isFavourite: favourite,
   })),
-  setArtistFavourite: jest.fn(
+  setArtistFavourite: mockOf(
     async ({ favourite }: ArtistFavouriteProps): Promise<ArtistDetails> => ({
       ...RADIOHEAD_PAGE,
       isFavourite: favourite,
     }),
   ),
-  getMe: jest.fn(async (): Promise<Account> => LISTENER_ACCOUNT),
-  getArtistAbout: jest.fn(async (_artistId: number): Promise<ArtistAbout> => ({
+  getMe: mockOf(async (): Promise<Account> => LISTENER_ACCOUNT),
+  getArtistAbout: mockOf(async (_artistId: number): Promise<ArtistAbout> => ({
     bio: null,
     birthName: null,
     born: null,
@@ -140,31 +149,31 @@ export const musicApi = () => ({
     nationality: [],
     awards: [],
   })),
-  listArtistBackgrounds: jest.fn(
+  listArtistBackgrounds: mockOf(
     async (_artistId: number): Promise<ArtistBackgrounds> => RADIOHEAD_BACKGROUNDS,
   ),
-  setArtistBackground: jest.fn(
+  setArtistBackground: mockOf(
     async (_props: ArtistBackgroundProps): Promise<ArtistDetails> => RADIOHEAD_PAGE,
   ),
-  getLibraryCounts: jest.fn(async (_id: number): Promise<LibraryCounts> => MUSIC_COUNTS),
-  listInProgress: jest.fn(async (_id: number): Promise<PosterEntry[]> => IN_PROGRESS),
-  setFavourite: jest.fn(async ({ id }: TrackFavouriteProps): Promise<MediaItem> =>
+  getLibraryCounts: mockOf(async (_id: number): Promise<LibraryCounts> => MUSIC_COUNTS),
+  listInProgress: mockOf(async (_id: number): Promise<PosterEntry[]> => IN_PROGRESS),
+  setFavourite: mockOf(async ({ id }: TrackFavouriteProps): Promise<MediaItem> =>
     mediaOf({ ...AIRBAG, id }),
   ),
-  listFavouriteArtists: jest.fn(async (): Promise<Artist[]> => []),
-  listFavouriteAlbums: jest.fn(async (): Promise<AlbumSummary[]> => []),
-  listLibraryFavourites: jest.fn(async (_id: number): Promise<PosterEntry[]> => FAVOURITES),
-  listHistory: jest.fn(async (_props: HistoryProps): Promise<HistoryEntry[]> => FINISHED),
-  getLyrics: jest.fn(async (id: number): Promise<Lyrics> =>
+  listFavouriteArtists: mockOf(async (): Promise<Artist[]> => []),
+  listFavouriteAlbums: mockOf(async (): Promise<AlbumSummary[]> => []),
+  listLibraryFavourites: mockOf(async (_id: number): Promise<PosterEntry[]> => FAVOURITES),
+  listHistory: mockOf(async (_props: HistoryProps): Promise<HistoryEntry[]> => FINISHED),
+  getLyrics: mockOf(async (id: number): Promise<Lyrics> =>
     id === AIRBAG.id ? AIRBAG_LYRICS : NO_LYRICS,
   ),
-  getMarkers: jest.fn(async (_id: number) => ({ intro: null, credits: null, chapters: [] })),
-  getMediaOrigins: jest.fn(async () => ({ origins: [], remote: null })),
-  getMediaTicket: jest.fn(async () => ({ ticket: 'tkt.wren', expiresAt: 0 })),
+  getMarkers: mockOf(async (_id: number) => ({ intro: null, credits: null, chapters: [] })),
+  getMediaOrigins: mockOf(async () => ({ origins: [], remote: null })),
+  getMediaTicket: mockOf(async () => ({ ticket: 'tkt.wren', expiresAt: 0 })),
   fileUrl: addresses.fileUrl,
-  recordPlay: jest.fn(async (_id: number) => undefined),
-  startListen: jest.fn(async () => 1),
-  reportListen: jest.fn(async () => undefined),
+  recordPlay: mockOf(async (_id: number) => undefined),
+  startListen: mockOf(async () => 1),
+  reportListen: mockOf(async () => undefined),
   albumCoverUrl: (): string | null => null,
   artistBackgroundUrl: addresses.artistBackgroundUrl,
 })

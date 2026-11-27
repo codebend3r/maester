@@ -40,7 +40,8 @@
     "typescript": "6.0.3"
   },
   "peerDependencies": {
-    "react": "19.3.0"
+    "react": "19.3.0",
+    "react-native": "npm:react-native-tvos@0.88.1-0"
   },
   "nx": {
     "projectType": "library",

@@ -1,8 +1,7 @@
 import { View } from 'react-native'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, type WrenIconName } from '@raven/wren'
 import { NAVIGATION_ROW_VARIANTS, RowBody, useRowStyles } from '@/ui/NavigationRow'
-import type { WrenIconName } from '@/ui/WrenIcon'
 
 type FactRowProps = {
   label: string

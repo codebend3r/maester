@@ -1,49 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 
-import {
-  KEY_ACTIONS,
-  LONG_PRESSES,
-  LONG_PRESS_NAMES,
-  REMOTE_KEYS,
-  REMOTE_HOLDERS,
-  heldSeekOf,
-  pressedKeyOf,
-  remoteAnswerOf,
-  remoteHolderOf,
-} from '@/layouts/remoteKeys'
+import { KEY_ACTIONS, LONG_PRESS_NAMES, REMOTE_KEYS } from '@raven/native/headless'
 
-/** A key the fork names that the player leaves alone. */
-const UNANSWERED = { menu: 'menu' } as const
+import { REMOTE_HOLDERS, heldSeekOf, remoteAnswerOf, remoteHolderOf } from '@/layouts/remoteKeys'
 
 const PLAYING = { isShown: true, isScrubbing: false, isPaused: false }
-
-describe('pressedKeyOf', () => {
-  it('takes a key as it comes up, the one action Android TV sends for a press', () => {
-    expect(pressedKeyOf({ eventType: REMOTE_KEYS.right, eventKeyAction: KEY_ACTIONS.up })).toBe(
-      REMOTE_KEYS.right,
-    )
-  })
-
-  it('lets the same key going down go, so a press counts once where both are sent', () => {
-    expect(
-      pressedKeyOf({ eventType: REMOTE_KEYS.right, eventKeyAction: KEY_ACTIONS.down }),
-    ).toBeNull()
-  })
-
-  it('takes a key held down as the key, once it is let go', () => {
-    const held = { eventType: LONG_PRESSES.longRight }
-    expect(pressedKeyOf({ ...held, eventKeyAction: KEY_ACTIONS.down })).toBeNull()
-    expect(pressedKeyOf({ ...held, eventKeyAction: KEY_ACTIONS.up })).toBe(REMOTE_KEYS.right)
-  })
-
-  it('takes a press that names no action', () => {
-    expect(pressedKeyOf({ eventType: REMOTE_KEYS.select })).toBe(REMOTE_KEYS.select)
-  })
-
-  it('leaves a key the player does not answer', () => {
-    expect(pressedKeyOf({ eventType: UNANSWERED.menu, eventKeyAction: KEY_ACTIONS.up })).toBeNull()
-  })
-})
 
 describe('remoteAnswerOf', () => {
   it('seeks ten seconds either way from the scrubber', () => {

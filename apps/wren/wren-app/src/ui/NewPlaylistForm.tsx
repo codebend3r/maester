@@ -3,12 +3,11 @@ import { useServerPlaylistMutations } from '@raven/ui/headless'
 import { useState } from 'react'
 import { KeyboardAvoidingView, Platform } from 'react-native'
 
-import { NEW_PLAYLIST_COPY } from '@raven/wren'
+import { NEW_PLAYLIST_COPY, WREN_ICONS } from '@raven/wren'
 import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { Button } from '@/ui/Button'
 import { TextField } from '@/ui/TextField'
-import { ICONS } from '@/ui/WrenIcon'
 import { type WrenSession } from '@raven/wren-native'
 
 const useStyles = themedStyles(() => ({ form: { gap: SPACE.s3 } }))
@@ -37,7 +36,7 @@ export function NewPlaylistForm({ session, onCreated }: NewPlaylistFormProps) {
     <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding' })} style={styles.form}>
       <TextField
         error={create.error?.message ?? null}
-        icon={ICONS.playlist}
+        icon={WREN_ICONS.playlist}
         label={NEW_PLAYLIST_COPY.name}
         onChangeText={setName}
         onSubmitEditing={make}

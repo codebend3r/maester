@@ -1,10 +1,11 @@
+import { WREN_ICONS } from '@raven/wren'
 import { classNames, hasPlayingTrackOf, shuffledTracksOf, useAudioQueue } from '@raven/ui/headless'
 import {
   HOME_COPY,
+  HOME_RECENT_CHOICES,
+  HOME_RECENT_TITLES,
   LIBRARY_PAGE_COPY,
   OFFLINE_COPY,
-  RECENT_SORTS,
-  type RecentSort,
   countsLineOf,
   greetingOf,
   lineValueOf,
@@ -29,11 +30,9 @@ import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { FORM_FACTORS, type FormFactor, useFormFactor } from '@/theme/formFactor'
 import { SIZES } from '@/theme/tokens'
 import { Card } from '@/ui/Card/Card'
-import type { Choice } from '@/ui/RadioChoices/RadioChoices'
 import { SegmentedControl } from '@/ui/SegmentedControl/SegmentedControl'
 import { ServerStatusChip } from '@/ui/ServerStatusChip/ServerStatusChip'
 import { GRID_COLUMNS, type GridColumns } from '@/ui/TileGrid/TileGrid'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Home/Home.module.scss'
 
 /** How many rows of albums Home's grid shows. */
@@ -44,18 +43,6 @@ const RECENT_COLUMNS = {
   [FORM_FACTORS.phone]: GRID_COLUMNS[FORM_FACTORS.phone],
   [FORM_FACTORS.tablet]: 6,
 } as const satisfies GridColumns
-
-/** The two orders of Home's albums, as its control offers them. */
-const RECENT_CHOICES = [
-  { key: RECENT_SORTS.release, label: HOME_COPY.sorts.release },
-  { key: RECENT_SORTS.added, label: HOME_COPY.sorts.added },
-] as const satisfies readonly Choice<RecentSort>[]
-
-/** What the section is called under each order. */
-const RECENT_TITLES = {
-  [RECENT_SORTS.added]: LIBRARY_PAGE_COPY.recent,
-  [RECENT_SORTS.release]: HOME_COPY.latestReleases,
-} as const satisfies Record<RecentSort, string>
 
 /** The narrow layout's header: the lockup, and whether the server answers. The sidebar has both. */
 function HomeHeader() {
@@ -85,7 +72,7 @@ function PlaylistsShortcut() {
   return (
     <ShortcutCard
       href={collectionPath(COLLECTION_KINDS.playlists)}
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       title={LIBRARY_PAGE_COPY.playlists}
       value={lineValueOf({
         line: playlists.isSuccess ? countsLineOf({ playlists: playlists.data.length }) : null,
@@ -110,7 +97,7 @@ function Shortcuts({ formFactor }: ShortcutsProps) {
   return (
     <div className={styles.shortcuts}>
       <ShortcutCard
-        icon={ICONS.shuffle}
+        icon={WREN_ICONS.shuffle}
         isAccent
         isDisabled={songs === 0}
         onPress={() => {
@@ -137,9 +124,12 @@ function RecentlyAdded() {
   const limit = RECENT_ROWS * RECENT_COLUMNS[useFormFactor()]
   const { albums, listing } = useRecentAlbums({ sort, limit })
   return (
-    <Section seeAll={{ href: collectionPath(COLLECTION_KINDS.albums) }} title={RECENT_TITLES[sort]}>
+    <Section
+      seeAll={{ href: collectionPath(COLLECTION_KINDS.albums) }}
+      title={HOME_RECENT_TITLES[sort]}
+    >
       <SegmentedControl
-        choices={RECENT_CHOICES}
+        choices={HOME_RECENT_CHOICES}
         label={HOME_COPY.sortAlbums}
         onSelect={(homeSort) => change({ homeSort })}
         selected={sort}

@@ -41,6 +41,9 @@ const TOP_SHELF_SIGN_IN = {
   picture2x: `${APPLE_TV_IMAGES}/top-shelf-sign-in-2x.png`,
 } as const
 
+/** The Siri Remote's UI test target `tvos-e2e/` compiles into. */
+const REMOTE_TESTS = { target: 'RavenRemoteTests' } as const
+
 type AppleTVIconLayers = { front: string; back: string }
 
 type AppleTVIconLayersProps = { name: string }
@@ -175,7 +178,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
    */
   const withTests = isTv
     ? withoutTvAudioService(
-        withTvTopShelf(withTvRemoteTests(withTvBannerDensities(app)), {
+        withTvTopShelf(withTvRemoteTests(withTvBannerDensities(app), REMOTE_TESTS), {
           signIn: TOP_SHELF_SIGN_IN,
         }),
       )

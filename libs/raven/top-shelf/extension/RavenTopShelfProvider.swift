@@ -13,19 +13,19 @@ private func action(_ link: String?) -> TVTopShelfAction? {
 }
 
 /// Signed out: one wide picture asking the viewer to sign in, opening the sign-in page.
-private func signedOut(_ shelf: RavenTopShelfStored) -> TVTopShelfContent {
+private func signedOut(title: String, openUrl: String) -> TVTopShelfContent {
   let item = TVTopShelfItem(identifier: RavenTopShelfKind.signedOut.rawValue)
-  item.title = shelf.title
+  item.title = title
   signInPictures.forEach { picture in
     if let url = Bundle.main.url(forResource: picture.name, withExtension: pictureType) {
       item.setImageURL(url, for: picture.scale)
     }
   }
-  item.displayAction = action(shelf.openUrl)
+  item.displayAction = action(openUrl)
   return TVTopShelfInsetContent(items: [item])
 }
 
-/// A stored title's words, picture and deep links on the shelf's item, whichever kind it is.
+/// A stored title's words, picture and deep links on the shelf's item, whichever layout it is in.
 private func dressed<Item: TVTopShelfItem>(
   _ item: Item, as stored: RavenTopShelfStoredItem, in folder: URL
 ) -> Item {
@@ -37,38 +37,46 @@ private func dressed<Item: TVTopShelfItem>(
 }
 
 /// raven's Continue watching: each title full screen behind the tile, with Play and More Info.
-private func carousel(_ shelf: RavenTopShelfStored, in folder: URL) -> TVTopShelfContent {
-  let items = shelf.items.map { stored -> TVTopShelfCarouselItem in
+private func carousel(title: String, items: [RavenTopShelfStoredItem], in folder: URL)
+  -> TVTopShelfContent
+{
+  let slides = items.map { stored -> TVTopShelfCarouselItem in
     let item = dressed(TVTopShelfCarouselItem(identifier: stored.id), as: stored, in: folder)
-    item.contextTitle = shelf.title
+    item.contextTitle = title
     item.summary = stored.summary
     return item
   }
-  return TVTopShelfCarouselContent(style: .actions, items: items)
+  return TVTopShelfCarouselContent(style: .actions, items: slides)
 }
 
 /// Wren's latest releases: a row of square covers under the shelf's heading.
-private func sectioned(_ shelf: RavenTopShelfStored, in folder: URL) -> TVTopShelfContent {
-  let items = shelf.items.map { stored -> TVTopShelfSectionedItem in
+private func sectioned(title: String, items: [RavenTopShelfStoredItem], in folder: URL)
+  -> TVTopShelfContent
+{
+  let tiles = items.map { stored -> TVTopShelfSectionedItem in
     let item = dressed(TVTopShelfSectionedItem(identifier: stored.id), as: stored, in: folder)
     item.imageShape = .square
     return item
   }
-  let section = TVTopShelfItemCollection(items: items)
-  section.title = shelf.title
+  let section = TVTopShelfItemCollection(items: tiles)
+  section.title = title
   return TVTopShelfSectionedContent(sections: [section])
 }
 
 /// What the shelf shows; nil (before the app first wrote one, or with nothing on it) leaves the static Top Shelf image up.
 private func content() -> TVTopShelfContent? {
   guard let (shelf, folder) = RavenTopShelfStore.read() else { return nil }
-  switch shelf.kind {
-  case .signedOut:
-    return signedOut(shelf)
-  case .carousel:
-    return shelf.items.isEmpty ? nil : carousel(shelf, in: folder)
-  case .sectioned:
-    return shelf.items.isEmpty ? nil : sectioned(shelf, in: folder)
+  switch shelf {
+  case let .signedOut(title, openUrl):
+    return signedOut(title: title, openUrl: openUrl)
+  case let .titles(layout, title, items):
+    guard !items.isEmpty else { return nil }
+    switch layout {
+    case .carousel:
+      return carousel(title: title, items: items, in: folder)
+    case .sectioned:
+      return sectioned(title: title, items: items, in: folder)
+    }
   }
 }
 

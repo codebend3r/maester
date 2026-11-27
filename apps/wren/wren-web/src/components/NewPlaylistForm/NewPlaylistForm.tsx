@@ -1,11 +1,10 @@
 import { type PlaylistDetails, isPlaylistName } from '@raven/core'
 import { useServerPlaylistMutations } from '@raven/ui/headless'
-import { NEW_PLAYLIST_COPY } from '@raven/wren'
+import { NEW_PLAYLIST_COPY, WREN_ICONS } from '@raven/wren'
 import { type FormEvent, useState } from 'react'
 import { api } from '@/lib/api'
 import { Button } from '@/ui/Button/Button'
 import { TextField } from '@/ui/TextField/TextField'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/components/NewPlaylistForm/NewPlaylistForm.module.scss'
 
 type NewPlaylistFormProps = {
@@ -33,7 +32,7 @@ export function NewPlaylistForm({ onCreated }: NewPlaylistFormProps) {
         autoComplete="off"
         enterKeyHint="done"
         error={create.error?.message ?? null}
-        icon={ICONS.playlist}
+        icon={WREN_ICONS.playlist}
         label={NEW_PLAYLIST_COPY.name}
         onChangeText={setName}
         placeholder={NEW_PLAYLIST_COPY.placeholder}

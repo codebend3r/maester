@@ -1,11 +1,10 @@
 import { REPEAT_MODES } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, repeatIconOf, toggleLookOf } from '@raven/wren'
+import { PLAYER_COPY, repeatIconOf, toggleLookOf, WREN_ICONS, type WrenIconName } from '@raven/wren'
 
 import { useWrenTheme } from '@/theme/wrenTheme'
 import { PLAYER_SIZES } from '@/theme/wrenTokens'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 type QueueToggleProps = { isOn: boolean; icon: WrenIconName; label: string; onPress: () => void }
 
@@ -30,7 +29,7 @@ export function ShuffleToggle() {
   const toggleShuffle = useAudioQueue((store) => store.toggleShuffle)
   return (
     <QueueToggle
-      icon={ICONS.shuffle}
+      icon={WREN_ICONS.shuffle}
       isOn={isShuffled}
       label={PLAYER_COPY.shuffle}
       onPress={toggleShuffle}
@@ -47,7 +46,7 @@ export function RepeatToggle() {
   const cycleRepeat = useAudioQueue((store) => store.cycleRepeat)
   return (
     <QueueToggle
-      icon={repeatIconOf({ repeat, icons: ICONS })}
+      icon={repeatIconOf({ repeat, icons: WREN_ICONS })}
       isOn={repeat !== REPEAT_MODES.off}
       label={PLAYER_COPY.repeat[repeat]}
       onPress={cycleRepeat}

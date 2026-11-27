@@ -1,6 +1,6 @@
+import { WREN_ICONS } from '@raven/wren'
 import { FocusButton } from '@/ui/FocusButton'
 import { FOCUS_ROLES } from '@/ui/Focusable'
-import { ICONS } from '@/ui/WrenIcon'
 
 type FavouriteButtonProps = { label: string; isOn: boolean; onToggle: () => void }
 
@@ -11,7 +11,7 @@ type FavouriteButtonProps = { label: string; isOn: boolean; onToggle: () => void
 export function FavouriteButton({ label, isOn, onToggle }: FavouriteButtonProps) {
   return (
     <FocusButton
-      icon={isOn ? ICONS.heartFilled : ICONS.heart}
+      icon={isOn ? WREN_ICONS.heartFilled : WREN_ICONS.heart}
       isSelected={isOn}
       label={label}
       onPress={onToggle}

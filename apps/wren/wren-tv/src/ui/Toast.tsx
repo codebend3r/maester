@@ -1,9 +1,10 @@
+import { WREN_ICONS } from '@raven/wren'
 import { Text, View } from 'react-native'
 
 import { useToast } from '@raven/wren-native'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   toast: {
@@ -37,7 +38,7 @@ export function ToastHost() {
         pointerEvents="none"
         style={styles.toast}
       >
-        <WrenIcon color={colors.bg} name={ICONS.check} size={SIZE.iconSmall} />
+        <WrenIcon color={colors.bg} name={WREN_ICONS.check} size={SIZE.iconSmall} />
         <Text style={styles.message}>{message}</Text>
       </View>
     )

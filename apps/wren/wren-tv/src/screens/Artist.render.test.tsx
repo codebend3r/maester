@@ -7,7 +7,13 @@ import { fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-li
 import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_PAGES } from '@raven/wren-native/headless'
-import { LISTENER, OK_COMPUTER, OK_COMPUTER_PAGE, RADIOHEAD, musicApi } from '@/test/music'
+import {
+  LISTENER,
+  OK_COMPUTER,
+  OK_COMPUTER_PAGE,
+  RADIOHEAD,
+  musicApi,
+} from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'

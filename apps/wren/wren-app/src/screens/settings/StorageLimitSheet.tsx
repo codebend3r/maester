@@ -1,12 +1,12 @@
 import { Pressable, Text, View } from 'react-native'
 
-import { SETTINGS_COPY, STORAGE_COPY } from '@raven/wren'
+import { SETTINGS_COPY, STORAGE_COPY, WREN_ICONS } from '@raven/wren'
 import { STORAGE_LIMITS_GB, useWrenPrefs } from '@/stores/wrenPrefs'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 type StorageLimitGb = (typeof STORAGE_LIMITS_GB)[number]
 
@@ -58,7 +58,7 @@ export function StorageLimitSheet({ isOpen, onClose }: StorageLimitSheetProps) {
             >
               <Text style={styles.label}>{label}</Text>
               {isSelected && (
-                <WrenIcon color={colors.accentText} name={ICONS.check} size={SIZE.icon} />
+                <WrenIcon color={colors.accentText} name={WREN_ICONS.check} size={SIZE.icon} />
               )}
             </Pressable>
           )

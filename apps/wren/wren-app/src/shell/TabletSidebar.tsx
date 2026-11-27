@@ -1,4 +1,11 @@
-import { HOME_COPY, LIBRARY_PAGE_COPY, SEARCH_COPY, SETTINGS_COPY } from '@raven/wren'
+import {
+  HOME_COPY,
+  LIBRARY_PAGE_COPY,
+  SEARCH_COPY,
+  SETTINGS_COPY,
+  WREN_ICONS,
+  type WrenIconName,
+} from '@raven/wren'
 import { type Href, usePathname, useRouter } from 'expo-router'
 import type { ComponentType } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
@@ -14,7 +21,7 @@ import { FONTS, RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenToken
 import { pressedStyleOf } from '@/ui/press'
 import { ServerStatusChip } from '@/ui/ServerStatusChip'
 import { Unseen } from '@/ui/Unseen'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   sidebar: {
@@ -87,8 +94,8 @@ const collectionPlace = ({ kind, label, icon }: Category): SidebarPlace => ({
 
 /** Home and Search, at the sidebar's top. */
 const TOP_PLACES = [
-  tabPlace({ label: HOME_COPY.title, icon: ICONS.home, path: WREN_ROUTES.home }),
-  tabPlace({ label: SEARCH_COPY.title, icon: ICONS.search, path: WREN_ROUTES.search }),
+  tabPlace({ label: HOME_COPY.title, icon: WREN_ICONS.home, path: WREN_ROUTES.home }),
+  tabPlace({ label: SEARCH_COPY.title, icon: WREN_ICONS.search, path: WREN_ROUTES.search }),
 ] as const
 
 /** Library's categories, under its overline, in Library's order. */
@@ -96,7 +103,7 @@ const LIBRARY_PLACES = CATEGORIES.map(collectionPlace)
 
 const SETTINGS_PLACE = tabPlace({
   label: SETTINGS_COPY.title,
-  icon: ICONS.settings,
+  icon: WREN_ICONS.settings,
   path: WREN_ROUTES.settings,
 })
 

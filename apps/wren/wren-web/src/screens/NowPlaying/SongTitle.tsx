@@ -1,5 +1,5 @@
 import { classNames } from '@raven/ui/headless'
-import { NOW_PLAYING_COPY, type SongActions } from '@raven/wren'
+import { NOW_PLAYING_COPY, type SongActions, WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import {
   ARTIST_KINDS,
@@ -13,7 +13,6 @@ import { IconButton } from '@/ui/IconButton/IconButton'
 import { LikeButton } from '@/ui/LikeButton/LikeButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
 import { QualityChips } from '@/ui/QualityChips/QualityChips'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/NowPlaying/SongTitle.module.scss'
 
 type SongProps = { playing: Playing }
@@ -112,7 +111,7 @@ export function SongTitle({ playing, like, onAddToPlaylist }: SongTitleProps) {
       <div className={styles.actions}>
         <LikeButton idleColor={COLORS.text2} like={like} title={playing.track.title} />
         <IconButton
-          icon={ICONS.playlistAdd}
+          icon={WREN_ICONS.playlistAdd}
           label={NOW_PLAYING_COPY.addToPlaylist}
           onPress={onAddToPlaylist}
         />

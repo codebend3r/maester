@@ -1,6 +1,6 @@
 import { type ArtistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
 import { useAudioQueue, useIsOwner, useServerArtistFavourite } from '@raven/ui/headless'
-import { ARTIST_COPY, artistMetaOf, PLAYER_COPY } from '@raven/wren'
+import { ARTIST_COPY, artistMetaOf, PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { useQuery } from '@tanstack/react-query'
 import { type ComponentType, type ReactNode, useState } from 'react'
 import { ScrollView, View } from 'react-native'
@@ -26,7 +26,7 @@ import { BUTTON_VARIANTS, Button } from '@/ui/Button'
 import { AlbumTileOf } from '@/ui/AlbumTile'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { TileGrid } from '@/ui/TileGrid'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -59,13 +59,13 @@ function ArtistActions({
   return (
     <>
       <Button
-        icon={ICONS.play}
+        icon={WREN_ICONS.play}
         isStretched={isStretched}
         label={PLAYER_COPY.play}
         onPress={onPlay}
       />
       <Button
-        icon={ICONS.shuffle}
+        icon={WREN_ICONS.shuffle}
         isStretched={isStretched}
         label={PLAYER_COPY.shuffle}
         onPress={onShuffle}
@@ -79,7 +79,7 @@ function ArtistActions({
       />
       {onEditBackground !== null && (
         <DetailAction
-          glyph={<WrenIcon color={colors.text2} name={ICONS.image} />}
+          glyph={<WrenIcon color={colors.text2} name={WREN_ICONS.image} />}
           label={ARTIST_COPY.editBackground}
           onPress={onEditBackground}
           shape={ACTION_SHAPES.circle}

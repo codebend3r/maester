@@ -1,6 +1,5 @@
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { type Press, Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/BackLink/BackLink.module.scss'
 
@@ -18,7 +17,7 @@ export function BackLink({ to, ...press }: BackTarget) {
       className={styles.back}
       label={to === undefined ? KIT_COPY.backAlone : KIT_COPY.back(to)}
     >
-      <WrenIcon name={ICONS.back} />
+      <WrenIcon name={WREN_ICONS.back} />
       <span>{to ?? KIT_COPY.backAlone}</span>
     </Pressable>
   )

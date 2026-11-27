@@ -1,13 +1,6 @@
-import { MUSIC_SORTS, MUSIC_SORT_LABELS, type MusicSort } from '@raven/core'
-import { LIBRARY_PAGE_COPY } from '@raven/wren'
+import type { MusicSort } from '@raven/core'
+import { LIBRARY_PAGE_COPY, MUSIC_SORT_OPTIONS, WREN_ICONS } from '@raven/wren'
 import { ChoiceButton } from '@/screens/Collection/ChoiceButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
-
-/** raven's music sorts, in raven's order and in raven's words. */
-const SORT_OPTIONS = Object.values(MUSIC_SORTS).map((sort) => ({
-  value: sort,
-  label: MUSIC_SORT_LABELS[sort],
-}))
 
 type SortButtonProps = { sort: MusicSort; onSort: (sort: MusicSort) => void }
 
@@ -16,9 +9,9 @@ export function SortButton({ sort, onSort }: SortButtonProps) {
   return (
     <ChoiceButton
       chosen={sort}
-      icon={ICONS.sort}
+      icon={WREN_ICONS.sort}
       onChoose={onSort}
-      options={SORT_OPTIONS}
+      options={MUSIC_SORT_OPTIONS}
       spokenLabelOf={LIBRARY_PAGE_COPY.sortLabel}
       title={LIBRARY_PAGE_COPY.sortBy}
     />

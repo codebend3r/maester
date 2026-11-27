@@ -1,4 +1,4 @@
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
 import { NotedGroup } from '@/screens/settings/NotedGroup'
@@ -8,7 +8,7 @@ import { SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { GroupedList } from '@/ui/GroupedList'
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -47,7 +47,11 @@ export function LibraryGroup({ session }: LibraryGroupProps) {
                 </Text>
                 {/* Drawn on every row, so no row changes when it is picked; seen on the worn one alone. */}
                 <View style={id !== worn.id && UNSEEN}>
-                  <WrenIcon color={colors.accentText} name={ICONS.check} size={SIZE.smallIcon} />
+                  <WrenIcon
+                    color={colors.accentText}
+                    name={WREN_ICONS.check}
+                    size={SIZE.smallIcon}
+                  />
                 </View>
               </Pressable>
             ))}

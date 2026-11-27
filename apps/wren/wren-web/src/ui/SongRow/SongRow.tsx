@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { classNames } from '@raven/ui/headless'
 import {
   KIT_COPY,
@@ -16,7 +17,6 @@ import { EqualizerIndicator } from '@/ui/EqualizerIndicator/EqualizerIndicator'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { LikeButton } from '@/ui/LikeButton/LikeButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/ui/SongRow/SongRow.module.scss'
 
 type LeadProps = { lead: ShownLead<Cover>; isPlaying: boolean }
@@ -126,7 +126,7 @@ export function SongRow({
         <span className={styles.more}>
           <IconButton
             color={COLORS.text3}
-            icon={ICONS.more}
+            icon={WREN_ICONS.more}
             label={KIT_COPY.more(title)}
             onPress={onMore}
             size={SIZES.smallButton}

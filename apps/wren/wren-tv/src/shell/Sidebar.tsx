@@ -1,3 +1,4 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import type { Palette } from '@raven/wren'
 import { PLAYER_COPY } from '@raven/wren'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
@@ -12,16 +13,16 @@ import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { AlbumArt } from '@/ui/AlbumArt'
 import { FOCUS_ROLES, Focusable } from '@/ui/Focusable'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 import { WrenLockup } from '@/ui/WrenLockup'
 import type { Track } from '@raven/core'
 
 /** Each place's drawing, the phone's tab bar's. */
 const PLACE_ICONS = {
-  [WREN_ROUTES.home]: ICONS.home,
-  [WREN_ROUTES.library]: ICONS.library,
-  [WREN_ROUTES.search]: ICONS.search,
-  [WREN_ROUTES.settings]: ICONS.settings,
+  [WREN_ROUTES.home]: WREN_ICONS.home,
+  [WREN_ROUTES.library]: WREN_ICONS.library,
+  [WREN_ROUTES.search]: WREN_ICONS.search,
+  [WREN_ROUTES.settings]: WREN_ICONS.settings,
 } as const satisfies Record<Place['route'], WrenIconName>
 
 const useStyles = themedStyles(({ colors }) => ({

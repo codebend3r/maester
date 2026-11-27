@@ -1,4 +1,4 @@
-import { LIBRARY_COPY, RESULT_STATES, type ResultState, SEARCH_COPY } from '@raven/wren'
+import { LIBRARY_COPY, RESULT_STATES, type ResultState, SEARCH_COPY, WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { View } from 'react-native'
 
@@ -8,7 +8,6 @@ import { NoMatches, type ResultsProps } from '@/screens/search/ResultParts'
 import { themedStyles } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
 import { EmptyState } from '@/ui/EmptyState'
-import { ICONS } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(() => ({
   searching: { paddingVertical: SPACE.s8 },
@@ -28,7 +27,7 @@ function Failed({ results, contentStyle }: ResultsProps) {
     <View style={contentStyle}>
       <EmptyState
         body={SEARCH_COPY.failedHint(results.failure?.message ?? '')}
-        icon={ICONS.alert}
+        icon={WREN_ICONS.alert}
         title={SEARCH_COPY.failed}
       />
     </View>
@@ -38,7 +37,11 @@ function Failed({ results, contentStyle }: ResultsProps) {
 function NoMusic({ contentStyle }: ResultsProps) {
   return (
     <View style={contentStyle}>
-      <EmptyState body={SEARCH_COPY.noMusicHint} icon={ICONS.album} title={LIBRARY_COPY.noMusic} />
+      <EmptyState
+        body={SEARCH_COPY.noMusicHint}
+        icon={WREN_ICONS.album}
+        title={LIBRARY_COPY.noMusic}
+      />
     </View>
   )
 }

@@ -1,6 +1,7 @@
+import { type WrenIconName } from '@raven/wren'
 import { SIZES } from '@/theme/tokens'
 import { Button, type ButtonVariant } from '@/ui/Button/Button'
-import type { IconAction, WrenIconName } from '@/ui/WrenIcon/icons'
+import type { IconAction } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/ui/EmptyState/EmptyState.module.scss'
 

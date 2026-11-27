@@ -1,8 +1,8 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import {
   KIT_COPY,
   LIBRARY_SEGMENTS,
   type LibrarySegment,
-  isRecentPage,
   recentKeyOf,
   type RecentSearch,
   recentTextOf,
@@ -12,8 +12,8 @@ import {
 import { useRouter } from 'expo-router'
 import { Pressable, Text, View } from 'react-native'
 
-import { useRecentSearches } from '@raven/wren-native'
-import { libraryHref, recentPageHref } from '@raven/wren-native/headless'
+import { useOpenRecent, useRecentSearches } from '@raven/wren-native'
+import { libraryHref } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import {
   RADIUS,
@@ -28,7 +28,7 @@ import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { SectionHeader } from '@/ui/SectionHeader'
 import { tileWidthOf } from '@/ui/tileWidth'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 // Two Browse tiles to a row on a phone, all four in one on a tablet.
 const BROWSE_COLUMNS = {
@@ -74,28 +74,28 @@ const BROWSE_TILES = [
   {
     segment: LIBRARY_SEGMENTS.albums,
     label: SEARCH_COPY.albums,
-    icon: ICONS.album,
+    icon: WREN_ICONS.album,
     ground: ART.ink,
     ink: ART.ochre,
   },
   {
     segment: LIBRARY_SEGMENTS.artists,
     label: SEARCH_COPY.artists,
-    icon: ICONS.artist,
+    icon: WREN_ICONS.artist,
     ground: ART.dusk,
     ink: ART.blush,
   },
   {
     segment: LIBRARY_SEGMENTS.songs,
     label: SEARCH_COPY.songs,
-    icon: ICONS.song,
+    icon: WREN_ICONS.song,
     ground: ART.slate,
     ink: ART.cream,
   },
   {
     segment: LIBRARY_SEGMENTS.downloads,
     label: SEARCH_COPY.downloaded,
-    icon: ICONS.downloads,
+    icon: WREN_ICONS.downloads,
     ground: ART.pine,
     ink: ART.sand,
   },
@@ -141,19 +141,11 @@ type RecentRowProps = RecentViewProps & { onSearch: (text: string) => void }
 /** A recent search: a press searches again or opens its page, and its x forgets it. */
 function RecentRow({ recent, onSearch }: RecentRowProps) {
   const styles = useStyles()
-  const router = useRouter()
   const { colors } = useWrenTheme()
-  const remember = useRecentSearches((state) => state.remember)
   const forget = useRecentSearches((state) => state.forget)
   const { name, line } = recentTextOf(recent)
-  const open = () => {
-    remember(recent)
-    if (isRecentPage(recent)) {
-      router.push(recentPageHref(recent))
-      return
-    }
-    onSearch(recent.text)
-  }
+  const openRecent = useOpenRecent({ onSearch })
+  const open = () => openRecent(recent)
   return (
     <View style={styles.recent}>
       <Pressable
@@ -162,7 +154,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
         onPress={open}
         style={pressedStyleOf({ style: styles.recentMain })}
       >
-        <WrenIcon color={colors.text3} name={ICONS.recent} size={SIZE.icon} />
+        <WrenIcon color={colors.text3} name={WREN_ICONS.recent} size={SIZE.icon} />
         <View style={styles.recentText}>
           <Text numberOfLines={1} style={styles.recentName}>
             {name}
@@ -174,7 +166,7 @@ function RecentRow({ recent, onSearch }: RecentRowProps) {
       </Pressable>
       <IconButton
         color={colors.text3}
-        icon={ICONS.close}
+        icon={WREN_ICONS.close}
         label={SEARCH_COPY.removeRecent(name)}
         onPress={() => forget(recentKeyOf(recent))}
         size={SIZE.smallButton}

@@ -1,11 +1,10 @@
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { useState } from 'react'
 import { wrenVersion } from '@/lib/version'
 import { BottomSheet } from '@/ui/BottomSheet/BottomSheet'
 import { FactRow } from '@/ui/FactRow/FactRow'
 import { GroupedList } from '@/ui/GroupedList/GroupedList'
 import { NAVIGATION_ROW_VARIANTS, NavigationRow } from '@/ui/NavigationRow/NavigationRow'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Settings/AboutGroup.module.scss'
 
 /** The fonts' copyright and their licence, the Open Font License's notice. */
@@ -30,7 +29,7 @@ export function AboutGroup() {
     <>
       <GroupedList heading={SETTINGS_COPY.about}>
         <FactRow
-          icon={ICONS.info}
+          icon={WREN_ICONS.info}
           label={SETTINGS_COPY.version}
           value={SETTINGS_COPY.versionOf(wrenVersion)}
         />

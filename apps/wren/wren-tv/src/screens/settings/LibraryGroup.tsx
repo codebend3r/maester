@@ -1,11 +1,10 @@
-import { SETTINGS_COPY } from '@raven/wren'
+import { SETTINGS_COPY, WREN_ICONS } from '@raven/wren'
 import { type WrenSession, useMusicLibraries } from '@raven/wren-native'
 
 import { SettingsGroup } from '@/screens/settings/parts'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { FOCUS_ROLES } from '@/ui/Focusable'
 import { ListRow } from '@/ui/ListRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 type LibraryGroupProps = { session: WrenSession }
 
@@ -22,7 +21,7 @@ export function LibraryGroup({ session }: LibraryGroupProps) {
       <SettingsGroup heading={SETTINGS_COPY.library} note={SETTINGS_COPY.libraryNote}>
         {music.all.map(({ id, name }) => (
           <ListRow
-            icon={id === worn.id ? ICONS.check : ICONS.library}
+            icon={id === worn.id ? WREN_ICONS.check : WREN_ICONS.library}
             isSelected={id === worn.id}
             key={id}
             onPress={() => change({ libraryId: id })}

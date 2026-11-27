@@ -1,10 +1,10 @@
+import { WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { type ComponentType, useState } from 'react'
 
 import { FocusButton } from '@/ui/FocusButton'
 import { FOCUS_ROLES } from '@/ui/Focusable'
 import { ListRow } from '@/ui/ListRow'
 import { Sheet } from '@/ui/Sheet'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
 
 /** One of the choices offered, as it is kept and as it is called, with a quiet line under it. */
 type ChoiceOption<Choice extends string> = { value: Choice; label: string; line?: string }
@@ -63,7 +63,7 @@ function RowOption<Choice extends string>({
   return (
     <ListRow
       hasPreferredFocus={isChosen}
-      icon={isChosen ? ICONS.check : icon}
+      icon={isChosen ? WREN_ICONS.check : icon}
       isSelected={isChosen}
       line={option.line ?? null}
       onPress={() => onChoose(option.value)}

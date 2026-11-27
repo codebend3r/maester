@@ -28,7 +28,14 @@ import { useWrenAccount, accountServers, useActiveServer } from '@raven/wren-nat
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { DEFAULT_WREN_PREFS, useWrenPrefs } from '@/stores/wrenPrefs'
 import { PHONE_WINDOW } from '@/test/jestSetup'
-import { AIRBAG, LISTENER, MUSIC, OK_COMPUTER, PARANOID, musicApi } from '@/test/music'
+import {
+  AIRBAG,
+  LISTENER,
+  MUSIC,
+  OK_COMPUTER,
+  PARANOID,
+  musicApi,
+} from '@raven/wren-native/testing'
 import { WREN_TREE } from '@/test/wrenTree'
 
 const mockApi = musicApi()

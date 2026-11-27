@@ -2,6 +2,12 @@ import { REPEAT_MODES, type RepeatMode, formatDuration } from '@raven/core'
 
 import { PLAYER_COPY } from '@/copy/kit'
 
+/**
+ * How far one step of the scrubber moves the playhead, in seconds: a screen reader's swipe, an
+ * arrow key or a remote's press.
+ */
+export const SCRUB_STEP_SECONDS = 15
+
 type ProgressOfProps = { position: number; length: number }
 
 /** How far through the track it is, from 0 to 1, and none while its length is unknown. */

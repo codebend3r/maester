@@ -1,12 +1,9 @@
 import { formatDuration, remainingTimeOf } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
-import { PLAYER_COPY, scrubTextOf } from '@raven/wren'
+import { PLAYER_COPY, SCRUB_STEP_SECONDS, scrubTextOf } from '@raven/wren'
 import type { ComponentType, ReactElement } from 'react'
 import { Adjuster } from '@/player/Adjuster/Adjuster'
 import styles from '@/player/Scrubber/Scrubber.module.scss'
-
-// How far an arrow key moves the scrubber, in seconds.
-const SCRUB_STEP = 15
 
 /** Where the scrubber is drawn: Now Playing's, its times under it, or the player bar's, beside it. */
 export const SCRUBBERS = { player: 'player', bar: 'bar' } as const
@@ -83,7 +80,7 @@ export function Scrubber({ length, kind }: ScrubberProps) {
           label={PLAYER_COPY.position}
           max={length}
           onChange={seekTo}
-          step={SCRUB_STEP}
+          step={SCRUB_STEP_SECONDS}
           value={position}
           valueText={(at) => scrubTextOf({ position: at, length })}
         />

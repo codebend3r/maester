@@ -1,12 +1,19 @@
-/**
- * The three Top Shelves an app shows: an invitation to sign in, a full screen carousel (raven's
- * Continue watching) or a row of square tiles (Wren's latest releases).
- */
+/** The two Top Shelves an app shows: an invitation to sign in, or a shelf of titles. */
 export const TOP_SHELF_KINDS = {
   signedOut: 'signedOut',
+  titles: 'titles',
+} as const
+
+/**
+ * How a shelf of titles is laid out: a full screen carousel (raven's Continue watching) or a row
+ * of square tiles (Wren's latest releases).
+ */
+export const TOP_SHELF_LAYOUTS = {
   carousel: 'carousel',
   sectioned: 'sectioned',
 } as const
+
+export type TopShelfLayout = (typeof TOP_SHELF_LAYOUTS)[keyof typeof TOP_SHELF_LAYOUTS]
 
 /** A picture on the server, with the headers its request carries: the server's cookies and the account's token. */
 export type TopShelfPicture = { uri: string; headers: Record<string, string> }
@@ -25,23 +32,21 @@ export type TopShelfItem = {
   openUrl: string
 }
 
+/** The shelf shown while nobody is signed in: an invitation to sign in. */
+export type TopShelfInvitation = {
+  kind: typeof TOP_SHELF_KINDS.signedOut
+  title: string
+  /** Where pressing the invitation goes: the sign-in page. */
+  openUrl: string
+}
+
 /** What the Top Shelf shows above the app's tile, as the app last wrote it. */
 export type TopShelf =
+  | TopShelfInvitation
   | {
-      kind: typeof TOP_SHELF_KINDS.signedOut
-      title: string
-      /** Where pressing the invitation goes: the sign-in page. */
-      openUrl: string
-    }
-  | {
-      kind: typeof TOP_SHELF_KINDS.carousel
-      /** The words over each slide, the shelf's name: "Continue watching". */
-      title: string
-      items: readonly TopShelfItem[]
-    }
-  | {
-      kind: typeof TOP_SHELF_KINDS.sectioned
-      /** The row's heading: "Latest releases". */
+      kind: typeof TOP_SHELF_KINDS.titles
+      layout: TopShelfLayout
+      /** The shelf's name: the words over each slide of a carousel, the heading over a row. */
       title: string
       items: readonly TopShelfItem[]
     }

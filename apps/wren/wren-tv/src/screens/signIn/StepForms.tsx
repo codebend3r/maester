@@ -1,5 +1,5 @@
 import { SIGN_IN_STEPS, type SignInStep, keyboardFor } from '@raven/native/headless'
-import { SIGN_IN_COPY, signInErrorsOf } from '@raven/wren'
+import { SIGN_IN_COPY, signInErrorsOf, WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { Text, View } from 'react-native'
 import type { SignInFlow } from '@raven/wren-native'
@@ -8,7 +8,7 @@ import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { BUTTON_TONES, FocusButton } from '@/ui/FocusButton'
 import { TextField } from '@/ui/TextField'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }) => ({
   form: { gap: SPACE.s4, width: SIZE.fieldWidth },
@@ -40,7 +40,7 @@ function AlertBanner({ text }: AlertBannerProps) {
       accessible
       style={styles.banner}
     >
-      <WrenIcon color={colors.accentText} name={ICONS.alert} size={SIZE.iconSmall} />
+      <WrenIcon color={colors.accentText} name={WREN_ICONS.alert} size={SIZE.iconSmall} />
       <Text style={styles.bannerText}>{text}</Text>
     </View>
   )

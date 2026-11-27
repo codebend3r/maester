@@ -15,7 +15,14 @@ import { queryClient } from '@/queryClient'
 import { useWrenAccount } from '@raven/wren-native'
 import { WREN_PAGES, collectionPathOf } from '@raven/wren-native/headless'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
-import { AIRBAG, LISTENER, MIXTAPE, OK_COMPUTER, RADIOHEAD, musicApi } from '@/test/music'
+import {
+  AIRBAG,
+  LISTENER,
+  MIXTAPE,
+  OK_COMPUTER,
+  RADIOHEAD,
+  musicApi,
+} from '@raven/wren-native/testing'
 import type * as NativeMock from '@/test/nativeMock'
 import { pagePathOf } from '@/test/routes'
 import { WREN_TREE } from '@/test/wrenTree'

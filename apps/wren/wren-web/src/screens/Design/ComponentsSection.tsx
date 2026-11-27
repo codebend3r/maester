@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DESIGN_COPY } from '@raven/wren'
+import { DESIGN_COPY, WREN_ICONS } from '@raven/wren'
 import { DesignSection, Specimen } from '@/screens/Design/DesignSection'
 import { SECTION_IDS } from '@/screens/Design/sections'
 import { SIZES } from '@/theme/tokens'
@@ -18,7 +18,6 @@ import { SegmentedControl } from '@/ui/SegmentedControl/SegmentedControl'
 import { Spinner } from '@/ui/Spinner/Spinner'
 import { StatusChip } from '@/ui/StatusChip/StatusChip'
 import { TextField } from '@/ui/TextField/TextField'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/Design/Design.module.scss'
 
@@ -58,7 +57,7 @@ function Buttons() {
       <Button label={copy.secondary} onPress={NOOP} variant={BUTTON_VARIANTS.secondary} />
       <Button label={copy.ghost} onPress={NOOP} variant={BUTTON_VARIANTS.ghost} />
       <Button
-        icon={ICONS.playlistAdd}
+        icon={WREN_ICONS.playlistAdd}
         label={copy.icon}
         onPress={NOOP}
         variant={BUTTON_VARIANTS.secondary}
@@ -74,13 +73,13 @@ function IconButtons() {
   return (
     <div className={styles.row}>
       <IconButton
-        icon={ICONS.heart}
+        icon={WREN_ICONS.heart}
         label={SAMPLES.iconButton.plain}
         onPress={NOOP}
         variant={ICON_BUTTON_VARIANTS.plain}
       />
       <IconButton
-        icon={ICONS.play}
+        icon={WREN_ICONS.play}
         label={SAMPLES.iconButton.filled}
         onPress={NOOP}
         variant={ICON_BUTTON_VARIANTS.filled}
@@ -119,7 +118,7 @@ function Fields() {
     <div className={styles.column}>
       <TextField label={copy.plain} onChangeText={setPlain} value={plain} />
       <TextField
-        icon={ICONS.search}
+        icon={WREN_ICONS.search}
         label={copy.withIcon}
         onChangeText={setSearch}
         value={search}
@@ -160,7 +159,7 @@ function Rows() {
     <div className={styles.column}>
       <SectionHeader seeAll={{ onPress: NOOP }} title={copy.section} />
       <NavigationRow
-        icon={ICONS.library}
+        icon={WREN_ICONS.library}
         label={copy.library}
         onPress={NOOP}
         variant={NAVIGATION_ROW_VARIANTS.library}
@@ -209,13 +208,13 @@ function Empty() {
     <EmptyState
       action={{ label: copy.action, onPress: NOOP }}
       body={copy.body}
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       title={copy.title}
     />
   )
 }
 
-const ICON_SET = Object.entries(ICONS)
+const ICON_SET = Object.entries(WREN_ICONS)
 
 function IconSet() {
   return (

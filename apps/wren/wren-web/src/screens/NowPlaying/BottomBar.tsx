@@ -1,7 +1,6 @@
 import { classNames } from '@raven/ui/headless'
-import { PANES, type Pane, barWordsOf } from '@raven/wren'
+import { PANES, type Pane, barWordsOf, WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/NowPlaying/BottomBar.module.scss'
 
@@ -33,9 +32,9 @@ function BarItem({ icon, pane, current, onPane, output }: BarItemProps) {
 
 // The bar's buttons in the order they sit; the Output pill in the middle shows the player itself.
 const BAR_ITEMS = [
-  { pane: PANES.lyrics, icon: ICONS.lyrics },
-  { pane: PANES.player, icon: ICONS.output },
-  { pane: PANES.upNext, icon: ICONS.upNext },
+  { pane: PANES.lyrics, icon: WREN_ICONS.lyrics },
+  { pane: PANES.player, icon: WREN_ICONS.output },
+  { pane: PANES.upNext, icon: WREN_ICONS.upNext },
 ] as const
 
 type BottomBarProps = {

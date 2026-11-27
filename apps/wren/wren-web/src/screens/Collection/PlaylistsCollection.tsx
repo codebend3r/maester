@@ -1,3 +1,4 @@
+import { WREN_ICONS } from '@raven/wren'
 import { type PlaylistSummary, plural, playlistFactsOf } from '@raven/core'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import {
@@ -23,7 +24,6 @@ import { AlbumTile } from '@/ui/AlbumTile/AlbumTile'
 import { EmptyState } from '@/ui/EmptyState/EmptyState'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { TileGrid } from '@/ui/TileGrid/TileGrid'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Collection/Collection.module.scss'
 
 const NO_PLAYLISTS: readonly PlaylistSummary[] = []
@@ -43,7 +43,7 @@ function NoPlaylists({ onNew }: NoPlaylistsProps) {
     <EmptyState
       action={{ label: NEW_PLAYLIST_COPY.title, onPress: onNew }}
       body={LIBRARY_PAGE_COPY.noPlaylistsHint}
-      icon={ICONS.playlist}
+      icon={WREN_ICONS.playlist}
       title={LIBRARY_PAGE_COPY.noPlaylists}
     />
   )
@@ -98,7 +98,7 @@ export function PlaylistsCollection() {
         actions={
           <IconButton
             color={COLORS.accentText}
-            icon={ICONS.plus}
+            icon={WREN_ICONS.plus}
             label={NEW_PLAYLIST_COPY.title}
             onPress={onNew}
           />

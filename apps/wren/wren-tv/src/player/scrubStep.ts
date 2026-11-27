@@ -1,4 +1,5 @@
-import { remoteKeyOf } from '@/remote/remoteKeys'
+import { keyUpNameOf } from '@raven/native/headless'
+import { SCRUB_STEP_SECONDS } from '@raven/wren'
 
 /** The remote's keys the scrubber answers, as the fork's `useTVEventHandler` names them. */
 export const SCRUB_KEYS = { left: 'left', right: 'right' } as const
@@ -13,9 +14,6 @@ const SCRUB_DIRECTIONS = {
 
 const isScrubKey = (name: string): name is ScrubKey => Object.hasOwn(SCRUB_DIRECTIONS, name)
 
-/** How far one press moves the playhead, in seconds: the phone's screen reader's step. */
-export const SCRUB_STEP = 15
-
 type ScrubStepOfProps = {
   /** What the remote sent, as the fork hands it to a listener. */
   event: unknown
@@ -26,13 +24,13 @@ type ScrubStepOfProps = {
 }
 
 /**
- * Where a press of left or right on the scrubber moves the playhead: `SCRUB_STEP` seconds back or
- * on, held between the start and the end; null for any other key, counted once as
- * `remoteKeyOf` counts it.
+ * Where a press of left or right on the scrubber moves the playhead: `SCRUB_STEP_SECONDS` back
+ * or on, held between the start and the end; null for any other key, counted once as
+ * `keyUpNameOf` counts it.
  */
 export const scrubStepOf = ({ event, position, length }: ScrubStepOfProps): number | null => {
-  const key = remoteKeyOf(event)
+  const key = keyUpNameOf(event)
   if (key === null || !isScrubKey(key)) return null
-  const to = position + SCRUB_DIRECTIONS[key] * SCRUB_STEP
+  const to = position + SCRUB_DIRECTIONS[key] * SCRUB_STEP_SECONDS
   return Math.min(Math.max(to, 0), Math.max(length, 0))
 }

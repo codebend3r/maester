@@ -3,13 +3,13 @@ import { TRACK_STREAM_KINDS } from '@raven/core'
 import { useAudioQueue } from '@raven/ui/headless'
 import { waitFor } from '@testing-library/react-native'
 
-import { VideoAudioHost } from '@/music/VideoAudioHost'
+import { TvMusicHost } from '@/music/TvMusicHost'
 import { usePlayedStreams } from '@raven/native/headless'
 import { NAS } from '@/test/homeServer'
 import { AIRBAG, musicApi } from '@/test/musicServer'
 import { createScreenClient, renderScreen, untilIdle } from '@/test/renderScreen'
-import type * as VideoMock from '@/test/videoMock'
-import { drawnVideo, resetDrawnVideo } from '@/test/videoMock'
+import type * as VideoMock from '@raven/native/testing/video'
+import { drawnVideo, resetDrawnVideo } from '@raven/native/testing/video'
 
 type SourceAnswer =
   | { ok: true; source: { uri: string; headers: Record<string, string> } }
@@ -19,7 +19,7 @@ const FILE: SourceAnswer = { ok: true, source: { uri: `${NAS.origin}/airbag.flac
 const mockSource = jest.fn(async (): Promise<SourceAnswer> => FILE)
 
 jest.mock('react-native-video', () =>
-  jest.requireActual<typeof VideoMock>('@/test/videoMock').videoModuleMock(),
+  jest.requireActual<typeof VideoMock>('@raven/native/testing/video').videoModuleMock(),
 )
 jest.mock('@/player/mediaSources', () => ({
   mediaSourcesFor: () => ({ source: () => mockSource() }),
@@ -28,13 +28,13 @@ jest.mock('@/player/mediaSources', () => ({
 const renderHost = async () => {
   const client = createScreenClient()
   await renderScreen({
-    ui: <VideoAudioHost session={{ server: NAS, api: musicApi() }} />,
+    ui: <TvMusicHost session={{ server: NAS, api: musicApi() }} />,
     client,
   })
   return client
 }
 
-describe('VideoAudioHost', () => {
+describe('TvMusicHost', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     resetDrawnVideo()

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'bun:test'
 
 import { REPEAT_MODES } from '@raven/core'
 
-import { progressOf, repeatIconOf, scrubTextOf, toggleLookOf } from '@/playerModel'
+import {
+  SCRUB_STEP_SECONDS,
+  progressOf,
+  repeatIconOf,
+  scrubTextOf,
+  toggleLookOf,
+} from '@/playerModel'
 
 describe('progressOf', () => {
   it('is the share played, never past the end', () => {
@@ -49,5 +55,11 @@ describe('repeatIconOf', () => {
 
   it('draws the loop with a 1 while it repeats one song', () => {
     expect(repeatIconOf({ repeat: REPEAT_MODES.one, icons })).toBe(icons.repeatOne)
+  })
+})
+
+describe('SCRUB_STEP_SECONDS', () => {
+  it('moves the playhead a quarter of a minute a step', () => {
+    expect(SCRUB_STEP_SECONDS).toBe(15)
   })
 })

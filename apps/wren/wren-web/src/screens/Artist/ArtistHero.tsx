@@ -1,12 +1,11 @@
 import type { ArtistAbout } from '@raven/core'
-import { ARTIST_COPY, DETAIL_COPY, aboutFactsOf, hasAbout } from '@raven/wren'
+import { ARTIST_COPY, DETAIL_COPY, aboutFactsOf, hasAbout, WREN_ICONS } from '@raven/wren'
 import type { ReactNode } from 'react'
 import type { Cover } from '@/music/useCovers'
 import { BackButton } from '@/screens/detail/BackButton'
 import { COLORS } from '@/theme/tokens'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { usePicture } from '@/ui/usePicture'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/Artist/ArtistHero.module.scss'
 
 // What sits on the picture is drawn the same in both themes: light icons on a dark veil.
@@ -78,7 +77,7 @@ export function ArtistHero({ name, meta, photo, onMore, actions, about }: Artist
         <IconButton
           color={ON_PICTURE.ink}
           fill={ON_PICTURE.veil}
-          icon={ICONS.more}
+          icon={WREN_ICONS.more}
           label={DETAIL_COPY.more}
           onPress={onMore}
         />

@@ -1,11 +1,11 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
-import { type Palette } from '@raven/wren'
+import { type Palette, type WrenIconName } from '@raven/wren'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
 import { UNSEEN } from '@/ui/Unseen'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** What a button is for: the page's action, a quieter one, an outlined one, or one that removes. */
 export const BUTTON_VARIANTS = {

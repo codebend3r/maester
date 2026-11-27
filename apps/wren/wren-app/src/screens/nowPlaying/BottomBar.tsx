@@ -1,10 +1,10 @@
-import { barWordsOf, type Pane, PANES } from '@raven/wren'
+import { barWordsOf, type Pane, PANES, WREN_ICONS, type WrenIconName } from '@raven/wren'
 import { Pressable, Text, View } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { pressedStyleOf } from '@/ui/press'
-import { ICONS, WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   bar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -59,9 +59,9 @@ function BarItem({ icon, pane, current, onPane, output }: BarItemProps) {
 
 // The bar's buttons in the order they sit; the Output pill in the middle shows the player itself.
 const BAR_ITEMS = [
-  { pane: PANES.lyrics, icon: ICONS.lyrics },
-  { pane: PANES.player, icon: ICONS.output },
-  { pane: PANES.upNext, icon: ICONS.upNext },
+  { pane: PANES.lyrics, icon: WREN_ICONS.lyrics },
+  { pane: PANES.player, icon: WREN_ICONS.output },
+  { pane: PANES.upNext, icon: WREN_ICONS.upNext },
 ] as const
 
 type BottomBarProps = {

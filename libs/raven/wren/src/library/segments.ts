@@ -1,4 +1,5 @@
 import { LIBRARY_PAGE_COPY } from '@/copy/screens'
+import { WREN_ICONS, type WrenIconName } from '@/icons'
 
 /**
  * Library's lists, each a category page of its own and named in its path: raven's music tabs,
@@ -52,6 +53,19 @@ export const LIBRARY_LABELS = {
   [LIBRARY_SEGMENTS.songs]: LIBRARY_PAGE_COPY.songs,
   [LIBRARY_SEGMENTS.downloads]: LIBRARY_PAGE_COPY.downloads,
 } as const satisfies Record<LibrarySegment, string>
+
+/** Each category's drawing, as its row and its sidebar place draw it. */
+export const LIBRARY_ICONS = {
+  [LIBRARY_SEGMENTS.albums]: WREN_ICONS.album,
+  [LIBRARY_SEGMENTS.artists]: WREN_ICONS.artist,
+  [LIBRARY_SEGMENTS.playlists]: WREN_ICONS.playlist,
+  [LIBRARY_SEGMENTS.unmatchedAlbums]: WREN_ICONS.alert,
+  [LIBRARY_SEGMENTS.inProgress]: WREN_ICONS.recent,
+  [LIBRARY_SEGMENTS.favourites]: WREN_ICONS.heart,
+  [LIBRARY_SEGMENTS.finished]: WREN_ICONS.check,
+  [LIBRARY_SEGMENTS.songs]: WREN_ICONS.song,
+  [LIBRARY_SEGMENTS.downloads]: WREN_ICONS.downloads,
+} as const satisfies Record<LibrarySegment, WrenIconName>
 
 /** Whether a category is one a browser has too. */
 const isSharedSegment = (segment: LibrarySegment): segment is SharedSegment =>

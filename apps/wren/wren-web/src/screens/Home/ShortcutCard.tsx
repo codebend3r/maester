@@ -1,9 +1,8 @@
 import { classNames } from '@raven/ui/headless'
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, type WrenIconName } from '@raven/wren'
 import { SIZES } from '@/theme/tokens'
 import { Card } from '@/ui/Card/Card'
 import { type DisablablePress, Pressable } from '@/ui/Pressable/Pressable'
-import type { WrenIconName } from '@/ui/WrenIcon/icons'
 import { WrenIcon } from '@/ui/WrenIcon/WrenIcon'
 import styles from '@/screens/Home/ShortcutCard.module.scss'
 

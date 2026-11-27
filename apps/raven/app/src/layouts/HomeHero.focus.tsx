@@ -16,7 +16,8 @@ import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 import { BUTTON_TONES, type ButtonTone } from '@raven/native/headless'
 
 import { FocusBand } from '@/layouts/FocusBand'
-import { useFocusOnMount, useOpenerFocus, useOpeningFocus, useShelfBand } from '@/layouts/focus'
+import { useFocusOnMount, useOpenerFocus, useOpeningFocus } from '@/layouts/focus'
+import { ShelfSlot } from '@/layouts/ShelfSlot'
 import { HOME_BANDS } from '@/stores/shelfBands'
 import { useToneStyles } from '@/layouts/formStyles'
 import {
@@ -356,7 +357,6 @@ const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
   const isReduced = useReduceMotion((state) => state.isReduced)
   const isInFront = useIsFocused()
   const { isOpening } = useOpeningFocus()
-  const band = useShelfBand(HOME_BANDS.hero)
   const styles = useStyles()
   const at = turn.at % Math.max(count, 1)
   const isHeld = isReduced || isFocusedIn || !isInFront || count < 2
@@ -378,62 +378,64 @@ const HomeHeroBody = ({ slides, onOpen, isPreferred }: HomeHeroProps) => {
   const focus = { onFocused: () => setFocusedIn(true), onBlurred: () => setFocusedIn(false) }
 
   return (
-    <View accessibilityLabel={HERO_COPY.featured} onLayout={band.onLayout} style={styles.hero}>
-      <Wash slides={slides} turn={{ at, from: turn.from }} />
-      <View style={styles.column}>
-        <Words key={slide.key} slide={slide} />
-        <FocusBand>
-          <View style={styles.buttons}>
-            {play !== null && (
+    <ShelfSlot shelf={HOME_BANDS.hero}>
+      <View accessibilityLabel={HERO_COPY.featured} style={styles.hero}>
+        <Wash slides={slides} turn={{ at, from: turn.from }} />
+        <View style={styles.column}>
+          <Words key={slide.key} slide={slide} />
+          <FocusBand>
+            <View style={styles.buttons}>
+              {play !== null && (
+                <HeroButton
+                  {...focus}
+                  icon={APP_ICONS.play}
+                  isPreferred={isOpening && isPreferred}
+                  label={HERO_COPY.playTitle(slide.title)}
+                  onPress={() => onOpen(play)}
+                  place="hero/play"
+                  text={HERO_COPY.play}
+                  tone={BUTTON_TONES.primary}
+                />
+              )}
               <HeroButton
                 {...focus}
-                icon={APP_ICONS.play}
-                isPreferred={isOpening && isPreferred}
-                label={HERO_COPY.playTitle(slide.title)}
-                onPress={() => onOpen(play)}
-                place="hero/play"
-                text={HERO_COPY.play}
-                tone={BUTTON_TONES.primary}
+                icon={null}
+                isPreferred={isOpening && isPreferred && play === null}
+                label={HERO_COPY.detailsOf(slide.title)}
+                onPress={() => onOpen(slide.details)}
+                place="hero/details"
+                text={HERO_COPY.details}
+                tone={BUTTON_TONES.quiet}
               />
-            )}
-            <HeroButton
-              {...focus}
-              icon={null}
-              isPreferred={isOpening && isPreferred && play === null}
-              label={HERO_COPY.detailsOf(slide.title)}
-              onPress={() => onOpen(slide.details)}
-              place="hero/details"
-              text={HERO_COPY.details}
-              tone={BUTTON_TONES.quiet}
-            />
-            {count > 1 && (
-              <View style={styles.steps}>
-                <HeroButton
-                  {...focus}
-                  icon={APP_ICONS.back}
-                  label={HERO_COPY.previous}
-                  onPress={() => step(-1)}
-                  place="hero/previous"
-                  text={null}
-                  tone={BUTTON_TONES.ghost}
-                />
-                <HeroButton
-                  {...focus}
-                  icon={APP_ICONS.next}
-                  label={HERO_COPY.next}
-                  onPress={() => step(1)}
-                  place="hero/next"
-                  text={null}
-                  tone={BUTTON_TONES.ghost}
-                />
-                <Text style={styles.counter}>{HERO_COPY.counter({ at: at + 1, count })}</Text>
-              </View>
-            )}
-          </View>
-        </FocusBand>
+              {count > 1 && (
+                <View style={styles.steps}>
+                  <HeroButton
+                    {...focus}
+                    icon={APP_ICONS.back}
+                    label={HERO_COPY.previous}
+                    onPress={() => step(-1)}
+                    place="hero/previous"
+                    text={null}
+                    tone={BUTTON_TONES.ghost}
+                  />
+                  <HeroButton
+                    {...focus}
+                    icon={APP_ICONS.next}
+                    label={HERO_COPY.next}
+                    onPress={() => step(1)}
+                    place="hero/next"
+                    text={null}
+                    tone={BUTTON_TONES.ghost}
+                  />
+                  <Text style={styles.counter}>{HERO_COPY.counter({ at: at + 1, count })}</Text>
+                </View>
+              )}
+            </View>
+          </FocusBand>
+        </View>
+        <Fan at={at} slides={slides} />
       </View>
-      <Fan at={at} slides={slides} />
-    </View>
+    </ShelfSlot>
   )
 }
 

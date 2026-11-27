@@ -1,5 +1,11 @@
 import type { PosterEntry } from '@raven/core'
-import { TOP_SHELF_KINDS, type TopShelf, deepLinkOf } from '@raven/top-shelf/contract'
+import {
+  TOP_SHELF_KINDS,
+  TOP_SHELF_LAYOUTS,
+  type TopShelf,
+  type TopShelfInvitation,
+  deepLinkOf,
+} from '@raven/top-shelf/contract'
 
 import { APP_SCHEME } from '@/config/linkScheme'
 import type { Pictures, ShelfCard } from '@/queries/cards'
@@ -15,7 +21,7 @@ const linkTo = (target: RouteTarget): string =>
   deepLinkOf({ scheme: APP_SCHEME, ...hrefOf(target) })
 
 /** Signed out: the invitation, which opens sign-in. */
-export const SIGNED_OUT_SHELF: TopShelf = {
+export const SIGNED_OUT_SHELF: TopShelfInvitation = {
   kind: TOP_SHELF_KINDS.signedOut,
   title: TOP_SHELF_COPY.signIn,
   openUrl: deepLinkOf({ scheme: APP_SCHEME, pathname: APP_ROUTES.signIn, params: {} }),
@@ -43,7 +49,8 @@ export const continueShelfOf = ({
   arts,
   ...pictures
 }: ContinueShelfOfProps): TopShelf => ({
-  kind: TOP_SHELF_KINDS.carousel,
+  kind: TOP_SHELF_KINDS.titles,
+  layout: TOP_SHELF_LAYOUTS.carousel,
   title: CONTINUE_WATCHING,
   items: entries.slice(0, HOME_CONTINUE_COUNT).flatMap((entry) => {
     const card = continueCard({ entry, arts, ...pictures })

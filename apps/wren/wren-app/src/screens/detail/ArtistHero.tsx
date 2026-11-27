@@ -13,14 +13,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import type { ArtistAbout } from '@raven/core'
-import { ARTIST_COPY, DETAIL_COPY, aboutFactsOf, hasAbout, ON_PICTURE } from '@raven/wren'
+import {
+  ARTIST_COPY,
+  DETAIL_COPY,
+  aboutFactsOf,
+  hasAbout,
+  ON_PICTURE,
+  WREN_ICONS,
+} from '@raven/wren'
 import { type Cover } from '@raven/wren-native'
 import { BackButton } from '@/screens/detail/BackButton'
 import { type WrenTheme, themedStyles, useFormFactor, useWrenTheme } from '@/theme/wrenTheme'
 import { DETAIL_SIZES, SIZE, SPACE, TYPE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
 import { ArtistAvatar } from '@/ui/ArtistAvatar'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 /** The hero's height on each form factor. */
 const HERO_HEIGHTS = {
@@ -286,7 +292,7 @@ export function ArtistHero({ name, meta, photo, onMore, actions, sides, about }:
         <IconButton
           color={ON_PICTURE.ink}
           fill={ON_PICTURE.veil}
-          icon={ICONS.more}
+          icon={WREN_ICONS.more}
           label={DETAIL_COPY.more}
           onPress={onMore}
         />

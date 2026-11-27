@@ -2,13 +2,13 @@ import { SIGN_IN_STEPS, type SignInStep, keyboardFor } from '@raven/native/headl
 import { type ComponentType, useState } from 'react'
 import { Text, View } from 'react-native'
 
-import { SIGN_IN_COPY, signInErrorsOf } from '@raven/wren'
+import { SIGN_IN_COPY, signInErrorsOf, WREN_ICONS } from '@raven/wren'
 import type { SignInFlow } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
 import { BUTTON_SIZES, Button } from '@/ui/Button'
 import { TextField } from '@/ui/TextField'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   form: { gap: SPACE.s4 },
@@ -41,7 +41,7 @@ function AlertBanner({ text }: AlertBannerProps) {
       accessible
       style={styles.banner}
     >
-      <WrenIcon color={colors.accentText} name={ICONS.alert} size={SIZE.smallIcon} />
+      <WrenIcon color={colors.accentText} name={WREN_ICONS.alert} size={SIZE.smallIcon} />
       <Text style={styles.bannerText}>{text}</Text>
     </View>
   )
@@ -49,8 +49,8 @@ function AlertBanner({ text }: AlertBannerProps) {
 
 /** The password field's end button, by whether the password shows. */
 const PASSWORD_TOGGLES = {
-  show: { icon: ICONS.eye, label: SIGN_IN_COPY.showPassword },
-  hide: { icon: ICONS.eyeOff, label: SIGN_IN_COPY.hidePassword },
+  show: { icon: WREN_ICONS.eye, label: SIGN_IN_COPY.showPassword },
+  hide: { icon: WREN_ICONS.eyeOff, label: SIGN_IN_COPY.hidePassword },
 } as const
 
 const EMAIL_KEYBOARD = keyboardFor({ isSecret: false, isEmail: true, isNumber: false })
@@ -79,7 +79,7 @@ function AccountForm({ flow }: AccountFormProps) {
         autoComplete="email"
         autoCorrect={false}
         error={errors.email}
-        icon={ICONS.mail}
+        icon={WREN_ICONS.mail}
         keyboardType={EMAIL_KEYBOARD}
         label={SIGN_IN_COPY.email}
         onChangeText={setEmail}
@@ -95,7 +95,7 @@ function AccountForm({ flow }: AccountFormProps) {
         autoComplete="password"
         autoCorrect={false}
         error={errors.password}
-        icon={ICONS.lock}
+        icon={WREN_ICONS.lock}
         keyboardType={PASSWORD_KEYBOARD}
         label={SIGN_IN_COPY.password}
         onChangeText={setPassword}

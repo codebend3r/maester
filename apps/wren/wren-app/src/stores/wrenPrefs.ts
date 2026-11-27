@@ -10,7 +10,6 @@ import {
   sharedPrefsOf,
   themeChoiceIn,
 } from '@raven/wren'
-import { configureLibraryChoice } from '@raven/wren-native/headless'
 import { create } from 'zustand'
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware'
 import { useShallow } from 'zustand/react/shallow'
@@ -75,8 +74,10 @@ const prefsOf = (saved: unknown): WrenPrefsValues => {
  * stream to a 256 kbps transcode, which the server makes whole before it answers, so away from
  * home every track waited on it; 1 moves those installs to the file itself.
  */
+const CELLULAR_FILE_VERSION = 1
+
 const migratedPrefsOf = (saved: unknown, version: number): WrenPrefsValues =>
-  version < WREN_PREFS_VERSION
+  version < CELLULAR_FILE_VERSION
     ? { ...prefsOf(saved), cellularKbps: DEFAULT_WREN_PREFS.cellularKbps }
     : prefsOf(saved)
 
@@ -109,6 +110,3 @@ type ConfigureWrenPrefsProps = { storage: StateStorage }
 export const configureWrenPrefs = async ({ storage }: ConfigureWrenPrefsProps) => {
   await loadPersisted({ store: useWrenPrefs, storage })
 }
-
-// The shared listings read the music library picked here, in this app's own prefs.
-configureLibraryChoice({ prefs: useWrenPrefs })

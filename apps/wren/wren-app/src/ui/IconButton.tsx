@@ -1,9 +1,10 @@
+import { type WrenIconName } from '@raven/wren'
 import { type AccessibilityRole, Pressable } from 'react-native'
 
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS, SIZE } from '@/theme/wrenTokens'
 import { hitSlopOf, pressedStyleOf } from '@/ui/press'
-import { WrenIcon, type WrenIconName } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** An icon button's ground: none, a quiet fill, or a ring. */
 export const ICON_BUTTON_VARIANTS = {

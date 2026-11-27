@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router'
 
-import { KIT_COPY } from '@raven/wren'
+import { KIT_COPY, WREN_ICONS } from '@raven/wren'
 import { useWrenTheme } from '@/theme/wrenTheme'
 import { IconButton } from '@/ui/IconButton'
-import { ICONS } from '@/ui/WrenIcon'
 
 type BackButtonProps = {
   /** The icon's colour and the circle's fill over a picture: the artist's hero. */
@@ -18,7 +17,7 @@ export function BackButton({ onPicture }: BackButtonProps) {
     <IconButton
       color={onPicture?.ink ?? colors.text}
       fill={onPicture?.veil}
-      icon={ICONS.back}
+      icon={WREN_ICONS.back}
       label={KIT_COPY.backAlone}
       onPress={() => router.back()}
     />

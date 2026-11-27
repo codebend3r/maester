@@ -1,8 +1,7 @@
 import { usePlayerPrefs } from '@raven/ui/headless'
-import { NOW_PLAYING_COPY, PLAYER_COPY } from '@raven/wren'
+import { NOW_PLAYING_COPY, PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { Adjuster } from '@/player/Adjuster/Adjuster'
 import { IconButton } from '@/ui/IconButton/IconButton'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/player/Volume/Volume.module.scss'
 
 // How far an arrow key moves the volume, of its whole from 0 to 1.
@@ -25,7 +24,7 @@ export function Volume() {
   return (
     <div className={styles.volume}>
       <IconButton
-        icon={shown === SILENT ? ICONS.volumeMuted : ICONS.volume}
+        icon={shown === SILENT ? WREN_ICONS.volumeMuted : WREN_ICONS.volume}
         label={isMuted ? PLAYER_COPY.unmute : PLAYER_COPY.mute}
         onPress={() => setVolume({ volume, muted: !isMuted })}
       />

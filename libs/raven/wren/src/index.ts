@@ -68,6 +68,7 @@ export {
   unmatchedAlbumsOf,
 } from '@/library/listedTracks'
 export {
+  LIBRARY_ICONS,
   LIBRARY_LABELS,
   LIBRARY_ORDER,
   LIBRARY_SEGMENTS,
@@ -110,6 +111,7 @@ export {
 } from '@/nowPlaying/nowPlayingModel'
 export { type QualityView, qualityViewOf } from '@/nowPlaying/quality'
 export {
+  SCRUB_STEP_SECONDS,
   STEPS,
   type Step,
   TRANSPORTS,
@@ -184,4 +186,11 @@ export {
 export { SONG_LEADS, type ShownLead, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
 export { TOP_RESULT_KINDS, type TopResult, topResultOf } from '@/search/topResult'
 export { ART, BRAND, ON_PICTURE, type Palette, WREN_PALETTES } from '@/palettes'
+export {
+  COVER_SIZE_OPTIONS,
+  HOME_RECENT_CHOICES,
+  HOME_RECENT_TITLES,
+  MUSIC_SORT_OPTIONS,
+} from '@/choices'
+export { type Drawing, INKS, WREN_ICONS, type WrenIconName } from '@/icons'
 export { BRAND_INKS, LOCKUP_DRAWING, LOCKUP_VIEW_BOX, MARK_VIEW_BOX } from '@/lockup'

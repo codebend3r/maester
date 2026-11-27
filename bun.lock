@@ -441,6 +441,8 @@
         "react-native-svg": "15.16.1",
       },
       "devDependencies": {
+        "@jest/globals": "30.5.2",
+        "@testing-library/react-native": "14.1.0",
         "@types/bun": "1.4.4",
         "@types/react": "19.3.0",
         "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -451,7 +453,9 @@
         "typescript": "6.0.3",
       },
       "peerDependencies": {
+        "@tanstack/react-query": "5.107.1",
         "react": "19.3.0",
+        "react-native-video": "6.19.3",
         "zustand": "5.1.0",
       },
     },
@@ -473,6 +477,7 @@
       },
       "peerDependencies": {
         "react": "19.3.0",
+        "react-native": "npm:react-native-tvos@0.88.1-0",
       },
     },
     "libs/raven/ui": {
@@ -534,6 +539,7 @@
         "@raven/wren": "workspace:*",
       },
       "devDependencies": {
+        "@jest/globals": "30.5.2",
         "@tanstack/react-query": "5.107.1",
         "@types/bun": "1.4.4",
         "@types/react": "19.3.0",

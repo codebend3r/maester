@@ -2,17 +2,16 @@ import { describe, expect, it, jest } from '@jest/globals'
 import { AUDIO_BITRATES, TRACK_STREAM_KINDS, audioQualityOf } from '@raven/core'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { KIT_COPY, NOW_PLAYING_COPY, SONG_LEADS } from '@raven/wren'
+import { KIT_COPY, NOW_PLAYING_COPY, SONG_LEADS, WREN_ICONS } from '@raven/wren'
 
 import { AlertDialog } from '@/ui/AlertDialog'
 import { ArtistRow } from '@/ui/ArtistRow'
 import { BottomSheet } from '@/ui/BottomSheet'
-import { AIRBAG } from '@/test/music'
+import { AIRBAG } from '@raven/wren-native/testing'
 import { Button } from '@/ui/Button'
 import { QualityChips } from '@/ui/QualityChips'
 import { SegmentedControl } from '@/ui/SegmentedControl'
 import { SongRow } from '@/ui/SongRow'
-import { ICONS } from '@/ui/WrenIcon'
 
 // A phone's window with no notch, for what reads the safe area outside the router.
 const SAFE_AREA = {
@@ -131,7 +130,7 @@ describe("Wren's kit", () => {
       <AlertDialog
         body="8.4 MB of music will be deleted from this device."
         confirmLabel="Remove"
-        icon={ICONS.trash}
+        icon={WREN_ICONS.trash}
         isOpen
         onCancel={onCancel}
         onConfirm={onConfirm}

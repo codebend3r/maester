@@ -1,12 +1,11 @@
 import { classNames } from '@raven/ui/headless'
-import { KIT_COPY, NOW_PLAYING_COPY, type UpNextRow } from '@raven/wren'
+import { KIT_COPY, NOW_PLAYING_COPY, type UpNextRow, WREN_ICONS } from '@raven/wren'
 import { useCovers } from '@/music/useCovers'
 import type { UpNextPlace } from '@/screens/NowPlaying/UpNext'
 import { COLORS, RADII, SIZES } from '@/theme/tokens'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
-import { ICONS } from '@/ui/WrenIcon/icons'
 import styles from '@/screens/NowPlaying/QueueRow.module.scss'
 
 /** A row's move, from its place to another. */
@@ -51,7 +50,7 @@ export function QueueRow({
       </Pressable>
       <IconButton
         color={COLORS.text3}
-        icon={ICONS.chevronUp}
+        icon={WREN_ICONS.chevronUp}
         isDisabled={place <= first}
         label={named(NOW_PLAYING_COPY.moveUp)}
         onPress={() => onMove({ from: place, to: place - 1 })}
@@ -59,7 +58,7 @@ export function QueueRow({
       />
       <IconButton
         color={COLORS.text3}
-        icon={ICONS.chevronDown}
+        icon={WREN_ICONS.chevronDown}
         isDisabled={place >= last}
         label={named(NOW_PLAYING_COPY.moveDown)}
         onPress={() => onMove({ from: place, to: place + 1 })}
@@ -67,7 +66,7 @@ export function QueueRow({
       />
       <IconButton
         color={COLORS.text3}
-        icon={ICONS.trash}
+        icon={WREN_ICONS.trash}
         label={named(NOW_PLAYING_COPY.remove)}
         onPress={() => onRemove(place)}
         size={SIZES.smallButton}

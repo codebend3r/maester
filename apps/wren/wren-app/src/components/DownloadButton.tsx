@@ -2,7 +2,7 @@ import type { Track } from '@raven/core'
 import { IGNORED } from '@raven/native/headless'
 import { type ReactNode, useState } from 'react'
 
-import { DOWNLOAD_BUTTON_COPY } from '@raven/wren'
+import { DOWNLOAD_BUTTON_COPY, WREN_ICONS } from '@raven/wren'
 import { DetailAction } from '@/components/DetailAction'
 import { type DownloadCollection, useDownloads } from '@/downloads/downloadStore'
 import { DOWNLOAD_PROGRESS, downloadProgressOf } from '@/downloads/downloadViews'
@@ -12,7 +12,7 @@ import { SheetActions } from '@/ui/SheetActions'
 import { useWrenTheme } from '@/theme/wrenTheme'
 import { SIZE } from '@/theme/wrenTokens'
 import { BottomSheet } from '@/ui/BottomSheet'
-import { ICONS, WrenIcon } from '@/ui/WrenIcon'
+import { WrenIcon } from '@/ui/WrenIcon'
 
 /** What the button shows and does in one state of its download. */
 type DownloadAction = {
@@ -65,7 +65,7 @@ export function DownloadButton({
     [DOWNLOAD_PROGRESS.none]: {
       label: DOWNLOAD_BUTTON_COPY.download,
       spoken: DOWNLOAD_BUTTON_COPY.download,
-      glyph: <WrenIcon color={colors.text2} name={ICONS.download} />,
+      glyph: <WrenIcon color={colors.text2} name={WREN_ICONS.download} />,
       onPress: download,
       isDisabled: false,
     },
@@ -80,14 +80,14 @@ export function DownloadButton({
     [DOWNLOAD_PROGRESS.done]: {
       label: DOWNLOAD_BUTTON_COPY.downloaded,
       spoken: DOWNLOAD_BUTTON_COPY.downloaded,
-      glyph: <WrenIcon color={colors.accentText} name={ICONS.downloaded} size={SIZE.icon} />,
+      glyph: <WrenIcon color={colors.accentText} name={WREN_ICONS.downloaded} size={SIZE.icon} />,
       onPress: () => setIsRemoving(true),
       isDisabled: false,
     },
     [DOWNLOAD_PROGRESS.failed]: {
       label: DOWNLOAD_BUTTON_COPY.retryShort,
       spoken: DOWNLOAD_BUTTON_COPY.retry,
-      glyph: <WrenIcon color={colors.accentText} name={ICONS.alert} />,
+      glyph: <WrenIcon color={colors.accentText} name={WREN_ICONS.alert} />,
       onPress: download,
       isDisabled: false,
     },
@@ -109,7 +109,13 @@ export function DownloadButton({
       >
         <SheetActions
           groups={[
-            [{ icon: ICONS.trash, label: DOWNLOAD_BUTTON_COPY.remove, onPress: removeDownload }],
+            [
+              {
+                icon: WREN_ICONS.trash,
+                label: DOWNLOAD_BUTTON_COPY.remove,
+                onPress: removeDownload,
+              },
+            ],
           ]}
         />
       </BottomSheet>

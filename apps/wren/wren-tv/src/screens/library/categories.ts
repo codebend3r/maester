@@ -1,18 +1,10 @@
-import { LIBRARY_LABELS, LIBRARY_SEGMENTS, SHARED_ORDER, type SharedSegment } from '@raven/wren'
-
-import { ICONS, type WrenIconName } from '@/ui/WrenIcon'
-
-/** Each of Library's categories' drawing, the phone's. */
-const LIBRARY_ICONS = {
-  [LIBRARY_SEGMENTS.albums]: ICONS.album,
-  [LIBRARY_SEGMENTS.artists]: ICONS.artist,
-  [LIBRARY_SEGMENTS.playlists]: ICONS.playlist,
-  [LIBRARY_SEGMENTS.unmatchedAlbums]: ICONS.alert,
-  [LIBRARY_SEGMENTS.inProgress]: ICONS.recent,
-  [LIBRARY_SEGMENTS.favourites]: ICONS.heart,
-  [LIBRARY_SEGMENTS.finished]: ICONS.check,
-  [LIBRARY_SEGMENTS.songs]: ICONS.song,
-} as const satisfies Record<SharedSegment, WrenIconName>
+import {
+  LIBRARY_ICONS,
+  LIBRARY_LABELS,
+  SHARED_ORDER,
+  type SharedSegment,
+  type WrenIconName,
+} from '@raven/wren'
 
 /** One of Library's categories: its kind, its name and its drawing. */
 type Category = { kind: SharedSegment; label: string; icon: WrenIconName }

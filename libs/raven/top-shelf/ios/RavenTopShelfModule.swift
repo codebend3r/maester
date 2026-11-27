@@ -1,3 +1,4 @@
+import CryptoKit
 import ExpoModulesCore
 import Foundation
 
@@ -6,12 +7,12 @@ import Foundation
 #endif
 
 /// The shelf as JS hands it over: each picture still on the server, with the headers it needs.
-private struct IncomingPicture: Decodable {
+private struct IncomingPicture: Codable {
   let uri: String
   let headers: [String: String]
 }
 
-private struct IncomingItem: Decodable {
+private struct IncomingItem: Codable {
   let id: String
   let title: String
   let summary: String?
@@ -20,12 +21,7 @@ private struct IncomingItem: Decodable {
   let openUrl: String
 }
 
-private struct IncomingShelf: Decodable {
-  let kind: RavenTopShelfKind
-  let title: String
-  let openUrl: String?
-  let items: [IncomingItem]?
-}
+private typealias IncomingShelf = RavenTopShelf<IncomingItem>
 
 /// The picture types the server answers with, by their file's extension; anything else is kept as a JPEG.
 private let pictureExtensions = ["image/png": "png", "image/webp": "webp", "image/heic": "heic"]
@@ -35,10 +31,9 @@ private func fileSafe(_ id: String) -> String {
   String(id.map { $0.isLetter || $0.isNumber ? $0 : "-" })
 }
 
-/// FNV-1a over the picture, so a new picture for the same title gets a new file and tvOS never shows the old one it cached.
+/// The picture's MD5, its first 8 bytes in hex, so a new picture for the same title gets a new file and tvOS never shows the old one it cached.
 private func fingerprint(_ data: Data) -> String {
-  let hash = data.reduce(UInt64(0xcbf2_9ce4_8422_2325)) { ($0 ^ UInt64($1)) &* 0x100_0000_01b3 }
-  return String(hash, radix: 36)
+  Insecure.MD5.hash(data: data).prefix(8).map { String(format: "%02x", $0) }.joined()
 }
 
 /// Fetches one item's picture into `folder`; nil when it cannot be read, which leaves the item off the shelf.
@@ -85,17 +80,28 @@ private func sweep(_ folder: URL, keeping kept: Set<String>) {
     .forEach { try? FileManager.default.removeItem(at: folder.appendingPathComponent($0)) }
 }
 
+/// The shelf as the extension reads it, with each title's picture fetched into `folder`, and the pictures it shows.
+private func storedShelf(_ incoming: IncomingShelf, in folder: URL) async -> (
+  shelf: RavenTopShelfStored, files: Set<String>
+) {
+  switch incoming {
+  case let .signedOut(title, openUrl):
+    return (.signedOut(title: title, openUrl: openUrl), [])
+  case let .titles(layout, title, items):
+    let kept = await storedItems(items, in: folder)
+    return (.titles(layout: layout, title: title, items: kept), Set(kept.map { $0.file }))
+  }
+}
+
 /// Writes the shelf and its pictures where the extension reads them, then has tvOS load it again.
 private func write(_ json: String) async throws {
   guard let folder = RavenTopShelfStore.folder() else { return }
   let incoming = try JSONDecoder().decode(IncomingShelf.self, from: Data(json.utf8))
   try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-  let items = await storedItems(incoming.items ?? [], in: folder)
-  let shelf = RavenTopShelfStored(
-    kind: incoming.kind, title: incoming.title, openUrl: incoming.openUrl, items: items)
+  let (shelf, files) = await storedShelf(incoming, in: folder)
   try JSONEncoder().encode(shelf).write(
     to: folder.appendingPathComponent(RavenTopShelfStore.shelfFile), options: .atomic)
-  sweep(folder, keeping: Set(items.map { $0.file }))
+  sweep(folder, keeping: files)
   #if os(tvOS)
     TVTopShelfContentProvider.topShelfContentDidChange()
   #endif
