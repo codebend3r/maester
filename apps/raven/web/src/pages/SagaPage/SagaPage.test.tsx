@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { usePlayerPrefs } from '@raven/ui/headless'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import {
   type AdminLock,
   DEFAULT_SAGA_BACKDROP,
@@ -252,13 +251,6 @@ describe('SagaPage', () => {
     open()
     await userEvent.click(await screen.findByRole('link', { name: 'Play The Two Towers' }))
     expect(await screen.findByText('Playing 8 in saga 119, then')).toBeInTheDocument()
-  })
-
-  it("leaves the saga's backdrop up when a movie is pointed at", async () => {
-    open()
-    const card = await screen.findByRole('link', { name: 'The Two Towers' })
-    fireEvent.focusIn(card)
-    expect(usePageBackdrop.getState().current).toBeNull()
   })
 
   it('saves the backdrop picked in Edit backdrop, held still on one movie', async () => {

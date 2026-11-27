@@ -15,7 +15,6 @@ import { useIsMediumScreen } from '@/components/AppShell/useIsMediumScreen'
 import { LibraryIcon } from '@/components/LibraryIcon/LibraryIcon'
 import { ServerSwitcher } from '@/components/ServerSwitcher/ServerSwitcher'
 import { Logo } from '@/components/Logo/Logo'
-import { PageBackdrop } from '@/components/PageBackdrop/PageBackdrop'
 import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { SiteSearch } from '@/components/SiteSearch/SiteSearch'
 import { ThemePicker } from '@/components/ThemePicker/ThemePicker'
@@ -25,7 +24,6 @@ import { keepsSeveralServers, useServers } from '@/lib/servers'
 import { useScrollReset } from '@/lib/useScrollReset'
 import { ravenVersion } from '@/lib/version'
 import { useInProgressCount } from '@/desktop/downloadsApi'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
 import { useDownloadsHostOrNone } from '@/stores/downloadsHost'
 import { useServerReach } from '@/stores/serverReach'
@@ -295,8 +293,7 @@ const PINNED_MARKS = {
  * whoever is signed in, the account button with Sign out; under them the
  * search through every library; on a phone, as in the phone app, only Home
  * keeps the search, and elsewhere the corner sits level with the page's way
- * back. While a card's picture is behind the page,
- * the menu frosts over it. While the frame is open, what the pages show
+ * back. While the frame is open, what the pages show
  * follows the server's changes, and the admin lock coming on or going off.
  * The player leaves the frame behind for the whole screen. Inside raven
  * player the menu adds Downloads over Settings, and the
@@ -309,7 +306,6 @@ export const AppShell = () => {
   const { collapsed, tipSeen, toggle, dismissTip } = useSideMenu()
   const isMediumScreen = useIsMediumScreen()
   const isIconsOnly = collapsed || isMediumScreen
-  const isFrosted = usePageBackdrop((state) => state.shown != null)
   const hasDownloads = useDownloadsHostOrNone() !== null
   const isOffline = useServerReach((state) => state.isOffline)
   const libraries = useQuery({ ...librariesQuery, enabled: !isOffline })
@@ -326,12 +322,7 @@ export const AppShell = () => {
   return (
     <div className={collapsed ? `${styles.shell} ${styles.collapsed}` : styles.shell}>
       {!isOffline && <FollowServer />}
-      <PageBackdrop />
-      <nav
-        id={navId}
-        className={isFrosted ? `${styles.side} ${styles.frosted}` : styles.side}
-        aria-label={APP_SHELL_COPY.main}
-      >
+      <nav id={navId} className={styles.side} aria-label={APP_SHELL_COPY.main}>
         <Link to={APP_PATHS.home} className={styles.home}>
           <Logo isMarkOnly={isIconsOnly} />
         </Link>

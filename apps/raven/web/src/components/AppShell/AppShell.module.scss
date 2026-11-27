@@ -16,11 +16,9 @@
  * The menu holds still as the page scrolls: as tall as the screen, the logo
  * at its top and the dock at its foot, with only the links between scrolling
  * when more libraries are pinned than there is room for. Its top padding is
- * main's --page-top, so the logo sits level with the theme button. The
- * frost's blur would make the menu a stacking context only while a card is
- * pointed at, moving the tip under the page and back, so the menu is always
- * one: over the page (for the tip), still under a card's open menu, which
- * comes later.
+ * main's --page-top, so the logo sits level with the theme button. It is a
+ * stacking context over the page (for the tip), still under a card's open
+ * menu, which comes later.
  */
 .side {
   position: sticky;
@@ -40,33 +38,6 @@
   height: calc(100dvh - var(--player-room, 0px));
   padding: var(--side-top) var(--space-1) var(--space-4);
   border-right: 1px solid var(--color-line-faint);
-}
-
-/*
- * While a card's picture is behind the page, the menu frosts over it. The
- * frost is a layer under the menu's links with its blur held still, and only
- * its opacity fades, since blurring by a changing amount redraws every frame.
- */
-.side::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--color-frost-glass);
-  backdrop-filter: blur(24px);
-  opacity: 0;
-  content: '';
-  pointer-events: none;
-}
-
-.frosted::before {
-  opacity: 1;
-}
-
-// In step with the picture's own fade.
-@media (prefers-reduced-motion: no-preference) {
-  .side::before {
-    transition: opacity 450ms ease-out;
-  }
 }
 
 // The mark lines up over the icons below it.
@@ -277,7 +248,7 @@
   translate: 50% -40%;
 }
 
-// Clear until pointed at or open, so a picture behind the page shows through.
+// Clear until pointed at or open.
 .navLink {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

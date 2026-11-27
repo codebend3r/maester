@@ -1,36 +1,13 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { ShowCard, ShowGrid, ShowGridSkeleton } from '@/components/ShowCard/ShowCard'
 import { ShowList, ShowTiles } from '@/components/ShowCard/ShowViews'
 import { POSTER_SIZES } from '@/lib/posters'
 import { showEntry } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { usePageBackdrop } from '@/stores/pageBackdrop'
 import { reported } from '@/test/viewport'
 
 describe('ShowCard', () => {
-  afterEach(() => {
-    usePageBackdrop.setState({ current: null, shown: null, recent: [], loaded: [] })
-  })
-
-  it("does not load the show's backdrop when its card is hovered", () => {
-    const entry = showEntry()
-    const { container } = renderWithProviders({
-      ui: (
-        <ul>
-          <ShowCard
-            sizes={POSTER_SIZES.row}
-            entry={{ ...entry, show: { ...entry.show, backdropVersion: 'b9' } }}
-          />
-        </ul>
-      ),
-    })
-    fireEvent.pointerEnter(container.querySelector('li') ?? document.body, {
-      pointerType: 'mouse',
-    })
-    expect(usePageBackdrop.getState().current).toBeNull()
-  })
-
   it('says when its newest episode came when shows are sorted by when they were added', () => {
     const addedAt = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
     renderWithProviders({

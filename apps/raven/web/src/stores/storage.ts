@@ -10,7 +10,6 @@ export const STORE_KEYS = {
   downloadAsk: 'raven-download-ask',
   downloadNotes: 'raven-download-notes',
   downloadsShow: 'raven-downloads-show',
-  pageBackdrop: 'raven-page-backdrop',
   seasonView: 'raven-season-view',
   upcomingFilter: 'raven-upcoming-filter',
   serverReach: 'raven-server-reach',
