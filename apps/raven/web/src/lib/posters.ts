@@ -34,8 +34,8 @@ export const POSTER_SIZES = {
   bar: '3rem',
   /** An album or playlist's cover on Downloads, a control tall. */
   download: '3rem',
-  /** Now Playing's cover: most of a phone's width, 24rem past it. */
-  nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 24rem',
+  /** Now Playing's cover: most of a phone's width, 26.4rem past it. */
+  nowPlaying: '(max-width: 40rem) calc(100vw - 4rem), 26.4rem',
   /** Home's rows: two, four, eight, ten, then twelve across the page's full width. */
   row: 'auto, (max-width: 40rem) calc(50vw - 1.5rem), (max-width: 64rem) calc(23vw - 0.75rem), (max-width: 120rem) calc(12.5vw - 2rem), (max-width: 160rem) 10vw, 8.5vw',
   /** A saga's deck: 55% of its card, in a grid of `minmax(min(15rem, 100%), 1fr)`. */

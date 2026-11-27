@@ -264,8 +264,10 @@
   --measure-form: 40rem;
   // The widest dialog: a match's search with its candidates' posters beside them.
   --measure-form-wide: 44rem;
-  // An album's cover on its own page and on Now Playing.
+  // An album's cover on its own page.
   --cover-size: 15rem;
+  // The playing track's cover on Now Playing.
+  --cover-size-large: 26.4rem;
   // A line that has to be seen from across the room: the dashed edge of a drop target.
   --border-thick: 2px;
   --focus-ring: 2px solid var(--color-bark);
