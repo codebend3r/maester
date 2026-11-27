@@ -1,0 +1,21 @@
+appId: app.netlify.wren
+name: Open the fixture's album from Library's Albums
+---
+- extendedWaitUntil:
+    visible: Recently added
+    timeout: 30000
+- tapOn: Library.*
+# Library lists its categories, each read out with what it holds: "Albums, 1".
+- tapOn: Albums.*
+- extendedWaitUntil:
+    visible: Morning Chorus.*
+    timeout: 30000
+# While Albums is still sliding in, the first card named for the album is Home's, by then off
+# the screen's left edge, and a tap aimed at it lands nowhere; confirm navigation before continuing.
+- retry:
+    maxRetries: 2
+    commands:
+      - tapOn: Morning Chorus.*
+      - extendedWaitUntil:
+          visible: Shuffle
+          timeout: 30000

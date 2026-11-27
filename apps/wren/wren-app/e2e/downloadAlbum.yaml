@@ -2,23 +2,7 @@ appId: app.netlify.wren
 name: An album downloads from its page and is listed under Library's Downloads
 ---
 - runFlow: steps/signIn.yaml
-- extendedWaitUntil:
-    visible: Recently added
-    timeout: 30000
-- tapOn: Library.*
-# Library lists its categories, each read out with what it holds: "Albums, 1".
-- tapOn: Albums.*
-- extendedWaitUntil:
-    visible: Morning Chorus.*
-    timeout: 30000
-# A cold simulator can miss the card's first tap; confirm navigation before continuing.
-- retry:
-    maxRetries: 2
-    commands:
-      - tapOn: Morning Chorus.*
-      - extendedWaitUntil:
-          visible: Download
-          timeout: 30000
+- runFlow: steps/openAlbum.yaml
 - tapOn: Download
 # The server transcodes each track on first ask, two at a time, while the button says
 # "Downloading n of m"; a server that kept its transcodes may finish before the flow looks. A

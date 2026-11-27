@@ -2,19 +2,7 @@ appId: app.netlify.wren
 name: An album plays from its page, and the bar follows Next to the second track
 ---
 - runFlow: steps/signIn.yaml
-- extendedWaitUntil:
-    visible: Recently added
-    timeout: 30000
-- tapOn: Library.*
-# Library lists its categories, each read out with what it holds: "Albums, 1".
-- tapOn: Albums.*
-- extendedWaitUntil:
-    visible: Morning Chorus.*
-    timeout: 30000
-- tapOn: Morning Chorus.*
-- extendedWaitUntil:
-    visible: Shuffle
-    timeout: 30000
+- runFlow: steps/openAlbum.yaml
 - tapOn:
     text: Play
     waitToSettleTimeoutMs: 500
