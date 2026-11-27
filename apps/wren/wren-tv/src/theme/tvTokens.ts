@@ -88,6 +88,10 @@ export const SIZE = {
   launchLogo: tvSize(200),
   field: tvSize(84),
   fieldWidth: tvSize(760),
+  /** The side of sign-in's QR code, large enough for a phone to read from the sofa. */
+  qr: tvSize(280),
+  /** How far apart a sign-in code's letters stand, so each reads alone across the room. */
+  codeTracking: tvSize(6),
   sheetWidth: tvSize(760),
   scrubber: tvSize(10),
   scrubberThumb: tvSize(28),

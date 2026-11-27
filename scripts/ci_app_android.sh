@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Runs the device app's end to end flows for Android phones on this Mac, which CI does not run
-# yet: the libraries, the fixture server, the Android phone emulator, the Release APK through
+# Runs the 🎬 Build Raven Android phone job and its end to end job on this Mac: the libraries, the fixture server, the Android phone emulator, the Release APK through
 # ccache, the install and the Maestro flows a finger drives. The flows always run on the AVD
 # raven_phone, never on a phone attached over adb or on the Android TV emulator
 # (local_ci_android.sh). Each step is a root script of its own, which the whole job runs in

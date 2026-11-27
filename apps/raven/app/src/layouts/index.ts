@@ -41,7 +41,7 @@ export const { Loading } = byInput({
 })
 
 /** The form a screen asks for: driven by focus on a TV, by touch everywhere else. */
-export const { Form, Field, FormButton, useFormStyles } = byInput({
+export const { Form, Field, FormButton, ScanPanel, useFormStyles } = byInput({
   [INPUT_KINDS.focus]: focusForm,
   [INPUT_KINDS.touch]: touchForm,
 })

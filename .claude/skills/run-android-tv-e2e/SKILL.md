@@ -6,7 +6,7 @@ description: >-
 
 # Run the Android TV check locally
 
-The `🎬 Build Raven Android TV` and `🎬 E2E Raven Android TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flows in `native-checks.yml` alone, on main; CI builds on one runner and runs the flows on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🎬 Build Raven Android TV` and `🎬 E2E Raven Android TV` jobs (the build in `.github/workflows/pull-request-checks.yml` alone, the flows in `e2e-tests.yml` alone, on main; CI builds on one runner and runs the flows on a second), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:app:android-tv

@@ -8,15 +8,18 @@ import {
   type LibraryPin,
   type ServerId,
   type ServerName,
+  DEVICE_SIGN_IN_ARGS,
+  DEVICE_SIGN_IN_RPCS,
   isAccountPreferences,
   isAccountServer,
   isLibraryPin,
   isServerName,
 } from '@/contract'
 import { cleanName } from '@/names'
+import { isBoolean, isString, nullable } from '@/schema'
 import { serverOriginOf } from '@/serverOrigin'
 
-export { ACCOUNT_REST_PATH, POSTGREST } from '@/accountData/postgrest'
+export { ACCOUNT_REST_PATH, ACCOUNT_RPC_PATH, POSTGREST } from '@/accountData/postgrest'
 
 /** The account's tables in its Supabase database, under PostgREST's `/rest/v1`. */
 export const ACCOUNT_TABLES = {
@@ -99,6 +102,11 @@ type PinProps = { serverId: ServerId; libraryId: number }
 type NameServerProps = { serverId: ServerId; name: string }
 
 type SetPreferencesProps = AccountPreferences
+
+type DeviceCodeProps = { code: string }
+
+// What `device_sign_in_request` answers: the device's name, or null for a code that does not stand.
+const isDeviceName = nullable(isString)
 
 /** `name` as `cleanName` tidies it, refused before it is sent when it will not do. */
 const cleanNameOrThrow = (name: string): string => {
@@ -234,6 +242,22 @@ export const createAccountDataClient = (props: CreatePostgrestProps) => {
       rest.remove({
         table: ACCOUNT_TABLES.pins,
         where: { [ACCOUNT_COLUMNS.serverId]: serverId, [ACCOUNT_COLUMNS.libraryId]: libraryId },
+      }),
+
+    /** The name of the device showing `code`, or null for a code that is unknown, spent or past its time. */
+    deviceSignInRequest: ({ code }: DeviceCodeProps): Promise<string | null> =>
+      rest.rpc({
+        name: DEVICE_SIGN_IN_RPCS.request,
+        args: { [DEVICE_SIGN_IN_ARGS.code]: code },
+        guard: isDeviceName,
+      }),
+
+    /** Signs the device showing `code` in as this account; false when the code no longer stands. */
+    approveDeviceSignIn: ({ code }: DeviceCodeProps): Promise<boolean> =>
+      rest.rpc({
+        name: DEVICE_SIGN_IN_RPCS.approve,
+        args: { [DEVICE_SIGN_IN_ARGS.code]: code },
+        guard: isBoolean,
       }),
   }
 }

@@ -1,6 +1,9 @@
 /** Where the window was last, as Electron's bounds name it. */
 export type WindowBounds = { x: number; y: number; width: number; height: number }
 
+/** The file in Wren's data folder that holds where the window was last. */
+export const WINDOW_FILE = 'window.json'
+
 /** A display's work area, the part of the screen a window may take. */
 type WorkArea = WindowBounds
 

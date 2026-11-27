@@ -17,10 +17,10 @@ Read on 2026-11-21 from the suites themselves. A new end to end test, or a new a
 | --- | --- | --- | --- |
 | Web | `apps/raven/web/e2e` | Playwright in Google Chrome, against `@raven/server`'s fixture | 🌐 E2E Raven web |
 | Raven macOS | `apps/raven/desktop/e2e` | Playwright driving Electron, against a stand-in server | 🎬 E2E Raven Mac desktop |
-| Raven Windows | None | | Built and smoke-tested only |
+| Raven Windows | `apps/raven/desktop/e2e`, but the specs only macOS can run, with `windowsChrome.e2e.ts` | Playwright driving Electron, against a stand-in server | 🎬 E2E Raven Windows desktop |
 | iPhone | `apps/raven/app/e2e`, the flows not tagged `dpad` | Maestro on an iPhone simulator | 🎬 E2E Raven iPhone |
-| iPad | None | | The iPhone flows never run on an iPad simulator |
-| Android phone | None | | Built only |
+| iPad | The iPhone's flows | Maestro on an iPad simulator | 🎬 E2E Raven iPad |
+| Android phone | `apps/raven/app/e2e`, the flows tagged `touch` | Maestro on an Android phone emulator | 🎬 E2E Raven Android phone |
 | Android TV | `apps/raven/app/e2e`, the flows not tagged `touch` | Maestro on an Android TV emulator, with the remote's keys | 🎬 E2E Raven Android TV |
 | Apple TV | `apps/raven/app/tvos-e2e` | XCUITest pressing the Siri Remote | 🎬 E2E Raven Apple TV |
 
@@ -111,7 +111,7 @@ Read on 2026-11-21 from the suites themselves. A new end to end test, or a new a
 7. Android TV skips forward only, with the remote's Right while paused, and checks the spot the page then offers to resume from.
 8. Raven macOS tests resuming only for a download, after a relaunch. A server title's resume is never checked there.
 9. The device app has no Previous that goes to the video before, no Queue menu and no shuffle inside its player yet. Those were added to the web's shared player on 2026-11-21, so here the gap is the feature as well as its test.
-10. mpv plays the original file, so Raven offers no other quality. The macOS suite asserts exactly that: the Playback menu names direct play and holds no choice. Raven Windows has no suite to assert it.
+10. mpv plays the original file, so Raven offers no other quality. The macOS suite asserts exactly that: the Playback menu names direct play and holds no choice. Raven Windows runs the same spec.
 11. The web suite presses only `k` for play and pause and `End` to reach a video's end. Raven macOS also presses the number keys, `?`, `i`, Escape and the arrows.
 
 ## The widest gaps

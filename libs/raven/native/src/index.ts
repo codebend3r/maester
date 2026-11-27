@@ -7,16 +7,12 @@ export {
   accessTokenNow,
   createAccountSession,
 } from '@/account/accountSession'
+export { QrCode } from '@/account/QrCode'
 export { DISK_TRANSFERS, deviceDiskFor } from '@/downloads/deviceDisk'
 export { secretStore } from '@/servers/deviceSecretStore'
 export { isOnCellular, watchNetwork } from '@/servers/networkChanges'
-export {
-  type ApiForProps,
-  apiFor,
-  cookieJar,
-  openEventsFor,
-  openFetch,
-} from '@/servers/serverClient'
+export { type ApiForProps, apiFor, cookieJar, openEventsFor } from '@/servers/serverClient'
+export { openFetch } from '@/servers/serverFetch'
 export { followAccountServers } from '@/servers/followAccountServers'
 export { useServerUnlock } from '@/servers/serverUnlock'
 export { Icon } from '@/icons/Icon'

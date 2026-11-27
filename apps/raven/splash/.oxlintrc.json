@@ -1,11 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["../../../tooling/oxlint/react.json"],
-  "ignorePatterns": ["dist", "public"],
+  "ignorePatterns": ["dist", "public", "test-results"],
   "overrides": [
     {
-      // Vite needs a default export.
-      "files": ["vite.config.ts"],
+      // Vite and Playwright read their config through a default export.
+      "files": ["vite.config.ts", "playwright.config.ts"],
       "rules": {
         "import/no-default-export": "off"
       }

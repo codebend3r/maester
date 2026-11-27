@@ -41,6 +41,28 @@ export const isAccountSession = object({
 /** What the app keeps of a Supabase session: the two tokens, when the access one ends, and who. */
 export type AccountSession = Infer<typeof isAccountSession>
 
+type AccountSessionOfProps = Omit<AccountSession, 'expiresAt'> & {
+  /** How long the access token lasts, in seconds, as Supabase Auth says it. */
+  expiresIn: number
+  now: number
+}
+
+/** A session Supabase Auth made, as this device keeps one: its access token dated from `now`. */
+export const accountSessionOf = ({
+  accessToken,
+  refreshToken,
+  expiresIn,
+  userId,
+  email,
+  now,
+}: AccountSessionOfProps): AccountSession => ({
+  accessToken,
+  refreshToken,
+  expiresAt: now + expiresIn * MS_PER_SECOND,
+  userId,
+  email,
+})
+
 export const AUTH_OUTCOMES = {
   ok: 'ok',
   refused: 'refused',
@@ -52,14 +74,14 @@ export type AuthOutcome =
   | { kind: typeof AUTH_OUTCOMES.refused; message: string; code: string | null }
   | { kind: typeof AUTH_OUTCOMES.unreachable }
 
-type SupabaseConfig = { supabaseUrl: string; publishableKey: string }
+export type SupabaseConfig = { supabaseUrl: string; publishableKey: string; webUrl: string }
 
 type ReadSupabaseConfigProps = {
   origin: string
 }
 
 /** The raven server's public sign-in settings (the same ones the web reads), or null when it has none. */
-const readSupabaseConfig = async ({
+export const readSupabaseConfig = async ({
   origin,
 }: ReadSupabaseConfigProps): Promise<SupabaseConfig | null> => {
   const response = await fetch(`${origin}${AUTH_PATHS.config}`, {
@@ -67,7 +89,11 @@ const readSupabaseConfig = async ({
   })
   const body: unknown = await response.json()
   if (!isAuthConfig(body) || body.state !== AUTH_CONFIG_STATES.ready) return null
-  return { supabaseUrl: body.supabaseUrl, publishableKey: body.publishableKey }
+  return {
+    supabaseUrl: body.supabaseUrl,
+    publishableKey: body.publishableKey,
+    webUrl: body.webUrl,
+  }
 }
 
 type RequestTokenProps = {
@@ -99,13 +125,14 @@ const requestToken = async ({
     if (response.ok && isTokenAnswer(answer)) {
       return {
         kind: AUTH_OUTCOMES.ok,
-        session: {
+        session: accountSessionOf({
           accessToken: answer.access_token,
           refreshToken: answer.refresh_token,
-          expiresAt: Date.now() + answer.expires_in * MS_PER_SECOND,
+          expiresIn: answer.expires_in,
           userId: answer.user.id,
           email,
-        },
+          now: Date.now(),
+        }),
       }
     }
     // A 5xx is Supabase being down, not a refusal of this account.

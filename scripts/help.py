@@ -63,7 +63,10 @@ GROUPS: tuple[Group, ...] = (
                 "code and CSS, lint, format, typecheck, unit and screen tests, every build, "
                 "Lighthouse and axe-core.",
             ),
-            Command("verify:uncached", "verify, ignoring Nx's cache, after a toolchain change."),
+            Command(
+                "verify:uncached",
+                "verify, ignoring Nx's cache, after a toolchain change.",
+            ),
             Command(
                 "verify:push",
                 "What the pre-push hook runs: verify without dead code, dead CSS, Lighthouse and axe-core, in one Nx run.",
@@ -74,7 +77,8 @@ GROUPS: tuple[Group, ...] = (
                 "the projects your branch changed.",
             ),
             Command(
-                "affected:tasks", "The per-project half of affected, without the repo-wide checks."
+                "affected:tasks",
+                "The per-project half of affected, without the repo-wide checks.",
             ),
             Command("build", "Builds every project."),
             Command("test", "Every project's unit tests."),
@@ -107,7 +111,8 @@ GROUPS: tuple[Group, ...] = (
         (
             Command("spellcheck", "Spellchecks the repo with typos."),
             Command(
-                "one-command-per-script", "Fails on a package.json script chained with &&, || or ;."
+                "one-command-per-script",
+                "Fails on a package.json script chained with &&, || or ;.",
             ),
             Command("dead-code", "Finds unused exports, files and dependencies with knip."),
             Command("dead-css", "Finds SCSS module classes no component reads."),
@@ -143,9 +148,15 @@ GROUPS: tuple[Group, ...] = (
                 "Vhagar",
             ),
             Command("dev:raven:splash", "raven's splash page (maester.tv) with hot reload."),
-            Command("web:build", "Builds raven's web app, as Netlify and the desktop app ship it."),
+            Command(
+                "web:build",
+                "Builds raven's web app, as Netlify and the desktop app ship it.",
+            ),
             Command("build:raven:splash", "Builds raven's splash page."),
-            Command("preview:raven:splash", "Serves the built splash page, as Netlify would."),
+            Command(
+                "preview:raven:splash",
+                "Serves the built splash page, as Netlify would.",
+            ),
             Command("dev:wren:web", "raven's server and Wren on the web, with hot reload."),
             Command("build:wren:web", "Builds Wren on the web, as Netlify does."),
             Command("dev:sparrow", "sparrow's API and chat page."),
@@ -160,11 +171,19 @@ GROUPS: tuple[Group, ...] = (
             Command("app:start", "Starts Metro for a dev client.", "watchman"),
             Command("app:server", "raven's dev server, for the app to talk to."),
             Command(
-                "app:dev:ios", "A Debug build on the iPhone simulator, against Metro.", "Xcode"
+                "app:dev:ios",
+                "A Debug build on the iPhone simulator, against Metro.",
+                "Xcode",
             ),
-            Command("app:dev:ipad", "A Debug build on the iPad simulator, against Metro.", "Xcode"),
             Command(
-                "app:dev:tvos", "A Debug build on the Apple TV simulator, against Metro.", "Xcode"
+                "app:dev:ipad",
+                "A Debug build on the iPad simulator, against Metro.",
+                "Xcode",
+            ),
+            Command(
+                "app:dev:tvos",
+                "A Debug build on the Apple TV simulator, against Metro.",
+                "Xcode",
             ),
             Command(
                 "app:prebuild:ios",
@@ -172,10 +191,14 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
-                "app:prebuild:tvos", "Generates the Apple TV native project and its pods.", "Xcode"
+                "app:prebuild:tvos",
+                "Generates the Apple TV native project and its pods.",
+                "Xcode",
             ),
             Command(
-                "app:prebuild:android-tv", "Generates the Android TV native project.", "Android SDK"
+                "app:prebuild:android-tv",
+                "Generates the Android TV native project.",
+                "Android SDK",
             ),
             Command(
                 "app:prebuild:android",
@@ -203,6 +226,26 @@ GROUPS: tuple[Group, ...] = (
                 "wren:deploy:ios",
                 "Builds Wren's signed Release and puts it on every paired iPhone and iPad.",
                 "Xcode",
+            ),
+            Command(
+                "wren:build:android",
+                "Wren's Release APK for Android phones.",
+                "Android SDK",
+            ),
+            Command(
+                "wren:e2e",
+                "Wren's Maestro flows on the iPhone simulator, against the fixture server.",
+                "Maestro",
+            ),
+            Command(
+                "wren:e2e:ipad",
+                "The same flows on an iPad simulator, a target of their own.",
+                "Maestro",
+            ),
+            Command(
+                "wren:e2e:android",
+                "Wren's Maestro flows on the Android phone emulator ANDROID_SERIAL names.",
+                "emulator",
             ),
             Command(
                 "deploy:devices",
@@ -245,6 +288,11 @@ GROUPS: tuple[Group, ...] = (
                 "Maestro",
             ),
             Command(
+                "app:e2e:ipad",
+                "The touch Maestro flows on an iPad simulator, a target of their own.",
+                "Maestro",
+            ),
+            Command(
                 "app:e2e:tvos",
                 "The Siri Remote XCUITest on the Apple TV simulator.",
                 "Xcode",
@@ -281,7 +329,11 @@ GROUPS: tuple[Group, ...] = (
                 "The Release build for the Apple TV simulator, with a brief log.",
                 "Xcode",
             ),
-            Command("wren:tv:build:android-tv", "The Release APK for Android TV.", "Android SDK"),
+            Command(
+                "wren:tv:build:android-tv",
+                "The Release APK for Android TV.",
+                "Android SDK",
+            ),
             Command(
                 "wren:tv:deploy:tvos",
                 "Builds the signed Release and puts it on the paired Apple TV.",
@@ -298,7 +350,9 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
-                "wren:tv:e2e:tvos", "The Siri Remote XCUITest on the Apple TV simulator.", "Xcode"
+                "wren:tv:e2e:tvos",
+                "The Siri Remote XCUITest on the Apple TV simulator.",
+                "Xcode",
             ),
             Command(
                 "wren:tv:e2e:android-tv",
@@ -313,10 +367,20 @@ GROUPS: tuple[Group, ...] = (
         "bright_magenta",
         (
             Command(
-                "wren:desktop:dev", "Wren for Mac unpackaged, on the web app's build.", "macOS"
+                "wren:desktop:dev",
+                "Wren for Mac unpackaged, on the web app's build.",
+                "macOS",
             ),
-            Command("wren:desktop:build", "Builds Wren for Mac's main process and the web app."),
+            Command(
+                "wren:desktop:build",
+                "Builds Wren for Mac's main process and the web app.",
+            ),
             Command("wren:desktop:make", "Packages Wren for Mac: the dmg and zip.", "macOS"),
+            Command(
+                "wren:desktop:e2e",
+                "The 🎵 E2E Wren Mac desktop job: Playwright drives Wren for Mac against a fixture server.",
+                "macOS + ffmpeg",
+            ),
             Command(
                 "wren:desktop:deploy",
                 "Replaces /Applications/Wren.app with what wren:desktop:make packaged, and opens it.",
@@ -329,18 +393,30 @@ GROUPS: tuple[Group, ...] = (
         "The Electron app on macOS and Windows, with libmpv.",
         "bright_magenta",
         (
-            Command("desktop:dev", "Raven in Electron with the web app's dev build.", "macOS"),
+            Command(
+                "desktop:dev",
+                "Raven in Electron with the web app's dev build.",
+                "macOS",
+            ),
             Command("desktop:build", "Builds Raven's main process, preload and web app."),
             Command("desktop:test:native", "The libmpv player's native tests.", "macOS"),
             Command(
-                "desktop:e2e", "Playwright drives the real pages against a fixture server.", "macOS"
+                "desktop:e2e",
+                "Playwright drives the real pages against a fixture server.",
+                "macOS",
+            ),
+            Command(
+                "desktop:e2e:windows",
+                "The same suite on Windows, with the specs only Windows has.",
+                "Windows + ffmpeg",
             ),
             Command(
                 "desktop:make",
                 "Packages Raven: the dmg and zip, or Squirrel's installer on Windows.",
             ),
             Command(
-                "desktop:audit:bundle", "Checks the packaged engine's binaries and their imports."
+                "desktop:audit:bundle",
+                "Checks the packaged engine's binaries and their imports.",
             ),
             Command(
                 "desktop:smoke:packaged",
@@ -353,7 +429,10 @@ GROUPS: tuple[Group, ...] = (
                 "Replaces /Applications/Raven.app with what desktop:make packaged, and opens it.",
                 "macOS",
             ),
-            Command("desktop:release:assets", "Names and gathers the release's files for upload."),
+            Command(
+                "desktop:release:assets",
+                "Names and gathers the release's files for upload.",
+            ),
             Command(
                 "mpv:native",
                 "Builds the pinned libmpv and the addon, then runs its audit and native tests.",
@@ -371,7 +450,11 @@ GROUPS: tuple[Group, ...] = (
         "Each runs one CI job from pull-request-checks.yml on this machine.",
         "red",
         (
-            Command("ci:docker", "The ✅ Checks job inside an Ubuntu 24.04 container.", "Docker"),
+            Command(
+                "ci:docker",
+                "The ✅ Checks job inside an Ubuntu 24.04 container.",
+                "Docker",
+            ),
             Command(
                 "ci:app:ios",
                 "The 🎬 Build Raven iPhone job and its end to end job: every ci:app:ios step below, in order.",
@@ -392,9 +475,15 @@ GROUPS: tuple[Group, ...] = (
                 "The fixture's Release build for the iPhone simulator.",
                 "macOS + Xcode",
             ),
-            Command("ci:app:ios:pods", "Checks the build's pod install finished.", "macOS + Xcode"),
             Command(
-                "ci:app:ios:install", "Installs the build on the iPhone simulator.", "macOS + Xcode"
+                "ci:app:ios:pods",
+                "Checks the build's pod install finished.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ios:install",
+                "Installs the build on the iPhone simulator.",
+                "macOS + Xcode",
             ),
             Command(
                 "ci:app:ios:e2e",
@@ -437,7 +526,9 @@ GROUPS: tuple[Group, ...] = (
                 "Android SDK",
             ),
             Command(
-                "ci:app:android-tv:install", "Installs the APK on the emulator.", "Android SDK"
+                "ci:app:android-tv:install",
+                "Installs the APK on the emulator.",
+                "Android SDK",
             ),
             Command(
                 "ci:app:android-tv:e2e",
@@ -446,7 +537,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "ci:app:android",
-                "The Android phone end to end job: every ci:app:android step below, in order.",
+                "The 🎬 Build Raven Android phone job and its end to end job: every ci:app:android step below, in order.",
                 "Android SDK",
             ),
             Command(
@@ -490,10 +581,73 @@ GROUPS: tuple[Group, ...] = (
                 "ffmpeg",
             ),
             Command(
-                "ci:app:fixture:wait", "Waits up to three minutes for the fixture server to answer."
+                "ci:app:fixture:wait",
+                "Waits up to three minutes for the fixture server to answer.",
             ),
             Command(
-                "ci:wren", "The 🎵 Build Wren iPhone job and its end to end job.", "macOS + Xcode"
+                "ci:app:ipad",
+                "The 🎬 E2E Raven iPad job: the iPhone job's build on an iPad simulator, every step in order.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ipad:simulator",
+                "Boots the iPad simulator, making it when there is none.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ipad:install",
+                "Installs the build on the iPad simulator.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:app:ipad:e2e",
+                "The touch Maestro flows on the iPad simulator.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:wren",
+                "The 🎵 Build Wren iPhone job and its end to end job.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:wren:ipad",
+                "The 🎵 E2E Wren iPad job: the iPhone job's build and flows on an iPad simulator.",
+                "macOS + Xcode",
+            ),
+            Command(
+                "ci:wren:android",
+                "The 🎵 Build Wren Android job and its end to end job: every ci:wren:android step below, in order.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:tools",
+                "Its tools: Android Studio, the SDK, the phone system image and Maestro.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:emulator",
+                "Starts the wren_phone emulator, making it when there is none.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:build",
+                "The fixture's Wren Release APK for the phone emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:emulator:wait",
+                "Waits for the phone emulator to boot and turns its animations off.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:install",
+                "Installs Wren's APK on the phone emulator.",
+                "Android SDK",
+            ),
+            Command(
+                "ci:wren:android:e2e",
+                "Wren's Maestro flows on the phone emulator.",
+                "Android SDK",
             ),
             Command(
                 "ci:wren:tv:tvos",
@@ -552,6 +706,11 @@ GROUPS: tuple[Group, ...] = (
                 "Chrome + ffmpeg",
             ),
             Command(
+                "splash:e2e",
+                "The 🏠 E2E maester.tv job: Playwright drives the built site, with no server.",
+                "Chrome",
+            ),
+            Command(
                 "lighthouse",
                 "Lighthouse on both web apps, one after the other, against their floors.",
                 "Chrome + ffmpeg",
@@ -578,7 +737,7 @@ GROUPS: tuple[Group, ...] = (
             ),
             Command(
                 "e2e",
-                "Every end to end job, one after another: web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV and Android TV.",
+                "Every end to end suite this system can run, past Nx's cache, through all failures, with a table at the end (the run-all-e2e skill).",
                 "macOS + Xcode + Android SDK",
             ),
         ),

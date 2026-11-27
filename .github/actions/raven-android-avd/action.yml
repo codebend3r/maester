@@ -1,14 +1,22 @@
-name: 📺 raven Android TV AVD
+name: 📺 raven Android AVD
 description: >-
-  The Android TV emulator the app's flows run on: its settings, KVM, the AVD with a
-  booted snapshot restored from the cache, or made and booted once on a miss. Restores
-  only; its outputs are the cache's key and path, for app-caches.yml to save, and the
-  settings the flows' emulator step starts it with.
+  The Android emulator an app's flows run on, the Android TV unless a phone is asked for: its
+  settings, KVM, the AVD with a booted snapshot restored from the cache, or made and booted once
+  on a miss. Restores only; its outputs are the cache's key and path, for app-caches.yml to
+  save, and the settings the flows' emulator step starts it with.
 
-# The single definition of the emulator, shared by the PR's Android TV job and by
-# app-caches.yml, which saves the snapshot on main. The key names everything the snapshot
+# The single definition of each emulator, shared by main's Android end to end jobs and by
+# app-caches.yml, which saves the snapshots on main. The key names everything the snapshot
 # is made from, so a snapshot from anything else is never restored to cold boot.
 inputs:
+  target:
+    description: The system image's target, `android-tv` for the TV or `google_apis` for a phone
+    required: false
+    default: android-tv
+  profile:
+    description: The hardware profile, `tv_1080p` for the TV or `pixel_7` for a phone
+    required: false
+    default: tv_1080p
   lookup-only:
     description: "'true' to only check whether the snapshot is cached, without downloading it"
     required: false
@@ -42,20 +50,21 @@ outputs:
 runs:
   using: composite
   steps:
-    # Android TV at API 36 (the app's target SDK), x86_64 for KVM, at 960 by 540 dp, on the
+    # API 36 (the app's target SDK), x86_64 for KVM, the Android TV at 960 by 540 dp, on the
     # emulator build the flows were written on (36.5.11). The runner writes the RAM verbatim
     # to hw.ramSize, an integer in MiB: a suffix makes it fall back to 1024 MiB. The key adds
     # the system image's revision (the runner always installs the newest, which this reads
     # from the same repository) and a hash of the options. Bump the `v1` to throw the cache
-    # away by hand.
+    # away by hand. Each target's snapshots supersede only their own, so the TV's and the
+    # phone's never delete each other.
     - name: 🔑 AVD settings and key
       id: avd
       shell: bash
       env:
         API_LEVEL: '36'
-        TARGET: android-tv
+        TARGET: ${{ inputs.target }}
         ARCH: x86_64
-        PROFILE: tv_1080p
+        PROFILE: ${{ inputs.profile }}
         EMULATOR_BUILD: '15261927'
         CORES: '4'
         RAM_SIZE: '4096'
@@ -65,10 +74,11 @@ runs:
         revision="$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null | awk -F'|' -v image="$image" '{ gsub(/ /, "", $1); gsub(/ /, "", $2) } $1 == image { print $2; exit }')"
         test -n "$revision"
         options_hash="$(echo "$OPTIONS" | sha256sum | cut -c1-12)"
-        key="avd-v1-$TARGET-$API_LEVEL-$ARCH-$PROFILE-image$revision-emulator$EMULATOR_BUILD-$CORES-cores-$RAM_SIZE-$options_hash"
+        family="avd-v1-$TARGET-"
+        key="$family$API_LEVEL-$ARCH-$PROFILE-image$revision-emulator$EMULATOR_BUILD-$CORES-cores-$RAM_SIZE-$options_hash"
         {
           echo "key=$key"
-          echo "supersedes=avd- $key"
+          echo "supersedes=$family $key"
           printf 'path<<LIST\n%s\n%s\nLIST\n' "$HOME/.android/avd/*" "$HOME/.android/adb*"
           echo "api-level=$API_LEVEL"
           echo "target=$TARGET"
@@ -88,7 +98,7 @@ runs:
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
 
-    - name: 🗃️ Android TV AVD cache
+    - name: 🗃️ Android AVD cache
       id: restore
       uses: actions/cache/restore@v6
       with:
@@ -98,10 +108,10 @@ runs:
 
     # Only on a cache miss: makes the AVD and boots it once, which leaves the snapshot. The
     # runner unlocks the screen with `adb shell input keyevent 82` the moment the boot
-    # completes, and that call sometimes exits 255 while the Android TV image is still
+    # completes, and that call sometimes exits 255 while the system image is still
     # settling, which fails the step with a healthy emulator. The second attempt retries it,
     # and reuses the AVD the first one made.
-    - name: 📺 Make the Android TV AVD
+    - name: 📺 Make the Android AVD
       id: make
       if: steps.restore.outputs.cache-hit != 'true'
       continue-on-error: true
@@ -118,9 +128,9 @@ runs:
         force-avd-creation: false
         emulator-options: ${{ steps.avd.outputs.emulator-options }}
         disable-animations: false
-        script: echo "Booted the Android TV AVD once"
+        script: echo "Booted the Android AVD once"
 
-    - name: 📺 Make the Android TV AVD again
+    - name: 📺 Make the Android AVD again
       if: steps.make.outcome == 'failure'
       # reactivecircus/android-emulator-runner v2.38.0
       uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
@@ -135,4 +145,4 @@ runs:
         force-avd-creation: false
         emulator-options: ${{ steps.avd.outputs.emulator-options }}
         disable-animations: false
-        script: echo "Booted the Android TV AVD once"
+        script: echo "Booted the Android AVD once"

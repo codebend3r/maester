@@ -126,7 +126,7 @@ stateDiagram-v2
 - **End to end, Apple TV:** an XCUITest (`tvos-e2e/WrenRemoteFlowTests.swift`) driven by `XCUIRemote`, added to the generated project by `plugins/withTvRemoteTests.ts`, the same steps, since Maestro cannot drive tvOS.
 
 > [!WARNING]
-> The end to end suites need a Mac with Xcode, the tvOS simulator and the Android TV emulator, as raven's do, so `verify` leaves them out and CI runs them on main only (`native-checks.yml`).
+> The end to end suites need a Mac with Xcode, the tvOS simulator and the Android TV emulator, as raven's do, so `verify` leaves them out and CI runs them on main only (`e2e-tests.yml`).
 
 ## Risks
 

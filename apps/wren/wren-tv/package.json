@@ -9,7 +9,7 @@
     "#app-config": "./app.config.ts"
   },
   "scripts": {
-    "build:android-tv": "ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk} JAVA_HOME=\"${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./android/gradlew -p android assembleRelease",
+    "build:android-tv": "../../raven/app/scripts/assemble_android.sh",
     "build:tvos": "./scripts/build_tvos.sh",
     "deploy:android-tv": "./scripts/deploy_android_tv.sh",
     "deploy:tvos": "./scripts/deploy_tvos.sh",
@@ -147,6 +147,7 @@
         "{workspaceRoot}/apps/raven/app/plugins/withTvRemoteTests.ts",
         "{workspaceRoot}/apps/raven/app/plugins/withTvTopShelf.ts",
         "{workspaceRoot}/apps/raven/app/plugins/withoutTvAudioService.ts",
+        "{workspaceRoot}/apps/raven/app/scripts/assemble_android.sh",
         "{workspaceRoot}/apps/raven/app/scripts/build_tvos.sh",
         "{workspaceRoot}/apps/wren/wren-app/plugins/withCleartextTraffic.ts",
         "expoVariant",
@@ -213,6 +214,7 @@
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
           "{projectRoot}/ios/Pods/Manifest.lock",
+          "{projectRoot}/ios/Pods/Target Support Files/Pods-Wren",
           "{projectRoot}/ios/Wren.xcodeproj",
           "{projectRoot}/ios/WrenRemoteTests",
           "{projectRoot}/build/tvos/Build/Products/Release-appletvsimulator/Wren.app"

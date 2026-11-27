@@ -1,8 +1,8 @@
 {
-  // The main process is Node; the tests are bun's.
+  // The main process is Node; the tests are bun's. tsconfig.e2e.json checks the end to end suite.
   "extends": "../../../tooling/tsconfig/node.json",
   "compilerOptions": {
-    "paths": { "@/*": ["./src/*"] },
+    "paths": { "@/e2e/*": ["./e2e/*"], "@/*": ["./src/*"] },
     "types": ["node", "bun"]
   },
   "include": ["src", "forge.config.ts"]

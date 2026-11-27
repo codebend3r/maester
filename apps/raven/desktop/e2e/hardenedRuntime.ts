@@ -1,8 +1,8 @@
 import { cp, mkdtemp, writeFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { adHocSignArgs, runCommand, signAdHoc } from '@/build/machO'
+import { electronExecutable } from '@/e2e/harness'
 
 /**
  * What a Developer ID build of Raven runs under: the hardened runtime with Electron's default
@@ -23,13 +23,6 @@ const ENTITLEMENTS_PLIST = [
   ...Object.values(ENTITLEMENTS).map((key) => `<key>${key}</key><true/>`),
   '</dict></plist>',
 ].join('\n')
-
-// `require('electron')` outside Electron is the path of the executable Playwright launches.
-const electronExecutable = (): string => {
-  const path: unknown = createRequire(import.meta.url)('electron')
-  if (typeof path !== 'string') throw new Error('The electron package named no executable.')
-  return path
-}
 
 export type HardenedElectron = { folder: string; executable: string }
 

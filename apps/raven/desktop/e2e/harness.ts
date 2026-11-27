@@ -1,25 +1,35 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { execFile } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { setTimeout as delay } from 'node:timers/promises'
 import { _electron, type ElectronApplication, expect, type Page } from '@playwright/test'
-import { DESKTOP_REPLIES, DESKTOP_REQUESTS, type DesktopReply, isDesktopReply } from '@raven/core'
+import {
+  DESKTOP_PLATFORMS,
+  DESKTOP_REPLIES,
+  DESKTOP_REQUESTS,
+  type DesktopPlatform,
+  type DesktopReply,
+  isDesktopReply,
+} from '@raven/core'
+import { quitWithin, removeFolder, withLaunched } from '@tooling/web/electron'
 import { DESKTOP_ENV } from '@/shared/platform'
 import { FIXTURE_ACCOUNT } from '@/e2e/fixtureAuth'
+import { E2E_PLATFORM, E2E_SYSTEM, makeTempDir } from '@/e2e/platform'
 import { withoutTestHooks } from '@/build/smokeVerdict'
 import { LOG_FILE } from '@/main/log/log'
 import { ENGINE_MODES } from '@/main/player/engine'
 import { ERROR_CODES } from '@/main/stateStore'
 import { AUTH_ORIGIN_HOOK } from '@/main/origins'
 
+export { browserOpens, hasExited, stubBrowser } from '@tooling/web/electron'
+
 // `cwd` with `args: ['.']` runs the built app the way `electron .` does: package.json's `main`.
 const PROJECT_DIR = join(import.meta.dirname, '..')
 // A quit that hangs is a bug (the quit gate gives up flushing after a second), not a slow test.
-const QUIT_MS = 10_000
+export const QUIT_MS = 10_000
 // Every budget mark main prints on stdout (Ruling 14): `raven-<name> <n>` on a line of its own.
 const MARK_LINE = /^raven-([a-z][a-z0-9-]*) (\d+(?:\.\d+)?)$/
-const QUIT_OUTCOMES = { closed: 'closed', timeout: 'timeout' } as const
 
 /**
  * The server a launch without a fixture points at: the discard port, where nothing listens, so
@@ -54,13 +64,11 @@ export type Launched = {
   output: Output
 }
 
-export const freshUserData = (): Promise<string> => mkdtemp(join(tmpdir(), 'raven-e2e-user-'))
+export const freshUserData = (): Promise<string> => makeTempDir('raven-e2e-user-')
 
-// A hook that failed before it made its folder leaves the path empty, which is not a folder to remove.
-export const removeDir = async (path: string): Promise<void> => {
-  if (path === '') return
-  await rm(path, { recursive: true, force: true })
-}
+/** Removes a folder a test made, trying again as often as the system needs. */
+export const removeDir = (path: string): Promise<void> =>
+  removeFolder({ path, maxRetries: E2E_SYSTEM.removeRetries })
 
 const isMissing = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === ERROR_CODES.enoent
@@ -80,12 +88,6 @@ export const readLog = async ({ userData }: ReadLogProps): Promise<string[]> => 
     throw error
   })
   return text.split('\n').filter((line) => line !== '')
-}
-
-/** Whether the app's process has exited or been killed by a signal. */
-export const hasExited = (app: ElectronApplication): boolean => {
-  const child = app.process()
-  return child.exitCode !== null || child.signalCode !== null
 }
 
 /*
@@ -178,18 +180,8 @@ export const launchMarkWithin = ({ launched, ms }: LaunchMarkWithinProps) =>
 type CloseAppProps = { app: ElectronApplication }
 
 /** Quits the app as a person would and waits for its process to end, killing it past the deadline. */
-export const closeApp = async ({ app }: CloseAppProps): Promise<void> => {
-  if (hasExited(app)) return
-  const deadline = new AbortController()
-  const outcome = await Promise.race([
-    app.close().then(() => QUIT_OUTCOMES.closed),
-    delay(QUIT_MS, QUIT_OUTCOMES.timeout, { signal: deadline.signal }),
-  ])
-  deadline.abort()
-  if (outcome === QUIT_OUTCOMES.closed) return
-  app.process().kill('SIGKILL')
-  throw new Error(`Raven did not quit within ${QUIT_MS} ms.`)
-}
+export const closeApp = ({ app }: CloseAppProps): Promise<void> =>
+  quitWithin({ app, ms: QUIT_MS, name: 'Raven', forceEnd: E2E_SYSTEM.forceEnd })
 
 /** Headless mpv (`vo=null`, `ao=null`), or none, which is the html fallback's run (Ruling 15). */
 export type MpvMode = typeof ENGINE_MODES.headless | typeof ENGINE_MODES.off
@@ -201,33 +193,42 @@ type LaunchAppProps = {
   env?: Readonly<Record<string, string>>
   /** Another Electron to run the app on, such as `hardenedElectron`'s; the checkout's by default. */
   executable?: string
+  /** What the launch is handed after the app itself, as Windows hands over a `raven://` link. */
+  args?: readonly string[]
 }
+
+/*
+ * Chromium's fake audio sink: playback is clocked by the audio output, so a real device
+ * whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
+ */
+const APP_ARGS = ['--disable-audio-output', '.'] as const
+
+type AppEnvProps = Required<Pick<LaunchAppProps, 'userData' | 'mpv' | 'env'>>
+
+/*
+ * e2e never drives the window surface (Ruling 15). A hook exported in the developer's
+ * shell is dropped, so only the hooks a test names reach the app.
+ */
+const appEnv = ({ userData, mpv, env }: AppEnvProps): Record<string, string> => ({
+  ...withoutTestHooks({ env: process.env }),
+  RAVEN_DESKTOP_USER_DATA: userData,
+  RAVEN_DESKTOP_MPV: mpv,
+  [DESKTOP_ENV.serverOrigin]: NO_SERVER,
+  ...env,
+})
 
 export const launchApp = async ({
   userData,
   mpv = ENGINE_MODES.headless,
   env = {},
   executable,
+  args = [],
 }: LaunchAppProps): Promise<Launched> => {
   const app = await _electron.launch({
     executablePath: executable,
-    /*
-     * Chromium's fake audio sink: playback is clocked by the audio output, so a real device
-     * whose clock has stalled (an asleep USB interface) would freeze `currentTime` at 0.
-     */
-    args: ['--disable-audio-output', '.'],
+    args: [...APP_ARGS, ...args],
     cwd: PROJECT_DIR,
-    /*
-     * e2e never drives the window surface (Ruling 15). A hook exported in the developer's
-     * shell is dropped, so only the hooks a test names reach the app.
-     */
-    env: {
-      ...withoutTestHooks({ env: process.env }),
-      RAVEN_DESKTOP_USER_DATA: userData,
-      RAVEN_DESKTOP_MPV: mpv,
-      [DESKTOP_ENV.serverOrigin]: NO_SERVER,
-      ...env,
-    },
+    env: appEnv({ userData, mpv, env }),
   })
   const marks = readMarks(app)
   const output = readOutput(app)
@@ -241,60 +242,74 @@ export const launchApp = async ({
 type WithAppProps<T> = LaunchAppProps & { run: (launched: Launched) => Promise<T> }
 
 /** Launches the app, runs `run` against it and always quits it after, so no process outlives a test. */
-export const withApp = async <T>({ run, ...launch }: WithAppProps<T>): Promise<T> => {
-  const launched = await launchApp(launch)
-  const result = await run(launched).catch(async (error: unknown) => {
-    await closeApp({ app: launched.app }).catch(() => undefined)
-    throw error
-  })
-  await closeApp({ app: launched.app })
-  return result
+export const withApp = <T>({ run, ...launch }: WithAppProps<T>): Promise<T> =>
+  withLaunched({ launch: () => launchApp(launch), close: closeApp, run })
+
+// `require('electron')` outside Electron is the path of the executable Playwright launches.
+export const electronExecutable = (): string => {
+  const path: unknown = createRequire(import.meta.url)('electron')
+  if (typeof path !== 'string') throw new Error('The electron package named no executable.')
+  return path
 }
+
+type LaunchAgainProps = Pick<LaunchAppProps, 'userData' | 'mpv' | 'env'> & {
+  /** What the second launch is handed after the app itself: the links it should open. */
+  args: readonly string[]
+}
+
+/**
+ * Launches Raven a second time on a profile a running Raven holds, as clicking a `raven://`
+ * link does on Windows, and waits for it to end: it finds the first holding the profile, hands
+ * its arguments over and quits. Fails when it does not end within the quit deadline.
+ */
+export const launchAgain = ({
+  userData,
+  mpv = ENGINE_MODES.headless,
+  env = {},
+  args,
+}: LaunchAgainProps): Promise<void> =>
+  new Promise((resolve, reject) => {
+    execFile(
+      electronExecutable(),
+      [...APP_ARGS, ...args],
+      { cwd: PROJECT_DIR, env: appEnv({ userData, mpv, env }), timeout: QUIT_MS },
+      (error) => {
+        if (error === null) return resolve()
+        reject(new Error(`The second Raven did not hand over and quit: ${error.message}`))
+      },
+    )
+  })
 
 type OpenUrlProps = { app: ElectronApplication; url: string }
 
-/** The event macOS sends for a `raven://` link, emitted on the running app. */
-export const openUrl = async ({ app, url }: OpenUrlProps) => {
-  await app.evaluate(({ app: electronApp }, link) => {
-    electronApp.emit('open-url', { preventDefault: () => undefined }, link)
-  }, url)
-}
-
-const BROWSER_OPENS_KEY = 'ravenE2eBrowserOpens'
-
-type StubBrowserProps = { app: ElectronApplication }
-
-/**
- * Records what main hands the browser instead of opening it. main reads
- * `shell.openExternal` at each call, so the stand-in takes its place.
+/*
+ * How a `raven://` link reaches the running app from outside. macOS sends `open-url`. Windows
+ * launches the app again with the link as an argument, and the running app hears that launch's
+ * arguments as `second-instance`: the executable first, as `linksFromArgv` expects.
  */
-export const stubBrowser = async ({ app }: StubBrowserProps): Promise<void> => {
-  await app.evaluate(({ shell }, key) => {
-    Reflect.set(globalThis, key, [])
-    const open = async (...args: unknown[]) => {
-      const [url] = args
-      const opened: unknown = Reflect.get(globalThis, key)
-      const earlier = Array.isArray(opened)
-        ? opened.filter((item): item is string => typeof item === 'string')
-        : []
-      Reflect.set(globalThis, key, [...earlier, typeof url === 'string' ? url : ''])
-    }
-    Reflect.set(shell, 'openExternal', open)
-  }, BROWSER_OPENS_KEY)
-}
+const LINK_EVENTS = { openUrl: 'open-url', secondInstance: 'second-instance' } as const
 
-type BrowserOpensProps = { app: ElectronApplication }
+const LINK_DELIVERIES = {
+  [DESKTOP_PLATFORMS.mac]: async ({ app, url }: OpenUrlProps) => {
+    await app.evaluate(
+      ({ app: electronApp }, { event, link }) => {
+        electronApp.emit(event, { preventDefault: () => undefined }, link)
+      },
+      { event: LINK_EVENTS.openUrl, link: url },
+    )
+  },
+  [DESKTOP_PLATFORMS.windows]: async ({ app, url }: OpenUrlProps) => {
+    await app.evaluate(
+      ({ app: electronApp }, { event, link }) => {
+        electronApp.emit(event, {}, [process.execPath, link], process.cwd())
+      },
+      { event: LINK_EVENTS.secondInstance, link: url },
+    )
+  },
+} as const satisfies Record<DesktopPlatform, (input: OpenUrlProps) => Promise<void>>
 
-/** What main handed the browser since `stubBrowser`, in order. */
-export const browserOpens = async ({ app }: BrowserOpensProps): Promise<string[]> => {
-  const opened = await app.evaluate((_modules, key) => {
-    const value: unknown = Reflect.get(globalThis, key)
-    return value
-  }, BROWSER_OPENS_KEY)
-  return Array.isArray(opened)
-    ? opened.filter((item): item is string => typeof item === 'string')
-    : []
-}
+/** Hands the running app a `raven://` link the way its system does, by the event main listens for. */
+export const openUrl = (input: OpenUrlProps): Promise<void> => LINK_DELIVERIES[E2E_PLATFORM](input)
 
 type RequestFromPageProps = {
   page: Page

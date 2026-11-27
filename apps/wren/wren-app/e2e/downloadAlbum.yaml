@@ -13,9 +13,14 @@ name: An album downloads from its page and is listed under Library's Downloads
     timeout: 120000
 - assertNotVisible: Retry download
 - assertVisible: Downloaded
-# Back from the album to Albums, then back from Albums to Library.
+# Back from the album to Albums, then, on a phone, back from Albums to Library, which lists
+# Downloads; a tablet's sidebar lists it beside every page.
 - tapOn: Back.*
-- tapOn: Back to Library
+- runFlow:
+    when:
+      visible: Back to Library
+    commands:
+      - tapOn: Back to Library
 - tapOn: Downloads.*
 - extendedWaitUntil:
     visible: On this device

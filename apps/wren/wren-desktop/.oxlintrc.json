@@ -1,8 +1,15 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "extends": ["../../../tooling/oxlint/node.json"],
-  "ignorePatterns": ["dist", "out"],
+  "ignorePatterns": ["dist", "out", "test-results"],
   "overrides": [
+    {
+      // Playwright reads its config through a default export.
+      "files": ["playwright.config.ts"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
     {
       /*
        * Forge reads its config through a default export, and loads it with jiti, which does not

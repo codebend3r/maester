@@ -1,4 +1,4 @@
-name: 🧱 Native checks
+name: E2E Tests
 
 # The end to end suites: raven's web app and Wren on the web in Chrome, which a pull request runs
 # too, and the affected desktop, device app and Wren flows, which run here and nowhere else. Every
@@ -43,7 +43,7 @@ jobs:
   # which every end to end job below reads: whether the commit selected it and which run and
   # commit hold its builds. The action says how it decides.
   select:
-    name: 🔎 Select affected native checks
+    name: 🔎 Select affected E2E tests
     if: &not-a-release ${{ !startsWith(github.event.head_commit.message, 'Release v') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -192,13 +192,16 @@ jobs:
         working-directory: ${{ env.APP_PROJECT }}
         run: tar -xzf "$RUNNER_TEMP/remote-test-project.tgz"
 
-      # The Android TV emulator's settings and KVM, and the AVD with its booted snapshot,
-      # restored from what app-caches.yml saved on main (a PR's own 2.7 GB copy would be its
-      # alone), or made and booted once on a miss.
-      - name: 📺 Android TV AVD
+      # The job's Android emulator, the TV or a phone: its settings and KVM, and the AVD with
+      # its booted snapshot, restored from what app-caches.yml saved on main (a PR's own 2.7 GB
+      # copy would be its alone), or made and booted once on a miss.
+      - name: 📺 Android AVD
         if: env.APP_BUNDLE == ''
         id: avd
         uses: ./.github/actions/raven-android-avd
+        with:
+          target: ${{ env.APP_AVD_TARGET }}
+          profile: ${{ env.APP_AVD_PROFILE }}
 
       # A fresh simulator on the runtime of the selected Xcode's SDK, booted, with the build
       # on it. A runner with no such runtime fails here rather than testing on another. A new
@@ -309,6 +312,32 @@ jobs:
           path: ${{ runner.temp }}/${{ env.APP_SIMULATOR }}.png
           if-no-files-found: error
 
+  # The iPhone's flows on an iPad simulator, on the iPhone's own build (one build runs on both):
+  # an iPad moves by the side menu where an iPhone has a tab bar, so the same flows cover the
+  # tablet's layouts. A target of its own (`e2e:ipad`), so Nx never restores the iPhone's pass.
+  e2e-ipad:
+    name: 🎬 E2E Raven iPad
+    needs: select
+    if: needs.select.outputs.app_selected == 'true'
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.app_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.app_build }}
+      BUILD_SHA: ${{ needs.select.outputs.app_sha }}
+      APP_SETUP: ios
+      APP_PROJECT: apps/raven/app
+      APP_ARTIFACT: raven-app-ios-simulator
+      APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Raven.app
+      APP_SIMULATOR: raven-pad
+      APP_SDK: iphonesimulator
+      APP_RUNTIME: iOS
+      APP_DEVICE_TYPE: com.apple.CoreSimulator.SimDeviceType.iPad-A16
+      APP_DRIVER: maestro
+      APP_FLOWS: bun run app:e2e:ipad
+      APP_LOGS: raven-app-ipad-e2e-logs
+    steps: *e2e-steps
+
   # The XCUITests the tvOS prebuild added (`tvos-e2e/`) open on Home, play the film, leave with
   # Menu and find it under Continue watching, all with the Siri Remote.
   e2e-apple-tv:
@@ -336,7 +365,7 @@ jobs:
 
   # Every flow the remote drives (`e2e:android-tv`, all but the touch ones), which first point the
   # emulator's 127.0.0.1:8490 at the runner's with `adb reverse`, so the app signs in to the address
-  # the iPhone uses. The phone's touch flows need a phone emulator of their own, so it has none yet.
+  # the iPhone uses.
   # The flows drive the device ANDROID_SERIAL names and no other: the runner's one emulator takes
   # adb's first serial.
   e2e-android-tv:
@@ -356,11 +385,37 @@ jobs:
       APP_DRIVER: maestro
       APP_FLOWS: bun run app:e2e:android-tv
       APP_LOGS: raven-app-android-tv-e2e-logs
+      APP_AVD_TARGET: android-tv
+      APP_AVD_PROFILE: tv_1080p
+      ANDROID_SERIAL: emulator-5554
+    steps: *e2e-steps
+
+  # Every flow a finger drives (`e2e:android`, the `touch` ones), on an Android phone emulator and
+  # the phone's own build, which keeps the music service and has no leanback launcher.
+  e2e-android-phone:
+    name: 🎬 E2E Raven Android phone
+    needs: select
+    if: needs.select.outputs.app_selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.app_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.app_build }}
+      BUILD_SHA: ${{ needs.select.outputs.app_sha }}
+      APP_SETUP: android-tv
+      APP_PROJECT: apps/raven/app
+      APP_ARTIFACT: raven-app-android
+      APP_BUNDLE: ''
+      APP_DRIVER: maestro
+      APP_FLOWS: bun run app:e2e:android
+      APP_LOGS: raven-app-android-e2e-logs
+      APP_AVD_TARGET: google_apis
+      APP_AVD_PROFILE: pixel_7
       ANDROID_SERIAL: emulator-5554
     steps: *e2e-steps
 
   # Every flow in `apps/wren/wren-app/e2e`: open on Home, play the fixture's album, and download it,
-  # on a simulator of Wren's own, as `ci:wren` makes one. Wren on Android has no flows yet.
+  # on a simulator of Wren's own, as `ci:wren` makes one.
   e2e-wren-iphone:
     name: 🎵 E2E Wren iPhone
     needs: select
@@ -380,8 +435,57 @@ jobs:
       APP_RUNTIME: iOS
       APP_DEVICE_TYPE: com.apple.CoreSimulator.SimDeviceType.iPhone-16
       APP_DRIVER: maestro
-      APP_FLOWS: bunx nx run @wren/app:e2e
+      APP_FLOWS: bun run wren:e2e
       APP_LOGS: raven-music-e2e-logs
+    steps: *e2e-steps
+
+  # Wren's flows on an iPad simulator, on the iPhone's own build, under a target of its own
+  # (`e2e:ipad`).
+  e2e-wren-ipad:
+    name: 🎵 E2E Wren iPad
+    needs: select
+    if: needs.select.outputs.music_selected == 'true'
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.music_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.music_build }}
+      BUILD_SHA: ${{ needs.select.outputs.music_sha }}
+      APP_SETUP: ios
+      APP_PROJECT: apps/wren/wren-app
+      APP_ARTIFACT: raven-music-ios-simulator
+      APP_BUNDLE: build/ios/Build/Products/Release-iphonesimulator/Wren.app
+      APP_SIMULATOR: wren-pad
+      APP_SDK: iphonesimulator
+      APP_RUNTIME: iOS
+      APP_DEVICE_TYPE: com.apple.CoreSimulator.SimDeviceType.iPad-A16
+      APP_DRIVER: maestro
+      APP_FLOWS: bun run wren:e2e:ipad
+      APP_LOGS: raven-music-ipad-e2e-logs
+    steps: *e2e-steps
+
+  # Wren's flows on an Android phone emulator, raven's phone AVD, which first point the
+  # emulator's 127.0.0.1:8490 at the runner's with `adb reverse`.
+  e2e-wren-android:
+    name: 🎵 E2E Wren Android
+    needs: select
+    if: needs.select.outputs.music_selected == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BUILD_RUN_ID: ${{ needs.select.outputs.music_run }}
+      BUILD_MISSING: ${{ needs.select.outputs.music_build }}
+      BUILD_SHA: ${{ needs.select.outputs.music_sha }}
+      APP_SETUP: android-tv
+      APP_PROJECT: apps/wren/wren-app
+      APP_ARTIFACT: raven-music-android
+      APP_BUNDLE: ''
+      APP_DRIVER: maestro
+      APP_FLOWS: bun run wren:e2e:android
+      APP_LOGS: raven-music-android-e2e-logs
+      APP_AVD_TARGET: google_apis
+      APP_AVD_PROFILE: pixel_7
+      ANDROID_SERIAL: emulator-5554
     steps: *e2e-steps
 
   # Wren on TV's Siri Remote XCUITest (`apps/wren/wren-tv/tvos-e2e`): open on Home, play the
@@ -427,6 +531,8 @@ jobs:
       APP_DRIVER: maestro
       APP_FLOWS: bun run wren:tv:e2e:android-tv
       APP_LOGS: wren-tv-android-tv-e2e-logs
+      APP_AVD_TARGET: android-tv
+      APP_AVD_PROFILE: tv_1080p
       ANDROID_SERIAL: emulator-5554
     steps: *e2e-steps
 
@@ -472,7 +578,7 @@ jobs:
   # `@raven/web` is affected: the suite drives the server too, which the web does not depend
   # on in the project graph, and the target's inputs name the server's sources, so Nx
   # restores it from the cache when neither changed. What an app needs is its job's `WEB_*`
-  # variables, and the two browser jobs share one list of steps.
+  # variables, and the browser jobs share one list of steps.
   web-e2e:
     name: 🌐 E2E Raven web
     if: *not-a-release
@@ -529,6 +635,121 @@ jobs:
       WEB_PROJECT: '@wren/web'
       WEB_DIR: apps/wren/wren-web
       WEB_TRACES: wren-e2e-traces
+    steps: *web-e2e-steps
+
+  # Raven's Playwright suite on Windows, on the libmpv and the addon the merged pull request's
+  # 🎬 Build Raven Windows native job uploaded: the Mac's specs but the hardened runtime's, and the
+  # Windows-only one for the controls the page draws and a link handed over as an argument. It
+  # runs `electron .`, as the Mac's does. ffmpeg, which the runner image lacks, encodes the test
+  # clips with libx264.
+  windows-e2e:
+    name: 🎬 E2E Raven Windows desktop
+    needs: select
+    if: needs.select.outputs.desktop_selected == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      BUILD_MISSING: ${{ needs.select.outputs.desktop_build }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - *no-build
+
+      - name: 📥 Checkout exact commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 📦 Install
+        uses: ./.github/actions/bun-install
+
+      # The DLL and the addon, back where the native job built them, which is where the
+      # unpackaged app loads them from. The token lets it read another run's artifact.
+      - name: 📥 Windows native resources
+        uses: actions/download-artifact@v8
+        with:
+          name: raven-native-win32-x64-${{ needs.select.outputs.desktop_sha }}
+          run-id: ${{ needs.select.outputs.desktop_run }}
+          github-token: ${{ github.token }}
+          path: libs/raven/mpv/resources/win32-x64
+
+      - name: 🎞️ Install ffmpeg
+        run: choco install ffmpeg --version=7.1.1 --no-progress -y
+
+      # Cached on the desktop and native sources and the pinned libmpv.
+      - name: 🎬 E2E Raven Windows desktop
+        run: bun run desktop:e2e:windows --outputStyle=static
+
+      # Playwright keeps a failed test's trace, which shows each step's page.
+      - name: 📤 End to end traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: raven-windows-e2e-traces-${{ github.sha }}
+          path: apps/raven/desktop/test-results
+          if-no-files-found: ignore
+
+  # Wren for Mac's Playwright suite: `electron .` on the web app's build, against the server's
+  # fixture on a port of its own, which encodes its clips with ffmpeg. It needs no native build,
+  # so it waits for no selection and no pull request's artifact: Nx builds Wren on the web and
+  # the main process here, and restores the pass while they and the server are unchanged.
+  wren-desktop-e2e:
+    name: 🎵 E2E Wren Mac desktop
+    if: *not-a-release
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      # Bun's version comes from `packageManager` in package.json.
+      - name: 🍞 Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: 🎞️ Install ffmpeg
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: '1'
+        run: brew install ffmpeg
+
+      - name: 📦 Install
+        run: bun install --frozen-lockfile
+
+      # `static` keeps every test's output; Nx's CI default collapses passing tasks.
+      - name: 🎵 E2E Wren Mac desktop
+        run: bun run wren:desktop:e2e --outputStyle=static
+
+      # Playwright keeps a failed test's trace, which shows each step's page.
+      - name: 📤 End to end traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: wren-desktop-e2e-traces-${{ github.sha }}
+          path: apps/wren/wren-desktop/test-results
+          if-no-files-found: ignore
+
+  # maester.tv, the static site, in Google Chrome: its built pages served as Netlify serves them,
+  # with every request off the site answered by the suite, so it needs no server. Run on every
+  # push and restored from the cache while the site is unchanged, by the browser jobs' steps.
+  splash-e2e:
+    name: 🏠 E2E maester.tv
+    if: *not-a-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      WEB_PROJECT: '@raven/splash'
+      WEB_DIR: apps/raven/splash
+      WEB_TRACES: splash-e2e-traces
     steps: *web-e2e-steps
 
   # The device apps' render tests under jest-expo (`test:screens`, raven's device app and Wren),

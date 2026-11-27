@@ -43,6 +43,37 @@ export const EmailField = ({ value, onChange }: EmailFieldProps) => {
   )
 }
 
+type CodeFieldProps = {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}
+
+/** A short code read off another screen: letters as typed, never corrected, saved or suggested. */
+export const CodeField = ({ label, value, onChange }: CodeFieldProps) => {
+  const id = useId()
+  return (
+    <div className={styles.field}>
+      <label htmlFor={id} className={styles.label}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className={styles.input}
+        type="text"
+        name="code"
+        autoComplete="off"
+        autoCapitalize="characters"
+        autoCorrect="off"
+        spellCheck={false}
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </div>
+  )
+}
+
 type PasswordFieldProps = {
   label: string
   autoComplete: string

@@ -13,6 +13,9 @@ type PathWithQueryProps = { path: string; query: Record<string, string> }
 export const pathWithQuery = ({ path, query }: PathWithQueryProps): string =>
   Object.keys(query).length === 0 ? path : `${path}?${toQueryString(query)}`
 
+/** An address with no slash at its end, ready for a path that starts with one. */
+export const withoutTrailingSlash = (address: string): string => address.replace(/\/+$/, '')
+
 type FillPathProps = { path: string; params: Record<string, string | number> }
 
 /** A route's `:param` placeholders filled in, each value escaped: `/api/media/:id` to `/api/media/7`. */

@@ -1,11 +1,12 @@
 {
   "name": "@tooling/web",
   "private": true,
-  "description": "What the web apps' tests and Vite configs share: the bun test harness (happy-dom, act, the fake intersection observer, the SCSS module loader, the jest-dom matchers), raven's Vite helpers, the web apps' Lighthouse server and Playwright config, and the coverage and dead CSS checks",
+  "description": "What the web apps' tests and Vite configs share: the bun test harness (happy-dom, act, the fake intersection observer, the SCSS module loader, the jest-dom matchers), raven's Vite helpers, the web apps' Lighthouse server and Playwright config, what the Electron apps' Playwright harnesses share, and the coverage and dead CSS checks",
   "type": "module",
   "exports": {
     "./act": "./act.ts",
     "./axe": "./axe.ts",
+    "./electron": "./electron.ts",
     "./happy-dom": "./happy-dom.ts",
     "./intersection": "./intersection.ts",
     "./lighthouse": "./lighthouse.ts",

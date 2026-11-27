@@ -1,4 +1,4 @@
-import { SIGN_IN_STEPS, type SignInStep, keyboardFor } from '@raven/native/headless'
+import { SIGN_IN_STEPS, type SignInStep, autofillFor, keyboardFor } from '@raven/native/headless'
 import { SIGN_IN_COPY, signInErrorsOf, WREN_ICONS } from '@raven/wren'
 import type { ComponentType } from 'react'
 import { Text, View } from 'react-native'
@@ -48,6 +48,8 @@ function AlertBanner({ text }: AlertBannerProps) {
 
 const EMAIL_KEYBOARD = keyboardFor({ isSecret: false, isEmail: true, isNumber: false })
 const PASSWORD_KEYBOARD = keyboardFor({ isSecret: true, isEmail: false, isNumber: false })
+const EMAIL_AUTOFILL = autofillFor({ isSecret: false, isEmail: true })
+const PASSWORD_AUTOFILL = autofillFor({ isSecret: true, isEmail: false })
 
 /**
  * The raven account's email and password on the TV's keyboard, what went wrong with them, and
@@ -58,6 +60,10 @@ function AccountForm({ flow }: StepFormProps) {
   const { email, setEmail, password, setPassword, isBusy, error, submitAccount } = flow
   const errors = signInErrorsOf({ error, email, password })
   const submit = () => submitAccount()
+  // The email's Next with no password yet only closes the keyboard: there is nothing to refuse.
+  const submitIfWhole = () => {
+    if (password !== '') submit()
+  }
   // The keyboard's Go can come before the typed password reaches the state.
   const submitTyped = (typed: string) => {
     setPassword(typed)
@@ -66,20 +72,19 @@ function AccountForm({ flow }: StepFormProps) {
   return (
     <View style={styles.form}>
       <TextField
-        autoComplete="email"
+        {...EMAIL_AUTOFILL}
         error={errors.email}
         hasPreferredFocus
         keyboardType={EMAIL_KEYBOARD}
         label={SIGN_IN_COPY.email}
         onChangeText={setEmail}
-        onSubmitEditing={submit}
+        onSubmitEditing={submitIfWhole}
         placeholder={SIGN_IN_COPY.emailPlaceholder}
         returnKeyType="next"
-        textContentType="emailAddress"
         value={email}
       />
       <TextField
-        autoComplete="password"
+        {...PASSWORD_AUTOFILL}
         error={errors.password}
         keyboardType={PASSWORD_KEYBOARD}
         label={SIGN_IN_COPY.password}
@@ -88,7 +93,6 @@ function AccountForm({ flow }: StepFormProps) {
         placeholder={SIGN_IN_COPY.passwordPlaceholder}
         returnKeyType="go"
         secureTextEntry
-        textContentType="password"
         value={password}
       />
       {errors.banner !== null && <AlertBanner text={errors.banner} />}

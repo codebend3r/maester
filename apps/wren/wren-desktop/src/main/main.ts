@@ -13,32 +13,16 @@ import {
 } from '@shared/desktop'
 import { APP_ICON, WEB_DIST } from '@/build/forgeOptions'
 import { DESKTOP_COPY, PRODUCT_NAME } from '@/main/copy'
+import { EVENTS } from '@/main/events'
 import { WEB_SITE, menuTemplate } from '@/main/menu'
 import { serverOriginFrom } from '@/main/origins'
 import { isPermissionAllowed, navigationFor, windowOpenFor } from '@/main/security'
+import { userDataFrom } from '@/main/userData'
 import { createWrenHostHandler } from '@/main/webHost'
-import { MIN_SIZE, type WindowBounds, placeWindow } from '@/main/windowState'
+import { MIN_SIZE, WINDOW_FILE, type WindowBounds, placeWindow } from '@/main/windowState'
 
 // Wren's Night, so the window never flashes white before the page paints.
 const NIGHT = '#101816'
-
-const WINDOW_FILE = 'window.json'
-
-/** The Electron events main listens for. */
-const EVENTS = {
-  activate: 'activate',
-  beforeQuit: 'before-quit',
-  close: 'close',
-  moved: 'moved',
-  readyToShow: 'ready-to-show',
-  resize: 'resize',
-  secondInstance: 'second-instance',
-  webContentsCreated: 'web-contents-created',
-  willAttachWebview: 'will-attach-webview',
-  willNavigate: 'will-navigate',
-  willRedirect: 'will-redirect',
-  windowAllClosed: 'window-all-closed',
-} as const
 
 const warn = (message: string): void => console.warn(message)
 
@@ -214,6 +198,9 @@ const start = async (): Promise<void> => {
 }
 
 app.setName(PRODUCT_NAME)
+// Before the single instance lock, which is keyed by the userData directory.
+const userData = userDataFrom({ isPackaged: app.isPackaged, env: process.env })
+if (userData !== null) app.setPath('userData', userData)
 app.on(EVENTS.beforeQuit, () => {
   quitting.isQuitting = true
 })

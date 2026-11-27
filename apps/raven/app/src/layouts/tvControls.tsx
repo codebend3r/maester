@@ -59,7 +59,13 @@ type TvTextFieldProps = {
   frameStyle?: StyleProp<ViewStyle>
 } & Pick<
   TextInputProps,
-  'placeholder' | 'placeholderTextColor' | 'keyboardType' | 'returnKeyType' | 'secureTextEntry'
+  | 'autoComplete'
+  | 'keyboardType'
+  | 'placeholder'
+  | 'placeholderTextColor'
+  | 'returnKeyType'
+  | 'secureTextEntry'
+  | 'textContentType'
 >
 
 /**

@@ -1,0 +1,20 @@
+.actions {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: var(--space-2);
+
+  @media (max-width: 30rem) {
+    grid-auto-flow: row;
+    justify-content: stretch;
+  }
+}
+
+// The code as the TV shows it, set large and apart so the two can be compared letter by letter.
+.code {
+  color: var(--color-bark);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+}

@@ -4,7 +4,7 @@ description: >-
   of whichever run holds it: `bun run desktop:<target>`. The caller checks out the commit first.
 
 # Shared by 🧪 Test Raven Mac player (pull-request-checks.yml) and by main's
-# Playwright suite (native-checks.yml). It selects the native build's Xcode, which the cached
+# Playwright suite (e2e-tests.yml). It selects the native build's Xcode, which the cached
 # results are keyed on; the workflow sets NX_CLOUD_ACCESS_TOKEN.
 inputs:
   target:

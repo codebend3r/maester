@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
+import {
+  AUTH_OUTCOMES,
+  type AuthOutcome,
+  DEVICE_SCAN_COPY,
+  RAVEN_SERVER,
+} from '@raven/native/headless'
+import { fakeDeviceSignInServer } from '@raven/native/testing'
 import { SIGN_IN_COPY, STATUS_COPY } from '@raven/wren'
-import { fireEvent, render, screen } from '@testing-library/react-native'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import { useWrenAccount, useActiveServer } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 
@@ -93,5 +99,57 @@ describe('SignIn', () => {
     await signInWith({ email: SESSION.email, password: 'hunter2' })
     expect(await screen.findByText(SIGN_IN_COPY.unreachable)).toBeTruthy()
     expect(screen.getByText(STATUS_COPY.unreachable(RAVEN_SERVER.name))).toBeTruthy()
+  })
+
+  it("only closes the keyboard on the email's Next while there is no password yet", async () => {
+    await render(<SignIn />)
+    await fireEvent.changeText(screen.getByLabelText(SIGN_IN_COPY.email), SESSION.email)
+    await fireEvent(screen.getByLabelText(SIGN_IN_COPY.email), 'submitEditing', {
+      nativeEvent: { text: SESSION.email },
+    })
+    expect(mockSignIn).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  describe('with a server that offers a code', () => {
+    const offline = globalThis.fetch
+    const server = fakeDeviceSignInServer()
+
+    beforeEach(() => {
+      server.reset()
+      globalThis.fetch = server.fetch
+    })
+
+    afterEach(() => {
+      globalThis.fetch = offline
+    })
+
+    it('shows the code to scan under the welcome, with the address to type instead', async () => {
+      await render(<SignIn />)
+      expect(await screen.findByText(DEVICE_SCAN_COPY.title)).toBeTruthy()
+      expect(screen.getByLabelText(DEVICE_SCAN_COPY.qrLabel)).toBeTruthy()
+      expect(screen.getByText(DEVICE_SCAN_COPY.orOpen(server.address))).toBeTruthy()
+      expect(screen.getByLabelText(`Code ${server.spokenCode}`)).toBeTruthy()
+    })
+
+    it('opens the tabs with the session a phone approved the code for, with nothing typed', async () => {
+      await render(<SignIn />)
+      await screen.findByText(DEVICE_SCAN_COPY.title)
+      server.approve({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresIn: 3600,
+        userId: 'u2',
+        email: 'phone@example.com',
+      })
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(WREN_ROUTES.home))
+      expect(useWrenAccount.getState().session?.email).toBe('phone@example.com')
+      expect(mockSignIn).not.toHaveBeenCalled()
+    })
+  })
+
+  it('shows no code where the server offers none', async () => {
+    await render(<SignIn />)
+    expect(screen.queryByText(DEVICE_SCAN_COPY.title)).toBeNull()
   })
 })

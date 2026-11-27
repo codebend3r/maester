@@ -231,4 +231,26 @@ describe('createAccountDataClient', () => {
       message: 'At most 20 servers per account',
     })
   })
+
+  it('looks a device code up and approves it through the database functions', async () => {
+    const asked = clientWith({ response: respond({ body: 'Raven on Apple TV' }) })
+    expect(await asked.client.deviceSignInRequest({ code: 'BCDF-GHJK' })).toBe('Raven on Apple TV')
+    expect(asked.calls[0]!.url).toBe(
+      'https://project.supabase.co/rest/v1/rpc/device_sign_in_request',
+    )
+    expect(asked.calls[0]!.init).toMatchObject({
+      method: HTTP_METHODS.post,
+      body: JSON.stringify({ code: 'BCDF-GHJK' }),
+      headers: { [AUTH_HEADERS.authorization]: `${AUTH_SCHEME} ${TOKEN}` },
+    })
+
+    const unknown = clientWith({ response: respond({ body: null }) })
+    expect(await unknown.client.deviceSignInRequest({ code: 'ZZZZ-ZZZZ' })).toBeNull()
+
+    const approved = clientWith({ response: respond({ body: true }) })
+    expect(await approved.client.approveDeviceSignIn({ code: 'BCDF-GHJK' })).toBe(true)
+    expect(approved.calls[0]!.url).toBe(
+      'https://project.supabase.co/rest/v1/rpc/approve_device_sign_in',
+    )
+  })
 })

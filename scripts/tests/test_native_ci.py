@@ -1,5 +1,6 @@
 import json
 import re
+import shlex
 import subprocess
 import tomllib
 from pathlib import Path
@@ -11,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github/workflows"
 ACTIONS = ROOT / ".github/actions"
 PULL_REQUEST = "pull-request-checks.yml"
-MAIN = "native-checks.yml"
+MAIN = "e2e-tests.yml"
 # Every job main's run starts with, so a "Release vX.Y.Z" commit runs none of them.
 NOT_A_RELEASE = "${{ !startsWith(github.event.head_commit.message, 'Release v') }}"
 # Each runner OS's one install in the pull request workflow, and its runner.
@@ -29,18 +30,25 @@ DEVICES = {
     "iphone": ("iPhone", "app", True),
     "apple-tv": ("Apple TV", "app", True),
     "android-tv": ("Android TV", "app", True),
-    "android-phone": ("Android phone", "app", False),
+    "android-phone": ("Android phone", "app", True),
     "wren-iphone": ("Wren iPhone", "music", True),
-    "wren-android": ("Wren Android", "music", False),
+    "wren-android": ("Wren Android", "music", True),
     "wren-apple-tv": ("Wren Apple TV", "music", True),
     "wren-android-tv": ("Wren Android TV", "music", True),
 }
+# Each device whose flows run on another device's build, and that device: an iPad runs the
+# iPhone's simulator build.
+SHARED_BUILDS = {"ipad": "iphone", "wren-ipad": "wren-iphone"}
 # Each device with flows and its end to end job's name, which names the app it tests.
 E2E_NAMES = {
     "iphone": "🎬 E2E Raven iPhone",
+    "ipad": "🎬 E2E Raven iPad",
     "apple-tv": "🎬 E2E Raven Apple TV",
     "android-tv": "🎬 E2E Raven Android TV",
+    "android-phone": "🎬 E2E Raven Android phone",
     "wren-iphone": "🎵 E2E Wren iPhone",
+    "wren-ipad": "🎵 E2E Wren iPad",
+    "wren-android": "🎵 E2E Wren Android",
     "wren-apple-tv": "🎵 E2E Wren Apple TV",
     "wren-android-tv": "🎵 E2E Wren Android TV",
 }
@@ -57,7 +65,9 @@ FOLLOW_ON_JOBS = {"windows-app": "windows-native", "desktop-app": "desktop-nativ
 # Each end to end job and its group.
 E2E_JOBS = {
     **{f"e2e-{device}": group for device, (_, group, has_flows) in DEVICES.items() if has_flows},
+    **{f"e2e-{device}": DEVICES[build][1] for device, build in SHARED_BUILDS.items()},
     "desktop-e2e": "desktop",
+    "windows-e2e": "desktop",
 }
 # The native jobs a pull request lists: the builds and the tests. It selects nothing; main lists
 # the selection alone.
@@ -78,7 +88,7 @@ HANDOFF_SETTINGS = ("APP_SETUP", "APP_PROJECT", "APP_ARTIFACT", "APP_BUNDLE")
 HANDOFF = "${{ env.APP_ARTIFACT }}-${{ inputs.sha }}"
 FOUND_HANDOFF = "${{ env.APP_ARTIFACT }}-${{ env.BUILD_SHA }}"
 NATIVE_SHA = "${{ env.NATIVE_BUILD_SHA }}"
-END_TO_END_TARGETS = ("app:e2e", "@wren/app:e2e", "wren:tv:e2e")
+END_TO_END_TARGETS = ("app:e2e", "wren:e2e", "wren:tv:e2e")
 # Each app's folder and its Nx project.
 PROJECTS = {
     "apps/raven/app": "@raven/app",
@@ -99,6 +109,7 @@ STANDARD_CHECK_NAMES = {
     "♿ axe-core",
     "🌐 E2E Raven web",
     "🎵 E2E Wren web",
+    "🏠 E2E maester.tv",
     "🧩 One command per script",
     "🟦 Oxlint",
     "🐍 Python lint",
@@ -232,21 +243,27 @@ def test_a_pull_request_holds_no_device_end_to_end_job_not_even_a_skipped_one():
     assert "env.APP_FLOWS" not in (ACTIONS / "raven-app-build/action.yml").read_text()
 
 
-def test_a_pull_request_runs_both_browser_suites_as_checks_it_must_pass():
+def test_a_pull_request_runs_every_browser_suite_as_a_check_it_must_pass():
     # Main's run alone let a stale browser test merge and fail every push after it, so each web
-    # app's suite is a standard check, which ✅ Checks waits for.
+    # app's suite, and the static site's, is a standard check, which ✅ Checks waits for.
     suites = {check["name"]: check for check in standard_checks() if "e2e" in check["target"]}
-    assert set(suites) == {"🌐 E2E Raven web", "🎵 E2E Wren web"}
+    assert set(suites) == {"🌐 E2E Raven web", "🎵 E2E Wren web", "🏠 E2E maester.tv"}
     scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
     assert {scripts[suite["script"]] for suite in suites.values()} == {
         "nx run @raven/web:e2e:browser",
         "nx run @wren/web:e2e:browser",
+        "nx run @raven/splash:e2e:browser",
     }
-    # The fixture server encodes its clips with ffmpeg, and a failure keeps the app's traces.
-    assert all(suite["ffmpeg"] == "true" for suite in suites.values())
+    # The fixture server encodes its clips with ffmpeg, which the static site, with no server,
+    # does not need; a failure keeps the app's traces.
+    assert {name for name, suite in suites.items() if suite.get("ffmpeg") == "true"} == {
+        "🌐 E2E Raven web",
+        "🎵 E2E Wren web",
+    }
     assert {suite["dir"]: suite["traces"] for suite in suites.values()} == {
         "apps/raven/web": "e2e-traces",
         "apps/wren/wren-web": "wren-e2e-traces",
+        "apps/raven/splash": "splash-e2e-traces",
     }
     upload = next(
         step
@@ -286,6 +303,8 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
         *E2E_JOBS,
         "web-e2e",
         "wren-web-e2e",
+        "splash-e2e",
+        "wren-desktop-e2e",
         "screen-tests",
     }
     assert all("uses" not in job for job in workflow["jobs"].values())
@@ -295,7 +314,11 @@ def test_every_main_push_runs_the_end_to_end_jobs_without_cancellation():
     assert "needs" not in workflow["jobs"]["select"]
     # The browser suites run here too, on every push, and Nx restores an unchanged pass. Each
     # job runs its own app's suite alone, through the one list of steps they share.
-    browser_projects = {"web-e2e": "@raven/web", "wren-web-e2e": "@wren/web"}
+    browser_projects = {
+        "web-e2e": "@raven/web",
+        "wren-web-e2e": "@wren/web",
+        "splash-e2e": "@raven/splash",
+    }
     for name, project in browser_projects.items():
         web = workflow["jobs"][name]
         assert "needs" not in web
@@ -509,13 +532,17 @@ def test_each_device_is_built_by_a_job_named_for_it(device: str, facts: tuple[st
 @pytest.mark.parametrize(("device", "name"), sorted(E2E_NAMES.items()))
 def test_each_device_s_flows_run_on_its_own_build_in_a_job_named_for_it(device: str, name: str):
     jobs = load_workflow(MAIN)["jobs"]
-    job, build = (jobs[f"e2e-{device}"], load_workflow(PULL_REQUEST)["jobs"][f"build-{device}"])
+    built = SHARED_BUILDS.get(device, device)
+    job, build = (
+        jobs[f"e2e-{device}"],
+        load_workflow(PULL_REQUEST)["jobs"][f"build-{built}"],
+    )
     assert job["name"] == name
     # A device's two jobs agree on the build that passes between them.
     assert all(job["env"][setting] == build["env"][setting] for setting in HANDOFF_SETTINGS)
     # The Siri Remote's flow reads the test project its build packed beside the app.
     assert (job["env"]["APP_DRIVER"] == "xcuitest") == ("APP_TEST_PROJECT" in build["env"])
-    group = DEVICES[device][1]
+    group = DEVICES[built][1]
     assert job["env"]["BUILD_RUN_ID"] == f"${{{{ needs.select.outputs.{group}_run }}}}"
     assert job["env"]["BUILD_SHA"] == f"${{{{ needs.select.outputs.{group}_sha }}}}"
     assert job["steps"] == jobs["e2e-iphone"]["steps"]
@@ -563,7 +590,10 @@ def test_the_mac_s_build_jobs_build_the_named_commit_and_pass_the_handoff(
 def test_the_mac_s_tests_run_with_its_build_and_its_suite_waits_for_main():
     test = load_workflow(PULL_REQUEST)["jobs"]["desktop-test"]
     e2e = load_workflow(MAIN)["jobs"]["desktop-e2e"]
-    assert (test["name"], e2e["name"]) == ("🧪 Test Raven Mac player", "🎬 E2E Raven Mac desktop")
+    assert (test["name"], e2e["name"]) == (
+        "🧪 Test Raven Mac player",
+        "🎬 E2E Raven Mac desktop",
+    )
     # The tests run on the native pieces this run built.
     assert test["needs"] == "desktop-native"
     assert "if" not in test
@@ -604,14 +634,17 @@ def test_release_dry_runs_do_not_trigger_on_pull_requests():
 
 def test_local_desktop_e2e_downloads_main_native_handoffs():
     script = (ROOT / "scripts/ci_desktop_e2e.sh").read_text()
-    assert "native-checks.yml pull-request-checks.yml" in script
+    assert "e2e-tests.yml pull-request-checks.yml" in script
     assert 'gh run list --workflow "$workflow"' in script
 
 
 def test_main_warms_the_compile_caches_of_every_app_a_pull_request_builds():
     jobs = load_workflow(PULL_REQUEST)["jobs"]
     built = {
-        (jobs[f"build-{device}"]["env"]["APP_SETUP"], jobs[f"build-{device}"]["env"]["APP_PROJECT"])
+        (
+            jobs[f"build-{device}"]["env"]["APP_SETUP"],
+            jobs[f"build-{device}"]["env"]["APP_PROJECT"],
+        )
         for device in DEVICES
     }
     caches = load_workflow("app-caches.yml")["jobs"]
@@ -676,6 +709,87 @@ def test_a_release_builds_the_native_pieces_as_the_checks_do():
     assert windows[0]["uses"] == "./.github/actions/raven-windows-mpv"
 
 
+def test_every_remote_test_build_caches_what_its_pack_step_reads():
+    # A build Nx restores from its cache leaves only its outputs on disk, so a folder the pack step
+    # tars that the target does not save fails the job on every run with nothing to build.
+    step = next(
+        step
+        for step in load_action("raven-app-build")["runs"]["steps"]
+        if step.get("name") == "📦 Pack the remote test project"
+    )
+    jobs = load_workflow(PULL_REQUEST)["jobs"]
+    builds = [job["env"] for job in jobs.values() if job.get("env", {}).get("APP_TEST_PROJECT")]
+    assert builds
+    for env in builds:
+        xcode = env.get("APP_XCODE_PROJECT", "Raven")
+        pods = env.get("APP_PODS_TARGET", "raven")
+        packed = (
+            step["run"]
+            .replace("${APP_PODS_TARGET:-raven}", pods)
+            .replace("${APP_XCODE_PROJECT:-Raven}", xcode)
+        )
+        # `tar -czf <archive> <path>...`: everything after the archive is packed.
+        tarred = set(shlex.split(packed)[3:])
+        package = json.loads((ROOT / env["APP_PROJECT"] / "package.json").read_text())
+        outputs = {
+            output.removeprefix("{projectRoot}/")
+            for output in package["nx"]["targets"]["build:tvos"]["outputs"]
+        }
+        assert tarred <= outputs, (env["APP_PROJECT"], sorted(tarred - outputs))
+
+
+def test_each_device_s_flows_are_a_target_of_their_own():
+    # Nx Cloud restores a target's pass by its inputs, which a device shares with every other
+    # device of its app, so two jobs running one target would test one device and restore the
+    # other. A simulator and an emulator each get their own name too, and their own logs.
+    jobs = load_workflow(MAIN)["jobs"]
+    envs = [jobs[f"e2e-{device}"]["env"] for device in E2E_NAMES]
+    for setting in ("APP_FLOWS", "APP_LOGS"):
+        assert len({env[setting] for env in envs}) == len(envs), setting
+    simulators = [env["APP_SIMULATOR"] for env in envs if "APP_SIMULATOR" in env]
+    assert len(set(simulators)) == len(simulators)
+    scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
+    for env in envs:
+        script = env["APP_FLOWS"].removeprefix("bun run ")
+        project, target = scripts[script].removeprefix("nx run ").split(":", 1)
+        folder = next(folder for folder, name in PROJECTS.items() if name == project)
+        package = json.loads((ROOT / folder / "package.json").read_text())
+        assert target in package["scripts"]
+        assert target in package["nx"]["includedScripts"]
+        assert package["nx"]["targets"][target]["cache"] is True
+
+
+def test_each_android_job_boots_the_emulator_its_flows_need():
+    jobs = load_workflow(MAIN)["jobs"]
+    emulators = {
+        device: (job["env"]["APP_AVD_TARGET"], job["env"]["APP_AVD_PROFILE"])
+        for device in E2E_NAMES
+        if (job := jobs[f"e2e-{device}"])["env"]["APP_BUNDLE"] == ""
+    }
+    tv, phone = ("android-tv", "tv_1080p"), ("google_apis", "pixel_7")
+    assert emulators == {
+        "android-tv": tv,
+        "android-phone": phone,
+        "wren-android": phone,
+        "wren-android-tv": tv,
+    }
+    avd = action_step(jobs["e2e-iphone"], "raven-android-avd")
+    assert avd["with"] == {
+        "target": "${{ env.APP_AVD_TARGET }}",
+        "profile": "${{ env.APP_AVD_PROFILE }}",
+    }
+    # Main saves a snapshot of each, and a snapshot supersedes only its own target's.
+    legs = load_workflow("app-caches.yml")["jobs"]["android-avd"]["strategy"]["matrix"]["emulator"]
+    assert {(leg["target"], leg["profile"]) for leg in legs} == set(emulators.values())
+    key = next(
+        step
+        for step in load_action("raven-android-avd")["runs"]["steps"]
+        if step.get("id") == "avd"
+    )
+    assert 'family="avd-v1-$TARGET-"' in key["run"]
+    assert 'echo "supersedes=$family $key"' in key["run"]
+
+
 def test_main_finds_a_group_only_with_every_build_its_flows_read():
     jobs = load_workflow(MAIN)["jobs"]
     expected: dict[str, set[str]] = {group: set() for group in GROUPS}
@@ -686,7 +800,23 @@ def test_main_finds_a_group_only_with_every_build_its_flows_read():
         expected[group].add(env["APP_ARTIFACT"])
         if env["APP_DRIVER"] == "xcuitest":
             expected[group].add(f"{env['APP_ARTIFACT']}-test-project")
-    expected["desktop"].add("raven-native-handoff")
+    # The Mac's suite reads the native handoff, and the Windows one the libmpv and the addon.
+    expected["desktop"] |= {"raven-native-handoff", "raven-native-win32-x64"}
+    windows = action_step(
+        load_workflow(PULL_REQUEST)["jobs"]["windows-native"], "raven-windows-native"
+    )
+    assert windows["with"] == {"sha": NATIVE_SHA}
+    download = next(
+        step
+        for step in jobs["windows-e2e"]["steps"]
+        if step.get("uses") == "actions/download-artifact@v8"
+    )
+    assert download["with"] == {
+        "name": "raven-native-win32-x64-${{ needs.select.outputs.desktop_sha }}",
+        "run-id": "${{ needs.select.outputs.desktop_run }}",
+        "github-token": "${{ github.token }}",
+        "path": "libs/raven/mpv/resources/win32-x64",
+    }
     found = {
         group: set(names.split())
         for names, group in re.findall(

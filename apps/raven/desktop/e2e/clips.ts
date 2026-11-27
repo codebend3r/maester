@@ -1,16 +1,13 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { E2E_SYSTEM, makeTempDir } from '@/e2e/platform'
 
 export type Clips = { folder: string; first: string; second: string }
 
 export const CLIP_SECONDS = 30
 
-/*
- * H.264 in MP4, which Chromium decodes; `-allow_sw 1` lets VideoToolbox fall back to its
- * software encoder on a runner without a hardware one.
- */
+// H.264 in MP4, which Chromium decodes, from the system's own encoder.
 const encodeArgs = (output: string): string[] => [
   '-hide_banner',
   '-loglevel',
@@ -26,12 +23,7 @@ const encodeArgs = (output: string): string[] => [
   'sine=frequency=440:sample_rate=48000',
   '-t',
   `${CLIP_SECONDS}`,
-  '-c:v',
-  'h264_videotoolbox',
-  '-allow_sw',
-  '1',
-  '-b:v',
-  '1M',
+  ...E2E_SYSTEM.videoEncoder,
   '-pix_fmt',
   'yuv420p',
   '-c:a',
@@ -66,7 +58,7 @@ const ffmpegBinary = () => process.env.RAVEN_E2E_FFMPEG ?? 'ffmpeg'
  */
 export const makeClips = async (): Promise<Clips> => {
   const binary = ffmpegBinary()
-  const folder = await mkdtemp(join(tmpdir(), 'raven-e2e-clips-'))
+  const folder = await makeTempDir('raven-e2e-clips-')
   const first = join(folder, 'Clip 01.mp4')
   const second = join(folder, 'Clip 02 Été.mp4')
   await Promise.all([
@@ -135,7 +127,7 @@ const trackArgs = ({ subtitles, output }: TrackArgsProps): string[] => [
  */
 export const makeTrackClip = async (): Promise<{ folder: string; path: string }> => {
   const binary = ffmpegBinary()
-  const folder = await mkdtemp(join(tmpdir(), 'raven-native-clips-'))
+  const folder = await makeTempDir('raven-native-clips-')
   const path = join(folder, 'Tracks 01.mkv')
   const subtitles = join(folder, 'source.srt')
   try {

@@ -32,7 +32,7 @@ def test_project_selection(projects, expected):
         "package.json",
         "bun.lock",
         "tsconfig.base.json",
-        ".github/workflows/native-checks.yml",
+        ".github/workflows/e2e-tests.yml",
         ".github/workflows/pull-request-checks.yml",
         ".github/actions/raven-native-select/action.yml",
         ".github/actions/raven-app-setup/action.yml",

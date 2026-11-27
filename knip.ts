@@ -87,6 +87,7 @@ export default {
       entry: ['functions/*/index.ts', 'functions/*/*.test.ts'],
       paths: {
         '@/alert': ['functions/signup-alert/alert.ts'],
+        '@/claim': ['functions/device-sign-in/claim.ts'],
         '@/template': ['functions/signup-alert/template.ts'],
       },
       ignoreDependencies: ['nodemailer'],

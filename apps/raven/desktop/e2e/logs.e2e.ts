@@ -1,5 +1,4 @@
-import { chmod, mkdtemp, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { playLinkFor } from '@raven/core'
@@ -19,6 +18,7 @@ import {
   signIn,
   withApp,
 } from '@/e2e/harness'
+import { E2E_SYSTEM, makeTempDir } from '@/e2e/platform'
 import { clockOf, expectButton, expectNative } from '@/e2e/playerView'
 import { playDownload, seedDownloads } from '@/e2e/seedDownloads'
 import { entryDirFor, mediaPathFor } from '@/main/downloads/space'
@@ -28,6 +28,15 @@ const PLAY_SECONDS = 3
 // The seeded downloads' titles and the one media id each test files its own under.
 const LABELS = { clip: 'Clip 01', broken: 'Broken Secret' } as const
 const MEDIA_ID = 1
+
+type ExpectOwnerOnlyProps = { file: string }
+
+/** The log and its folder are the owner's alone, where the system has modes to say so. */
+const expectOwnerOnly = async ({ file }: ExpectOwnerOnlyProps): Promise<void> => {
+  if (!E2E_SYSTEM.hasFileModes) return
+  expect((await stat(dirname(file))).mode & 0o777).toBe(0o700)
+  expect((await stat(file)).mode & 0o777).toBe(0o600)
+}
 
 type ExpectLoggedProps = { userData: string; text: string }
 
@@ -117,9 +126,7 @@ test.describe.serial('the Raven log', () => {
       ]
       expect(lines.filter((line) => names.some((name) => line.includes(name)))).toEqual([])
 
-      const file = logPathFor({ userData })
-      expect((await stat(dirname(file))).mode & 0o777).toBe(0o700)
-      expect((await stat(file)).mode & 0o777).toBe(0o600)
+      await expectOwnerOnly({ file: logPathFor({ userData }) })
     } finally {
       await removeDir(userData)
     }
@@ -173,7 +180,7 @@ test.describe.serial('the Raven log', () => {
 
   test('keeps the folder and file name of a download mpv cannot open out of its log', async () => {
     const userData = await freshUserData()
-    const folder = await mkdtemp(join(tmpdir(), 'raven-e2e-broken-'))
+    const folder = await makeTempDir('raven-e2e-broken-')
     const source = join(folder, `${LABELS.broken}.mp4`)
     try {
       await writeFile(source, 'not a video at all')
@@ -184,7 +191,7 @@ test.describe.serial('the Raven log', () => {
       const container = containerOf(source)
       const video = mediaPathFor({ userData, serverId, mediaId: MEDIA_ID, container })
       // Granted, since a stat needs no read access, and then refused to mpv's open.
-      await chmod(video, 0o000)
+      await E2E_SYSTEM.denyReading(video)
       await withApp({
         userData,
         run: async ({ page }) => {

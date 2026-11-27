@@ -11,6 +11,7 @@
     "build:main": "bun build src/main/main.ts --target node --format esm --external electron --sourcemap=linked --define process.env.WREN_DESKTOP_SERVER_ORIGIN=\\\"$WREN_DESKTOP_SERVER_ORIGIN\\\" --outdir dist/main",
     "deploy:mac": "./scripts/deploy_mac.sh",
     "dev": "electron .",
+    "e2e": "playwright test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "install:electron": "install-electron",
@@ -20,7 +21,9 @@
     "package": "electron-forge package --platform darwin",
     "test": "bun test --dots src",
     "test:watch": "bun test --dots --watch src",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "bun run --parallel typecheck:main typecheck:e2e",
+    "typecheck:e2e": "tsgo --noEmit -p tsconfig.e2e.json",
+    "typecheck:main": "tsgo --noEmit"
   },
   "dependencies": {
     "@raven/core": "workspace:*",
@@ -34,6 +37,8 @@
     "@electron-forge/plugin-fuses": "8.0.1",
     "@electron-forge/shared-types": "8.0.1",
     "@electron/fuses": "2.1.3",
+    "@playwright/test": "1.65.0",
+    "@tooling/web": "workspace:*",
     "@types/bun": "1.4.4",
     "@types/node": "24.19.2",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
@@ -53,6 +58,8 @@
       "build:clean",
       "build:main",
       "typecheck",
+      "typecheck:main",
+      "typecheck:e2e",
       "lint:ts",
       "lint:ts:fix",
       "format",
@@ -60,6 +67,7 @@
       "test",
       "test:watch",
       "dev",
+      "e2e",
       "install:electron",
       "package",
       "make",
@@ -88,6 +96,31 @@
         "dependsOn": [
           "build",
           "install:electron"
+        ]
+      },
+      "e2e": {
+        "cache": true,
+        "dependsOn": [
+          "build",
+          "install:electron",
+          {
+            "projects": [
+              "@shared/server"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "default",
+          "^production",
+          "againstServer",
+          {
+            "dependentTasksOutputFiles": "**/*",
+            "transitive": true
+          },
+          {
+            "runtime": "uname -m"
+          }
         ]
       },
       "install:electron": {

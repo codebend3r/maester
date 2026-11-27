@@ -1,5 +1,6 @@
 import {
   type AppPath,
+  DEVICE_LINK_PATH,
   HOME_SEARCH_PARAM,
   PAGE_PATHS,
   type TitleRequestAsk,
@@ -48,6 +49,8 @@ export const APP_PATHS = {
   design: '/design',
   watch: `${PAGE_PATHS.watch}/:id`,
   get: '/get',
+  /** Where a phone approves the code a TV shows; core names it, since the TV's QR code holds it. */
+  link: DEVICE_LINK_PATH,
 } as const satisfies Record<string, AppPath>
 
 /** A library's history of what was watched in it. */

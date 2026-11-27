@@ -26,7 +26,7 @@ def test_ios_retry_only_recovers_screenshot_driver_crash(
     expected_exit: int,
     attempts: int,
 ):
-    workflow = (ROOT / ".github/workflows/native-checks.yml").read_text()
+    workflow = (ROOT / ".github/workflows/e2e-tests.yml").read_text()
     step = workflow.split("      - name: 🎬 Flows on the simulator\n", 1)[1]
     block = step.split("        run: |\n", 1)[1].split("\n      #", 1)[0]
     # The runner fills the device's flows in before bash reads the script.
