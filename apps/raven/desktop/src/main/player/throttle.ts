@@ -1,4 +1,4 @@
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 type CreateThrottleProps<T> = {
   timers: Timers

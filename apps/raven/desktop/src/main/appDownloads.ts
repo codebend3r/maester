@@ -13,7 +13,7 @@ import type { SwitchingServer } from '@/main/servers/activeServer'
 import { fetchDownload } from '@/main/netFetches'
 import { makeDir, openPart, removeTree, sizeOf } from '@/main/nodeFs'
 import type { ServerPlumbing } from '@/main/servers/serverPlumbing'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 type OpenAppDownloadsProps = {
   stores: AppStores

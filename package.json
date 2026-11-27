@@ -127,6 +127,10 @@
     "verify:uncached": "bun run verify --skip-nx-cache",
     "web:build": "nx run @raven/web:build",
     "web:e2e": "nx run @raven/web:e2e:browser",
+    "wren:desktop:build": "nx run @wren/desktop:build",
+    "wren:desktop:deploy": "nx run @wren/desktop:deploy:mac",
+    "wren:desktop:dev": "nx run @wren/desktop:dev",
+    "wren:desktop:make": "nx run @wren/desktop:make",
     "wren:deploy:ios": "APP_VARIANT=${APP_VARIANT:-development} nx run @wren/app:deploy:ios",
     "wren:tv:build:android-tv": "nx run @wren/tv:build:android-tv",
     "wren:tv:build:tvos": "nx run @wren/tv:build:tvos",
@@ -188,7 +192,8 @@
               "@raven/core",
               "@raven/ui",
               "@raven/native",
-              "@raven/wren"
+              "@raven/wren",
+              "@shared/desktop"
             ],
             "target": "build"
           }

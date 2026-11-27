@@ -2,6 +2,7 @@ import { AUDIO_PLAYER_EVENTS, type AudioPlayerEvent, audioPlayer } from '@raven/
 import { AUDIO_PLATFORMS, type ApiClient, type Track } from '@raven/core'
 import {
   AUDIO_STATES,
+  type DeviceSpotOf,
   playingTrackOf,
   runRemoteCommand,
   useAudioQueue,
@@ -36,6 +37,8 @@ type UseNativeAudioHostProps = {
   plan: TrackPlan
   /** Answers CarPlay and Android Auto; the device app, with no car, answers nothing. */
   car?: CarBrowse
+  /** Where this device left a song, which it starts from; none starts every song at its top. */
+  deviceSpotOf?: DeviceSpotOf
 }
 
 /**
@@ -51,6 +54,7 @@ export const useNativeAudioHost = ({
   sourcesFor,
   plan,
   car = NO_CAR_BROWSE,
+  deviceSpotOf,
 }: UseNativeAudioHostProps): void => {
   const engine = useAudioQueue((store) => store.engine)
   const player = useMemo(
@@ -68,7 +72,7 @@ export const useNativeAudioHost = ({
     [api, server, sourcesFor, plan],
   )
   // An audiobook's spot is saved as the app leaves the foreground, as the film player's is.
-  const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide })
+  const host = useWindowedAudioHost({ api, player, watchHide: watchAppHide, deviceSpotOf })
   const track = useAudioQueue(playingTrackOf)
   const rate = useTrackRate({ api, track })
 

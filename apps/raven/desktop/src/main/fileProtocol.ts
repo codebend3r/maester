@@ -1,5 +1,5 @@
 import { extensionOf, HTTP_METHODS } from '@raven/core'
-import { ALLOWED_METHODS } from '@/main/webHost'
+import { ALLOWED_METHODS } from '@shared/desktop'
 import type { Grants } from '@/main/grants'
 import { CACHE_POLICIES, HEADERS, HTTP_STATUSES } from '@shared/http'
 

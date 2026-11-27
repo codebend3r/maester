@@ -91,7 +91,7 @@ import {
 } from '@/main/servers/serverSources'
 import { NO_SERVERS, noExplanation, noRefusedAccount } from '@/main/test/playerFakes'
 import { fixedPicks } from '@/main/test/serverFakes'
-import { createNodeTimers } from '@/main/timers'
+import { createNodeTimers } from '@shared/desktop'
 import { HEADERS } from '@shared/http'
 
 /** The id the server gives a title's first sidecar (Ruling 18). */

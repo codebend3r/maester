@@ -42,7 +42,7 @@ import { errorText } from '@/main/log/errorText'
 import { parseJson } from '@/main/parseJson'
 import { type AllowedCall, CALL_NAMES } from '@/main/servers/allowlist'
 import { loggable, type ServerCalls } from '@/main/servers/serverCalls'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 /** The most of a picture kept; a larger one is skipped rather than read whole into memory. */

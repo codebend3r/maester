@@ -1,0 +1,9 @@
+{
+  // The main process is Node; the tests are bun's.
+  "extends": "../../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["node", "bun"]
+  },
+  "include": ["src", "forge.config.ts"]
+}

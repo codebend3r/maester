@@ -1,0 +1,23 @@
+# Claude context for Wren for Mac
+
+`@wren/desktop` is Wren for Mac: Wren's web app (`@wren/web`, `apps/wren/wren-web`) in an Electron window on macOS, Apple silicon only. There is no Windows or Linux build. The rules that apply to it are in the root `CLAUDE.md`; what Wren is and does is in `apps/wren/wren-app/CLAUDE.md` and `apps/wren/wren-web/CLAUDE.md`.
+
+## Parity is by construction
+
+- **It has no UI of its own.** Every page, word, theme, shortcut and player is the web app's build, so a change to Wren on the web is a change here with nothing to carry over: the same sign-in, Home, Search, Library, collections, albums, artists, playlists, Now Playing, Up next, lyrics, the queue, favourites, playlists, the nine themes and Settings. `wren-parity` and `wren-three-way-parity` check the web app; this app needs no row of its own there.
+- **The page knows it runs here by one tag.** The web host adds `<meta name="wren-server-address" content="<raven origin>">` (`WREN_HOST_META` in `@raven/wren`) to `index.html` before `</head>`. `@wren/web`'s `lib/desktopHost.ts` reads it: Settings shows that origin as the server's address instead of the page's `localhost`, and Now Playing's output says "This Mac" (`NOW_PLAYING_COPY.devices.mac`) where a browser says "This browser". Nothing else in the page branches on it.
+- **What the Mac adds** is the window and the menu bar, never a feature: closing the window hides it and the queue keeps playing (Quit, or the Dock's, ends Wren); the Dock icon or Window > Show Wren brings it back; the window opens where it was last (`window.json` in `~/Library/Application Support/Wren`); one Wren runs at a time; links to anywhere but the page open in the browser. The hardware media keys and the system's Now Playing come from Chromium's Media Session, which `@raven/ui`'s `AudioHost` already fills.
+
+## How it serves the page
+
+- **A loopback web host serves the page** (`@shared/desktop`'s, which Raven's serves from too, configured in `src/main/webHost.ts`) from `http://localhost:47485` (`WREN_HOST_PORT`, `WREN_HOST` and `WREN_PAGE_ORIGIN` in `@raven/wren`), beside Raven's 47484, so both apps run at once. The port is fixed so the page's cookies (the Supabase session), its local storage (the queue, the volume, the theme, recent searches) and its settings survive a relaunch; a custom scheme cannot hold the page, because Chromium keeps no `document.cookie` there. A request for another `Host` gets 421 (DNS rebinding). The CSP is the page's own files, `data:` images and `https://*.supabase.co` for sign-in, with the theme script in `index.html` allowed by its hash.
+- **`/api` goes to one raven**, streamed both ways with the page's cookie, so `<audio>` and covers load as they do on raven's own origin and no media origin or ticket is involved. The raven is `WREN_DESKTOP_SERVER_ORIGIN`, which `build:main` bakes in (an input of the Nx `build` target), else core's `DEFAULT_SERVER_ORIGIN`, raven's public origin, so a build signs in to the same accounts as the web and the phones at home or away. An unpackaged run reads the same variable from its environment to point at another raven (`src/main/origins.ts`); a packaged app never does. An unreachable raven is a 502 `{"error":"server_unreachable"}` (`WEB_HOST_ERRORS`), which the page reads as out of reach.
+- **The window is sandboxed**: context isolation, no Node, no preload, no webview, background throttling off so the next song starts while the window is hidden, and only the fullscreen and clipboard-write permissions.
+
+## Building and running
+
+- `bun run wren:desktop:dev` builds `@wren/web` and this app and opens Wren unpackaged. To run against the fixture server, start `bun run nx run @raven/server:serve:fixture`, then `WREN_DESKTOP_SERVER_ORIGIN=http://127.0.0.1:8490 bun run wren:desktop:dev`.
+- `bun run wren:desktop:make` packages `out/Wren-darwin-arm64/Wren.app` and makes `out/make/dmg/darwin/arm64/wren-<version>-arm64.dmg` (with `ditto` and `hdiutil`, `@shared/desktop/build`'s `MakerDmg`) and a zip. With no `RAVEN_SIGN_IDENTITY` the app is sealed ad hoc with `codesign --deep`; with one, Forge signs it, and notarizes it when `RAVEN_NOTARIZE_PROFILE` names a keychain profile, the same variables Raven's build reads.
+- `bun run wren:desktop:deploy` replaces `/Applications/Wren.app` with the packaged one and opens it.
+- `resources/icon.png` and `resources/icon.icns` are made from the phone app's icon by `scripts/make_icon.sh`.
+- `bun run nx run @wren/desktop:test` runs the bun tests beside the main process's modules: the web host against a stand-in raven, the navigation rules, the server origin, the window's place and the menu. The web host's and the dmg maker's own tests are `@shared/desktop`'s.

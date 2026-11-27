@@ -17,7 +17,7 @@ import {
 } from '@/main/downloads/downloadStore'
 import { exists, makeDir, TEXT_FS } from '@/main/nodeFs'
 import { createJsonStore, createStateStore, loadState, type StateStore } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /** What the page hears when a store cannot be saved. */
 const STORE_NOTICES = {

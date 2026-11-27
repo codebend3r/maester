@@ -1,5 +1,5 @@
 import { createThrottle } from '@/main/player/throttle'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 export const BUFFERED_MS = 1000
 

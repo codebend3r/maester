@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { createNodeTimers } from '@/main/timers'
+import { createNodeTimers } from '@/timers'
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 

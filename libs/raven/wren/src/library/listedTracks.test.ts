@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import { MATCH_STATES } from '@raven/core'
 
-import { FINISHED_SHOWN } from '@/library/libraryCounts'
 import {
   albumIdsOf,
   inLibraryOrder,
   listedTracksOf,
-  recentlyFinished,
   unmatchedAlbumsOf,
 } from '@/library/listedTracks'
 import { AIRBAG, LUCKY, OK_COMPUTER, OK_COMPUTER_PAGE, PARANOID, mediaOf } from '@/testing'
@@ -27,24 +25,6 @@ describe('unmatchedAlbumsOf', () => {
 describe('inLibraryOrder', () => {
   it("keeps each library's entries as it sent them", () => {
     expect(inLibraryOrder([3, 1, 2])).toEqual([3, 1, 2])
-  })
-})
-
-describe('recentlyFinished', () => {
-  const entryOf = (at: number) => ({
-    media: mediaOf(AIRBAG),
-    lastPlayedAt: `2026-11-${String(at).padStart(2, '0')}T00:00:00Z`,
-    plays: 1,
-    furthest: 300,
-    watched: true,
-    marked: false,
-  })
-
-  it('puts the most recently played first, as many as the page shows', () => {
-    const entries = Array.from({ length: FINISHED_SHOWN + 2 }, (_, at) => entryOf((at % 28) + 1))
-    const shown = recentlyFinished(entries)
-    expect(shown).toHaveLength(FINISHED_SHOWN)
-    expect(shown[0]?.lastPlayedAt).toBe(entryOf(28).lastPlayedAt)
   })
 })
 

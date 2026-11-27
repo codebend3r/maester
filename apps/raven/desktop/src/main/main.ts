@@ -90,7 +90,7 @@ import {
   QUIT_FLUSH_MS,
 } from '@/main/shutdown'
 import { squirrelStepFor, takeSquirrelStep } from '@/main/squirrel'
-import { createNodeTimers } from '@/main/timers'
+import { createNodeTimers } from '@shared/desktop'
 import { createMenuCheck, createUpdateService, updateSourceFrom } from '@/main/updateService'
 import { checkForUpdates } from '@/main/updates'
 import { fixedServerFrom, linkOriginsFrom, serverOriginFrom } from '@/main/origins'

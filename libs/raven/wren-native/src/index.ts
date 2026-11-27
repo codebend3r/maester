@@ -1,15 +1,21 @@
 /**
  * What Wren's apps on React Native share beyond its words: who is signed in and to which server,
- * the stores every screen reads (the toast, the recent searches), the listings of the music
- * library picked, sign-in's steps, the hooks over raven's music the phone and the TV draw from
- * alike, a detail page's states and the theme hooks over each app's own prefs. The words and
- * pure rules are `@raven/wren`'s, the routes `headless.ts`'s.
+ * the stores every screen reads (the toast, the recent searches, each song's progress on the
+ * device), the listings of the music library picked, sign-in's steps, the hooks over raven's
+ * music the phone and the TV draw from alike, a detail page's states and the theme hooks over
+ * each app's own prefs. The words and pure rules are `@raven/wren`'s, the routes `headless.ts`'s.
  */
 export { useWrenAccount } from '@/session'
 export { type WrenSession, useWren } from '@/useWren'
 export { accountServers, useActiveServer, useActiveServerName } from '@/stores/activeServer'
 export { configureRecentSearches, useRecentSearches } from '@/stores/recentSearches'
 export { useOpenRecent } from '@/search/useOpenRecent'
+export {
+  configureSongProgress,
+  forgetSongProgressOnAccountChange,
+  useSongProgress,
+} from '@/stores/songProgress'
+export { deviceSpotFor, useKeepSongProgress } from '@/music/songProgress'
 export { toastFailure, useToast } from '@/stores/toast'
 export {
   type ArtistPhotoOf,

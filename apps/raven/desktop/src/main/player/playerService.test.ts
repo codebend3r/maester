@@ -31,7 +31,7 @@ import {
 } from '@/main/player/playerService'
 import { TIME_MS } from '@/main/player/timeReader'
 import { SIDECAR_BUDGET_MS } from '@/main/player/sidecars'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { createFakeMpv, fakeTimers } from '@/main/test/playerFakes'
 
 const mpvTrack = (fields: Pick<MpvTrack, 'id' | 'type'> & Partial<MpvTrack>): MpvTrack => ({

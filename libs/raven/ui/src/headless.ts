@@ -166,7 +166,11 @@ export {
 } from '@/stores/audioQueue'
 export type { AudioState } from '@/stores/audioQueue'
 export { useTrackListening } from '@/components/AudioHost/useTrackListening'
-export { startOf, useAudiobookSpot } from '@/components/AudioHost/useAudiobookSpot'
+export {
+  type DeviceSpotOf,
+  startOf,
+  useAudiobookSpot,
+} from '@/components/AudioHost/useAudiobookSpot'
 export { AUDIO_HOST_COPY } from '@/components/AudioHost/copy'
 // The player's words, for the hosts' end to end suites, which find its controls by them.
 export {

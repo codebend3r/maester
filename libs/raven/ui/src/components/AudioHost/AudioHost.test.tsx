@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, jest, spyOn } from 'bun:te
 import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { AudioHost } from '@/components/AudioHost/AudioHost'
 import { LISTEN_AFTER_S, listenPointOf } from '@/components/AudioHost/useListenCounter'
+import type { DeviceSpotOf } from '@/components/AudioHost/useAudiobookSpot'
 import { AUDIO_STATES, useAudioQueue } from '@/stores/audioQueue'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
@@ -69,12 +70,20 @@ const clientWith = (kind: LibraryKind): QueryClient => {
   return client
 }
 
-type RenderHostProps = { api: ApiClient; client?: QueryClient }
+type RenderHostProps = {
+  api: ApiClient
+  client?: QueryClient
+  deviceSpotOf?: DeviceSpotOf
+}
 
-const renderHost = ({ api, client = clientWith(LIBRARY_KINDS.music) }: RenderHostProps) =>
+const renderHost = ({
+  api,
+  client = clientWith(LIBRARY_KINDS.music),
+  deviceSpotOf,
+}: RenderHostProps) =>
   render(
     <QueryClientProvider client={client}>
-      <AudioHost api={api} />
+      <AudioHost api={api} deviceSpotOf={deviceSpotOf} />
     </QueryClientProvider>,
   )
 
@@ -247,6 +256,26 @@ describe('AudioHost', () => {
     music.currentTime = 60
     fireEvent.timeUpdate(music)
     fireEvent.pause(music)
+    act(() => store().clear())
+    expect(saves).toEqual([])
+  })
+
+  it('starts a song where the device left it, and sends nothing of its spot', async () => {
+    const saves: number[] = []
+    const api = apiWith([])
+    spyOn(api, 'saveProgress').mockImplementation(async ({ position }) => {
+      saves.push(position)
+    })
+    renderHost({ api, deviceSpotOf: (playing) => (playing.id === 1 ? 42 : null) })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    await waitFor(() => expect(played).toHaveLength(1))
+    const [current] = audioElements()
+    if (!current) throw new Error('No audio element')
+    expect(current.currentTime).toBe(42)
+    fireEvent.playing(current)
+    current.currentTime = 80
+    fireEvent.timeUpdate(current)
+    fireEvent.pause(current)
     act(() => store().clear())
     expect(saves).toEqual([])
   })

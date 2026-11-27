@@ -13,7 +13,6 @@ import {
   COUNTS_COPY,
   COVER_SIZES,
   KIT_COPY,
-  FINISHED_SHOWN,
   LIBRARY_PAGE_COPY,
   LIBRARY_SEGMENTS,
   NEW_PLAYLIST_COPY,
@@ -51,6 +50,7 @@ import {
   trackFor,
 } from '@/test/music'
 import { renderWithProviders } from '@/test/render'
+import { forgetSongs, keepSongs } from '@/test/songProgress'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 
 /** A full first page of a library holding more songs than one page. */
@@ -298,10 +298,13 @@ describe('Collection', () => {
   })
 
   describe('In progress, Favourites and Recently finished', () => {
-    it('lists the songs left partway through as their albums keep them, and plays from one', async () => {
+    afterEach(forgetSongs)
+
+    it('lists the songs this browser left partway through as their albums keep them, and plays from one', async () => {
+      keepSongs({ partway: [PARANOID] })
       renderCollection({ kind: COLLECTION_KINDS.inProgress })
       await userEvent.click(await screen.findByRole('button', { name: PARANOID.title }))
-      expect(music().listInProgress).toHaveBeenCalledWith(MUSIC.id)
+      expect(music().listInProgress).not.toHaveBeenCalled()
       expect(music().getAlbum).toHaveBeenCalledWith(OK_COMPUTER.id)
       expect(useAudioQueue.getState().queue.items).toHaveLength(1)
       expect(screen.getByText(plural({ n: 1, ...COUNTS_COPY.songs }))).toBeInTheDocument()
@@ -345,14 +348,19 @@ describe('Collection', () => {
       expect(screen.queryByText(LIBRARY_PAGE_COPY.noFavourites)).toBeNull()
     })
 
-    it('lists the songs played to their end, as many as raven shows', async () => {
+    it('lists the songs this browser played to their end, the newest first, and none partway', async () => {
+      keepSongs({ finished: [LUCKY, AIRBAG], partway: [PARANOID] })
       renderCollection({ kind: COLLECTION_KINDS.finished })
-      expect(await screen.findByRole('button', { name: LUCKY.title })).toBeInTheDocument()
-      expect(music().listHistory).toHaveBeenCalledWith({
-        libraryId: MUSIC.id,
-        limit: FINISHED_SHOWN,
-        watchedOnly: true,
-      })
+      const airbag = await screen.findByRole('button', { name: AIRBAG.title })
+      const lucky = screen.getByRole('button', { name: LUCKY.title })
+      expect(airbag.compareDocumentPosition(lucky) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.queryByRole('button', { name: PARANOID.title })).toBeNull()
+      expect(music().listHistory).not.toHaveBeenCalled()
+    })
+
+    it('says so when this browser has left no song partway', async () => {
+      renderCollection({ kind: COLLECTION_KINDS.inProgress })
+      expect(await screen.findByText(LIBRARY_PAGE_COPY.noInProgress)).toBeInTheDocument()
     })
 
     it('says so when there is nothing to list, with no Play to press', async () => {
@@ -363,6 +371,7 @@ describe('Collection', () => {
     })
 
     it('says the songs could not be read when raven does not answer', async () => {
+      keepSongs({ partway: [PARANOID] })
       music().getAlbum.mockRejectedValue(new Error('refused'))
       renderCollection({ kind: COLLECTION_KINDS.inProgress })
       expect(await screen.findByText(LIBRARY_PAGE_COPY.failed)).toBeInTheDocument()

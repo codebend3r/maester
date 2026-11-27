@@ -30,7 +30,11 @@
   }
 }
 
-// It holds the screen's height less the player bar's, which the shell names in `--shell-foot`.
+/*
+ * It holds the screen's height less the player bar's, which the shell names in `--shell-foot`.
+ * The places never shrink under their content, so a window too short for them and the foot
+ * scrolls the sidebar rather than drawing Settings over the last place.
+ */
 .sidebar {
   position: sticky;
   inset-block-start: 0;
@@ -39,7 +43,7 @@
   grid-template-areas:
     'places'
     'foot';
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(min-content, 1fr) auto;
   gap: var(--space-4);
   inline-size: var(--size-sidebar);
   block-size: calc(100dvh - var(--shell-foot));

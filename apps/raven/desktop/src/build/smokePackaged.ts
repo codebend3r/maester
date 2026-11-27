@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 import { DESKTOP_PLATFORMS, type DesktopPlatform } from '@raven/core'
 import { desktopPlatformFor } from '@/shared/platform'
 import { WINDOWS_EXE } from '@/build/bundleAudit'
-import { versionOf } from '@/build/dmgMaker'
+import { versionOf } from '@shared/desktop/build'
 import {
   isRavenListed,
   logLinesSince,

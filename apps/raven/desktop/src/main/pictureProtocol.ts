@@ -1,7 +1,7 @@
 import { HTTP_METHODS } from '@raven/core'
 import type { DownloadPictures } from '@/main/downloads/pictures'
 import { hostOf } from '@/main/fileProtocol'
-import { ALLOWED_METHODS } from '@/main/webHost'
+import { ALLOWED_METHODS } from '@shared/desktop'
 import { HEADERS, HTTP_STATUSES } from '@shared/http'
 
 type AnswerProps = {

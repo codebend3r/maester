@@ -1,0 +1,114 @@
+{
+  "name": "@wren/desktop",
+  "version": "0.10.1",
+  "private": true,
+  "description": "Wren for Mac: raven's music app on the desktop",
+  "type": "module",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "bun run --sequential build:clean build:main",
+    "build:clean": "rm -rf dist",
+    "build:main": "bun build src/main/main.ts --target node --format esm --external electron --sourcemap=linked --define process.env.WREN_DESKTOP_SERVER_ORIGIN=\\\"$WREN_DESKTOP_SERVER_ORIGIN\\\" --outdir dist/main",
+    "deploy:mac": "./scripts/deploy_mac.sh",
+    "dev": "electron .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "install:electron": "install-electron",
+    "lint:ts": "oxlint",
+    "lint:ts:fix": "oxlint --fix",
+    "make": "electron-forge make --platform darwin",
+    "package": "electron-forge package --platform darwin",
+    "test": "bun test --dots src",
+    "test:watch": "bun test --dots --watch src",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@raven/core": "workspace:*",
+    "@raven/wren": "workspace:*",
+    "@shared/desktop": "workspace:*",
+    "@shared/http": "workspace:*"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "8.0.1",
+    "@electron-forge/maker-zip": "8.0.1",
+    "@electron-forge/plugin-fuses": "8.0.1",
+    "@electron-forge/shared-types": "8.0.1",
+    "@electron/fuses": "2.1.3",
+    "@types/bun": "1.4.4",
+    "@types/node": "24.19.2",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "electron": "45.2.3",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "typescript": "7.0.2"
+  },
+  "nx": {
+    "projectType": "application",
+    "tags": [
+      "scope:desktop",
+      "lang:ts"
+    ],
+    "includedScripts": [
+      "build",
+      "build:clean",
+      "build:main",
+      "typecheck",
+      "lint:ts",
+      "lint:ts:fix",
+      "format",
+      "format:check",
+      "test",
+      "test:watch",
+      "dev",
+      "install:electron",
+      "package",
+      "make",
+      "deploy:mac"
+    ],
+    "targets": {
+      "build": {
+        "dependsOn": [
+          "^build",
+          {
+            "projects": [
+              "@wren/web"
+            ],
+            "target": "build"
+          }
+        ],
+        "inputs": [
+          "production",
+          "^production",
+          {
+            "env": "WREN_DESKTOP_SERVER_ORIGIN"
+          }
+        ]
+      },
+      "dev": {
+        "dependsOn": [
+          "build",
+          "install:electron"
+        ]
+      },
+      "install:electron": {
+        "cache": false
+      },
+      "package": {
+        "cache": false,
+        "dependsOn": [
+          "build"
+        ]
+      },
+      "make": {
+        "cache": false,
+        "dependsOn": [
+          "build"
+        ]
+      },
+      "deploy:mac": {
+        "cache": false
+      }
+    }
+  },
+  "productName": "Wren"
+}

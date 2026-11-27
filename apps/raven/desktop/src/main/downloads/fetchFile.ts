@@ -1,7 +1,7 @@
 import { LOCKED_STATUS } from '@raven/core'
 import { accountRefusalOf, type AccountRefusal, readShort } from '@/main/servers/authRefusals'
 import { ERROR_CODES, errorCodeOf } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { HEADERS, HTTP_STATUSES, isSuccessStatus } from '@shared/http'
 
 export const PROGRESS_STEP_BYTES = 8 * 1024 ** 2

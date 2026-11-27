@@ -35,7 +35,7 @@ function SongsList({ session, title, empty, tracks, listing }: SongsListProps) {
   )
 }
 
-/** In progress: the songs left partway through in every music library, as raven's tab lists them. */
+/** In progress: the songs this device left partway through, in the music library worn. */
 export function InProgressCollection({ session }: CollectionPageProps) {
   const { tracks, listing } = useInProgressTracks(session)
   return (
@@ -49,7 +49,7 @@ export function InProgressCollection({ session }: CollectionPageProps) {
   )
 }
 
-/** Recently finished: the songs played to their end most recently in every music library. */
+/** Recently finished: the songs this device played to their end most recently, in the music library worn. */
 export function FinishedCollection({ session }: CollectionPageProps) {
   const { tracks, listing } = useFinishedTracks(session)
   return (

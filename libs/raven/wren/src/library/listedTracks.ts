@@ -1,13 +1,11 @@
 import {
   type AlbumDetails,
   type AlbumSummary,
-  type HistoryEntry,
   MATCH_STATES,
   type MediaItem,
   type Track,
 } from '@raven/core'
 
-import { FINISHED_SHOWN } from '@/library/libraryCounts'
 import type { ListState } from '@/library/listState'
 
 /** A music library's albums no MusicBrainz release was found for, as raven's Unmatched albums tab lists them. */
@@ -16,13 +14,6 @@ export const unmatchedAlbumsOf = (albums: readonly AlbumSummary[]): AlbumSummary
 
 /** Entries of several libraries in the order each library sent them, one library after another. */
 export const inLibraryOrder = <T>(entries: readonly T[]): T[] => [...entries]
-
-/**
- * What several libraries finished, the most recently played first, as many as Recently finished
- * shows.
- */
-export const recentlyFinished = (entries: readonly HistoryEntry[]): HistoryEntry[] =>
-  entries.toSorted((a, b) => b.lastPlayedAt.localeCompare(a.lastPlayedAt)).slice(0, FINISHED_SHOWN)
 
 /**
  * The albums a list of music files needs read to play them as tracks, each once, in the order
@@ -36,8 +27,8 @@ export const albumIdsOf = (media: readonly MediaItem[]): number[] => [
 type AlbumRead = { data: AlbumDetails | undefined; error: Error | null; isSuccess: boolean }
 
 type ListedTracksOfProps = {
-  /** The files the server listed, in its order. */
-  media: readonly MediaItem[]
+  /** The files listed, by their media ids, in the list's order. */
+  media: readonly Pick<MediaItem, 'id'>[]
   /** Where the listing of those files stands. */
   listing: ListState
   /** Each album `albumIdsOf` named, as it is read. */

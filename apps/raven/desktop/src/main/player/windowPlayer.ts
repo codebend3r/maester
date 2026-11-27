@@ -35,7 +35,7 @@ import { fontsDirFor, subtitleLookOptions } from '@/main/player/subtitleLook'
 import { attachWindowEngine, engineMode, openAppMpv } from '@/main/player/windowEngine'
 import type { MediaRelay } from '@/main/servers/mediaRelay'
 import type { ServerSources } from '@/main/servers/serverSources'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import type { createBudgets } from '@/main/budgets'
 import { IPC_CHANNELS } from '@/shared/hostNames'
 

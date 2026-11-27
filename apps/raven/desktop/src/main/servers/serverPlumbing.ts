@@ -10,7 +10,7 @@ import { createMediaRelay, listenOnLoopback, type MediaRelay } from '@/main/serv
 import { createOriginPicks, type OriginPicks } from '@/main/servers/originPicks'
 import { createServerCalls, fetchThrough, type ServerCalls } from '@/main/servers/serverCalls'
 import { createServerSources, type ServerSources } from '@/main/servers/serverSources'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 
 /** One relay and the server titles played through it. */
 type RelayedSources = { relay: MediaRelay; sources: ServerSources }

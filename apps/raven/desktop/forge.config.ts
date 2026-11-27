@@ -3,11 +3,12 @@ import { MakerZIP } from '@electron-forge/maker-zip'
 import { FusesPlugin } from '@electron-forge/plugin-fuses'
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { FuseV1Options, FuseVersion } from '@electron/fuses'
+import { MakerDmg } from '@shared/desktop/build'
 // Forge loads this file through jiti, which reads no tsconfig `paths`: relative imports only.
-import { MakerDmg } from './src/build/dmgMaker'
 import {
   adHocApps,
   APP_ICON,
+  DMG_FILE_STEM,
   FONTS,
   FUSES,
   isPackagedPath,
@@ -62,7 +63,7 @@ const config: ForgeConfig = {
     ...signing,
   },
   makers: [
-    new MakerDmg({}, [PLATFORMS.darwin]),
+    new MakerDmg({ fileStem: DMG_FILE_STEM }, [PLATFORMS.darwin]),
     new MakerZIP({}, [PLATFORMS.darwin, PLATFORMS.win32]),
     new MakerSquirrel(
       { name: SQUIRREL_ID, authors: AUTHOR, setupIcon: WINDOWS_ICON, iconUrl: ICON_URL },

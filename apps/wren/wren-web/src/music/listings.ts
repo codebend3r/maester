@@ -1,7 +1,5 @@
 import { type Library, MUSIC_SORTS, type MediaItem, type Track } from '@raven/core'
-import { HISTORY_SHOWS } from '@raven/ui/headless'
 import {
-  FINISHED_SHOWN,
   type ListOrder,
   type ListState,
   RECENT_SERVER_SORTS,
@@ -9,15 +7,18 @@ import {
   albumIdsOf,
   albumsByTitle,
   artistsByName,
+  finishedSongsOf,
   inLibraryOrder,
+  inProgressSongsOf,
   libraryValuesOf,
   listStateOf,
   listedTracksOf,
   mergedOf,
   nextPageOf,
   recentAlbums,
-  recentlyFinished,
+  songAlbumIdsOf,
   songCountOf,
+  songCountsOf,
   tracksOfPages,
   unmatchedAlbumsOf,
 } from '@raven/wren'
@@ -29,7 +30,9 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { queries } from '@/lib/queries'
+import { serverAddress } from '@/lib/serverAddress'
 import { useMusicLibraries } from '@/music/musicLibraries'
+import { useSongProgress } from '@/stores/songProgress'
 
 /** The query one music library is asked. */
 type PerLibrary<Answer, Data, Key extends QueryKey> = (
@@ -159,12 +162,31 @@ const useListedTracks = ({ media, listing }: UseListedTracksProps) => {
   return listedTracksOf({ media, listing, albums })
 }
 
-/** The songs left partway through in every music library, each library's most recent first. */
-export const useInProgressTracks = () => {
-  const { music, listings } = usePerLibrary((library) => queries.inProgressQuery(library.id))
-  const { entries, ...listing } = mergedOf({ music, listings, order: inLibraryOrder })
-  return useListedTracks({ media: entries.map(({ media }) => media), listing })
+/** Picks some of this browser's songs, of the server and libraries worn: In progress's or Recently finished's. */
+type SongsPick = typeof inProgressSongsOf
+
+/**
+ * Songs this browser keeps the progress of, as `pick` lists them from the music libraries worn,
+ * each the track its album's page holds; read once the libraries and those albums are.
+ */
+const useDeviceSongs = (pick: SongsPick) => {
+  const music = useMusicLibraries()
+  const kept = useSongProgress((state) => state.songs)
+  const songs = pick({
+    songs: kept,
+    serverId: serverAddress(),
+    libraryIds: music.libraries.map(({ id }) => id),
+  })
+  const albums = useQueries({ queries: songAlbumIdsOf(songs).map((id) => queries.albumQuery(id)) })
+  return listedTracksOf({
+    media: songs.map(({ trackId }) => ({ id: trackId })),
+    listing: listStateOf({ music, failure: null, isRead: true }),
+    albums,
+  })
 }
+
+/** The songs left partway through in this browser, in the libraries worn, the most recently left first. */
+export const useInProgressTracks = () => useDeviceSongs(inProgressSongsOf)
 
 /** The songs marked a favourite in every music library, each library's most recently marked first. */
 export const useFavouriteTracks = () => {
@@ -203,31 +225,28 @@ export const useFavouriteAlbums = () => {
   return { albums: entries, listing }
 }
 
-/** The songs played to their end most recently in every music library, the newest first. */
-export const useFinishedTracks = () => {
-  const { music, listings } = usePerLibrary((library) =>
-    queries.historyQuery({
-      libraryId: library.id,
-      show: HISTORY_SHOWS.watched,
-      limit: FINISHED_SHOWN,
-    }),
-  )
-  const { entries, ...listing } = mergedOf({ music, listings, order: recentlyFinished })
-  return useListedTracks({ media: entries.map(({ media }) => media), listing })
-}
+/** The songs played to their end in this browser, in the libraries worn, the newest first. */
+export const useFinishedTracks = () => useDeviceSongs(finishedSongsOf)
 
 /**
  * What each of Library's categories holds, added up over every music library from the server's
- * counts, the playlists and the songs; a count still on its way, failed or none is left out.
+ * counts, the playlists and the songs, and In progress and Recently finished from this browser's
+ * own; a count still on its way, failed or none is left out.
  */
 export const useLibraryValues = () => {
   const { music, listings } = usePerLibrary((library) => queries.libraryCountsQuery(library.id))
   const playlists = usePlaylists()
   const songs = useSongCount({ search: '' })
+  const kept = useSongProgress((state) => state.songs)
   return libraryValuesOf({
     music,
     counts: listings,
     playlists: playlists.data?.length ?? null,
     songs,
+    progress: songCountsOf({
+      songs: kept,
+      serverId: serverAddress(),
+      libraryIds: music.libraries.map(({ id }) => id),
+    }),
   })
 }

@@ -308,6 +308,23 @@ GROUPS: tuple[Group, ...] = (
         ),
     ),
     Group(
+        "Wren for Mac",
+        "Wren's web app in an Electron window on macOS.",
+        "bright_magenta",
+        (
+            Command(
+                "wren:desktop:dev", "Wren for Mac unpackaged, on the web app's build.", "macOS"
+            ),
+            Command("wren:desktop:build", "Builds Wren for Mac's main process and the web app."),
+            Command("wren:desktop:make", "Packages Wren for Mac: the dmg and zip.", "macOS"),
+            Command(
+                "wren:desktop:deploy",
+                "Replaces /Applications/Wren.app with what wren:desktop:make packaged, and opens it.",
+                "macOS",
+            ),
+        ),
+    ),
+    Group(
         "Raven desktop",
         "The Electron app on macOS and Windows, with libmpv.",
         "bright_magenta",

@@ -8,7 +8,7 @@ import {
   type PortRequest,
   type PortService,
 } from '@/main/player/playerPort'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { messageOf } from '@/shared/messageOf'
 
 /**

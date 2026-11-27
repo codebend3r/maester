@@ -1,5 +1,5 @@
-import type { Timers } from '@/main/timers'
-import { createNodeTimers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
+import { createNodeTimers } from '@shared/desktop'
 
 export const BOUNDED_OUTCOMES = { answered: 'answered', late: 'late', failed: 'failed' } as const
 

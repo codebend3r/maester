@@ -24,15 +24,10 @@ import { setWindowBounds } from '@/main/playerState'
 import { createRequestHandler } from '@/main/requestHandler'
 import { isPermissionAllowed, isTrustedSender, navigationFor, windowOpenFor } from '@/main/security'
 import type { StateStore } from '@/main/stateStore'
-import type { Timers } from '@/main/timers'
-import {
-  createWebHostHandler,
-  listenWebHost,
-  LOOPBACK_ADDRESSES,
-  WEB_HOST_READY,
-  webHostFailureText,
-  webRootFor,
-} from '@/main/webHost'
+import { LOOPBACK_ADDRESSES, type Timers, listenWebHost, webRootFor } from '@shared/desktop'
+import { WEB_DIST } from '@/build/forgeOptions'
+import { quietly } from '@/main/log/quietly'
+import { WEB_HOST_READY, createRavenHostHandler, webHostFailureText } from '@/main/webHost'
 import { authOriginFrom } from '@/main/origins'
 import { placeWindow } from '@/main/windowBounds'
 import { chromeOptionsFor } from '@/main/windowChrome'
@@ -79,11 +74,12 @@ export const startWebHost = async ({
 }: StartWebHostProps): Promise<void> => {
   // A test hook too: an unpackaged run may let the page sign in at a stand-in Supabase Auth.
   const authOrigin = authOriginFrom({ isPackaged: app.isPackaged, env: process.env, warn })
-  const handler = createWebHostHandler({
+  const handler = createRavenHostHandler({
     root: webRootFor({
       isPackaged: app.isPackaged,
       appPath: app.getAppPath(),
       resourcesPath: process.resourcesPath,
+      webDist: WEB_DIST,
     }),
     serverOrigin,
     homeOrigin,
@@ -99,7 +95,7 @@ export const startWebHost = async ({
       handler,
       port: WEB_HOST_PORT,
       addresses: LOOPBACK_ADDRESSES,
-      warn,
+      warn: quietly(warn),
     })
   } catch (error) {
     dialog.showErrorBox('Raven could not open', webHostFailureText(error))

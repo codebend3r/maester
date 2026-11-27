@@ -4,6 +4,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Outlet } from 'react-router-dom'
 import { ACCESS_KINDS, useAccess } from '@/lib/access'
 import { api } from '@/lib/api'
+import { deviceSpotOf, useKeepSongProgress } from '@/music/songProgress'
 import { CHROMES, type Chrome, useChrome, useShownPath } from '@/shell/chrome'
 import { NowPlayingBar } from '@/shell/NowPlayingBar/NowPlayingBar'
 import { TABS } from '@/shell/places'
@@ -79,6 +80,12 @@ function WideFrame({ chrome, children }: FrameProps) {
   )
 }
 
+/** Keeps each song's progress in this browser, apart from the shell, which redraws on no tick. */
+function KeepSongProgress() {
+  useKeepSongProgress()
+  return null
+}
+
 const FRAMES = {
   [FORM_FACTORS.phone]: PhoneFrame,
   [FORM_FACTORS.tablet]: WideFrame,
@@ -86,9 +93,9 @@ const FRAMES = {
 
 /**
  * What frames every route, as the apps' `WrenRoot` does. Music plays from here, above the
- * routes, so leaving a page stops nothing; the toast floats over whichever bars show. Until the
- * listener is let in there is no chrome and no player, so nothing asks raven for what it would
- * refuse.
+ * routes, so leaving a page stops nothing, and each song's progress is kept in this browser; the
+ * toast floats over whichever bars show. Until the listener is let in there is no chrome and no
+ * player, so nothing asks raven for what it would refuse.
  */
 export function Shell() {
   const isOpen = useAccess() === ACCESS_KINDS.open
@@ -98,7 +105,12 @@ export function Shell() {
   usePlayPauseKey()
   return (
     <>
-      {isOpen && <AudioHost api={api} />}
+      {isOpen && (
+        <>
+          <AudioHost api={api} deviceSpotOf={deviceSpotOf} />
+          <KeepSongProgress />
+        </>
+      )}
       <Frame chrome={isOpen ? chrome : CHROMES.bare}>
         <Outlet />
       </Frame>

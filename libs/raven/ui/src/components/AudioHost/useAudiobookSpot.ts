@@ -9,16 +9,26 @@ import { afterWatching } from '@/query/invalidate'
 import { ravenQueriesFor } from '@/query/ravenQueries'
 import { AUDIO_STATES, type AudioState, useAudioQueue } from '@/stores/audioQueue'
 
-const TRACK_SPOTS = { waiting: 'waiting', none: 'none', saved: 'saved' } as const
+const TRACK_SPOTS = {
+  waiting: 'waiting',
+  none: 'none',
+  saved: 'saved',
+  device: 'device',
+} as const
 
 /**
  * Where the playing track starts, and whether its spot is saved: still being read, from its top
- * with nothing saved (music), or from where it was left with each spot saved (an audiobook).
+ * with nothing saved (music), from where it was left with each spot saved (an audiobook), or
+ * from the spot the device itself keeps for it (a song, which the host saves nowhere).
  */
 export type TrackSpot =
   | { kind: typeof TRACK_SPOTS.waiting }
   | { kind: typeof TRACK_SPOTS.none }
   | { kind: typeof TRACK_SPOTS.saved; at: number }
+  | { kind: typeof TRACK_SPOTS.device; at: number }
+
+/** Where the device left a track whose spot the server keeps none of; null to play it from its top. */
+export type DeviceSpotOf = (track: Track) => number | null
 
 const WAITING = { kind: TRACK_SPOTS.waiting } as const satisfies TrackSpot
 const NONE = { kind: TRACK_SPOTS.none } as const satisfies TrackSpot
@@ -31,6 +41,7 @@ export const startOf = (spot: TrackSpot): number | null => {
     case TRACK_SPOTS.none:
       return 0
     case TRACK_SPOTS.saved:
+    case TRACK_SPOTS.device:
       return spot.at
     default: {
       const unreachable: never = spot
@@ -49,7 +60,15 @@ const savesSpotOf = ({ track, libraries }: SavesSpotOfProps): boolean => {
   return KIND_RULES[settings.kind].saveProgress && settings.saveProgress
 }
 
-type UseTrackSpotProps = { api: ApiClient; track: Track | null }
+type UseTrackSpotProps = { api: ApiClient; track: Track | null; deviceSpotOf: DeviceSpotOf }
+
+type SpotOnDeviceProps = { track: Track | null; deviceSpotOf: DeviceSpotOf }
+
+/** The device's own spot for a track the server keeps none for, or its top. */
+const spotOnDevice = ({ track, deviceSpotOf }: SpotOnDeviceProps): TrackSpot => {
+  const at = track === null ? null : deviceSpotOf(track)
+  return at === null || at <= 0 ? NONE : { kind: TRACK_SPOTS.device, at }
+}
 
 /** A spot read for one track, kept until another plays. */
 type Fixed = { id: number; spot: TrackSpot }
@@ -58,9 +77,10 @@ type Fixed = { id: number; spot: TrackSpot }
  * The playing track's spot, read once as it starts: from the libraries whether it keeps one, and
  * for one that does, its media's saved position, asked of the server afresh rather than the
  * cache. Either read failing plays the track from its top and saves nothing, so a spot that
- * cannot be read is never written over.
+ * cannot be read is never written over. A track that keeps no spot on the server starts where
+ * `deviceSpotOf` says the device left it.
  */
-const useTrackSpot = ({ api, track }: UseTrackSpotProps): TrackSpot => {
+const useTrackSpot = ({ api, track, deviceSpotOf }: UseTrackSpotProps): TrackSpot => {
   const queries = useMemo(() => ravenQueriesFor(api), [api])
   const libraries = useQuery({ ...queries.librariesQuery, enabled: track !== null })
   const isSaving =
@@ -74,7 +94,8 @@ const useTrackSpot = ({ api, track }: UseTrackSpotProps): TrackSpot => {
   const read = ((): TrackSpot => {
     if (libraries.isError) return NONE
     if (libraries.data === undefined) return WAITING
-    if (!isSaving || media.isError) return NONE
+    if (!isSaving) return spotOnDevice({ track, deviceSpotOf })
+    if (media.isError) return NONE
     if (media.data === undefined || media.isFetching) return WAITING
     return { kind: TRACK_SPOTS.saved, at: resumeAtFor({ at: 0, media: media.data }) }
   })()
@@ -205,15 +226,25 @@ type UseAudiobookSpotProps = {
   track: Track | null
   /** Calls its save as the host is about to go away; the web's page hide, or nothing. */
   watchHide: WatchHide
+  /** Where the device left a song, which the server keeps no spot for; none starts each at its top. */
+  deviceSpotOf?: DeviceSpotOf
 }
+
+const NO_DEVICE_SPOT: DeviceSpotOf = () => null
 
 /**
  * The playing track's spot for a host to start it from, saved as it plays when the track keeps
- * one: an audiobook's, never music's. Both audio hosts share it, the web's `<audio>` and the
- * windowed players, so a book resumes alike wherever it plays.
+ * one: an audiobook's, never music's. A song starts where the device left it when the host is
+ * handed `deviceSpotOf`, and nothing of it is sent. Both audio hosts share it, the web's
+ * `<audio>` and the windowed players, so a book resumes alike wherever it plays.
  */
-export const useAudiobookSpot = ({ api, track, watchHide }: UseAudiobookSpotProps): TrackSpot => {
-  const spot = useTrackSpot({ api, track })
+export const useAudiobookSpot = ({
+  api,
+  track,
+  watchHide,
+  deviceSpotOf = NO_DEVICE_SPOT,
+}: UseAudiobookSpotProps): TrackSpot => {
+  const spot = useTrackSpot({ api, track, deviceSpotOf })
   useSpotReport({ api, track, spot, watchHide })
   return spot
 }

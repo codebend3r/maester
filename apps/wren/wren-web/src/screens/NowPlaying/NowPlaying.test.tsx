@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import { WREN_ROUTES, artistPath } from '@/routes'
 import { NowPlaying } from '@/screens/NowPlaying/NowPlaying'
 import { AIRBAG, AUDIOBOOKS, PARANOID, RADIOHEAD, mockMusicApiEach, trackFor } from '@/test/music'
+import { servedByDesktop } from '@/test/desktopHost'
 import { renderWithProviders } from '@/test/render'
 import { FORM_FACTORS, type FormFactor } from '@/theme/formFactor'
 
@@ -78,6 +79,17 @@ describe('Now Playing', () => {
     expect(screen.getByRole('slider', { name: PLAYER_COPY.position })).toBeInTheDocument()
     expect(screen.getByRole('slider', { name: PLAYER_COPY.volume })).toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: NOW_PLAYING_COPY.speedOf(1.5) })).toBeNull()
+  })
+
+  it('says it plays on this Mac in Wren for Mac', async () => {
+    const untag = servedByDesktop()
+    openNowPlaying()
+    const onMac = NOW_PLAYING_COPY.output({
+      server: STATUS_COPY.raven,
+      device: NOW_PLAYING_COPY.devices.mac,
+    })
+    expect(await screen.findByRole('button', { name: onMac, pressed: true })).toBeInTheDocument()
+    untag()
   })
 
   it("draws the file's format and bit depth as chips once the host has a source for it", async () => {

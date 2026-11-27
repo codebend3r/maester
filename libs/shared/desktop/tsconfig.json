@@ -1,0 +1,9 @@
+{
+  // Node code that is neither a server nor a web app; the tests are bun's.
+  "extends": "../../../tooling/tsconfig/node.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["node", "bun"]
+  },
+  "include": ["src"]
+}

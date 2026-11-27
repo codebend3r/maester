@@ -75,6 +75,10 @@ export default {
       // Electron's main and preload bundles are entry points no import names; knip's Forge plugin finds its config.
       entry: ['src/main/main.ts', 'src/preload/preload.ts'],
     },
+    'apps/wren/wren-desktop': {
+      // Electron's main bundle is an entry point no import names; knip's Forge plugin finds its config.
+      entry: ['src/main/main.ts'],
+    },
     'apps/raven/supabase': {
       /*
        * Deno runs the Edge Functions and resolves their imports through each
@@ -114,6 +118,10 @@ export default {
        * Its exports name them in dist, and knip's default finds only src/index.ts.
        */
       entry: ['src/index.ts', 'src/testing.ts'],
+    },
+    'libs/shared/desktop': {
+      // The package's two entries: the main process's web host, and the Forge configs' dmg maker.
+      entry: ['src/index.ts', 'src/build.ts'],
     },
     'libs/raven/mpv': {
       /*

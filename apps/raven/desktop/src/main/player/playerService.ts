@@ -64,7 +64,7 @@ import {
   titleOf,
 } from '@/main/player/titleState'
 import { sidFor, tracksFromMpv } from '@/main/player/tracksFromMpv'
-import type { Timers } from '@/main/timers'
+import type { Timers } from '@shared/desktop'
 import { messageOf } from '@/shared/messageOf'
 
 export type PlayerActivity = { isPlaying: boolean; isShowing: boolean }
