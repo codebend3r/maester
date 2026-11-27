@@ -22,6 +22,7 @@ import { themedStyles } from '@/theme/wrenTheme'
 import { EmptyState } from '@/ui/EmptyState'
 import { SectionHeader } from '@/ui/Headers'
 import { Loading } from '@/ui/Loading'
+import { ListFrame } from '@/ui/ListFrame'
 import { usePageStyles } from '@/ui/pageStyles'
 
 const useStyles = themedStyles(() => ({
@@ -112,23 +113,27 @@ function SongResults(props: ResultsProps) {
   const { results, covers, actions } = props
   const styles = useStyles()
   return (
-    <FlatList
-      ListEmptyComponent={<NoMatches {...props} />}
-      contentContainerStyle={[styles.rows, styles.content]}
-      data={results.songs}
-      keyExtractor={(track, index) => `${track.id}:${index}`}
-      onEndReached={results.nextSongs}
-      renderItem={({ item, index }) => (
-        <FoundSong
-          actions={actions}
-          covers={covers}
-          index={index}
-          track={item}
-          tracks={results.songs}
+    <ListFrame>
+      {(fill) => (
+        <FlatList
+          ListEmptyComponent={<NoMatches {...props} />}
+          contentContainerStyle={[styles.rows, styles.content]}
+          data={results.songs}
+          keyExtractor={(track, index) => `${track.id}:${index}`}
+          onEndReached={results.nextSongs}
+          renderItem={({ item, index }) => (
+            <FoundSong
+              actions={actions}
+              covers={covers}
+              index={index}
+              track={item}
+              tracks={results.songs}
+            />
+          )}
+          style={fill}
         />
       )}
-      style={styles.scroller}
-    />
+    </ListFrame>
   )
 }
 

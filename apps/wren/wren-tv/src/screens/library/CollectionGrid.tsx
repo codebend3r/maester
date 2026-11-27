@@ -5,6 +5,7 @@ import { PAGE_WIDTH } from '@/shell/layout'
 import { SPACE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
 import { columnsFitting } from '@/ui/grid'
+import { ListFrame } from '@/ui/ListFrame'
 
 const useStyles = themedStyles(({ colors }) => ({
   ground: { backgroundColor: colors.bg, flex: 1 },
@@ -39,19 +40,23 @@ export function CollectionGrid<Item>({
   const styles = useStyles()
   const columns = columnsFitting({ width: PAGE_WIDTH, tile, gap: SPACE.s4 })
   return (
-    <FlatList
-      ListEmptyComponent={empty}
-      ListHeaderComponent={header}
-      // React Native refuses a row's style on a list of one column.
-      columnWrapperStyle={columns > 1 && styles.columns}
-      contentContainerStyle={styles.content}
-      data={items}
-      // A change in columns makes a new list: React Native cannot change them in place.
-      key={columns}
-      keyExtractor={(item) => String(keyOf(item))}
-      numColumns={columns}
-      renderItem={({ item }) => renderTile(item)}
-      style={styles.ground}
-    />
+    <ListFrame style={styles.ground}>
+      {(fill) => (
+        <FlatList
+          ListEmptyComponent={empty}
+          ListHeaderComponent={header}
+          // React Native refuses a row's style on a list of one column.
+          columnWrapperStyle={columns > 1 && styles.columns}
+          contentContainerStyle={styles.content}
+          data={items}
+          // A change in columns makes a new list: React Native cannot change them in place.
+          key={columns}
+          keyExtractor={(item) => String(keyOf(item))}
+          numColumns={columns}
+          renderItem={({ item }) => renderTile(item)}
+          style={fill}
+        />
+      )}
+    </ListFrame>
   )
 }

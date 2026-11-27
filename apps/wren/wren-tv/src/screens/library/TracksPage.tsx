@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { FlatList } from 'react-native'
 
 import { ListNotice } from '@/components/ListNotice'
+import { ListFrame } from '@/ui/ListFrame'
 import { usePageStyles } from '@/ui/pageStyles'
 import { SPACE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
@@ -39,21 +40,27 @@ export function TracksPage({
   const { trackCoverOf } = useCovers(session)
   const playTracks = useAudioQueue((store) => store.playTracks)
   return (
-    <FlatList
-      ListEmptyComponent={<>{empty !== null && <ListNotice empty={empty} listing={listing} />}</>}
-      ListHeaderComponent={<>{header}</>}
-      contentContainerStyle={styles.content}
-      data={tracks}
-      keyExtractor={(track, index) => `${track.id}:${index}`}
-      onEndReached={onEndReached}
-      renderItem={({ item, index }) => (
-        <SongTrackRow
-          cover={trackCoverOf(item)}
-          onPress={() => playTracks({ tracks, startAt: index })}
-          track={item}
+    <ListFrame style={page.ground}>
+      {(fill) => (
+        <FlatList
+          ListEmptyComponent={
+            <>{empty !== null && <ListNotice empty={empty} listing={listing} />}</>
+          }
+          ListHeaderComponent={<>{header}</>}
+          contentContainerStyle={styles.content}
+          data={tracks}
+          keyExtractor={(track, index) => `${track.id}:${index}`}
+          onEndReached={onEndReached}
+          renderItem={({ item, index }) => (
+            <SongTrackRow
+              cover={trackCoverOf(item)}
+              onPress={() => playTracks({ tracks, startAt: index })}
+              track={item}
+            />
+          )}
+          style={fill}
         />
       )}
-      style={page.ground}
-    />
+    </ListFrame>
   )
 }

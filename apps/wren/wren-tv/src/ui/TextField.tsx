@@ -1,8 +1,9 @@
-import { type ComponentProps, useState } from 'react'
+import { type ComponentProps, type ComponentRef, useRef, useState } from 'react'
 import { Text, TextInput, View } from 'react-native'
 
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
 import { themedStyles, useWrenTheme } from '@/theme/wrenTheme'
+import { useFocusOnceDrawn } from '@/ui/useFocusOnceDrawn'
 
 const useStyles = themedStyles(({ colors }) => ({
   field: { gap: SPACE.s1, width: SIZE.fieldWidth },
@@ -53,8 +54,13 @@ export function TextField({
   const styles = useStyles()
   const { colors } = useWrenTheme()
   const [isFocused, setIsFocused] = useState(false)
+  const field = useRef<ComponentRef<typeof View>>(null)
+  /* As every control does, asked once drawn: `hasTVPreferredFocus` alone loses to the sidebar on
+     Android TV. A `TextInput` has no `requestTVFocus`, so the ask goes to its own view, which
+     hands the focus down to the field. */
+  const opening = useFocusOnceDrawn({ view: field, isAsked: hasPreferredFocus })
   return (
-    <View style={styles.field}>
+    <View collapsable={false} onLayout={opening.onDrawn} ref={field} style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         {...input}
@@ -63,7 +69,10 @@ export function TextField({
         autoCorrect={false}
         hasTVPreferredFocus={hasPreferredFocus}
         onBlur={() => setIsFocused(false)}
-        onFocus={() => setIsFocused(true)}
+        onFocus={() => {
+          opening.onReached()
+          setIsFocused(true)
+        }}
         placeholderTextColor={colors.text3}
         style={[styles.input, isFocused && styles.focused]}
       />
