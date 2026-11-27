@@ -46,7 +46,13 @@ import { APP_ROUTE_PARAMS, hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
 import { LibraryToolbar, ShuffleButton } from '@/screens/LibraryToolbar'
 import { LockedLibrary, type LockedLibraryProps } from '@/screens/LockedLibrary'
-import { type PageFrame, type PageTab, PageTools } from '@/screens/PageTools'
+import {
+  type MainPage,
+  type PageFrame,
+  type PageTab,
+  PageTools,
+  pageTabsOf,
+} from '@/screens/PageTools'
 import type { LoadingProps } from '@/layouts/loadingKit'
 import { useLibraryView } from '@/screens/useLibraryView'
 import { APP_ICONS } from '@/theme/icons'
@@ -72,8 +78,15 @@ const PAGE_TABS = {
   [LIBRARY_PAGES.continue]: { name: LIBRARY_COPY.inProgressPage, icon: APP_ICONS.history },
   [LIBRARY_PAGES.favourites]: { name: LIBRARY_COPY.favourites, icon: APP_ICONS.heart },
   [LIBRARY_PAGES.sagas]: { name: LIBRARY_COPY.sagas, icon: APP_ICONS.covers },
-  [LIBRARY_PAGES.finished]: { name: LIBRARY_COPY.recentlyFinished, icon: APP_ICONS.check },
+  [LIBRARY_PAGES.finished]: { name: LIBRARY_COPY.finishedPage, icon: APP_ICONS.check },
 } as const satisfies Record<LibraryPage, PageTab>
+
+/** A library's main pages, each under an iPad's name for its tab, in the order the tabs stand. */
+const MAIN_PAGES = [
+  { page: LIBRARY_PAGES.continue, label: LIBRARY_COPY.tabs.continue },
+  { page: LIBRARY_PAGES.library, label: LIBRARY_COPY.tabs.browse },
+  { page: LIBRARY_PAGES.favourites, label: LIBRARY_COPY.tabs.favourites },
+] as const satisfies readonly MainPage<LibraryPage>[]
 
 /** The pages a library has, in the order the web's tabs stand: Sagas only where files are matched to movies. */
 const pagesOf = (kind: LibraryKind): LibraryPage[] =>
@@ -150,6 +163,7 @@ const ContinueGrid = ({ session, library, entries, frame }: ContinueGridProps) =
       onOpen={({ target }) => router.push(hrefOf(target))}
       search={null}
       sections={sections}
+      tabs={pageTabsOf(frame)}
       title={library.name}
       toolbar={
         <PageTools frame={frame}>
@@ -231,6 +245,7 @@ const LibraryGrid = ({ session, library, asked, frame }: LibraryGridProps) => {
       onOpen={open}
       search={<SearchField label={LIBRARY_COPY.search(library.name)} search={search} />}
       sections={sections}
+      tabs={pageTabsOf(frame)}
       title={library.name}
       toolbar={
         <PageTools frame={frame}>
@@ -319,7 +334,7 @@ const libraryPagesViewOf = ({
 
 /**
  * A library's pages, the web's tabs: All, In progress, Favourites, in a movie library its Sagas,
- * and Recently finished, with a press to each of the others. It opens on In progress while
+ * and Finished, with a press to each of the others. It opens on In progress while
  * anything in it is in progress, so a show is picked up in one press, and on All otherwise; a
  * search handed over opens All too.
  */
@@ -336,6 +351,7 @@ const LibraryPages = (props: LibraryPagesProps) => {
       page,
       pages: pagesOf(props.library.settings.kind),
       tabs: PAGE_TABS,
+      mainPages: MAIN_PAGES,
       onChange: setChosen,
       library: props.library,
       api: props.session.api,

@@ -213,6 +213,7 @@
         "outputs": [
           "{projectRoot}/ios/Podfile.lock",
           "{projectRoot}/ios/Pods/Manifest.lock",
+          "{projectRoot}/ios/Pods/Target Support Files/Pods-Wren",
           "{projectRoot}/ios/Wren.xcodeproj",
           "{projectRoot}/ios/WrenRemoteTests",
           "{projectRoot}/build/tvos/Build/Products/Release-appletvsimulator/Wren.app"

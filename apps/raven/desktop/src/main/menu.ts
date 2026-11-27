@@ -116,7 +116,9 @@ const appMenus = ({ appName, platform, actions }: AppMenusProps): MenuEntry[] =>
 /**
  * The menus from the spec's "Menus" table. Every accelerator holds a modifier:
  * single keys stay with the page, or a menu would take Space and the arrows from
- * the PIN field and the volume slider.
+ * the PIN field and the volume slider. Edit is the standard role: on macOS, Command C,
+ * V, X and A reach the page only through its items, so without it nobody can paste a
+ * password.
  */
 export const menuTemplate = ({
   appName,
@@ -129,6 +131,7 @@ export const menuTemplate = ({
 
   return [
     ...appMenus({ appName, platform, actions }),
+    { label: 'Edit', role: 'editMenu' },
     {
       label: 'Playback',
       submenu: PLAYBACK.map(({ label, action }) => ({ label, click: player(action) })),

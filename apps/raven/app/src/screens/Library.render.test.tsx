@@ -18,6 +18,8 @@ import type { AppServer } from '@raven/native/headless'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { ActionSheetIOS, StyleSheet } from 'react-native'
 
+import type * as DevicePlatform from '@/platform/devicePlatform'
+import { NAV_KINDS, type NavKind } from '@/platform/platform'
 import { APP_ROUTE_PARAMS, APP_ROUTES } from '@/routes'
 import { Library } from '@/screens/Library'
 import { LIBRARY_COPY } from '@/screens/copy'
@@ -88,9 +90,15 @@ const mockApi = jest.fn((_server: AppServer) =>
   }),
 )
 
+const mockNavKind = jest.fn<() => NavKind>(() => NAV_KINDS.tabs)
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
+}))
+jest.mock('@/platform/devicePlatform', () => ({
+  ...jest.requireActual<typeof DevicePlatform>('@/platform/devicePlatform'),
+  deviceNavKind: () => mockNavKind(),
 }))
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -197,6 +205,7 @@ describe('Library on a phone or tablet', () => {
     mockServer.finished = []
     mockServer.reads = async () => undefined
     mockFontScale.mockReturnValue(1)
+    mockNavKind.mockReturnValue(NAV_KINDS.tabs)
     useActiveServer.setState({ servers: [NAS], activeId: NAS.id })
     useLibraryViews.setState({
       choices: {
@@ -264,12 +273,61 @@ describe('Library on a phone or tablet', () => {
       'Show In progress',
       'Show Favourites',
       'Show Sagas',
-      'Show Recently finished',
+      'Show Finished',
       'Shuffle Films',
       'Sort: Title',
       'Order: A to Z',
       `View: ${LIBRARY_VIEW_LABELS.grid}`,
     ])
+  })
+
+  it("draws an iPad's main pages as tabs beside the name, and leaves them out of the toolbar", async () => {
+    mockNavKind.mockReturnValue(NAV_KINDS.drawer)
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+
+    const tabs = Object.values(LIBRARY_COPY.tabs).map((name) =>
+      screen.getByRole('button', { name }),
+    )
+    expect(tabs.map((tab) => !!tab.props.accessibilityState?.selected)).toEqual([
+      false,
+      true,
+      false,
+    ])
+    expect(toolbarLabels()).toEqual([
+      'Show Sagas',
+      'Show Finished',
+      'Shuffle Films',
+      'Sort: Title',
+      'Order: A to Z',
+      `View: ${LIBRARY_VIEW_LABELS.grid}`,
+    ])
+
+    await fireEvent.press(screen.getByRole('button', { name: LIBRARY_COPY.tabs.favourites }))
+    expect(await screen.findByText(LIBRARY_COPY.favouritesEmpty('Films'))).toBeTruthy()
+    expect(screen.getByRole('button', { name: LIBRARY_COPY.tabs.browse })).toBeTruthy()
+  })
+
+  it("shows every toolbar chip's words on an iPad", async () => {
+    mockNavKind.mockReturnValue(NAV_KINDS.drawer)
+    await renderLibrary({ id: FILMS.id })
+    await screen.findByRole('button', { name: 'Night Train' })
+
+    expect(
+      within(screen.getByRole('button', { name: 'Shuffle Films' })).getByText('Shuffle'),
+    ).toBeTruthy()
+    const view = screen.getByRole('button', { name: `View: ${LIBRARY_VIEW_LABELS.grid}` })
+    expect(within(view).getByText(LIBRARY_VIEW_LABELS.grid)).toBeTruthy()
+  })
+
+  it("says each title's facts after its line in an iPad's list, and not in a phone's", async () => {
+    useLibraryViews.setState({
+      choices: { [`${NAS.id}/${FILMS.id}`]: { sort: MEDIA_SORTS.title, view: LIBRARY_VIEWS.list } },
+    })
+    mockNavKind.mockReturnValue(NAV_KINDS.drawer)
+    await renderLibrary({ id: FILMS.id })
+    const busboys = await screen.findByRole('button', { name: 'Busboys' })
+    expect(within(busboys).getByText('2026 · 1080p · HEVC')).toBeTruthy()
   })
 
   it("opens a card on its item's page, as this library shows it", async () => {
@@ -577,7 +635,7 @@ describe('Library on a phone or tablet', () => {
       await renderLibrary({ id: FILMS.id })
       await screen.findByRole('button', { name: 'Night Train' })
 
-      await fireEvent.press(screen.getByRole('button', { name: 'Show Recently finished' }))
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Finished' }))
 
       expect(await screen.findByText('1 video finished')).toBeTruthy()
       expect(screen.getByRole('button', { name: /Busboys/ })).toBeTruthy()
@@ -588,7 +646,7 @@ describe('Library on a phone or tablet', () => {
       await renderLibrary({ id: FILMS.id })
       await screen.findByRole('button', { name: 'Night Train' })
 
-      await fireEvent.press(screen.getByRole('button', { name: 'Show Recently finished' }))
+      await fireEvent.press(screen.getByRole('button', { name: 'Show Finished' }))
 
       expect(
         await screen.findByText(

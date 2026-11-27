@@ -76,6 +76,7 @@ describe('menuTemplate', () => {
     expect(template.map((entry) => entry.label ?? entry.role)).toEqual([
       'Raven',
       'File',
+      'Edit',
       'Playback',
       'View',
       'Window',
@@ -141,6 +142,13 @@ describe('menuTemplate', () => {
   it('ends the File menu with Close Window', () => {
     const { template } = setup()
     expect((topLevel({ template, name: 'File' }).submenu ?? []).at(-1)?.role ?? null).toBe('close')
+  })
+
+  it('keeps the standard Edit menu on every platform, so a password can be pasted', () => {
+    Object.values(DESKTOP_PLATFORMS).forEach((platform) => {
+      const { template } = setup({ platform })
+      expect(topLevel({ template, name: 'Edit' }).role).toBe('editMenu')
+    })
   })
 
   it('sends each Playback item as a player action, with no accelerators', () => {
@@ -263,6 +271,7 @@ describe('menuTemplate on Windows', () => {
     const { template } = windows()
     expect(template.map((entry) => entry.label ?? entry.role)).toEqual([
       'File',
+      'Edit',
       'Playback',
       'View',
       'Window',

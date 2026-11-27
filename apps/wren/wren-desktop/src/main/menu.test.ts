@@ -3,7 +3,7 @@ import type { MenuItemConstructorOptions } from 'electron'
 import { DESKTOP_COPY } from '@/main/copy'
 import { menuTemplate } from '@/main/menu'
 
-const ROLES = { devTools: 'toggleDevTools' } as const
+const ROLES = { devTools: 'toggleDevTools', edit: 'editMenu' } as const
 
 const submenuOf = (menu: MenuItemConstructorOptions): MenuItemConstructorOptions[] =>
   Array.isArray(menu.submenu) ? menu.submenu : []
@@ -18,6 +18,11 @@ describe('menuTemplate', () => {
       itemsOf(menuTemplate({ ...props, isPackaged })).some(({ role }) => role === ROLES.devTools)
     expect(hasDevTools(false)).toBe(true)
     expect(hasDevTools(true)).toBe(false)
+  })
+
+  it('keeps the standard Edit menu, so a password can be pasted', () => {
+    const template = menuTemplate({ isPackaged: true, showWindow: mock(), openWebSite: mock() })
+    expect(template.some(({ role }) => role === ROLES.edit)).toBe(true)
   })
 
   it('brings the window back, and opens Wren on the web, from their items', () => {

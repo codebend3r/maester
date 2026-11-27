@@ -9,15 +9,21 @@ import {
   type LibraryKind,
   type MediaItem,
   type MediaSort,
+  type RatingSource,
   type ShowEntry,
   WATCHED_STATES,
   cardDestination,
   cardTitle,
+  codecLabel,
+  formatScore,
   formatRuntime,
   matchTypeFor,
   mediaEntryKey,
   mediaLabel,
+  pickScore,
   progressOf,
+  rangeLabel,
+  resolutionLabel,
   showEntryKey,
   showCountFacts,
   showSortFact,
@@ -70,6 +76,11 @@ export type ShelfCard = {
   chips?: readonly FactPart[]
   /** A movie's scores, in a small ratings panel under a row's words: a saga's movies. */
   ratings?: readonly Rating[]
+  /**
+   * What an iPad's list and tiles say under the title: when it came out, its score, and its
+   * picture's quality and codec, those it has. Only a library's cards carry them.
+   */
+  rowFacts?: readonly string[]
   /** Set on a card that resumes a video: it is drawn as a resume card, with what is left to watch. */
   resume?: { timeLeft: string | null } | null
   /** A library's icon, drawn before a row's words, as the side menu's row wears it. */
@@ -197,6 +208,37 @@ export const videoCard = ({
   isWatched: media.watched,
   target: videoTarget({ media, hasPages }),
 })
+
+type ScoreFactProps = { ratings: readonly Rating[]; source: RatingSource }
+
+/** A title's score as a row's fact, by the library's chosen source; none with no score. */
+const scoreFact = ({ ratings, source }: ScoreFactProps): string | null => {
+  const score = pickScore({ ratings, source })
+  return score === null ? null : LIBRARY_GRID_COPY.score(formatScore(score))
+}
+
+const isFact = (fact: string | null): fact is string => fact !== null && fact !== ''
+
+type VideoRowFactsProps = { media: MediaItem; source: RatingSource }
+
+/** A video's row facts: its release, its score, then its resolution, range and codec. */
+export const videoRowFacts = ({ media, source }: VideoRowFactsProps): string[] =>
+  [
+    cardTitle(media).date,
+    scoreFact({ ratings: media.item?.ratings ?? [], source }),
+    resolutionLabel(media),
+    rangeLabel(media),
+    media.videoCodec === null ? null : codecLabel(media.videoCodec),
+  ].filter(isFact)
+
+type ShowRowFactsProps = { entry: ShowEntry; source: RatingSource }
+
+/** A show's row facts: the years it ran and its score. */
+export const showRowFacts = ({ entry, source }: ShowRowFactsProps): string[] =>
+  [
+    showYears({ year: entry.show.year, endedYear: entry.endedYear }),
+    scoreFact({ ratings: entry.show.ratings, source }),
+  ].filter(isFact)
 
 type SortedLineProps = { media: MediaItem; order: Order }
 

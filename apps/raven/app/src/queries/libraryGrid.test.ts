@@ -7,6 +7,8 @@ import {
   MATCH_STATES,
   MEDIA_GROUPINGS,
   MEDIA_SORTS,
+  RATING_KINDS,
+  RATING_SOURCES,
   type LibrarySettings,
 } from '@raven/core'
 import { mediaItemFor } from '@raven/native/testing'
@@ -77,6 +79,36 @@ describe('librarySectionsOf', () => {
       ...pictures,
     })
     expect(all!.cards[0]!.line).toBe('Added 4 days ago')
+  })
+
+  it("gives a film its row's facts: its release, the library's score, then its picture and codec", () => {
+    const scored = {
+      ...BUSBOYS,
+      item: {
+        ...BUSBOYS.item!,
+        ratings: [
+          { source: RATING_SOURCES.tmdb, kind: RATING_KINDS.audience, value: 8.2, votes: 26_000 },
+        ],
+      },
+    }
+    const [all] = librarySectionsOf({
+      settings: settingsWith({ ratingsSource: RATING_SOURCES.metacritic }),
+      listing: { shows: [], files: [scored, ASHFALL_GATE] },
+      ...pictures,
+    })
+    expect(all!.cards.map(({ rowFacts }) => rowFacts)).toEqual([
+      ['2026', '★ 82%', '1080p', 'HEVC'],
+      ['2021', '1080p', 'HEVC'],
+    ])
+  })
+
+  it("gives a show its row's facts: the years it ran, and a score once it has one", () => {
+    const [shows] = librarySectionsOf({
+      settings: { ...SERIES.settings, view: LIBRARY_VIEWS.list },
+      listing: { shows: [ASHFALL_SHOW], files: [] },
+      ...pictures,
+    })
+    expect(shows!.cards[0]!.rowFacts).toEqual(['2020 to 2022'])
   })
 
   it('buckets the grouped view as the web groups it, each bucket with its count', () => {

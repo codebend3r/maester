@@ -8,10 +8,10 @@
 # Signing is Xcode's automatic, cloud-managed signing for the paid team: the archive is signed
 # for development and the export signs it again with an Apple Distribution certificate and an
 # App Store profile, both of which Xcode makes the first time. It authenticates with the App
-# Store Connect API key when ASC_KEY_ISSUER_ID is set (the key itself is the one .p8 in
-# ~/.appstoreconnect/private_keys, or ASC_KEY_PATH), and with the Apple ID signed in to Xcode
-# otherwise. The app record (bundle id io.github.codebend3r.raven.app, with the tvOS platform
-# added for the Apple TV) must already exist in App Store Connect: the API cannot create one.
+# Store Connect API key when apple_team.sh's asc_auth finds an issuer (ASC_KEY_ISSUER_ID, or
+# ~/.appstoreconnect/issuer_id), and with the Apple ID signed in to Xcode otherwise. The app
+# record (bundle id io.github.codebend3r.raven.app, with the tvOS platform added for the Apple
+# TV) must already exist in App Store Connect: the API cannot create one.
 #
 # Every upload of a version needs a build number above the last, so the build number is the
 # time of the build (yymmddHHMM), passed to app.config.ts as the run number CI would pass.
@@ -45,17 +45,7 @@ ARCHIVE="$OUT/Raven.xcarchive"
 require_team "No paid team found: set APPLE_TEAM_ID, or install the team's Developer ID or Apple Distribution certificate." \
   "Apple Distribution" "Developer ID Application"
 
-AUTH=()
-if [ -n "${ASC_KEY_ISSUER_ID:-}" ]; then
-  KEY_PATH="${ASC_KEY_PATH:-$(find "$HOME/.appstoreconnect/private_keys" -name 'AuthKey_*.p8' 2>/dev/null | head -1)}"
-  if [ -z "$KEY_PATH" ]; then
-    echo "ASC_KEY_ISSUER_ID is set but no AuthKey_*.p8 is in ~/.appstoreconnect/private_keys: set ASC_KEY_PATH." >&2
-    exit 1
-  fi
-  KEY_ID="$(basename "$KEY_PATH" .p8)"
-  KEY_ID="${KEY_ID#AuthKey_}"
-  AUTH=(-authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ASC_KEY_ISSUER_ID")
-fi
+asc_auth
 
 say "Regenerating the $PLATFORM project for team $TEAM (production variant, build $GITHUB_RUN_NUMBER)"
 bun run "$PREBUILD"
