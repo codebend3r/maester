@@ -1,8 +1,9 @@
 name: 🧱 Native checks
 
-# The end to end suites, which run here and nowhere else: raven's web app and Wren on the web in
-# Chrome, and the affected desktop, device app and Wren flows. Every push to main runs it, against
-# the last green ancestor. Nothing is built here: a pull request builds the native apps
+# The end to end suites: raven's web app and Wren on the web in Chrome, which a pull request runs
+# too, and the affected desktop, device app and Wren flows, which run here and nowhere else. Every
+# push to main runs it, against the last green ancestor. Nothing is built here: a pull request
+# builds the native apps
 # (pull-request-checks.yml) and uploads them, and this run downloads the merged pull request's
 # builds and runs the flows on them. A selected group with no build to find (a push with no pull
 # request, an expired artifact, a group the pull request never built) fails its end to end job,
@@ -465,7 +466,9 @@ jobs:
           if-no-files-found: ignore
 
   # raven's web app in Google Chrome, which the runner image has, against the server's
-  # fixture, which encodes its clips with ffmpeg. Run on every push, not only where
+  # fixture, which encodes its clips with ffmpeg. A pull request runs both browser suites as
+  # standard checks, so this is the merged commit's turn, restored from that pass unless main
+  # moved under the pull request. Run on every push, not only where
   # `@raven/web` is affected: the suite drives the server too, which the web does not depend
   # on in the project graph, and the target's inputs name the server's sources, so Nx
   # restores it from the cache when neither changed. What an app needs is its job's `WEB_*`

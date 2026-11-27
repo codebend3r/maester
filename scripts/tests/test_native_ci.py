@@ -97,6 +97,8 @@ STANDARD_CHECK_NAMES = {
     "🔦 Lighthouse Raven web",
     "🔦 Lighthouse Wren web",
     "♿ axe-core",
+    "🌐 E2E Raven web",
+    "🎵 E2E Wren web",
     "🧩 One command per script",
     "🟦 Oxlint",
     "🐍 Python lint",
@@ -148,7 +150,6 @@ def test_pull_requests_list_the_native_jobs_and_wait_for_them():
     # The builds are named for the head commit, and nothing diffs against the base.
     assert workflow["env"]["NATIVE_BUILD_SHA"] == "${{ github.event.pull_request.head.sha }}"
     assert "NATIVE_SELECT_BASE" not in workflow["env"]
-    assert all("e2e" not in check["target"] for check in standard_checks())
     complete = jobs["checks-complete"]
     assert complete["name"] == "✅ Checks"
     assert set(complete["needs"]) == {*INSTALL_JOBS, "standard-checks", *NATIVE_JOBS}
@@ -219,13 +220,44 @@ def test_each_runner_os_installs_once_and_every_job_restores_that_install():
         assert expected is None or expected in needs, job_name
 
 
-def test_a_pull_request_holds_no_end_to_end_job_not_even_a_skipped_one():
-    # A job a pull request skips is still listed on it, so its workflow holds none, and no word
-    # of one: the flows are main's alone.
-    assert "e2e" not in (WORKFLOWS / PULL_REQUEST).read_text().lower()
+def test_a_pull_request_holds_no_device_end_to_end_job_not_even_a_skipped_one():
+    # A job a pull request skips is still listed on it, so its workflow holds none: the device
+    # flows are main's alone. The browser suites are rows of the standard checks, not jobs.
     jobs = load_workflow(PULL_REQUEST)["jobs"]
+    assert not any("e2e" in job_name for job_name in jobs)
     assert not any("E2E" in job.get("name", "") for job in jobs.values())
+    text = (WORKFLOWS / PULL_REQUEST).read_text()
+    assert "env.APP_FLOWS" not in text
+    assert "maestro" not in text.lower()
     assert "env.APP_FLOWS" not in (ACTIONS / "raven-app-build/action.yml").read_text()
+
+
+def test_a_pull_request_runs_both_browser_suites_as_checks_it_must_pass():
+    # Main's run alone let a stale browser test merge and fail every push after it, so each web
+    # app's suite is a standard check, which ✅ Checks waits for.
+    suites = {check["name"]: check for check in standard_checks() if "e2e" in check["target"]}
+    assert set(suites) == {"🌐 E2E Raven web", "🎵 E2E Wren web"}
+    scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
+    assert {scripts[suite["script"]] for suite in suites.values()} == {
+        "nx run @raven/web:e2e:browser",
+        "nx run @wren/web:e2e:browser",
+    }
+    # The fixture server encodes its clips with ffmpeg, and a failure keeps the app's traces.
+    assert all(suite["ffmpeg"] == "true" for suite in suites.values())
+    assert {suite["dir"]: suite["traces"] for suite in suites.values()} == {
+        "apps/raven/web": "e2e-traces",
+        "apps/wren/wren-web": "wren-e2e-traces",
+    }
+    upload = next(
+        step
+        for step in load_workflow(PULL_REQUEST)["jobs"]["standard-checks"]["steps"]
+        if step.get("name") == "📤 Upload the browser suite's traces"
+    )
+    assert upload["if"] == "failure() && matrix.check.target == 'e2e:browser'"
+    assert upload["with"]["path"] == "${{ matrix.check.dir }}/test-results"
+    for project in suites.values():
+        targets = json.loads((ROOT / project["dir"] / "package.json").read_text())["nx"]["targets"]
+        assert targets["e2e:browser"]["cache"] is True
 
 
 def test_supabase_reserves_its_ports_before_any_network_activity():
@@ -671,14 +703,17 @@ def test_the_standard_checks_run_every_check_at_once_and_cancel_on_a_failure():
     assert "max-parallel" not in job["strategy"]
     assert job["strategy"]["fail-fast"] == "true"
     assert job["steps"][-1] == CANCEL_STEP
-    # Lighthouse runs on one web app a runner, through the root script that names its cached Nx
-    # target; every other check runs on every project.
+    # Lighthouse and the browser suites run on one web app a runner, through the root script that
+    # names its cached Nx target; every other check runs on every project.
     scripts = json.loads((ROOT / "package.json").read_text())["scripts"]
-    assert {scripts[check["script"]] for check in checks if "script" in check} == {
+    assert {scripts[check["script"]] for check in checks if check["target"] == "lighthouse"} == {
         "nx run @raven/web:lighthouse",
         "nx run @wren/web:lighthouse",
     }
-    assert all(check["target"] == "lighthouse" for check in checks if "script" in check)
+    assert {check["target"] for check in checks if "script" in check} == {
+        "lighthouse",
+        "e2e:browser",
+    }
     for project in ("apps/raven/web", "apps/wren/wren-web"):
         targets = json.loads((ROOT / project / "package.json").read_text())["nx"]["targets"]
         assert targets["lighthouse"]["cache"] is True

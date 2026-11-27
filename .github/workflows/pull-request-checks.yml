@@ -6,9 +6,10 @@ name: 🧪 Pull request checks
 # own, and every other job on that OS restores that install (the bun-install action; a Windows
 # job restores Bun's downloads and installs from them, since its links do not cache). Once the
 # standard checks pass, every native build starts at once, each a job of this workflow, and
-# ✅ Checks waits for them. Beside them the production images are built and health checked. No
-# end to end suite runs here, and none is listed: each build is uploaded as an artifact, and the
-# push to main that merges the PR runs the suites on those builds (native-checks.yml), where a
+# ✅ Checks waits for them. Beside them the production images are built and health checked. The
+# two browser suites run here, as standard checks, so a pull request that breaks one cannot merge.
+# No device suite runs here, and none is listed: each build is uploaded as an artifact, and the
+# push to main that merges the PR runs the flows on those builds (native-checks.yml), where a
 # failure emails the pusher. Merges to main are also covered by main-smoke-test.yml.
 on:
   pull_request:
@@ -131,6 +132,22 @@ jobs:
           - name: ♿ axe-core
             target: axe:ci
             ffmpeg: true
+          # Each web app's Playwright suite in Google Chrome, against the server's fixture: the
+          # end to end suites cheap enough to hold a pull request to, where main's run alone let a
+          # stale test merge and fail every push after it. One app a runner, each through its root
+          # script, whose Nx target Nx Cloud restores while the app and the server are unchanged.
+          - name: 🌐 E2E Raven web
+            target: e2e:browser
+            script: web:e2e
+            traces: e2e-traces
+            dir: apps/raven/web
+            ffmpeg: true
+          - name: 🎵 E2E Wren web
+            target: e2e:browser
+            script: wren:web:e2e
+            traces: wren-e2e-traces
+            dir: apps/wren/wren-web
+            ffmpeg: true
           - name: 🧩 One command per script
             target: one-command-per-script
           - name: 🟦 Oxlint
@@ -216,6 +233,15 @@ jobs:
             apps/raven/web/test-results
             apps/wren/wren-web/playwright-report
             apps/wren/wren-web/test-results
+          if-no-files-found: ignore
+
+      # Playwright keeps a failed test's trace, which shows each step's page.
+      - name: 📤 Upload the browser suite's traces
+        if: failure() && matrix.check.target == 'e2e:browser'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.check.traces }}-${{ github.sha }}
+          path: ${{ matrix.check.dir }}/test-results
           if-no-files-found: ignore
 
       - *native-cancel

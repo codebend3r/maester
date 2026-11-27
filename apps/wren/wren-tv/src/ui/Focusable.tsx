@@ -1,4 +1,4 @@
-import { type ComponentRef, type ReactNode, type Ref } from 'react'
+import { type ComponentRef, type ReactNode, useRef } from 'react'
 import {
   type AccessibilityRole,
   type AccessibilityState,
@@ -9,6 +9,7 @@ import {
 
 import { OPACITIES, SIZE } from '@/theme/tvTokens'
 import { themedStyles } from '@/theme/wrenTheme'
+import { useFocusOnceDrawn } from '@/ui/useFocusOnceDrawn'
 
 /** What a focusable control knows of itself as it draws: whether the remote is on it. */
 type FocusState = { isFocused: boolean }
@@ -73,7 +74,6 @@ export type FocusableProps = {
   /** Whether it wears the kit's ring and lift; a control that draws its own focus says no. */
   hasRing?: boolean
   children: ReactNode | ((state: FocusState) => ReactNode)
-  ref?: Ref<ComponentRef<typeof Pressable>>
   testID?: string
 }
 
@@ -97,13 +97,18 @@ export function Focusable({
   focusedStyle,
   hasRing = true,
   children,
-  ref,
   testID,
 }: FocusableProps) {
   const styles = useStyles()
+  const control = useRef<ComponentRef<typeof Pressable>>(null)
+  const opening = useFocusOnceDrawn({ view: control, isAsked: hasPreferredFocus })
+  const reached = () => {
+    opening.onReached()
+    onFocus?.()
+  }
   return (
     <Pressable
-      ref={ref}
+      ref={control}
       accessibilityHint={hint}
       accessibilityLabel={label}
       accessibilityRole={role}
@@ -111,7 +116,8 @@ export function Focusable({
       disabled={isDisabled}
       hasTVPreferredFocus={hasPreferredFocus}
       onBlur={onBlur}
-      onFocus={onFocus}
+      onFocus={reached}
+      onLayout={opening.onDrawn}
       onLongPress={onLongPress}
       onPress={onPress}
       style={({ focused }) => [

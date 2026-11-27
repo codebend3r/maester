@@ -64,6 +64,7 @@ export {
   keyUpNameOf,
   pressedKeyOf,
 } from '@/remote/remoteKeys'
+export { requestTVFocus } from '@/remote/tvFocus'
 export {
   type AddProblem,
   RENAME_OUTCOMES,

@@ -34,7 +34,7 @@ The ✅ Checks job lives in `.github/workflows/pull-request-checks.yml`. The nat
 
 `bun run raven:web:lighthouse` and `bun run wren:web:lighthouse` run the 🔦 Lighthouse Raven web and 🔦 Lighthouse Wren web checks, as those jobs do: each is its app's `lighthouse` Nx target, which Nx Cloud caches, so a run is restored while the app and the server are unchanged. Both start the server's Lighthouse fixture on its one port, so run them one after the other.
 
-`bun run web:e2e` runs the 🌐 E2E Raven web job the same way, though its name has no `ci:` prefix: Playwright drives the web app against a fixture server. `bun run wren:web:e2e` runs the 🎵 E2E Wren web job, Wren on the web against a fixture server of its own, on its own port, so the two can run at once. Each needs Chrome and ffmpeg.
+`bun run web:e2e` runs the 🌐 E2E Raven web job the same way, though its name has no `ci:` prefix: Playwright drives the web app against a fixture server. `bun run wren:web:e2e` runs the 🎵 E2E Wren web job, Wren on the web against a fixture server of its own, on its own port, so the two can run at once. Each needs Chrome and ffmpeg. Both are standard checks of a pull request, and run again on main.
 
 `bun run e2e` runs every end to end job above, `web:e2e` and `wren:web:e2e` one after another (web, Wren on the web, the Mac desktop, iPhone, Wren, Apple TV, Android TV, Android phones), stopping at the first failure. It needs everything each of them needs.
 

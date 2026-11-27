@@ -23,19 +23,20 @@ test.describe('Settings', () => {
     ).toBeChecked()
   })
 
-  test('names the server, and the sidebar says the name from then on', async ({ page }) => {
+  /*
+   * The name is the account's (`server_names`), and the fixture has no accounts, so a name typed
+   * here is refused and raven keeps its own.
+   */
+  test('keeps no name for the server while nobody is signed in', async ({ page }) => {
     await page.goto(WREN_ROUTES.settings)
-    await expect(
-      sidebar({ page }).getByText(STATUS_COPY.connected(STATUS_COPY.raven)),
-    ).toBeVisible()
+    const connected = sidebar({ page }).getByText(STATUS_COPY.connected(STATUS_COPY.raven))
+    await expect(connected).toBeVisible()
 
     const name = page.getByRole('textbox', { name: SETTINGS_COPY.serverName })
     await name.fill(SERVER_NAME)
     await name.blur()
-    await expect(sidebar({ page }).getByText(STATUS_COPY.connected(SERVER_NAME))).toBeVisible()
-
-    await page.reload()
-    await expect(sidebar({ page }).getByText(STATUS_COPY.connected(SERVER_NAME))).toBeVisible()
+    await expect(page.getByRole('main').getByText(SETTINGS_COPY.serverNameNoAccount)).toBeVisible()
+    await expect(connected).toBeVisible()
   })
 
   test('shows the music library worn, the address it plays from and the version', async ({
