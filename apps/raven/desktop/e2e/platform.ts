@@ -83,6 +83,17 @@ type E2eSystem = {
    * behind would keep the profile's files open, so `taskkill` ends the whole tree.
    */
   forceEnd: (input: ChildProps) => Promise<void>
+  /**
+   * The most a launch's median may take, from main's first line to ready-to-show: twice the
+   * 800 ms cold launch budget (spec section 8) on a Mac, three times it on a Windows runner,
+   * whose launches measured 1,660 to 1,830 ms there.
+   */
+  launchLimitMs: number
+  /**
+   * Whether mpv's warnings name a download it cannot read, so the log shows `<file>` in its
+   * place. On the Windows runner they named no file at all, so only the leak check applies.
+   */
+  isRefusedFileNamed: boolean
 }
 
 /** Everyone, by its well-known SID, so the rule does not depend on the system's language. */
@@ -99,6 +110,8 @@ const SYSTEMS = {
     forceEnd: async ({ child }) => {
       child.kill('SIGKILL')
     },
+    launchLimitMs: 1600,
+    isRefusedFileNamed: true,
   },
   [DESKTOP_PLATFORMS.windows]: {
     videoEncoder: ['-c:v', 'libx264', '-preset', 'veryfast', '-g', '12', '-b:v', '1M'],
@@ -123,6 +136,8 @@ const SYSTEMS = {
         () => undefined,
       )
     },
+    launchLimitMs: 2400,
+    isRefusedFileNamed: false,
   },
 } as const satisfies Record<DesktopPlatform, E2eSystem>
 

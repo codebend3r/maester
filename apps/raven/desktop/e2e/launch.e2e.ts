@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test'
 import { freshUserData, launchMarkWithin, markWithin, removeDir, withApp } from '@/e2e/harness'
+import { E2E_SYSTEM } from '@/e2e/platform'
 import { BUDGETS } from '@/main/budgets'
 
 const LAUNCHES = 5
-// Twice the 800 ms cold launch budget (spec section 8), from main's first line to ready-to-show.
-const MEDIAN_LIMIT_MS = 1600
 
 // The mark follows the window by a frame or so; this only turns a missed mark into an error.
 const MARK_WAIT_MS = 10_000
@@ -33,7 +32,7 @@ test('opens its window within twice the cold launch budget', async () => {
   process.stdout.write(`raven-launch-ms marks ${marks.join(', ')}; median ${median}\n`)
 
   expect(marks).toHaveLength(LAUNCHES)
-  expect(median).toBeLessThan(MEDIAN_LIMIT_MS)
+  expect(median).toBeLessThan(E2E_SYSTEM.launchLimitMs)
 })
 
 test('logs idle memory under twice its budget', async () => {

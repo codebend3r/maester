@@ -28,7 +28,7 @@ const useStyles = themedStyles(({ colors }) => ({
     gap: SPACE.s2,
     justifyContent: 'center',
     minHeight: SIZE.button,
-    paddingHorizontal: SPACE.s4,
+    paddingHorizontal: SPACE.s3,
   },
   lit: { backgroundColor: colors.text },
   text: TYPE.button,

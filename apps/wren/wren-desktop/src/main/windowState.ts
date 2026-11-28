@@ -39,16 +39,31 @@ const overlaps = ({ bounds, area }: OverlapsProps): boolean =>
   bounds.y < area.y + area.height &&
   bounds.y + bounds.height > area.y
 
-type PlaceWindowProps = { saved: unknown; areas: readonly WorkArea[] }
+/** A window's size alone, which Electron centres on the main display. */
+export type WindowSize = Pick<WindowBounds, 'width' | 'height'>
+
+/** The first size, shrunk to fit a display smaller than it, so no edge opens off the screen. */
+export const firstSizeIn = (area: WorkArea): WindowSize => ({
+  width: Math.min(FIRST_SIZE.width, area.width),
+  height: Math.min(FIRST_SIZE.height, area.height),
+})
+
+type PlaceWindowProps = {
+  saved: unknown
+  areas: readonly WorkArea[]
+  /** The main display's work area, which the first size fits in. */
+  primary: WorkArea
+}
 
 /**
  * Where the window opens: where it was last while some display still shows it, else the first
- * size, which Electron centres on the main display.
+ * size fitted to the main display, which Electron centres there.
  */
 export const placeWindow = ({
   saved,
   areas,
-}: PlaceWindowProps): WindowBounds | typeof FIRST_SIZE => {
-  if (!isWindowBounds(saved)) return FIRST_SIZE
-  return areas.some((area) => overlaps({ bounds: saved, area })) ? saved : FIRST_SIZE
+  primary,
+}: PlaceWindowProps): WindowBounds | WindowSize => {
+  if (!isWindowBounds(saved)) return firstSizeIn(primary)
+  return areas.some((area) => overlaps({ bounds: saved, area })) ? saved : firstSizeIn(primary)
 }

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { type ElectronApplication, expect, test } from '@playwright/test'
 import { freshUserData, homeTile, removeFolder, withApp } from '@/e2e/harness'
-import { FIRST_SIZE, WINDOW_FILE, isWindowBounds } from '@/main/windowState'
+import { WINDOW_FILE, firstSizeIn, isWindowBounds } from '@/main/windowState'
 
 // Smaller than the first size and away from where Electron centres it, so a restored window is told apart.
 const MOVED = { inset: 60, width: 900, height: 640 } as const
@@ -36,7 +36,9 @@ test.describe('where the window was', () => {
       userData,
       run: async ({ app, page }) => {
         await expect(homeTile({ page })).toBeVisible()
-        expect(await boundsOf({ app })).toMatchObject(FIRST_SIZE)
+        // A runner's screen can be smaller than the first size, which then fits the screen.
+        const primary = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea)
+        expect(await boundsOf({ app })).toMatchObject(firstSizeIn(primary))
 
         const wanted = await app.evaluate(({ BrowserWindow, screen }, { inset, width, height }) => {
           const { workArea } = screen.getPrimaryDisplay()

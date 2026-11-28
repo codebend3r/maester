@@ -1,4 +1,4 @@
-name: E2E Tests
+name: 🎬 E2E Tests
 
 # The end to end suites: raven's web app and Wren on the web in Chrome, which a pull request runs
 # too, and the affected desktop, device app and Wren flows, which run here and nowhere else. Every

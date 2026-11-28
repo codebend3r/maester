@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 
-import { REPEAT_MODES } from '@raven/core'
+import { QUEUE_SOURCE_KINDS, REPEAT_MODES } from '@raven/core'
 
 import {
+  PAGE_PLAYS,
   SCRUB_STEP_SECONDS,
+  pagePlayOf,
   progressOf,
   repeatIconOf,
   scrubTextOf,
@@ -61,5 +63,26 @@ describe('repeatIconOf', () => {
 describe('SCRUB_STEP_SECONDS', () => {
   it('moves the playhead a quarter of a minute a step', () => {
     expect(SCRUB_STEP_SECONDS).toBe(15)
+  })
+})
+
+describe('pagePlayOf', () => {
+  const album = { kind: QUEUE_SOURCE_KINDS.album, id: 7 } as const
+  const other = { kind: QUEUE_SOURCE_KINDS.album, id: 8 } as const
+  const playlist = { kind: QUEUE_SOURCE_KINDS.playlist, id: 7 } as const
+
+  it('pauses while the queue plays from the page, and carries on once paused', () => {
+    expect(pagePlayOf({ source: album, queued: album, isPlaying: true })).toBe(PAGE_PLAYS.pause)
+    expect(pagePlayOf({ source: album, queued: album, isPlaying: false })).toBe(PAGE_PLAYS.resume)
+  })
+
+  it('starts the page when the queue plays from somewhere else or nowhere', () => {
+    expect(pagePlayOf({ source: album, queued: other, isPlaying: true })).toBe(PAGE_PLAYS.start)
+    expect(pagePlayOf({ source: album, queued: playlist, isPlaying: true })).toBe(PAGE_PLAYS.start)
+    expect(pagePlayOf({ source: album, queued: null, isPlaying: false })).toBe(PAGE_PLAYS.start)
+  })
+
+  it('always starts a list of songs with no source', () => {
+    expect(pagePlayOf({ source: undefined, queued: album, isPlaying: true })).toBe(PAGE_PLAYS.start)
   })
 })

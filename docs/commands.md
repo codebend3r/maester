@@ -71,39 +71,42 @@ Run a product locally; each reads the .env beside its compose file.
 
 Expo on react-native-tvos: iPhone, iPad, Apple TV and Android TV.
 
-| Command                   | What it does                                                                    | Needs       |
-| ------------------------- | ------------------------------------------------------------------------------- | ----------- |
-| `app:start`               | Starts Metro for a dev client.                                                  | watchman    |
-| `app:server`              | raven's dev server, for the app to talk to.                                     |             |
-| `app:dev:ios`             | A Debug build on the iPhone simulator, against Metro.                           | Xcode       |
-| `app:dev:ipad`            | A Debug build on the iPad simulator, against Metro.                             | Xcode       |
-| `app:dev:tvos`            | A Debug build on the Apple TV simulator, against Metro.                         | Xcode       |
-| `app:prebuild:ios`        | Generates the iPhone and iPad native project and its pods.                      | Xcode       |
-| `app:prebuild:tvos`       | Generates the Apple TV native project and its pods.                             | Xcode       |
-| `app:prebuild:android-tv` | Generates the Android TV native project.                                        | Android SDK |
-| `app:prebuild:android`    | Generates the Android phone native project.                                     | Android SDK |
-| `app:build:ios`           | A Release build for the iPhone simulator.                                       | Xcode       |
-| `app:build:tvos`          | A Release build for the Apple TV simulator.                                     | Xcode       |
-| `app:build:android-tv`    | A Release APK for Android TV, to install on the emulator or a TV.               | Android SDK |
-| `app:build:android`       | A Release APK for Android phones, to install on the emulator or a phone.        | Android SDK |
-| `app:deploy:ios`          | Builds the signed Release and puts it on every paired iPhone and iPad.          | Xcode       |
-| `wren:deploy:ios`         | Builds Wren's signed Release and puts it on every paired iPhone and iPad.       | Xcode       |
-| `wren:build:android`      | Wren's Release APK for Android phones.                                          | Android SDK |
-| `wren:e2e`                | Wren's Maestro flows on the iPhone simulator, against the fixture server.       | Maestro     |
-| `wren:e2e:ipad`           | The same flows on an iPad simulator, a target of their own.                     | Maestro     |
-| `wren:e2e:android`        | Wren's Maestro flows on the Android phone emulator ANDROID_SERIAL names.        | emulator    |
-| `deploy:devices`          | Puts raven and Wren on both TVs and on every paired iPhone and iPad.            | Xcode       |
-| `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.                   | Xcode       |
-| `app:testflight:ios`      | Archives the iPhone and iPad app and uploads it to TestFlight.                  | Xcode       |
-| `app:testflight:tvos`     | Archives the Apple TV app and uploads it to TestFlight.                         | Xcode       |
-| `app:deploy:android-tv`   | Builds the Release APK and puts it on the Android TV over adb, found over mDNS. | Android SDK |
-| `app:deploy:android`      | Builds the Release APK and puts it on the Android phone or emulator adb sees.   | Android SDK |
-| `app:deploy:tvs`          | Puts the checked-out app on the Android TV, then on the Apple TV.               | Xcode       |
-| `app:e2e`                 | The Maestro flows on the iPhone simulator, against the fixture server.          | Maestro     |
-| `app:e2e:ipad`            | The touch Maestro flows on an iPad simulator, a target of their own.            | Maestro     |
-| `app:e2e:tvos`            | The Siri Remote XCUITest on the Apple TV simulator.                             | Xcode       |
-| `app:e2e:android-tv`      | The Maestro flows on the Android TV emulator, driven by the remote.             | emulator    |
-| `app:e2e:android`         | The touch Maestro flows on the Android phone emulator ANDROID_SERIAL names.     | emulator    |
+| Command                   | What it does                                                                     | Needs       |
+| ------------------------- | -------------------------------------------------------------------------------- | ----------- |
+| `app:start`               | Starts Metro for a dev client.                                                   | watchman    |
+| `app:server`              | raven's dev server, for the app to talk to.                                      |             |
+| `app:dev:ios`             | A Debug build on the iPhone simulator, against Metro.                            | Xcode       |
+| `app:dev:ipad`            | A Debug build on the iPad simulator, against Metro.                              | Xcode       |
+| `app:dev:tvos`            | A Debug build on the Apple TV simulator, against Metro.                          | Xcode       |
+| `app:prebuild:ios`        | Generates the iPhone and iPad native project and its pods.                       | Xcode       |
+| `app:prebuild:tvos`       | Generates the Apple TV native project and its pods.                              | Xcode       |
+| `app:prebuild:android-tv` | Generates the Android TV native project.                                         | Android SDK |
+| `app:prebuild:android`    | Generates the Android phone native project.                                      | Android SDK |
+| `app:build:ios`           | A Release build for the iPhone simulator.                                        | Xcode       |
+| `app:build:tvos`          | A Release build for the Apple TV simulator.                                      | Xcode       |
+| `app:build:android-tv`    | A Release APK for Android TV, to install on the emulator or a TV.                | Android SDK |
+| `app:build:android`       | A Release APK for Android phones, to install on the emulator or a phone.         | Android SDK |
+| `app:deploy:ios`          | Builds the signed Release and puts it on every paired iPhone and iPad.           | Xcode       |
+| `wren:deploy:ios`         | Builds Wren's signed Release and puts it on every paired iPhone and iPad.        | Xcode       |
+| `wren:build:android`      | Wren's Release APK for Android phones.                                           | Android SDK |
+| `wren:e2e`                | Wren's Maestro flows on the iPhone simulator, against the fixture server.        | Maestro     |
+| `wren:e2e:ipad`           | The same flows on an iPad simulator, a target of their own.                      | Maestro     |
+| `wren:e2e:android`        | Wren's Maestro flows on the Android phone emulator ANDROID_SERIAL names.         | emulator    |
+| `deploy:devices`          | Puts raven and Wren on both TVs and on every paired iPhone and iPad.             | Xcode       |
+| `app:deploy:tvos`         | Builds the signed Release and puts it on the paired Apple TV.                    | Xcode       |
+| `app:testflight:ios`      | Archives the iPhone and iPad app and uploads it to TestFlight.                   | Xcode       |
+| `app:testflight:tvos`     | Archives the Apple TV app and uploads it to TestFlight.                          | Xcode       |
+| `app:play:android`        | A signed App Bundle of the phone app for Google Play, under the upload key.      | Android SDK |
+| `app:play:android-tv`     | A signed App Bundle of the Android TV app for Google Play, under the upload key. | Android SDK |
+| `app:play:upload-key`     | Makes Google Play's upload key once and keeps its password in the Keychain.      | Android SDK |
+| `app:deploy:android-tv`   | Builds the Release APK and puts it on the Android TV over adb, found over mDNS.  | Android SDK |
+| `app:deploy:android`      | Builds the Release APK and puts it on the Android phone or emulator adb sees.    | Android SDK |
+| `app:deploy:tvs`          | Puts the checked-out app on the Android TV, then on the Apple TV.                | Xcode       |
+| `app:e2e`                 | The Maestro flows on the iPhone simulator, against the fixture server.           | Maestro     |
+| `app:e2e:ipad`            | The touch Maestro flows on an iPad simulator, a target of their own.             | Maestro     |
+| `app:e2e:tvos`            | The Siri Remote XCUITest on the Apple TV simulator.                              | Xcode       |
+| `app:e2e:android-tv`      | The Maestro flows on the Android TV emulator, driven by the remote.              | emulator    |
+| `app:e2e:android`         | The touch Maestro flows on the Android phone emulator ANDROID_SERIAL names.      | emulator    |
 
 ## Wren on TV
 

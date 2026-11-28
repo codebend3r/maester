@@ -5,6 +5,7 @@ import {
   NOW_PLAYING_COPY,
   PLAYER_COPY,
   SETTINGS_COPY,
+  STATUS_COPY,
   WREN_HOST_META,
   WREN_PAGE_ORIGIN,
 } from '@raven/wren'
@@ -85,8 +86,17 @@ test.describe.serial('Wren for Mac', () => {
 
     await nowPlaying.click()
     await expect(heading({ page, name: firstTrack })).toBeVisible()
+    /*
+     * Past 64rem Now Playing says where it plays in its own line; a runner's screen can hold the
+     * window narrower than that, where the output's button names the Mac instead.
+     */
+    const device = NOW_PLAYING_COPY.devices.mac
     await expect(
-      page.getByText(NOW_PLAYING_COPY.playingOn(NOW_PLAYING_COPY.devices.mac)),
+      page.getByText(NOW_PLAYING_COPY.playingOn(device)).or(
+        page.getByRole('button', {
+          name: NOW_PLAYING_COPY.output({ server: STATUS_COPY.raven, device }),
+        }),
+      ),
     ).toBeVisible()
   })
 })

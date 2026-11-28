@@ -20,11 +20,16 @@ tags:
       - extendedWaitUntil:
           visible: Mark watched
           timeout: 30000
-- tapOn: Play
+# A playing video never settles, so the press caps Maestro's wait for it, or the controls have
+# faded before the wait below starts.
+- tapOn:
+    text: Play
+    waitToSettleTimeoutMs: 500
 # The film is an MKV, which plays through the server's HLS remux. The controls show while it
-# starts, and a pause keeps them up.
+# starts; once they fade, the catcher that brings them back stands for them, and the retry below
+# brings them back.
 - extendedWaitUntil:
-    visible: Pause
+    visible: Pause|Show the controls
     timeout: 60000
 # The controls fade five seconds after a touch, and a playing video never settles, so a tap left
 # to wait for the screen to settle spends seconds before and after it and lands on the hidden
@@ -48,7 +53,8 @@ tags:
                 text: Pause
                 waitToSettleTimeoutMs: 500
       - assertVisible: Play
-- assertVisible: Position
+# Android reads the scrubber's value with its name ("Position, 0:11 of 1:00"); iOS keeps the two apart.
+- assertVisible: 'Position(, .*)?'
 - assertVisible: Back 10 seconds
 - assertVisible: Forward 10 seconds
 - runFlow: steps/back.yaml

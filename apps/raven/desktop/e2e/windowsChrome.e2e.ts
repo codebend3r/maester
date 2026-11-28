@@ -19,6 +19,7 @@ import {
   hasExited,
   launchAgain,
   launchApp,
+  processHasExited,
   QUIT_MS,
   removeDir,
   requestFromPage,
@@ -156,6 +157,8 @@ test.describe('the window Raven draws on Windows', () => {
     const { app, page } = await launchApp({ userData })
     try {
       await expectOffline({ page })
+      // Held before the click: once the app has quit, Playwright can no longer hand it over.
+      const child = app.process()
       /*
        * The window may be gone before Playwright hears its click land, which it reports as a
        * failed click; the app ending is what the test reads.
@@ -163,7 +166,7 @@ test.describe('the window Raven draws on Windows', () => {
       await control({ page, label: CONTROL_LABELS.close })
         .click()
         .catch(() => undefined)
-      await expect.poll(() => hasExited(app), { timeout: QUIT_MS }).toBe(true)
+      await expect.poll(() => processHasExited(child), { timeout: QUIT_MS }).toBe(true)
     } finally {
       await closeApp({ app }).catch(() => undefined)
       await removeDir(userData)

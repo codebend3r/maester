@@ -12,6 +12,7 @@ import {
   FIRST_LIST_ORDER,
   RECENT_SERVER_SORTS,
   listOrderOf,
+  openingAlbumsOrderOf,
   matchingAlbums,
   matchingArtists,
   recentAlbums,
@@ -181,5 +182,20 @@ describe('recentAlbums', () => {
       [RECENT_SORTS.added]: MUSIC_SORTS.added,
       [RECENT_SORTS.release]: MUSIC_SORTS.release,
     })
+  })
+})
+
+describe('openingAlbumsOrderOf', () => {
+  it('opens Albums in the order Home was showing', () => {
+    expect(openingAlbumsOrderOf(RECENT_SORTS.added)).toEqual({ sort: MUSIC_SORTS.added, seed: 0 })
+    expect(openingAlbumsOrderOf(RECENT_SORTS.release)).toEqual({
+      sort: MUSIC_SORTS.release,
+      seed: 0,
+    })
+  })
+
+  it('opens Albums by title when no order or an unknown one is named', () => {
+    expect(openingAlbumsOrderOf(undefined)).toEqual(FIRST_LIST_ORDER)
+    expect(openingAlbumsOrderOf('plays')).toEqual(FIRST_LIST_ORDER)
   })
 })

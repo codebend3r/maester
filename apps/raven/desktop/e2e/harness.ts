@@ -22,7 +22,7 @@ import { ENGINE_MODES } from '@/main/player/engine'
 import { ERROR_CODES } from '@/main/stateStore'
 import { AUTH_ORIGIN_HOOK } from '@/main/origins'
 
-export { browserOpens, hasExited, stubBrowser } from '@tooling/web/electron'
+export { browserOpens, hasExited, processHasExited, stubBrowser } from '@tooling/web/electron'
 
 // `cwd` with `args: ['.']` runs the built app the way `electron .` does: package.json's `main`.
 const PROJECT_DIR = join(import.meta.dirname, '..')

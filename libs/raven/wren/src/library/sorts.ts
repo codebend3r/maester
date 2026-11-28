@@ -8,7 +8,7 @@ import {
 } from '@raven/core'
 
 import { byTitle } from '@/library/order'
-import { RECENT_SORTS, type RecentSort } from '@/prefs'
+import { RECENT_SORTS, type RecentSort, isRecentSort } from '@/prefs'
 
 /**
  * The order Albums or Songs is in: one of raven's music sorts, the same list in the same order
@@ -107,3 +107,10 @@ type RecentAlbumsProps = { albums: readonly AlbumSummary[]; sort: RecentSort; li
 /** The newest `limit` of several libraries' newest albums by `sort`, newest first, as Albums orders them. */
 export const recentAlbums = ({ albums, sort, limit }: RecentAlbumsProps): AlbumSummary[] =>
   sortedAlbums({ albums, order: { sort: RECENT_SERVER_SORTS[sort], seed: 0 } }).slice(0, limit)
+
+/** The query parameter Home's See all names its order in, so Albums opens in the same order. */
+export const ALBUMS_ORDER_PARAM = 'sort'
+
+/** The order Albums opens in: Home's, when See all named one, else by title. */
+export const openingAlbumsOrderOf = (sort: unknown): ListOrder =>
+  isRecentSort(sort) ? { sort: RECENT_SERVER_SORTS[sort], seed: 0 } : FIRST_LIST_ORDER

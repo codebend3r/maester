@@ -94,9 +94,11 @@ export {
   type SharedSegment,
 } from '@/library/segments'
 export {
+  ALBUMS_ORDER_PARAM,
   FIRST_LIST_ORDER,
   type ListOrder,
   RECENT_SERVER_SORTS,
+  openingAlbumsOrderOf,
   listOrderOf,
   matchingAlbums,
   matchingArtists,
@@ -128,11 +130,14 @@ export {
 } from '@/nowPlaying/nowPlayingModel'
 export { type QualityView, qualityViewOf } from '@/nowPlaying/quality'
 export {
+  PAGE_PLAYS,
+  type PagePlay,
   SCRUB_STEP_SECONDS,
   STEPS,
   type Step,
   TRANSPORTS,
   type TransportKind,
+  pagePlayOf,
   progressOf,
   repeatIconOf,
   scrubTextOf,

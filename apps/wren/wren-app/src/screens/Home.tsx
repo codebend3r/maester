@@ -31,7 +31,7 @@ import {
   useSongCount,
 } from '@raven/wren-native'
 import { useDownloadsSummary } from '@/screens/library/downloadsSummary'
-import { libraryHref } from '@raven/wren-native/headless'
+import { albumsInOrderHref, libraryHref } from '@raven/wren-native/headless'
 import { ContinueCard } from '@/screens/home/ContinueCard'
 import { ShortcutCard } from '@/screens/home/ShortcutCard'
 import { LIST_SHAPES } from '@/components/ListSkeleton'
@@ -199,7 +199,7 @@ type RecentlyAddedProps = { session: WrenSession; coverOf: CoverOf }
 
 /*
  * Every music library's newest albums, six rows of them, by when they were added or when they
- * came out, as the control under the title sets; See all opens Albums.
+ * came out, as the control under the title sets; See all opens Albums in that same order.
  */
 function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
   const styles = useStyles()
@@ -211,7 +211,7 @@ function RecentlyAdded({ session, coverOf }: RecentlyAddedProps) {
   return (
     <View style={styles.section}>
       <SectionHeader
-        onSeeAll={() => router.push(libraryHref(LIBRARY_SEGMENTS.albums))}
+        onSeeAll={() => router.push(albumsInOrderHref({ sort }))}
         title={HOME_RECENT_TITLES[sort]}
       />
       <SegmentedControl

@@ -9,11 +9,15 @@ const BROWSER_OPENS_KEY = 'e2eBrowserOpens'
 
 type AppProps = { app: ElectronApplication }
 
+/**
+ * Whether a process has exited or been killed by a signal. Hold the app's process from before it
+ * quits: once Playwright has closed its side, `app.process()` throws.
+ */
+export const processHasExited = (child: ChildProcess): boolean =>
+  child.exitCode !== null || child.signalCode !== null
+
 /** Whether the app's process has exited or been killed by a signal. */
-export const hasExited = (app: ElectronApplication): boolean => {
-  const child = app.process()
-  return child.exitCode !== null || child.signalCode !== null
-}
+export const hasExited = (app: ElectronApplication): boolean => processHasExited(app.process())
 
 type RemoveFolderProps = {
   path: string

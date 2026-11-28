@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'bun:test'
-import { RECENT_KINDS } from '@raven/wren'
+import { ALBUMS_ORDER_PARAM, LIBRARY_SEGMENTS, RECENT_KINDS, RECENT_SORTS } from '@raven/wren'
 
-import { WREN_PAGES, WREN_ROUTE_PARAMS, recentPageHref } from '@/routes'
+import {
+  WREN_PAGES,
+  WREN_ROUTE_PARAMS,
+  albumsInOrderHref,
+  libraryHref,
+  recentPageHref,
+} from '@/routes'
 
 describe('recentPageHref', () => {
   it("opens a recent artist's page", () => {
@@ -20,5 +26,17 @@ describe('recentPageHref', () => {
         artists: 'Radiohead',
       }),
     ).toEqual({ pathname: WREN_PAGES.album, params: { [WREN_ROUTE_PARAMS.id]: '7' } })
+  })
+})
+
+describe('albumsInOrderHref', () => {
+  it("opens Albums with Home's order named", () => {
+    expect(albumsInOrderHref({ sort: RECENT_SORTS.release })).toEqual({
+      pathname: libraryHref(LIBRARY_SEGMENTS.albums).pathname,
+      params: {
+        [WREN_ROUTE_PARAMS.kind]: LIBRARY_SEGMENTS.albums,
+        [ALBUMS_ORDER_PARAM]: RECENT_SORTS.release,
+      },
+    })
   })
 })
