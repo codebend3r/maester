@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { SearchFade } from '@/layouts/SearchFade'
 import { TouchBack } from '@/layouts/TouchBack'
+import { isTabletLayout } from '@/layouts/tabletKit'
 import { TOUCH_NAV_COPY } from '@/layouts/touchMenuKit'
 import { useGoHome } from '@/layouts/useGoHome'
 import { deviceNavKind } from '@/platform/devicePlatform'
@@ -109,18 +110,20 @@ type TouchNavProps = {
   isRaised?: boolean
   /** Home itself: no Home button. */
   isHome?: boolean
-  /** A search field under the buttons, for the pages that search. */
+  /** A search field for the pages that search: under the buttons, or between them on an iPad. */
   search?: ReactNode
 }
 
 /**
  * The header every touch page opens with, once for all of them: Back, Home and the menu at the
- * left, the theme swap at the right, and the search field under them where a page has one.
- * Home stays out of Home's own header; the player has its own chrome. An iPhone moves by its
- * tab bar, so only an iPad's header has the menu button.
+ * left, the theme swap at the right, and the search field where a page has one: under them on
+ * a phone, and on an iPad in their row, between the menu button and the theme swap. Home stays
+ * out of Home's own header; the player has its own chrome. An iPhone moves by its tab bar, so
+ * only an iPad's header has the menu button.
  */
 export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: TouchNavProps) => {
   const styles = useStyles()
+  const isInRow = !!search && isTabletLayout()
   return (
     <View style={styles.nav}>
       {search !== undefined && <SearchFade />}
@@ -130,9 +133,10 @@ export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: T
           {!isHome && <HomeButton isRaised={isRaised} />}
           {deviceNavKind() === NAV_KINDS.drawer && <MenuButton isRaised={isRaised} />}
         </View>
+        {isInRow && <View style={styles.inRow}>{search}</View>}
         <ThemeButton isRaised={isRaised} />
       </View>
-      {search}
+      {!isInRow && search}
     </View>
   )
 }
@@ -140,7 +144,13 @@ export const TouchNav = ({ onBack, isRaised = false, isHome = false, search }: T
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     nav: { gap: SIZES.space2 },
-    bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    bar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SIZES.space3,
+    },
+    inRow: { flex: 1 },
     side: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
     button: {
       minWidth: SIZES.fieldHeight,

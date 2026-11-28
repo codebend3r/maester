@@ -9,6 +9,7 @@ import {
   chosenLabelOf,
   pickerLabelOf,
 } from '@/layouts/gridKit'
+import { isTabletLayout } from '@/layouts/tabletKit'
 import { type SheetAnchor, showChoice } from '@/layouts/touchSheets'
 
 type OpenPickerSheetProps<K extends string> = Pick<
@@ -52,12 +53,12 @@ export const openPickerSheet = <K extends string>({
 /**
  * A picker under the thumb: a chip that opens this device's sheet, on an iPad as a popover
  * pointing at the chip. Over the video the chip is the player's dark glass and the sheet is
- * dark, whatever the theme. Its word and its value show unless `isIconOnly`; the spoken label
- * says both either way.
+ * dark, whatever the theme. Its word and its value show unless `isIconOnly`, which an iPad, with
+ * the room for every chip's words, ignores; the spoken label says both either way.
  */
 const Picker = <K extends string>(props: PickerProps<K>) => {
   const chip = useRef<ComponentRef<typeof View>>(null)
-  const isIconOnly = !!props.isIconOnly
+  const isIconOnly = !!props.isIconOnly && !isTabletLayout()
   return (
     <Chip
       ref={chip}
@@ -71,14 +72,23 @@ const Picker = <K extends string>(props: PickerProps<K>) => {
   )
 }
 
-/** A toolbar button under the thumb is its icon alone; the spoken label says what it does. */
-const ToolButton = ({ icon, accessibilityLabel, onPress, isOverPicture }: ToolButtonProps) => (
+/**
+ * A toolbar button under the thumb: its icon alone on a phone, its icon and its words on an iPad;
+ * the spoken label says what it does either way.
+ */
+const ToolButton = ({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  isOverPicture,
+}: ToolButtonProps) => (
   <Chip
     icon={icon}
     isOverPicture={isOverPicture}
     label={accessibilityLabel}
     onPress={onPress}
-    text={null}
+    text={isTabletLayout() ? label : null}
   />
 )
 

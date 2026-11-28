@@ -8,7 +8,7 @@ import type { AppQueries } from '@/queries/useAppQueries'
 import { usePictures } from '@/queries/usePictures'
 import { hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
-import { type PageFrame, PageTools } from '@/screens/PageTools'
+import { type PageFrame, PageTools, pageTabsOf } from '@/screens/PageTools'
 
 type SagasNoticeOfProps = {
   library: LibraryRecord
@@ -65,6 +65,7 @@ export const SagasGrid = <P extends string>({
       onOpen={({ target }) => router.push(hrefOf(target))}
       search={null}
       sections={sections}
+      tabs={pageTabsOf(frame)}
       title={library.name}
       toolbar={<PageTools frame={frame} />}
       view={LIBRARY_VIEWS.grid}

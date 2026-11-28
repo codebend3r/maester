@@ -32,3 +32,24 @@ require_team() {
   fi
   export APPLE_TEAM_ID="$TEAM"
 }
+
+# Sets AUTH to xcodebuild's App Store Connect API key flags, or to nothing. With the key, automatic
+# signing makes and renews its profiles without an Apple ID signed in to Xcode, which Xcode drops
+# every week or two. The issuer is ASC_KEY_ISSUER_ID, else the one line of
+# ~/.appstoreconnect/issuer_id; the key is ASC_KEY_PATH, else the one .p8 in
+# ~/.appstoreconnect/private_keys. With no issuer, xcodebuild falls back to Xcode's account.
+asc_auth() {
+  local issuer key id
+  AUTH=()
+  issuer="${ASC_KEY_ISSUER_ID:-$(tr -d '[:space:]' <"$HOME/.appstoreconnect/issuer_id" 2>/dev/null || true)}"
+  if [ -z "$issuer" ]; then
+    return
+  fi
+  key="${ASC_KEY_PATH:-$(find "$HOME/.appstoreconnect/private_keys" -name 'AuthKey_*.p8' 2>/dev/null | head -1)}"
+  if [ -z "$key" ]; then
+    echo "An App Store Connect issuer is set but no AuthKey_*.p8 is in ~/.appstoreconnect/private_keys: set ASC_KEY_PATH." >&2
+    exit 1
+  fi
+  id="$(basename "$key" .p8)"
+  AUTH=(-authenticationKeyPath "$key" -authenticationKeyID "${id#AuthKey_}" -authenticationKeyIssuerID "$issuer")
+}

@@ -1,4 +1,4 @@
-import { JUMP_SCALE_LABELS, type JumpScale, LIBRARY_VIEWS, type LibraryView } from '@raven/core'
+import { JUMP_SCALE_LABELS, type JumpScale } from '@raven/core'
 import { type ComponentType, useState } from 'react'
 import { FlatList, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -9,12 +9,14 @@ import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { CARD_SHAPES, type CardShape, type ShelfCard, cardLabelOf } from '@/queries/cards'
 import { CardPicture, pictureHeightOf } from '@/layouts/Card'
+import { Chip } from '@/layouts/Chip.touch'
 import { RowRatings, rowRatingsHeightOf } from '@/layouts/RatingPanel'
 import { SCROLL_EVERY_MS, ScrollHomeButton, useScrollHome } from '@/layouts/ScrollHome.touch'
 import { TouchNav } from '@/layouts/TouchNav'
 import { TouchCard, isCaptionless, touchCaptionHeightOf } from '@/layouts/TouchCard'
 import { PanelFace, type PanelScale, panelHeightOf } from '@/layouts/PanelCard'
 import { fitJumpMarks } from '@/layouts/jumpMarks'
+import { type RowLook, rowLineOf, rowLookOf } from '@/layouts/rowLooks'
 import { BREAKPOINTS } from '@/layouts/screenSizes'
 import { LINE_RATIO, linesHeightOf } from '@/layouts/textHeights'
 import {
@@ -25,7 +27,6 @@ import {
   type GridProps,
   cardLayoutOf,
   headingLabelOf,
-  isRowView,
 } from '@/layouts/gridKit'
 import {
   type CardRun,
@@ -58,9 +59,6 @@ const leastWidthOf = ({ shape, screen }: LeastWidthOfProps): number => {
   return screen <= BREAKPOINTS.wide ? 150 : 168
 }
 
-/** A row of the list and tiles views is at least this wide, so a tablet holds two. */
-const LEAST_ROW_WIDTH = 320
-
 /** A panel is at least the web's wide show card's 17.5rem, so an iPad holds three or four and a phone one. */
 const LEAST_PANEL_WIDTH = 280
 
@@ -75,20 +73,13 @@ const PANEL_SCALE = {
   line: SIZES.textXs,
 } as const satisfies PanelScale
 
-type LeastOfProps = { run: CardRun; isRows: boolean; screen: number }
+type LeastOfProps = { run: CardRun; look: RowLook | null; screen: number }
 
 /** The narrowest a run's card stands: a panel's, a row's, or its shape's. */
-const leastOf = ({ run, isRows, screen }: LeastOfProps): number => {
+const leastOf = ({ run, look, screen }: LeastOfProps): number => {
   if (run.hasPanels) return LEAST_PANEL_WIDTH
-  return isRows ? LEAST_ROW_WIDTH : leastWidthOf({ shape: run.shape, screen })
+  return look === null ? leastWidthOf({ shape: run.shape, screen }) : look.least
 }
-
-/** A tile's picture, by its card's shape. */
-const TILE_WIDTHS = {
-  [CARD_SHAPES.poster]: 48,
-  [CARD_SHAPES.wide]: 96,
-  [CARD_SHAPES.square]: 48,
-} as const
 
 /** How tall a bucket's heading row stands: a finger's reach, or its title at the viewer's size. */
 const headerHeightOf = (fontScale: number): number =>
@@ -99,35 +90,42 @@ const STRIP_WIDTH = SIZES.space5
 
 type RowCardProps = {
   card: ShelfCard
-  hasPicture: boolean
+  look: RowLook
   onPress: () => void
 }
 
 /** A card of the list or tiles view: a row of words, with its picture in the tiles view; a long press opens its menu. */
-const RowCard = ({ card, hasPicture, onPress }: RowCardProps) => {
+const RowCard = ({ card, look, onPress }: RowCardProps) => {
   const styles = useStyles()
   const text = useTheme((theme) => theme.palette.text)
   const { onLongPress, menu } = useTouchCard({ card })
+  const line = rowLineOf({ card, look })
   return (
     <Pressable
       accessibilityLabel={cardLabelOf({ card })}
       accessibilityRole="button"
       onLongPress={onLongPress}
       onPress={onPress}
-      style={({ pressed }) => [styles.rowCard, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.rowCard, { gap: look.gap }, pressed && styles.pressed]}
     >
-      {hasPicture && (
-        // A tile is too small for title art, and its words sit beside it.
-        <CardPicture card={{ ...card, logo: null }} width={TILE_WIDTHS[card.shape]} />
+      {look.pictures !== null && (
+        // A tile's words sit beside it, so it wears no title art.
+        <CardPicture card={{ ...card, logo: null }} width={look.pictures[card.shape]} />
       )}
       {!!card.icon && <Icon colour={text} name={card.icon} size={SIZES.textXl} />}
       <View style={styles.words}>
-        <Text numberOfLines={1} style={styles.rowTitle}>
+        <Text
+          numberOfLines={1}
+          style={[styles.rowTitle, { fontSize: look.title, lineHeight: look.title * LINE_RATIO }]}
+        >
           {card.title}
         </Text>
-        {card.line !== null && (
-          <Text numberOfLines={1} style={styles.rowLine}>
-            {card.line}
+        {line !== null && (
+          <Text
+            numberOfLines={1}
+            style={[styles.rowLine, { fontSize: look.line, lineHeight: look.line * LINE_RATIO }]}
+          >
+            {line}
           </Text>
         )}
         <RowRatings card={card} sizes={SIZES} />
@@ -179,7 +177,9 @@ const JumpStrip = ({ jump, room, fontScale, onJump }: JumpStripProps) => {
 
 /** What a grid's rows draw from beyond the row itself. */
 type GridRowContext = {
-  view: LibraryView
+  view: GridProps['view']
+  /** The look of the view's rows; null for a view that draws cards. */
+  rowLook: RowLook | null
   heightOf: (row: GridRow) => number
   widthOf: (run: CardRun) => number
   toggle: ReturnType<typeof useGrid>['toggle']
@@ -191,15 +191,12 @@ type GridCellProps = { card: ShelfCard; width: number; grid: GridRowContext }
 type RowCellProps = GridCellProps
 
 /** A card of the list or tiles view, in its column. */
-const RowCell = ({ card, width, grid }: RowCellProps) => (
-  <View style={{ width }}>
-    <RowCard
-      card={card}
-      hasPicture={grid.view === LIBRARY_VIEWS.tiles}
-      onPress={() => grid.onOpen(card)}
-    />
-  </View>
-)
+const RowCell = ({ card, width, grid }: RowCellProps) =>
+  grid.rowLook !== null && (
+    <View style={{ width }}>
+      <RowCard card={card} look={grid.rowLook} onPress={() => grid.onOpen(card)} />
+    </View>
+  )
 
 type CardCellProps = GridCellProps
 
@@ -298,7 +295,8 @@ const gridRowViewOf = <K extends GridRowKind>({
 /**
  * A library under the thumb: the way back, its name and what it holds, its search box and the
  * pickers, then its cards in as many columns as the screen's width fits, the buckets folded
- * until pressed, and the jump strip along the right edge.
+ * until pressed, and the jump strip along the right edge. Handed tabs, as an iPad's library is,
+ * it draws them at the right of its name's row.
  */
 const Grid = ({
   title,
@@ -307,6 +305,7 @@ const Grid = ({
   notice,
   search,
   toolbar,
+  tabs = [],
   sections,
   view,
   jump,
@@ -329,23 +328,26 @@ const Grid = ({
    */
   const left = GUTTER + insets.left
   const right = GUTTER + (jump === null ? 0 : STRIP_WIDTH) + insets.right
-  const isRows = isRowView(view)
+  const rowLook = rowLookOf(view)
   const { columnsOf, widthOf } = gridColumnsOf({
     room: screen.width - left - right,
     gap: GAP,
-    leastOf: (run) => leastOf({ run, isRows, screen: screen.width }),
+    leastOf: (run) => leastOf({ run, look: rowLook, screen: screen.width }),
   })
   const heightOf = (row: GridRow): number => {
     if (row.kind === GRID_ROWS.header) return headerHeightOf(screen.fontScale)
     if (row.hasPanels) {
       return panelHeightOf({ scale: PANEL_SCALE, fontScale: screen.fontScale }) + ROW_GAP
     }
-    if (isRows) {
-      const picture = pictureHeightOf({ shape: row.shape, width: TILE_WIDTHS[row.shape] })
+    if (rowLook !== null) {
+      const picture =
+        rowLook.pictures === null
+          ? 0
+          : pictureHeightOf({ shape: row.shape, width: rowLook.pictures[row.shape] })
       const words =
-        linesHeightOf({ sizes: [SIZES.text, SIZES.textXs], fontScale: screen.fontScale }) +
+        linesHeightOf({ sizes: [rowLook.title, rowLook.line], fontScale: screen.fontScale }) +
         rowRatingsHeightOf({ cards: row.cards, sizes: SIZES, fontScale: screen.fontScale })
-      return Math.max(view === LIBRARY_VIEWS.tiles ? picture : 0, words) + SIZES.space2 * 2
+      return Math.max(picture, words) + SIZES.space2 * 2
     }
     return (
       pictureHeightOf({ shape: row.shape, width: widthOf(row) }) +
@@ -357,7 +359,7 @@ const Grid = ({
 
   type RenderRowProps = { item: GridRow }
 
-  const grid: GridRowContext = { view, heightOf, widthOf, toggle, onOpen }
+  const grid: GridRowContext = { view, rowLook, heightOf, widthOf, toggle, onOpen }
 
   const renderRow = ({ item: row }: RenderRowProps) => (
     <KeyedView<GridRowViewsProps>
@@ -400,6 +402,20 @@ const Grid = ({
               <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
                 {title}
               </Text>
+              {tabs.length > 0 && (
+                <View accessibilityRole="tablist" style={styles.tabs}>
+                  {tabs.map((tab) => (
+                    <Chip
+                      key={tab.key}
+                      icon={tab.icon}
+                      isOn={tab.isOn}
+                      label={tab.label}
+                      onPress={tab.onPress}
+                      text={tab.label}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
             {line !== null && <Text style={styles.line}>{line}</Text>}
             <View style={styles.toolbar}>{toolbar}</View>
@@ -442,7 +458,8 @@ const useStyles = themedStyles((colours) =>
     ground: { flex: 1, backgroundColor: colours.ground },
     header: { gap: SIZES.space2, paddingBottom: SIZES.space4 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space2 },
-    title: { color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+    title: { flex: 1, color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
+    tabs: { flexDirection: 'row', alignItems: 'center', gap: SIZES.space1 },
     line: { color: colours.muted, fontSize: SIZES.textSm },
     toolbar: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZES.space1 },
     notice: { color: colours.muted, fontSize: SIZES.text },
@@ -458,24 +475,11 @@ const useStyles = themedStyles((colours) =>
     },
     count: { color: colours.muted, fontSize: SIZES.textSm },
     cards: { flexDirection: 'row', gap: GAP },
-    rowCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SIZES.space2,
-      paddingVertical: SIZES.space2,
-    },
+    rowCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: SIZES.space2 },
     words: { flex: 1 },
-    rowTitle: {
-      color: colours.text,
-      fontSize: SIZES.text,
-      lineHeight: SIZES.text * LINE_RATIO,
-      fontWeight: '600',
-    },
-    rowLine: {
-      color: colours.muted,
-      fontSize: SIZES.textXs,
-      lineHeight: SIZES.textXs * LINE_RATIO,
-    },
+    // A row's gap and type sizes are its look's, set where the row is drawn.
+    rowTitle: { color: colours.text, fontWeight: '600' },
+    rowLine: { color: colours.muted },
     stripSlot: { position: 'absolute', width: STRIP_WIDTH, justifyContent: 'center' },
     strip: { alignItems: 'center' },
     unit: { color: colours.muted, fontSize: SIZES.textXs, lineHeight: SIZES.textXs * LINE_RATIO },

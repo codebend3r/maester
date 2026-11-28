@@ -6,6 +6,8 @@ export const LIBRARY_GRID_COPY = {
   /** Between a show panel's facts: "1 season · 6 episodes". */
   factsSeparator: ' · ',
   notMatched: (count: string) => `Not matched, ${count}`,
+  /** A title's score among a row's facts: "★ 82%". */
+  score: (figure: string) => `★ ${figure}`,
 } as const
 
 export const ITEM_PAGE_COPY = {

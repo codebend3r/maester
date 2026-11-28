@@ -447,6 +447,7 @@ Every way in ends in the same call in the main process, `grant(path)`. It checks
 | --- | --- |
 | raven player | About, Settings (Command comma), Check for Updates, Hide, Quit |
 | File | Open (Command O), Open Recent with Clear Menu, Open Link (Command L), Close Window (Command W) |
+| Edit | the standard role: Undo, Redo, Cut, Copy, Paste, Select All. On macOS the page gets Command C, V, X and A only through it |
 | Playback | Play or Pause, Skip Back, Skip Forward, Next, Video Info. Shown with no accelerators; each sends its `PlayerAction` to the page, and Video Info sends `stats` |
 | View | Enter Full Screen (Control Command F) |
 | Window, Help | the standard roles; Keyboard Shortcuts, Show Logs, Show Crash Reports, Copy Diagnostics |

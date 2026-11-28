@@ -34,7 +34,8 @@ ios_devices() {
   local wanted="${IOS_DEVICES:-}"
   xcrun devicectl list devices --hide-headers 2>/dev/null \
     | awk -v wanted="$wanted" '
-        /\((iPhone|iPad)[0-9]+,[0-9]+\)/ && / physical/ {
+        # Xcode 27.2 prints a real device with no parentheses around the model and no physical.
+        /(iPhone|iPad)[0-9]+,[0-9]+/ && !/ simulated/ {
           udid = ""; at = 0
           for (i = 1; i <= NF; i++) {
             if ($i ~ /^[0-9A-F]{8}-[0-9A-F]{16}$/ || $i ~ /^[0-9a-f]{40}$/) { udid = $i; at = i; break }
@@ -68,9 +69,10 @@ say "Regenerating the iOS project for team $TEAM ($APP_VARIANT variant)"
 bun run prebuild:ios
 
 say "Building the signed Release"
+asc_auth
 xcodebuild -workspace "ios/$APP_NAME.xcworkspace" -scheme "$APP_NAME" -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath "$DERIVED" \
-  -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration ${AUTH[@]+"${AUTH[@]}"} \
   DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic build -quiet
 
 deployed=()

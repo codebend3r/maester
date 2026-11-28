@@ -19,9 +19,9 @@ import { usePictures } from '@/queries/usePictures'
 import { useShowArts } from '@/queries/useShowArts'
 import { hrefOf } from '@/routes'
 import { LIBRARY_COPY } from '@/screens/copy'
-import { type PageFrame, PageTools } from '@/screens/PageTools'
+import { type PageFrame, PageTools, pageTabsOf } from '@/screens/PageTools'
 
-/** How many finished videos Recently finished lists, as the web's tab does. */
+/** How many finished videos Finished lists, as the web's tab does. */
 const FINISHED_LIMIT = 48
 
 type MarksNoticeOfProps = {
@@ -70,6 +70,7 @@ const MarksPage = <P extends string>({
       onOpen={({ target }) => router.push(hrefOf(target))}
       search={null}
       sections={sections}
+      tabs={pageTabsOf(frame)}
       title={library.name}
       toolbar={<PageTools frame={frame} />}
       view={LIBRARY_VIEWS.grid}
@@ -131,7 +132,7 @@ const posterEntryOf = ({ media, poster }: HistoryEntry): PosterEntry => ({
 })
 
 /**
- * A library's Recently finished page, the web's tab: the videos watched to the end, or marked
+ * A library's Finished page, the web's tab: the videos watched to the end, or marked
  * watched, the latest first, as wide cards like Continue watching's.
  */
 export const FinishedGrid = <P extends string>({

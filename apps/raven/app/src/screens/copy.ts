@@ -59,7 +59,9 @@ export const LIBRARY_COPY = {
   all: 'All',
   inProgressPage: 'In progress',
   favourites: 'Favourites',
-  recentlyFinished: 'Recently finished',
+  finishedPage: 'Finished',
+  /** The main pages' names as an iPad's tabs beside the library's name. */
+  tabs: { continue: 'Continue Watching', browse: 'Browse', favourites: 'Favourites' },
   favourite: { one: 'favourite', many: 'favourites' },
   finished: { one: 'video finished', many: 'videos finished' },
   favouritesEmpty: (name: string) =>

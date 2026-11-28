@@ -20,6 +20,8 @@ import {
   libraryVideoCard,
   showCard,
   showPanelCard,
+  showRowFacts,
+  videoRowFacts,
   videoShapeFor,
 } from '@/queries/cards'
 import { LIBRARY_GRID_COPY } from '@/queries/copy'
@@ -84,17 +86,18 @@ type Cards = Pictures & { settings: LibrarySettings; now: Date }
 
 type FileCardsProps = Cards & { files: MediaItem[] }
 
-/** A library's videos as its type draws them, each saying what it is sorted by. */
+/** A library's videos as its type draws them, each saying what it is sorted by, with its row's facts. */
 const fileCards = ({ settings, now, files, ...pictures }: FileCardsProps) => ({
   shape: videoShapeFor(settings.kind),
-  cards: files.map((media) =>
-    libraryVideoCard({
+  cards: files.map((media) => ({
+    ...libraryVideoCard({
       kind: settings.kind,
       media,
       order: { sort: settings.sort, now },
       ...pictures,
     }),
-  ),
+    rowFacts: videoRowFacts({ media, source: settings.ratingsSource }),
+  })),
 })
 
 const videos = (n: number): string => plural({ n, ...LIBRARY_GRID_COPY.videos })
@@ -148,7 +151,10 @@ const showSections = ({
     count: isBucketed ? plural({ n: shows.length, ...LIBRARY_GRID_COPY.shows }) : null,
     shape: CARD_SHAPES.poster,
     hasPanels,
-    cards: shows.map((entry) => cardOf({ entry, order, ...pictures })),
+    cards: shows.map((entry) => ({
+      ...cardOf({ entry, order, ...pictures }),
+      rowFacts: showRowFacts({ entry, source: settings.ratingsSource }),
+    })),
   }
   const shown: GridSection[] = shows.length === 0 ? [] : [showRun]
   const folders = unmatchedShowsOf(files).map((folder) => ({
@@ -158,7 +164,10 @@ const showSections = ({
       plural({ n: folder.files.length, ...LIBRARY_GRID_COPY.episodes }),
     ),
     shape: CARD_SHAPES.wide,
-    cards: folder.files.map((media) => frameCard({ media, order, ...pictures })),
+    cards: folder.files.map((media) => ({
+      ...frameCard({ media, order, ...pictures }),
+      rowFacts: videoRowFacts({ media, source: settings.ratingsSource }),
+    })),
   }))
   return [...shown, ...folders]
 }

@@ -7,6 +7,7 @@ import { HomeScrollView } from '@/layouts/ScrollHome.touch'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { TouchNav } from '@/layouts/TouchNav'
+import { isTabletLayout } from '@/layouts/tabletKit'
 import { chosenLabelOf, pickerLabelOf } from '@/layouts/gridKit'
 import type {
   SettingsButtonProps,
@@ -37,6 +38,8 @@ const SettingsPage = ({ title, onBack, children }: SettingsPageProps) => {
     <HomeScrollView
       contentContainerStyle={[
         styles.page,
+        // An iPad's Settings runs the screen's width; a phone's keeps the reading measure.
+        !isTabletLayout() && styles.measured,
         {
           paddingTop: insets.top + SIZES.space2,
           paddingBottom: insets.bottom + SIZES.space5,
@@ -193,7 +196,8 @@ export const touchSettings: SettingsKit = {
 const useStyles = themedStyles((colours) =>
   StyleSheet.create({
     ground: { flex: 1, backgroundColor: colours.ground },
-    page: { gap: SIZES.space4, width: '100%', maxWidth: SIZES.measure, alignSelf: 'center' },
+    page: { gap: SIZES.space4, width: '100%' },
+    measured: { maxWidth: SIZES.measure, alignSelf: 'center' },
     title: { color: colours.text, fontSize: SIZES.textXl, fontWeight: 'bold' },
     section: { gap: SIZES.space2 },
     heading: { color: colours.text, fontSize: SIZES.textLg, fontWeight: 'bold' },

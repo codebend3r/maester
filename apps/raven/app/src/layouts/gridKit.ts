@@ -5,6 +5,16 @@ import type { ReactNode } from 'react'
 import type { ShelfCard } from '@/queries/cards'
 import type { GridSection } from '@/queries/libraryGrid'
 
+/** One of a library's main pages as a tab beside its name. */
+export type GridTab = {
+  key: string
+  label: string
+  icon: IconName
+  /** The page open now. */
+  isOn: boolean
+  onPress: () => void
+}
+
 export type GridProps = {
   title: string
   /** The library's icon, the one the side menu's pinned row wears; null while no library is known. */
@@ -17,6 +27,11 @@ export type GridProps = {
   search: ReactNode
   /** The pickers over the cards. */
   toolbar: ReactNode
+  /**
+   * The library's main pages as tabs at the right of its name's row, which a screen hands only
+   * an iPad's grid; with none, the toolbar reaches them.
+   */
+  tabs?: readonly GridTab[]
   sections: GridSection[]
   view: LibraryView
   /**
@@ -35,9 +50,13 @@ export type GridProps = {
 export type GridKit = { Grid: (props: GridProps) => ReactNode }
 
 /** The views that lay the cards out as rows of words, one card a row, rather than as cards. */
-const ROW_VIEWS: ReadonlySet<LibraryView> = new Set([LIBRARY_VIEWS.list, LIBRARY_VIEWS.tiles])
+const ROW_VIEW_LIST = [LIBRARY_VIEWS.list, LIBRARY_VIEWS.tiles] as const
 
-export const isRowView = (view: LibraryView): boolean => ROW_VIEWS.has(view)
+export type RowView = (typeof ROW_VIEW_LIST)[number]
+
+const ROW_VIEWS: ReadonlySet<LibraryView> = new Set(ROW_VIEW_LIST)
+
+export const isRowView = (view: LibraryView): view is RowView => ROW_VIEWS.has(view)
 
 /** How a grid draws each card: as a row of words, as a card, or as a panel, its poster beside its words. */
 export const CARD_LAYOUTS = { rows: 'rows', cards: 'cards', panels: 'panels' } as const
@@ -82,7 +101,7 @@ export type PickerProps<K extends string> = {
 }
 
 export type ToolButtonProps = {
-  /** The words a TV's plate shows; under the thumb the button is its icon alone. */
+  /** The words a TV's plate and an iPad's chip show; on a phone the button is its icon alone. */
   label: string
   /** Drawn beside the text, the web's icon for the same control; decorative. */
   icon: IconName

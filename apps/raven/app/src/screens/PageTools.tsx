@@ -3,11 +3,33 @@ import type { IconName } from '@raven/ui/iconDrawings'
 import type { ReactNode } from 'react'
 
 import { ToolButton } from '@/layouts'
+import type { GridTab } from '@/layouts/gridKit'
+import { isTabletLayout } from '@/layouts/tabletKit'
 import { LIBRARY_COPY } from '@/screens/copy'
 import { RelockButton } from '@/screens/LockedLibrary'
 
 /** What a page's button shows: the page's name, and the web's icon for it. */
 export type PageTab = { name: string; icon: IconName }
+
+/** A main page, and what it is called as an iPad's tab beside the library's name. */
+export type MainPage<P extends string> = { page: P; label: string }
+
+/**
+ * The pages reached from the tabs beside the library's name, so not from the toolbar: an iPad's
+ * main pages, and none anywhere else.
+ */
+const tabbedPagesOf = <P extends string>(frame: PageFrame<P>): readonly MainPage<P>[] =>
+  isTabletLayout() ? (frame.mainPages ?? []) : []
+
+/** The grid's tabs: an iPad's main pages, in the order the frame names them. */
+export const pageTabsOf = <P extends string>(frame: PageFrame<P>): GridTab[] =>
+  tabbedPagesOf(frame).map(({ page, label }) => ({
+    key: page,
+    label,
+    icon: frame.tabs[page].icon,
+    isOn: page === frame.page,
+    onPress: () => frame.onChange(page),
+  }))
 
 /**
  * A library's pages as its toolbar frames them: the page open, every page in the order their
@@ -18,6 +40,8 @@ export type PageFrame<P extends string> = {
   page: P
   pages: readonly P[]
   tabs: Record<P, PageTab>
+  /** The pages an iPad draws as tabs beside the library's name, in the tabs' order; a music library names none. */
+  mainPages?: readonly MainPage<P>[]
   onChange: (page: P) => void
   library: LibraryRecord
   api: ApiClient
@@ -25,10 +49,11 @@ export type PageFrame<P extends string> = {
 
 type PageTogglesProps<P extends string> = { frame: PageFrame<P> }
 
-/** A press to each of the other pages, each named for where it goes. */
-const PageToggles = <P extends string>({ frame }: PageTogglesProps<P>) =>
-  frame.pages
-    .filter((other) => other !== frame.page)
+/** A press to each of the other pages, each named for where it goes, but those the tabs hold. */
+const PageToggles = <P extends string>({ frame }: PageTogglesProps<P>) => {
+  const tabbed = new Set(tabbedPagesOf(frame).map(({ page }) => page))
+  return frame.pages
+    .filter((other) => other !== frame.page && !tabbed.has(other))
     .map((other) => (
       <ToolButton
         key={other}
@@ -38,6 +63,7 @@ const PageToggles = <P extends string>({ frame }: PageTogglesProps<P>) =>
         onPress={() => frame.onChange(other)}
       />
     ))
+}
 
 type PageToolsProps<P extends string> = {
   frame: PageFrame<P>
