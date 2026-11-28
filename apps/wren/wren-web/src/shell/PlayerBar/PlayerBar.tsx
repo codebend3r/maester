@@ -1,6 +1,7 @@
 import type { Track } from '@raven/core'
 import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { PLAYER_COPY, TRANSPORTS, factsLineOf, WREN_ICONS } from '@raven/wren'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SCRUBBERS, Scrubber } from '@/player/Scrubber/Scrubber'
 import { Transport } from '@/player/Transport/Transport'
@@ -9,6 +10,7 @@ import { useQuality } from '@/player/useQuality'
 import { Volume } from '@/player/Volume/Volume'
 import { WREN_ROUTES } from '@/routes'
 import { SIZES } from '@/theme/tokens'
+import { TrackCoverMenu } from '@/ui/CoverMenu/CoverMenu'
 import { IconButton } from '@/ui/IconButton/IconButton'
 import { PlayingSummary } from '@/ui/PlayingSummary/PlayingSummary'
 import styles from '@/shell/PlayerBar/PlayerBar.module.scss'
@@ -17,6 +19,7 @@ type PlayingBarProps = { track: Track }
 
 function PlayingBar({ track }: PlayingBarProps) {
   const navigate = useNavigate()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { cover, artists, length, error } = useNowPlaying({ track })
   const quality = useQuality({ track })
   const isPlaying = useAudioQueue(isPlayingOf)
@@ -31,6 +34,7 @@ function PlayingBar({ track }: PlayingBarProps) {
         error={error}
         isPlaying={isPlaying}
         line={factsLineOf([artists, track.album.title])}
+        onArtHold={() => setIsMenuOpen(true)}
         onOpen={openNowPlaying}
         quality={quality}
         title={track.title}
@@ -46,6 +50,7 @@ function PlayingBar({ track }: PlayingBarProps) {
           <Volume />
         </span>
       </div>
+      {isMenuOpen && <TrackCoverMenu onClose={() => setIsMenuOpen(false)} track={track} />}
     </section>
   )
 }

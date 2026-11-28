@@ -8,6 +8,7 @@ import {
   type AlbumDisc,
   type PlaylistTrack,
   type QueueRow,
+  type Track,
 } from '@raven/core'
 import { AUDIOBOOK_SPEEDS, type AudiobookSpeed } from '@raven/ui/headless'
 import type { ReactNode } from 'react'
@@ -67,6 +68,8 @@ export const toggleLabelOf = (isPlaying: boolean): string =>
   isPlaying ? MUSIC_COPY.pause : MUSIC_COPY.play
 
 export type AlbumLayoutProps = {
+  /** The album's id, whose menu a long press on the cover opens under the thumb. */
+  albumId: number
   title: string
   artists: readonly ArtistCredit[]
   /** "1997 · 12 tracks · 53:21". */
@@ -101,6 +104,8 @@ type AlbumPlaylistRequest = { pick: PlaylistPick; index: number | null }
 
 /** What Now Playing shows of the track playing. */
 type PlayingTrack = {
+  /** The queue's track itself, whose menu a long press on the cover opens under the thumb. */
+  played: Track
   title: string
   artists: string
   album: string
@@ -235,6 +240,8 @@ export type NewPlaylistButtonProps = { onCreate: (name: string) => void }
 export type FavouriteButtonProps = { isFavourite: boolean; onToggle: () => void }
 
 export type NowPlayingStripProps = {
+  /** The track playing, whose menu a long press on the cover opens under the thumb. */
+  track: Track
   title: string
   artists: string
   cover: Picture | null

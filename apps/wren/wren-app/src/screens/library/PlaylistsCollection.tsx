@@ -26,6 +26,7 @@ import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { usePageInsets } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { SPACE } from '@/theme/wrenTokens'
+import { AlbumArt } from '@/ui/AlbumArt'
 import { AlbumTile } from '@/ui/AlbumTile'
 import { EmptyState } from '@/ui/EmptyState'
 import { IconButton } from '@/ui/IconButton'
@@ -84,7 +85,7 @@ function PlaylistTile({ playlist, width }: PlaylistTileProps) {
   const router = useRouter()
   return (
     <AlbumTile
-      cover={null}
+      art={<AlbumArt cover={null} size={width} />}
       label={playlist.name}
       onPress={() => router.push(pageHref({ page: WREN_PAGES.playlist, id: playlist.id }))}
       subtitle={playlistFactsOf({ playlist })}

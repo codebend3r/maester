@@ -1,11 +1,17 @@
-import { afterEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { LIBRARY_KINDS } from '@raven/core'
-import { AUDIO_STATES, MUSIC_QUALITIES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import { EQUALIZER_MARK, SOUND_BAR_LEVEL } from '@raven/ui'
+import {
+  AUDIO_STATES,
+  MUSIC_QUALITIES,
+  useAudioQueue,
+  usePlayerPrefs,
+  useSoundMeter,
+} from '@raven/ui/headless'
 import { NowPlayingBar } from '@/components/NowPlayingBar/NowPlayingBar'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { PANE_COPY } from '@/lib/nowPlayingPanes'
-import equalizer from '@/components/Equalizer/Equalizer.module.scss'
 import { library } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { track } from '@/test/music'
@@ -18,6 +24,8 @@ const MUSIC = library({
 
 afterEach(() => {
   cleanup()
+  jest.restoreAllMocks()
+  useSoundMeter.setState({ levels: null })
   useAudioQueue.getState().clear()
   usePlayerPrefs.getState().setMusicQuality(MUSIC_QUALITIES.original)
 })
@@ -113,14 +121,31 @@ describe('mini-player', () => {
     ).toBe(true)
   })
 
-  it('animates the equalizer while audio plays and holds it still when paused', () => {
+  it('shows the equalizer, following the sound while audio plays and holding it when paused', () => {
+    const frames: FrameRequestCallback[] = []
+    spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback)
+      return frames.length
+    })
+    spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {
+      frames.length = 0
+    })
+    useSoundMeter.getState().claim(({ count }) => Array.from({ length: count }, () => 1))
     useAudioQueue.getState().playTracks({ tracks: [track()] })
     const { container } = renderWithProviders({ ui: <NowPlayingBar /> })
-    expect(container.querySelector(`.${equalizer.still}`)).not.toBeNull()
+    const bars = () =>
+      Array.from(container.querySelectorAll(`[${EQUALIZER_MARK}] > span`)).map((bar) =>
+        bar instanceof HTMLElement ? bar.style.getPropertyValue(SOUND_BAR_LEVEL) : '',
+      )
+    act(() => useAudioQueue.getState().engine.state(AUDIO_STATES.paused))
+    expect(frames).toHaveLength(0)
+    expect(bars()).toEqual(['', '', '', '', ''])
     act(() => useAudioQueue.getState().engine.state(AUDIO_STATES.playing))
-    expect(container.querySelector(`.${equalizer.still}`)).toBeNull()
+    act(() => frames.shift()?.(0))
+    expect(bars()).toEqual(['1', '1', '1', '1', '1'])
     act(() => useAudioQueue.getState().pause())
-    expect(container.querySelector(`.${equalizer.still}`)).not.toBeNull()
+    expect(frames).toHaveLength(0)
+    expect(bars()).toEqual(['1', '1', '1', '1', '1'])
   })
 
   it('says the format and quality the track plays in, beside the queue and the volume', async () => {

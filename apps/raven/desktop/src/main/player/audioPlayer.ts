@@ -78,6 +78,7 @@ export const attachMusicPlayer = ({
           canChooseAo: mode === ENGINE_MODES.window,
           platform,
           onPlaying: (isPlaying) => sleepGuard.set(isPlaying),
+          timers,
           warn,
         })
         sink.service = service

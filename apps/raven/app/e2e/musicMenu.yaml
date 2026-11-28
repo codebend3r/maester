@@ -1,0 +1,45 @@
+appId: io.github.codebend3r.raven.app
+name: A held album cover and the held Now Playing cover tell of the music and go to its album or artist
+tags:
+  - touch
+---
+- runFlow: signIn.yaml
+# Home shelves every library while none is pinned, the music's albums among them.
+- runFlow:
+    file: steps/shelfCard.touch.yaml
+    env:
+      TITLE: Morning Chorus
+      SHELF: Music
+# A long press on the album's card opens the system's sheet over its title: what is known of the
+# album as its message, then its favourite and the ways to its page and its artist.
+- longPressOn:
+    text: Morning Chorus
+    below: Music
+- extendedWaitUntil:
+    visible: Go to artist
+    timeout: 30000
+- assertVisible: '.*Artist: The Fixture Birds.*'
+- assertVisible: '.*Tracks: 3 tracks.*'
+- tapOn: Go to album
+- extendedWaitUntil:
+    visible: '1. First Light'
+    timeout: 30000
+- tapOn: '1. First Light'
+- extendedWaitUntil:
+    visible: Open Now Playing
+    timeout: 30000
+- tapOn: Open Now Playing
+# Now Playing's cover takes a press for the equalizer and a long press for the track's menu. The
+# fixture's tracks have no artwork, so the cover reads as the equalizer; either label holds it.
+- longPressOn: '(.*[Aa]lbum cover.*|The equalizer.*)'
+- extendedWaitUntil:
+    visible: Go to artist
+    timeout: 30000
+- assertVisible: '.*Album: Morning Chorus.*'
+- tapOn: Go to artist
+- extendedWaitUntil:
+    visible: The Fixture Birds
+    timeout: 30000
+# The strip's X stops the music, so the flows after this one start with nothing queued.
+- tapOn: Stop the music and close the player
+- assertNotVisible: Open Now Playing

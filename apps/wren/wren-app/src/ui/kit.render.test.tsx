@@ -51,6 +51,7 @@ describe("Wren's kit", () => {
         isDownloaded
         label="Airbag"
         lead={{ kind: SONG_LEADS.number, number: '1' }}
+        onArtHold={() => undefined}
         onMore={onMore}
         onPress={() => undefined}
         title="Airbag"

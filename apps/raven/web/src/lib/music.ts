@@ -15,33 +15,13 @@ import {
 import { generatePath, matchPath } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { COMMON_COPY, MUSIC_COPY } from '@/lib/copy'
+import { MUSIC_PATHS } from '@/lib/musicPaths'
 
 /** Now Playing, the full page over the bar. */
 export const NOW_PLAYING_PATH: AppPath = '/now-playing'
 
 /** The route a playlist's page answers on; `playlistPath` names one playlist's. */
 export const PLAYLIST_ROUTE: AppPath = '/playlists/:id'
-
-/**
- * The music mode's pages, under `/music`: Home, the library's four lists,
- * the album, artist and playlist pages raven's own mode shows too, a mix,
- * Now Playing, the music search and, in Raven, the downloads.
- */
-export const MUSIC_PATHS = {
-  root: '/music',
-  albums: '/music/albums',
-  artists: '/music/artists',
-  noArtwork: '/music/no-artwork',
-  songs: '/music/songs',
-  playlists: '/music/playlists',
-  album: '/music/albums/:id',
-  artist: '/music/artists/:id',
-  playlist: '/music/playlists/:id',
-  mix: '/music/mixes/:id',
-  nowPlaying: '/music/now-playing',
-  search: '/music/search',
-  downloads: '/music/downloads',
-} as const satisfies Record<string, AppPath>
 
 /** A mix's page: `/music/mixes/:id`, its kind the id. */
 export const mixPath = (kind: MixKind): string => generatePath(MUSIC_PATHS.mix, { id: kind })

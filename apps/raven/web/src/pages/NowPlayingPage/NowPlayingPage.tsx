@@ -27,6 +27,7 @@ import { AddToPlaylistDialog } from '@/components/AddToPlaylistDialog/AddToPlayl
 import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { BackButton } from '@/components/BackButton/BackButton'
+import { useTrackMenu } from '@/components/MusicMenu/useMusicMenu'
 import { Tabs } from '@/components/Tabs/Tabs'
 import { TrackHeart } from '@/components/TrackHeart/TrackHeart'
 import { Transport } from '@/components/Transport/Transport'
@@ -251,6 +252,7 @@ const Playing = ({ track }: PlayingProps) => {
   const error = useAudioQueue((store) => store.error)
   const seekTo = useAudioQueue((store) => store.seekTo)
   const quality = useAudioQuality({ track })
+  const { coverProps, coverClass, menu } = useTrackMenu({ track })
 
   const length = duration ?? track.duration ?? 0
   const pane = paneOf(searchParams.get(PANE_PARAM))
@@ -264,7 +266,9 @@ const Playing = ({ track }: PlayingProps) => {
         {NOW_PLAYING_COPY.title}
       </h1>
       <div className={styles.stage}>
-        <div className={styles.cover}>
+        {/* A finger's long press alone: the facts and links it opens are beside the cover too. */}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div className={classNames([styles.cover, coverClass])} {...coverProps}>
           <AlbumCover
             album={{
               id: track.albumId,
@@ -274,6 +278,7 @@ const Playing = ({ track }: PlayingProps) => {
             sizes={POSTER_SIZES.nowPlaying}
           />
         </div>
+        {menu}
         <div className={styles.words}>
           <div className={styles.heading}>
             <h2 className={styles.trackTitle}>{track.title}</h2>

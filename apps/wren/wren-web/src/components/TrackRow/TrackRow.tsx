@@ -5,6 +5,7 @@ import { type MouseEvent, useState } from 'react'
 import { TrackMenu } from '@/components/TrackMenu/TrackMenu'
 import { useTrackLike } from '@/lib/useTrackLike'
 import type { Cover } from '@/music/useCovers'
+import { TrackCoverMenu } from '@/ui/CoverMenu/CoverMenu'
 import { SongRow } from '@/ui/SongRow/SongRow'
 import styles from '@/components/TrackRow/TrackRow.module.scss'
 
@@ -27,6 +28,7 @@ type TrackRowProps = {
 /**
  * A track in a list: a press plays from it, and its More, a right click or the context menu
  * key opens its sheet: Play next, Add to queue, Add to playlist, Go to album and Go to artist.
+ * Holding its art, where it leads with one, opens the song's cover menu instead.
  */
 export function TrackRow({
   track,
@@ -39,6 +41,7 @@ export function TrackRow({
   onPress,
 }: TrackRowProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isCoverMenuOpen, setIsCoverMenuOpen] = useState(false)
   const isPlaying = useAudioQueue((store) => isCurrent && isPlayingOf(store))
   const like = useTrackLike({ track })
   const openMenu = () => setIsMenuOpen(true)
@@ -47,7 +50,7 @@ export function TrackRow({
    * click inside the sheet once it is up is the browser's own, so a field there still pastes.
    */
   const openFromContext = (event: MouseEvent) => {
-    if (isMenuOpen) return
+    if (isMenuOpen || isCoverMenuOpen) return
     event.preventDefault()
     openMenu()
   }
@@ -67,12 +70,16 @@ export function TrackRow({
         label={label}
         lead={lead}
         like={like}
+        onArtHold={() => setIsCoverMenuOpen(true)}
         onMore={openMenu}
         onPress={onPress}
         subtitle={subtitle}
         title={track.title}
       />
       {isMenuOpen && <TrackMenu like={like} onClose={() => setIsMenuOpen(false)} track={track} />}
+      {isCoverMenuOpen && (
+        <TrackCoverMenu onClose={() => setIsCoverMenuOpen(false)} track={track} />
+      )}
     </div>
   )
 }

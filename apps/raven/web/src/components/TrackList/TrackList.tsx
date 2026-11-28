@@ -1,10 +1,11 @@
-import { BUTTON_TONES, Button, Icon, classNames } from '@raven/ui'
+import { BUTTON_TONES, Button, EQUALIZER_SIZES, classNames } from '@raven/ui'
 import type { Track } from '@raven/core'
 import { AUDIO_STATES, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import type { ComponentType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { TRACK_LIST_COPY } from '@/components/TrackList/copy'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
+import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { POSTER_SIZES } from '@/lib/posters'
 import { trackLength } from '@/lib/music'
@@ -13,20 +14,24 @@ import styles from '@/components/TrackList/TrackList.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { useDrawnFirst } from '@/lib/useDrawnFirst'
 
-/** What a row's leading cell shows: a speaker while its track plays, else its number. */
-const LEAD_KINDS = { speaker: 'speaker', number: 'number' } as const
+/** What a row's leading cell shows: the equalizer while its track is the queue's, else its number. */
+const LEAD_KINDS = { equalizer: 'equalizer', number: 'number' } as const
 type LeadKind = (typeof LEAD_KINDS)[keyof typeof LEAD_KINDS]
 
-type LeadProps = { number: number | null }
+type LeadProps = { number: number | null; isPlaying: boolean }
 
-const Speaker = () => <Icon name="volume" size="1em" />
+type RowEqualizerProps = LeadProps
+
+const RowEqualizer = ({ isPlaying }: RowEqualizerProps) => (
+  <Equalizer isPlaying={isPlaying} size={EQUALIZER_SIZES.small} />
+)
 
 type TrackNumberProps = LeadProps
 
 const TrackNumber = ({ number }: TrackNumberProps) => number ?? ''
 
 const LEADS = {
-  [LEAD_KINDS.speaker]: Speaker,
+  [LEAD_KINDS.equalizer]: RowEqualizer,
   [LEAD_KINDS.number]: TrackNumber,
 } as const satisfies Record<LeadKind, ComponentType<LeadProps>>
 
@@ -55,15 +60,16 @@ const TrackRow = ({
   shouldShowAlbumCover,
 }: TrackRowProps) => {
   const links = useMusicLinks()
-  const Lead = LEADS[isPlaying ? LEAD_KINDS.speaker : LEAD_KINDS.number]
+  const isCurrent = isPlaying || isPaused
+  const Lead = LEADS[isCurrent ? LEAD_KINDS.equalizer : LEAD_KINDS.number]
   return (
     <li
       className={classNames([
         styles.row,
-        (isPlaying || isPaused) && styles.current,
+        isCurrent && styles.current,
         shouldShowAlbumCover && styles.withCover,
       ])}
-      aria-current={isPlaying || isPaused ? 'true' : undefined}
+      aria-current={isCurrent ? 'true' : undefined}
     >
       {shouldShowAlbumCover && (
         <span className={styles.cover}>
@@ -78,7 +84,7 @@ const TrackRow = ({
         </span>
       )}
       <span className={styles.number} aria-hidden="true">
-        <Lead number={number} />
+        <Lead number={number} isPlaying={isPlaying} />
       </span>
       <Button
         tone={BUTTON_TONES.ghost}
@@ -131,7 +137,7 @@ type TrackListProps = {
 }
 
 /**
- * Tracks as a list: a number or a speaker for the one playing, a play
+ * Tracks as a list: a number, or the equalizer for the queue's track, a play
  * button, the title (and artists), the length, and any controls of the
  * row's own. The row that plays is marked, and its button pauses.
  */

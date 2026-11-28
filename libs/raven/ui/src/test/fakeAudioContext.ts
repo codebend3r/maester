@@ -60,6 +60,22 @@ class FakeFilter extends FakeNode {
   readonly gain = new FakeParam(0)
 }
 
+/** An `AnalyserNode` whose spectrum a test writes, byte by byte, as the browser's would hear it. */
+class FakeAnalyser extends FakeNode {
+  fftSize = 2048
+  smoothingTimeConstant = 0.8
+  /** What the analyser hears, one byte a bin; silent until a test says otherwise. */
+  spectrum = new Uint8Array(1024)
+
+  get frequencyBinCount(): number {
+    return this.fftSize / 2
+  }
+
+  getByteFrequencyData(array: Uint8Array<ArrayBuffer>): void {
+    array.set(this.spectrum.subarray(0, array.length))
+  }
+}
+
 /** The fake contexts made since the last `forgetContexts`, oldest first. */
 const made: FakeAudioContext[] = []
 
@@ -70,11 +86,13 @@ const made: FakeAudioContext[] = []
  */
 export class FakeAudioContext {
   currentTime = 10
+  readonly sampleRate = 48000
   state: AudioContextState = 'suspended'
   readonly destination = new FakeNode()
   readonly sources = new Map<HTMLMediaElement, FakeNode>()
   readonly gains: FakeGain[] = []
   readonly filters: FakeFilter[] = []
+  readonly analysers: FakeAnalyser[] = []
   resumes = 0
   isClosed = false
 
@@ -99,6 +117,12 @@ export class FakeAudioContext {
     const filter = new FakeFilter()
     this.filters.push(filter)
     return filter
+  }
+
+  createAnalyser(): FakeAnalyser {
+    const analyser = new FakeAnalyser()
+    this.analysers.push(analyser)
+    return analyser
   }
 
   resume(): Promise<void> {

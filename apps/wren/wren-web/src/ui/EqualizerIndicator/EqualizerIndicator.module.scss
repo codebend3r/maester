@@ -1,76 +1,54 @@
-@use 'sass:map';
-
-/*
- * Each bar's height at rest as a share of the tallest, the height it swings to, and how long
- * one swing takes: the apps' own numbers.
- */
-$bars: (
-  1: (
-    rest: 45%,
-    peak: 90%,
-    period: 900ms,
-  ),
-  2: (
-    rest: 100%,
-    peak: 40%,
-    period: 1100ms,
-  ),
-  3: (
-    rest: 66%,
-    peak: 25%,
-    period: 800ms,
-  ),
-  4: (
-    rest: 30%,
-    peak: 80%,
-    period: 1200ms,
-  ),
+// Each bar's height at rest as a share of the tallest: the logo's own.
+$rests: (
+  1: 0.45,
+  2: 1,
+  3: 0.66,
+  4: 0.3,
 );
 
 .bars {
   display: grid;
   grid-auto-flow: column;
-  gap: var(--size-equalizer-gap);
+  gap: var(--equalizer-gap);
   align-items: end;
-  block-size: var(--size-equalizer);
+  block-size: var(--equalizer-height);
 }
 
+.small {
+  --equalizer-height: var(--size-equalizer);
+  --equalizer-bar: var(--size-equalizer-bar);
+  --equalizer-gap: var(--size-equalizer-gap);
+  --equalizer-radius: var(--size-equalizer-radius);
+}
+
+.medium {
+  --equalizer-height: var(--size-equalizer-medium);
+  --equalizer-bar: var(--size-equalizer-bar-medium);
+  --equalizer-gap: var(--size-equalizer-gap-medium);
+  --equalizer-radius: var(--size-equalizer-radius-medium);
+}
+
+.large {
+  --equalizer-height: var(--size-equalizer-large);
+  --equalizer-bar: var(--size-equalizer-bar-large);
+  --equalizer-gap: var(--size-equalizer-gap-large);
+  --equalizer-radius: var(--size-equalizer-radius-large);
+}
+
+// `--bar-level` is the sound's band, which `useSoundBars` writes on every frame; without it the bar rests.
 .bar {
-  inline-size: var(--size-equalizer-bar);
-  block-size: var(--bar-rest);
-  border-radius: var(--size-equalizer-radius);
+  inline-size: var(--equalizer-bar);
+  block-size: calc(var(--bar-level, var(--bar-rest)) * 100%);
+  border-radius: var(--equalizer-radius);
   background: var(--color-accent-text);
 
-  @each $place, $bar in $bars {
+  @each $place, $rest in $rests {
     &:nth-child(#{$place}) {
-      --bar-rest: #{map.get($bar, rest)};
-      --bar-peak: #{map.get($bar, peak)};
-      --bar-period: #{map.get($bar, period)};
+      --bar-rest: #{$rest};
     }
-  }
-
-  // Paused, each bar stops where it is.
-  @media (prefers-reduced-motion: no-preference) {
-    animation: swing var(--bar-period) ease-in-out infinite alternate paused;
-  }
-}
-
-.playing .bar {
-  @media (prefers-reduced-motion: no-preference) {
-    animation-play-state: running;
   }
 }
 
 .onPicture .bar {
   background: var(--color-picture-ink);
-}
-
-@keyframes swing {
-  from {
-    block-size: var(--bar-rest);
-  }
-
-  to {
-    block-size: var(--bar-peak);
-  }
 }

@@ -53,7 +53,6 @@ function AlbumPage({ session, details }: AlbumPageProps) {
     title,
     data,
   }))
-  const [artist] = album.artists
   const toggleFavourite = () =>
     favourite.attempt({ variables: !isFavourite, onRefused: toastFailure })
   const renderRow = ({ item }: RenderRowProps) => (
@@ -112,7 +111,7 @@ function AlbumPage({ session, details }: AlbumPageProps) {
           canAddToPlaylist
           head={{ title: album.title, subtitle: artistNames(album), cover }}
           onClose={closeMenu}
-          places={{ artist }}
+          places={{ artists: album.artists }}
           session={session}
           tracksOf={tracksOf}
         />

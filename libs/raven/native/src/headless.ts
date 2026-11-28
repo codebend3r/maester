@@ -41,6 +41,7 @@ export {
   inFolder,
 } from '@/downloads/downloadPaths'
 export { BUTTON_TONES, type ButtonTone, autofillFor, keyboardFor } from '@/form/formFields'
+export { holdActionPropsOf } from '@/lib/holdActions'
 export { IGNORED } from '@/lib/ignore'
 export {
   BROWSE_KINDS,

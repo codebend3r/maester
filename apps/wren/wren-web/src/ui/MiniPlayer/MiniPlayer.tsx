@@ -17,6 +17,8 @@ type MiniPlayerProps = {
   onOpen: () => void
   onToggle: () => void
   onNext: () => void
+  /** What holding the cover does: the song's cover menu. */
+  onArtHold?: () => void
 }
 
 /**
@@ -33,6 +35,7 @@ export function MiniPlayer({
   onOpen,
   onToggle,
   onNext,
+  onArtHold,
 }: MiniPlayerProps) {
   const played: TokenStyle = { '--played': `${Math.round(progress * 100)}%` }
   return (
@@ -45,6 +48,7 @@ export function MiniPlayer({
         error={error}
         isPlaying={isPlaying}
         line={artists}
+        onArtHold={onArtHold}
         onOpen={onOpen}
         quality={null}
         title={title}

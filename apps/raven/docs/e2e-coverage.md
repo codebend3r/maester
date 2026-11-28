@@ -78,6 +78,8 @@ Read on 2026-11-21 from the suites themselves. A new end to end test, or a new a
 | **Music** | | | | | | | | |
 | Play a track from its album | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Pause or stop the music | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| The equalizer marks the playing track's playlist row and the mini-player | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `/design` shows the equalizer at its three sizes | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | A music library opens on its albums | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
 | Clear the queue from Up next | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Downloads and offline** | | | | | | | | |

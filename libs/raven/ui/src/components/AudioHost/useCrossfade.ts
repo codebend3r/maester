@@ -2,11 +2,8 @@ import { type RefObject, useEffect, useState } from 'react'
 import type { SoundGraph } from '@/components/AudioHost/soundGraph'
 import { AUDIO_STATES, useAudioQueue } from '@/stores/audioQueue'
 
-/** What an element last loaded: the track, and whether it was fetched with CORS, as Web Audio needs. */
-type ElementLoad = { id: number; isCors: boolean }
-
-/** What each element has loaded; an element that has nothing is missing. */
-export type ElementLoads = WeakMap<HTMLMediaElement, ElementLoad>
+/** The track each element has loaded, by its id; an element that has nothing is missing. */
+export type ElementLoads = WeakMap<HTMLMediaElement, number>
 
 /** The fade under way: the element the next track fades in on, by its place, and that track. */
 type Fade = { slot: number; id: number }
@@ -109,8 +106,7 @@ export const useCrossfade = ({
       const slot = 1 - lead
       const incoming = elements[slot]?.current ?? null
       if (!route || !incoming || element !== elements[lead]?.current || element.ended) return
-      const loaded = loads.current.get(incoming)
-      if (loaded?.id !== nextId || !loaded.isCors) return
+      if (loads.current.get(incoming) !== nextId) return
       const remaining = element.duration - element.currentTime
       if (!Number.isFinite(remaining) || remaining <= 0 || remaining > seconds) return
       rewind(incoming)

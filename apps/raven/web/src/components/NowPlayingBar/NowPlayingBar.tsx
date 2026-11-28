@@ -1,11 +1,12 @@
 import { artistNames, formatDuration, type Track } from '@raven/core'
-import { BUTTON_TONES, ButtonLink } from '@raven/ui'
+import { BUTTON_TONES, ButtonLink, classNames } from '@raven/ui'
 import { AUDIO_STATES, hasPlayingTrackOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AudioQualityLine } from '@/components/AudioQualityLine/AudioQualityLine'
 import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
+import { useTrackMenu } from '@/components/MusicMenu/useMusicMenu'
 import { NOW_PLAYING_BAR_COPY } from '@/components/NowPlayingBar/copy'
 import { TrackHeart } from '@/components/TrackHeart/TrackHeart'
 import { Transport } from '@/components/Transport/Transport'
@@ -26,6 +27,7 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
   const links = useMusicLinks()
   const seekTo = useAudioQueue((store) => store.seekTo)
   const quality = useAudioQuality({ track })
+  const { coverProps, coverClass, menu } = useTrackMenu({ track })
   const [hoverFraction, setHoverFraction] = useState<number | null>(null)
   const length = duration ?? track.duration ?? 0
   const fraction = length > 0 ? Math.min(position / length, 1) : 0
@@ -34,8 +36,9 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
       <div className={styles.track}>
         <Link
           to={links.nowPlaying}
-          className={styles.cover}
+          className={classNames([styles.cover, coverClass])}
           aria-label={NOW_PLAYING_BAR_COPY.nowPlaying}
+          {...coverProps}
         >
           <AlbumCover
             album={{
@@ -46,6 +49,7 @@ const PlayingStrip = ({ track }: PlayingStripProps) => {
             sizes={POSTER_SIZES.bar}
           />
         </Link>
+        {menu}
         <Link to={links.nowPlaying} className={styles.words}>
           <span className={styles.title}>{track.title}</span>
           <span className={styles.artists}>{error === null ? artistNames(track) : error}</span>

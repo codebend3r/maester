@@ -7,7 +7,7 @@ import {
   RADIO_SEED_KINDS,
   routeState,
 } from '@raven/core'
-import { BUTTON_TONES, Button } from '@raven/ui'
+import { BUTTON_TONES, Button, classNames } from '@raven/ui'
 import { afterAlbumMatch, useAudioQueue } from '@raven/ui/headless'
 import { useId, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -16,6 +16,7 @@ import { AdminOnly } from '@/components/AdminOnly/AdminOnly'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
 import { AlbumMatchDialog } from '@/components/AlbumMatchDialog/AlbumMatchDialog'
 import { BackButton } from '@/components/BackButton/BackButton'
+import { useAlbumMenu } from '@/components/MusicMenu/useMusicMenu'
 import { DownloadButton } from '@/components/DownloadButton/DownloadButton'
 import { FavouriteButton } from '@/components/FavouriteButton/FavouriteButton'
 import { RouteView } from '@/components/RouteState/RouteState'
@@ -75,6 +76,7 @@ const AlbumView = ({ details }: AlbumViewProps) => {
   const [isFixing, setFixing] = useState(false)
   const [isAdding, setAdding] = useState(false)
   const favourite = useAlbumFavourite({ albumId: album.id })
+  const { coverProps, coverClass, menu } = useAlbumMenu({ album, isOnAlbum: true })
   const { tracks } = details
   const source = { kind: QUEUE_SOURCE_KINDS.album, id: album.id }
   const isOneArtist =
@@ -97,9 +99,12 @@ const AlbumView = ({ details }: AlbumViewProps) => {
         className={styles.back}
       />
       <header className={styles.header}>
-        <div className={styles.cover}>
+        {/* A finger's long press alone: the facts and links it opens are beside the cover too. */}
+        {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions */}
+        <div className={classNames([styles.cover, coverClass])} {...coverProps}>
           <AlbumCover album={album} sizes={POSTER_SIZES.album} />
         </div>
+        {menu}
         <div className={styles.heading}>
           <p className={styles.eyebrow}>{ALBUM_COPY.eyebrow}</p>
           <h1 id={titleId} className={styles.title}>

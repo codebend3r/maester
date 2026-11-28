@@ -18,7 +18,7 @@ import { CAN_DOWNLOAD } from '@/layouts/downloadKind'
 type CardMenuListProps = {
   title: string
   options: readonly CardMenuOption[]
-  /** A line under the title in place of the marks: while the title is read, or why there are none. */
+  /** Lines under the title: what is known of an album or a track, or while the title is read. */
   note: string | null
   onClose: () => void
 }
@@ -67,9 +67,9 @@ const CardMenuList = ({ title, options, note, onClose }: CardMenuListProps) => {
   )
 }
 
-/** The menu once its title is read: its options, each a line. */
-const CardMenuView = ({ title, options, onClose }: CardMenuViewProps) => (
-  <CardMenuList note={null} onClose={onClose} options={options} title={title} />
+/** The menu once its title is read: what is known of an album over its options, each a line. */
+const CardMenuView = ({ title, about, options, onClose }: CardMenuViewProps) => (
+  <CardMenuList note={about} onClose={onClose} options={options} title={title} />
 )
 
 /** The menu while its title is read, or once the read failed: the title and a line, no marks. */

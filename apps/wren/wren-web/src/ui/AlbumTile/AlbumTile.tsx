@@ -1,8 +1,10 @@
 import { type AlbumSummary, artistNames } from '@raven/core'
 import { KIT_COPY } from '@raven/wren'
+import { useState } from 'react'
 import type { Cover, CoverOf } from '@/music/useCovers'
 import { albumPath } from '@/routes'
 import { AlbumArt } from '@/ui/AlbumArt/AlbumArt'
+import { AlbumCoverMenu } from '@/ui/CoverMenu/CoverMenu'
 import { type Press, Pressable } from '@/ui/Pressable/Pressable'
 import styles from '@/ui/AlbumTile/AlbumTile.module.scss'
 
@@ -15,16 +17,26 @@ type AlbumTileProps = Press & {
   cover: Cover | null
   /** What the tile is called aloud: "OK Computer, Radiohead". */
   label: string
+  /** What holding the cover does: an album's menu. A short tap still opens the tile. */
+  onArtHold?: () => void
 }
 
 /**
  * An album or a playlist as a tile: its square art, its title, which wraps to four lines, and the
  * line under it, which wraps to two. It fills the column it is set in, a grid's or a shelf's.
  */
-export function AlbumTile({ title, subtitle, detail, cover, label, ...press }: AlbumTileProps) {
+export function AlbumTile({
+  title,
+  subtitle,
+  detail,
+  cover,
+  label,
+  onArtHold,
+  ...press
+}: AlbumTileProps) {
   return (
     <Pressable {...press} className={styles.tile} label={label}>
-      <AlbumArt cover={cover} />
+      <AlbumArt cover={cover} onHold={onArtHold} />
       <span className={styles.text}>
         <span className={styles.title} title={title}>
           {title}
@@ -55,19 +67,27 @@ type AlbumTileOfProps = {
   onPress?: (album: AlbumSummary) => void
 }
 
-/** An album as a tile, read out by its title, artists and any third line, that opens its page. */
+/**
+ * An album as a tile, read out by its title, artists and any third line, that opens its page.
+ * Holding its cover opens the album's menu: what it is, Go to album and Go to artist.
+ */
 export function AlbumTileOf({ album, coverOf, subtitle, detail, onPress }: AlbumTileOfProps) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const artists = artistNames(album)
   const label = KIT_COPY.labelled({ label: album.title, value: artists })
   return (
-    <AlbumTile
-      cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
-      detail={detail}
-      href={albumPath(album.id)}
-      label={detail === undefined ? label : KIT_COPY.labelled({ label, value: detail })}
-      onPress={onPress === undefined ? undefined : () => onPress(album)}
-      subtitle={subtitle ?? artists}
-      title={album.title}
-    />
+    <>
+      <AlbumTile
+        cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
+        detail={detail}
+        href={albumPath(album.id)}
+        label={detail === undefined ? label : KIT_COPY.labelled({ label, value: detail })}
+        onArtHold={() => setIsMenuOpen(true)}
+        onPress={onPress === undefined ? undefined : () => onPress(album)}
+        subtitle={subtitle ?? artists}
+        title={album.title}
+      />
+      {isMenuOpen && <AlbumCoverMenu album={album} onClose={() => setIsMenuOpen(false)} />}
+    </>
   )
 }

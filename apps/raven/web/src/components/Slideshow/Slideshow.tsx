@@ -1,8 +1,7 @@
-import { classNames } from '@raven/ui'
+import { classNames, useAsksForLessMotion } from '@raven/ui'
 import type { SlideshowMotion } from '@raven/core'
 import { useEffect, useState } from 'react'
 import styles from '@/components/Slideshow/Slideshow.module.scss'
-import { useAsksForLessMotion } from '@/lib/motion'
 
 /** How long each picture holds before the next comes in; the stylesheet reads it as `--slide-ms`. */
 export const SLIDE_MS = 8000

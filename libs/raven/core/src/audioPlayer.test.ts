@@ -91,8 +91,22 @@ describe('isAudioEvent', () => {
       { type: AUDIO_EVENTS.error, reason: PLAYER_ERROR_REASONS.engine, message: 'gone' },
       { type: AUDIO_EVENTS.remote, command: { kind: REMOTE_COMMANDS.toggle } },
       { type: AUDIO_EVENTS.remote, command: { kind: REMOTE_COMMANDS.seek, time: 4 } },
+      { type: AUDIO_EVENTS.levels, measure: { rms: -18, peak: -3, centroid: 1200 } },
+      { type: AUDIO_EVENTS.levels, measure: { rms: -120, peak: -120, centroid: null } },
     ]
     events.forEach((event) => expect(isAudioEvent(event)).toBe(true))
+  })
+
+  test('rejects levels that are not finite numbers', () => {
+    const measures = [
+      { rms: Number.NEGATIVE_INFINITY, peak: -3, centroid: null },
+      { rms: -18, peak: Number.NaN, centroid: null },
+      { rms: -18, peak: -3, centroid: '1200' },
+      { rms: -18, peak: -3 },
+    ]
+    measures.forEach((measure) =>
+      expect(isAudioEvent({ type: AUDIO_EVENTS.levels, measure })).toBe(false),
+    )
   })
 
   test('rejects a seek without a time and a command it does not know', () => {

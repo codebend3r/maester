@@ -38,7 +38,7 @@ const kbpsOf = (kbps: number | null): string | null =>
   kbps === null ? null : AUDIO_QUALITY_COPY.kbps(kbps)
 
 /** The file itself: its codec, its resolution when it is lossless, and its bitrate. */
-const fileQualityOf = (track: Track): AudioQuality => ({
+export const fileQualityOf = (track: Track): AudioQuality => ({
   format: (track.codec ?? track.container).toUpperCase(),
   bitDepth:
     track.isLossless && track.bitDepth !== null

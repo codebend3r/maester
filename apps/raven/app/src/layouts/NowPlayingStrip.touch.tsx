@@ -1,7 +1,9 @@
 import { Icon } from '@raven/native'
+import { holdActionPropsOf } from '@raven/native/headless'
 import { Image, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { useTrackCoverMenu } from '@/cardMenu/useTrackCoverMenu'
 import { MUSIC_COPY } from '@/layouts/copy'
 import { type NowPlayingStripProps, toggleLabelOf } from '@/layouts/musicKit'
 import { useMusicStyles } from '@/layouts/MusicParts.touch'
@@ -73,8 +75,10 @@ const BarButton = ({ label, onPress }: BarButtonProps) => {
  * The strip under the screens while a track plays: its cover, title and artists, play or pause,
  * next, and an X at the right that stops the music and closes it; pressed, it opens Now Playing.
  * A tablet's strip has room for the format and quality beside the words; a phone's has none.
+ * A long press on its cover opens the playing track's menu.
  */
 export const NowPlayingStrip = ({
+  track,
   title,
   artists,
   cover,
@@ -90,6 +94,7 @@ export const NowPlayingStrip = ({
   const muted = useTheme((theme) => theme.palette.muted)
   const music = useMusicStyles()
   const styles = useStyles()
+  const coverMenu = useTrackCoverMenu({ track })
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, SIZES.space2) }]}>
       <Pressable
@@ -97,10 +102,22 @@ export const NowPlayingStrip = ({
         accessibilityRole="button"
         onPress={onOpen}
         style={({ pressed }) => [styles.barWords, pressed && music.pressed]}
+        {...holdActionPropsOf({
+          label: MUSIC_COPY.coverHoldAction,
+          hint: MUSIC_COPY.coverHoldHint,
+          onHold: coverMenu.onLongPress,
+        })}
       >
-        <View style={styles.thumb}>
+        {/* The cover alone takes the long press; the strip around it speaks for it. */}
+        <Pressable
+          accessible={false}
+          onLongPress={coverMenu.onLongPress}
+          onPress={onOpen}
+          style={styles.thumb}
+        >
           {cover !== null && <Image source={cover} style={styles.thumbPicture} />}
-        </View>
+        </Pressable>
+        {coverMenu.menu}
         <View style={styles.lines}>
           <Text numberOfLines={1} style={styles.barTitle}>
             {title}

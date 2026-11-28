@@ -41,7 +41,7 @@ export const albumCard = ({ api, headersFor, album }: AlbumCardProps): ShelfCard
     headersFor,
   }),
   progress: 0,
-  subject: { kind: CARD_SUBJECTS.album, albumId: album.id },
+  subject: { kind: CARD_SUBJECTS.album, albumId: album.id, isOnAlbum: false },
   isWatched: false,
   target: { kind: ROUTE_TARGETS.album, albumId: album.id },
 })

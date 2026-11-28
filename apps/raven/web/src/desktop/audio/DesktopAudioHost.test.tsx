@@ -21,10 +21,12 @@ import {
   playingTrackOf,
   useAudioQueue,
   usePlayerPrefs,
+  useSoundMeter,
 } from '@raven/ui/headless'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, cleanup, waitFor } from '@testing-library/react'
 import { DesktopAudioHost } from '@/desktop/audio/DesktopAudioHost'
+import { barLevelsOf } from '@/desktop/audio/soundLevels'
 import type { NativeAudio } from '@/desktop/audioConnection'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import { api } from '@/lib/api'
@@ -386,5 +388,46 @@ describe('DesktopAudioHost', () => {
       state: AUDIO_STATES.failed,
       error: 'Sign in to Vhagar to play this.',
     })
+  })
+})
+
+describe("DesktopAudioHost's sound meter", () => {
+  const MEASURE = { rms: -14, peak: -2, centroid: 900 } as const
+  const meter = () => useSoundMeter.getState().levels
+
+  afterEach(() => {
+    useSoundMeter.setState({ levels: null })
+  })
+
+  it('hands the bars the levels mpv measures while the engine is connected', () => {
+    const audio = renderNative()
+    expect(meter()?.({ count: 4 })).toEqual([0, 0, 0, 0])
+    audio.emit({ type: AUDIO_EVENTS.levels, measure: MEASURE })
+    expect(meter()?.({ count: 4 })).toEqual(barLevelsOf({ measure: MEASURE, count: 4 }))
+    audio.emit({ type: AUDIO_EVENTS.levels, measure: { ...MEASURE, rms: -40 } })
+    expect(meter()?.({ count: 4 })).toEqual(
+      barLevelsOf({ measure: { ...MEASURE, rms: -40 }, count: 4 }),
+    )
+  })
+
+  it('lets go of the meter once the engine is gone', () => {
+    renderNative()
+    expect(meter()).not.toBeNull()
+    cleanup()
+    expect(meter()).toBeNull()
+  })
+
+  it('leaves alone a meter another host has taken since', () => {
+    renderNative()
+    const other = () => [1]
+    useSoundMeter.getState().claim(other)
+    cleanup()
+    expect(meter()).toBe(other)
+  })
+
+  it('sets no meter while main has no engine of its own to measure', () => {
+    asPlayingDesktop({ audio: audioConnectionsOf({ status: CONNECTION_STATUSES.waiting }) })
+    renderWithProviders({ ui: <DesktopAudioHost api={api} /> })
+    expect(meter()).toBeNull()
   })
 })

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type * as Native from '@raven/native'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
-import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, MUSIC_LINK_COPY } from '@raven/core'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { Alert } from 'react-native'
 import { type HeardRequest, pathWithId } from '@raven/native/testing'
@@ -21,7 +21,8 @@ import {
   RADIOHEAD,
   musicApi,
 } from '@/test/musicServer'
-import { answerSheet } from '@/test/actionSheet'
+import { answerSheet, answerSheetShown } from '@/test/actionSheet'
+import { CARD_MENU_COPY } from '@/cardMenu/menuOptions'
 import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen, untilIdle, untilSettled } from '@/test/renderScreen'
 
@@ -151,6 +152,30 @@ describe('Album', () => {
         body: { mediaIds: [AIRBAG.id, PARANOID.id, LUCKY.id] },
       },
     ])
+    await untilIdle(client)
+  })
+
+  it("opens the album's facts on a long press of its cover, and goes to its artist but not to itself", async () => {
+    const shown = answerSheetShown({ answer: MUSIC_LINK_COPY.goToArtist })
+    const client = createScreenClient()
+    await renderScreen({ ui: <Album />, client })
+    await fireEvent(
+      await screen.findByRole('image', { name: OK_COMPUTER.title }),
+      NATIVE_EVENTS.longPress,
+    )
+    await waitFor(() => expect(shown).toHaveLength(1))
+    expect(shown).toEqual([
+      {
+        title: OK_COMPUTER.title,
+        message: ['Artist: Radiohead', 'Released: 1997', 'Tracks: 3 tracks', 'Length: 15:00'].join(
+          '\n',
+        ),
+        options: [CARD_MENU_COPY.addFavourite, MUSIC_LINK_COPY.goToArtist, 'Cancel'],
+      },
+    ])
+    expect(mockPush).toHaveBeenCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.artist, artistId: RADIOHEAD.id }),
+    )
     await untilIdle(client)
   })
 

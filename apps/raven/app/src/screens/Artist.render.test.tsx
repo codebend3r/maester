@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { HTTP_METHODS, APP_CLIENT_CALLS } from '@raven/core'
+import { HTTP_METHODS, APP_CLIENT_CALLS, MUSIC_LINK_COPY } from '@raven/core'
 import type * as Native from '@raven/native'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native'
 import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
-import { APP_ROUTE_PARAMS } from '@/routes'
+import { CARD_MENU_COPY } from '@/cardMenu/menuOptions'
+import { APP_ROUTE_PARAMS, ROUTE_TARGETS, hrefOf } from '@/routes'
+import { answerSheetShown } from '@/test/actionSheet'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { Artist } from '@/screens/Artist'
 import { useActiveServer } from '@/stores/activeServer'
 import { heldAnswer } from '@/test/heldAnswer'
@@ -21,8 +24,10 @@ const mockApi = jest.fn(() =>
   musicApi({ hear: (request) => mockHeard.push(request), writes: () => mockServer.writes() }),
 )
 
+const mockPush = jest.fn()
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, back: jest.fn() }),
   useLocalSearchParams: () => mockParams(),
 }))
 jest.mock('@raven/native', () => ({
@@ -75,5 +80,26 @@ describe('Artist', () => {
       },
     ])
     release()
+  })
+
+  it("opens a held album card's facts beside its favourite, and goes to the album", async () => {
+    const sheets = answerSheetShown({ answer: MUSIC_LINK_COPY.goToAlbum })
+    shown.client = createScreenClient()
+    await renderScreen({ ui: <Artist />, client: shown.client })
+    await fireEvent(
+      await screen.findByRole('button', { name: OK_COMPUTER.title }),
+      NATIVE_EVENTS.longPress,
+    )
+    await waitFor(() => expect(sheets).toHaveLength(1))
+    expect(sheets[0]?.options).toEqual([
+      CARD_MENU_COPY.addFavourite,
+      MUSIC_LINK_COPY.goToAlbum,
+      MUSIC_LINK_COPY.goToArtist,
+      'Cancel',
+    ])
+    expect(sheets[0]?.message ?? '').toContain('Released: 1997')
+    expect(mockPush).toHaveBeenCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.album, albumId: OK_COMPUTER.id }),
+    )
   })
 })

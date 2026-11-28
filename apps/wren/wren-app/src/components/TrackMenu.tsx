@@ -127,7 +127,6 @@ type TrackMenuOfProps = TrackMenuProps & { session: WrenSession }
 
 function TrackMenuOf({ session, track, like, startsOn, onClose }: TrackMenuOfProps) {
   const { trackCoverOf } = useCovers(session)
-  const [artist] = track.artists
   // TODO(redesign): Download once a track downloads alone.
   return (
     <TracksMenu
@@ -139,7 +138,7 @@ function TrackMenuOf({ session, track, like, startsOn, onClose }: TrackMenuOfPro
       }}
       like={like}
       onClose={onClose}
-      places={{ albumId: track.albumId, artist }}
+      places={{ albumId: track.albumId, artists: track.artists }}
       session={session}
       startsOn={startsOn}
       tracksOf={async () => [track]}

@@ -1,7 +1,7 @@
 import { type ComponentRef, useEffect, useRef } from 'react'
 import type { View } from 'react-native'
 
-import { type CardMenuOption, isOptionBlocked } from '@/cardMenu/menuOptions'
+import { isOptionBlocked } from '@/cardMenu/menuOptions'
 import {
   type CardMenuKit,
   type CardMenuViewProps,
@@ -10,10 +10,16 @@ import {
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import { CAN_DOWNLOAD } from '@/layouts/downloadKind'
 
-/** What the sheet says under the title: why each option it cannot offer is not there; null with none. */
-const messageOf = (options: readonly CardMenuOption[]): string | null => {
+type MessageOfProps = Pick<CardMenuViewProps, 'about' | 'options'>
+
+/**
+ * What the sheet says under the title: what is known of an album or the track playing, then why
+ * each option it cannot offer is not there; null with neither.
+ */
+const messageOf = ({ about, options }: MessageOfProps): string | null => {
   const reasons = options.flatMap(({ blockedBy }) => (blockedBy === null ? [] : [blockedBy]))
-  return reasons.length === 0 ? null : reasons.join('\n')
+  const lines = [...(about === null ? [] : [about]), ...reasons]
+  return lines.length === 0 ? null : lines.join('\n')
 }
 
 /**
@@ -22,7 +28,7 @@ const messageOf = (options: readonly CardMenuOption[]): string | null => {
  * is the system's and lives on without the card. An option that is blocked now is not on the
  * sheet, which cannot draw one faint; its why is the sheet's message instead.
  */
-const CardMenuView = ({ title, options, onClose }: CardMenuViewProps) => {
+const CardMenuView = ({ title, about, options, onClose }: CardMenuViewProps) => {
   const hasOpened = useRef(false)
   // The sheet is a popover on an iPad: with no view to point at it sits centred.
   const anchor = useRef<ComponentRef<typeof View>>(null)
@@ -32,14 +38,14 @@ const CardMenuView = ({ title, options, onClose }: CardMenuViewProps) => {
     const offered = options.filter((option) => !isOptionBlocked(option))
     openPickerSheet({
       label: title,
-      message: messageOf(options),
+      message: messageOf({ about, options }),
       options: offered,
       onChoose: (key) => offered.find((option) => option.key === key)?.onPress(),
       destructiveKey: offered.find((option) => !!option.isDestructive)?.key ?? null,
       anchor,
     })
     onClose()
-  }, [title, options, onClose])
+  }, [title, about, options, onClose])
   return null
 }
 

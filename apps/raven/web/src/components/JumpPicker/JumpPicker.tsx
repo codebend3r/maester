@@ -1,8 +1,9 @@
 import type { RefObject } from 'react'
 import { JUMP_SCALE_LABELS, type JumpScale } from '@raven/core'
+import { asksForLessMotion } from '@raven/ui'
 import { holdInPlace } from '@/lib/holdInPlace'
 import styles from '@/components/JumpPicker/JumpPicker.module.scss'
-import { scrollBehavior, asksForLessMotion } from '@/lib/motion'
+import { scrollBehavior } from '@/lib/motion'
 
 /** A link the keyboard reaches: not a picture link hidden from it and from screen readers. */
 const FOCUSABLE_LINK = 'a[href]:not([aria-hidden="true"]):not([tabindex="-1"])'

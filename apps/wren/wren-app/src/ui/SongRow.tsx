@@ -14,8 +14,8 @@ import {
 import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme } from '@/theme/wrenTheme'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { AlbumArt } from '@/ui/AlbumArt'
 import { EqualizerIndicator } from '@/ui/EqualizerIndicator'
+import { HeldArt } from '@/ui/HeldArt'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 import { WrenIcon } from '@/ui/WrenIcon'
@@ -60,24 +60,43 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   },
 }))
 
-type LeadProps = { lead: ShownLead<Cover>; isPlaying: boolean }
+type LeadProps = {
+  lead: ShownLead<Cover>
+  isPlaying: boolean
+  /** What holding the art does, where the row leads with art: the song's cover menu. */
+  onArtHold: () => void
+  /** The row's tap, which the art hands on. */
+  onPress: () => void
+}
 
-function ArtLead({ lead }: LeadProps) {
+function ArtLead({ lead, onArtHold, onPress }: LeadProps) {
   return (
     lead.kind === SONG_LEADS.art && (
-      <AlbumArt cover={lead.cover} radius={RADIUS.xs} size={SIZE.rowArt} />
+      <HeldArt
+        cover={lead.cover}
+        onHold={onArtHold}
+        onPress={onPress}
+        radius={RADIUS.xs}
+        size={SIZE.rowArt}
+      />
     )
   )
 }
 
 /** The queue's track in a list of covers: its cover under a veil, the equalizer over it. */
-function ArtEqualizerLead({ lead, isPlaying }: LeadProps) {
+function ArtEqualizerLead({ lead, isPlaying, onArtHold, onPress }: LeadProps) {
   const styles = useStyles()
   return (
     lead.kind === SONG_LEADS.artEqualizer && (
       <View>
-        <AlbumArt cover={lead.cover} radius={RADIUS.xs} size={SIZE.rowArt} />
-        <View style={styles.veil}>
+        <HeldArt
+          cover={lead.cover}
+          onHold={onArtHold}
+          onPress={onPress}
+          radius={RADIUS.xs}
+          size={SIZE.rowArt}
+        />
+        <View pointerEvents="none" style={styles.veil}>
           <EqualizerIndicator isOnPicture isPlaying={isPlaying} />
         </View>
       </View>
@@ -129,6 +148,8 @@ type SongRowProps = {
   label: string
   onPress: () => void
   onLongPress?: () => void
+  /** What holding the row's art does: the song's cover menu. A short tap on it still plays. */
+  onArtHold: () => void
   /** More: the track's menu. */
   onMore?: () => void
 }
@@ -148,6 +169,7 @@ export function SongRow({
   label,
   onPress,
   onLongPress,
+  onArtHold,
   onMore,
 }: SongRowProps) {
   const styles = useStyles()
@@ -164,7 +186,7 @@ export function SongRow({
         onPress={onPress}
         style={pressedStyleOf({ style: styles.main })}
       >
-        <Lead isPlaying={isPlaying} lead={shown} />
+        <Lead isPlaying={isPlaying} lead={shown} onArtHold={onArtHold} onPress={onPress} />
         <View style={styles.text}>
           <Text numberOfLines={1} style={[styles.title, isCurrent && styles.playing]}>
             {title}

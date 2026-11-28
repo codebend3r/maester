@@ -1,0 +1,5 @@
+// The facts sit between the sheet's head and its places, inset as the head's words are.
+.facts {
+  display: grid;
+  padding: var(--space-3) var(--space-2) 0;
+}
