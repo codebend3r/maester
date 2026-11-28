@@ -1,4 +1,4 @@
-name: 📱 Android release APKs
+name: 📱 Android releases
 
 # Builds every Android APK and attaches them to the release of each pushed vX.Y.Z tag
 # (scripts/bump_version.sh --push), for the splash's dev builds page (maester.tv/dev-builds/)
@@ -10,6 +10,9 @@ name: 📱 Android release APKs
 #
 # A run from the Actions tab names a tag and builds that tag's apps, to give a release that
 # came out before this workflow its APKs: `gh workflow run device-release.yml -f tag=v0.8.10`.
+#
+# The same tag also sends raven's Google Play bundles, the TV's and the phone's, to Play's
+# internal track, once the repository variable RAVEN_PLAY_UPLOAD is `on` (see the `play` job).
 on:
   push:
     tags:
@@ -76,20 +79,11 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
-      # Fails before the long build when the tag is not a release or the app disagrees on it.
       - name: 🏷️ Check the tag
-        env:
-          FOLDER: ${{ matrix.apk.folder }}
-        run: |
-          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::$TAG is not a vX.Y.Z release tag."
-            exit 1
-          fi
-          version=$(jq -r .version "$FOLDER/package.json")
-          if [ "$TAG" != "v$version" ]; then
-            echo "::error::$TAG is not v$version, the version in $FOLDER/package.json."
-            exit 1
-          fi
+        uses: ./.github/actions/check-release-tag
+        with:
+          tag: ${{ env.TAG }}
+          folder: ${{ matrix.apk.folder }}
 
       # The Android TV setup serves every Android build: the phone and Wren APKs build the same way.
       - name: 🧰 Set up the app build
@@ -137,3 +131,71 @@ jobs:
 
       - name: 📤 Upload the APK
         run: gh release upload "$TAG" release/* --clobber
+
+  # raven's App Bundles for Google Play, the TV's and the phone's, signed with the upload key and
+  # sent to Play's internal track. Off until the repository variable RAVEN_PLAY_UPLOAD is `on`,
+  # since it needs three secrets and an app Play has already taken one bundle of by hand (its API
+  # uploads to an app only after that): RAVEN_PLAY_UPLOAD_STORE, the upload key's PKCS12 store
+  # in base64, RAVEN_UPLOAD_PASSWORD, its password, and GOOGLE_PLAY_SERVICE_ACCOUNT, the JSON key
+  # of a service account Play Console has given release rights. The release is a draft until
+  # RAVEN_PLAY_STATUS says `completed`, as Play requires while the app has never been published.
+  play:
+    name: ▶️ Build and send the Google Play bundles
+    if: vars.RAVEN_PLAY_UPLOAD == 'on'
+    runs-on: ubuntu-24.04
+    # Two Release builds of React Native for two ABIs, one after the other.
+    timeout-minutes: 120
+    env:
+      NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+    steps:
+      - name: 📥 Checkout the tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: 🏷️ Check the tag
+        uses: ./.github/actions/check-release-tag
+        with:
+          tag: ${{ env.TAG }}
+          folder: apps/raven/app
+
+      - name: 🧰 Set up the app build
+        uses: ./.github/actions/raven-app-setup
+        with:
+          platform: android-tv
+          project: apps/raven/app
+          node-version: ${{ env.APP_NODE_VERSION }}
+
+      # The store goes to the runner's temporary folder, which is wiped with the job, and its
+      # path and password reach the Play script through the variables it reads in place of the
+      # Keychain. The script sets the production variant and the ARM ABIs itself.
+      - name: 🔑 Upload key
+        env:
+          STORE: ${{ secrets.RAVEN_PLAY_UPLOAD_STORE }}
+        run: |
+          store="$RUNNER_TEMP/raven-play-upload.p12"
+          base64 --decode <<< "$STORE" > "$store"
+          echo "RAVEN_UPLOAD_STORE_FILE=$store" >> "$GITHUB_ENV"
+
+      # One after the other, since both prebuild the same android/ folder. Each takes its build's
+      # UTC minute as its versionCode, so the phone's lands above the TV's.
+      - name: 📺 Build the Android TV bundle
+        env:
+          RAVEN_UPLOAD_PASSWORD: ${{ secrets.RAVEN_UPLOAD_PASSWORD }}
+        run: bunx nx run @raven/app:play:android-tv --excludeTaskDependencies
+
+      - name: 📱 Build the Android phone bundle
+        env:
+          RAVEN_UPLOAD_PASSWORD: ${{ secrets.RAVEN_UPLOAD_PASSWORD }}
+        run: bunx nx run @raven/app:play:android --excludeTaskDependencies
+
+      # Pinned to v1.1.5's commit, since it holds the service account's key.
+      - name: 📤 Send the bundles to the internal track
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          packageName: io.github.codebend3r.raven.app
+          releaseFiles: apps/raven/app/build/play-*/*.aab
+          releaseName: ${{ env.TAG }}
+          track: internal
+          status: ${{ vars.RAVEN_PLAY_STATUS || 'draft' }}

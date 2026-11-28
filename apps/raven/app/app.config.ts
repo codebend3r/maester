@@ -18,6 +18,7 @@ import { withTvBannerDensities } from './plugins/withTvBannerDensities.ts'
 import { withTvRemoteTests } from './plugins/withTvRemoteTests.ts'
 import { withTvTopShelf } from './plugins/withTvTopShelf.ts'
 import { withoutTvAudioService } from './plugins/withoutTvAudioService.ts'
+import { withUploadSigning } from './plugins/withUploadSigning.ts'
 
 const APP_ID = 'io.github.codebend3r.raven.app'
 
@@ -183,6 +184,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         }),
       )
     : app
-  const withFonts = withAndroidFonts(withTests)
-  return isDevelopment ? withCleartextTraffic(withFonts) : withFonts
+  const withAndroid = withUploadSigning(withAndroidFonts(withTests))
+  return isDevelopment ? withCleartextTraffic(withAndroid) : withAndroid
 }
