@@ -8,6 +8,7 @@ export {
   WREN_ROUTE_PARAMS,
   WREN_SCREENS,
   WREN_TABS,
+  albumsInOrderHref,
   collectionPathOf,
   libraryHref,
   pageHref,

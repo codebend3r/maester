@@ -106,7 +106,7 @@ describe('placeWindow', () => {
     )
   })
 
-  it('clamps the default to a small main display', () => {
+  it('fits the default inside a small main display, short of its edges', () => {
     const small: Rect = { x: 0, y: 0, width: 1024, height: 700 }
     expect(
       placeWindow({
@@ -114,6 +114,6 @@ describe('placeWindow', () => {
         displays: [{ id: 1, workArea: small }],
         primary: { workArea: small },
       }),
-    ).toEqual({ x: 0, y: 0, width: 1024, height: 700 })
+    ).toEqual({ x: 32, y: 32, width: 960, height: 636 })
   })
 })

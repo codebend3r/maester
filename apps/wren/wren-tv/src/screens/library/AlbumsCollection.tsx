@@ -1,15 +1,17 @@
 import { plural } from '@raven/core'
 import {
+  ALBUMS_ORDER_PARAM,
   COUNTS_COPY,
   COVER_SIZES,
   type CoverSize,
-  FIRST_LIST_ORDER,
   LIBRARY_PAGE_COPY,
   type ListOrder,
   listOrderOf,
   matchingAlbums,
+  openingAlbumsOrderOf,
   sortedAlbums,
 } from '@raven/wren'
+import { useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 
 import { ListNotice } from '@/components/ListNotice'
@@ -42,7 +44,9 @@ export function AlbumsCollection({ session }: CollectionPageProps) {
     placeholder: LIBRARY_PAGE_COPY.searchAlbums,
     none: LIBRARY_PAGE_COPY.noAlbums,
   })
-  const [order, setOrder] = useState<ListOrder>(FIRST_LIST_ORDER)
+  // Opened from Home's See all, it starts in the order Home's albums were in.
+  const opening = useLocalSearchParams()[ALBUMS_ORDER_PARAM]
+  const [order, setOrder] = useState<ListOrder>(() => openingAlbumsOrderOf(opening))
   const tile = COVER_WIDTHS[useWrenPrefs((state) => state.coverSize)]
   const { albums, listing } = useAllAlbums({ session, search: '' })
   const shown = sortedAlbums({ albums: matchingAlbums({ albums, query: search.query }), order })

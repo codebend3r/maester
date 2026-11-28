@@ -1,6 +1,7 @@
-import { REPEAT_MODES, type RepeatMode, formatDuration } from '@raven/core'
+import { type QueueSource, REPEAT_MODES, type RepeatMode, formatDuration } from '@raven/core'
 
 import { PLAYER_COPY } from '@/copy/kit'
+import { sourceIdOf } from '@/nowPlaying/nowPlayingModel'
 
 /**
  * How far one step of the scrubber moves the playhead, in seconds: a screen reader's swipe, an
@@ -70,3 +71,27 @@ type RepeatIconOfProps<Icon> = { repeat: RepeatMode; icons: RepeatIcons<Icon> }
 /** The drawing for a repeat mode, so repeating one song never looks like repeating them all. */
 export const repeatIconOf = <Icon>({ repeat, icons }: RepeatIconOfProps<Icon>): Icon =>
   repeat === REPEAT_MODES.one ? icons.repeatOne : icons.repeat
+
+/**
+ * What a page's Play does: start the page's songs from the top, or, while the queue already plays
+ * from this page, pause it, or carry on once it is paused.
+ */
+export const PAGE_PLAYS = { start: 'start', pause: 'pause', resume: 'resume' } as const
+
+export type PagePlay = (typeof PAGE_PLAYS)[keyof typeof PAGE_PLAYS]
+
+type PagePlayOfProps = {
+  /** Where the page's songs come from; none for a list of songs, whose Play always starts. */
+  source: QueueSource | undefined
+  /** Where the queue plays from, if anywhere. */
+  queued: QueueSource | null | undefined
+  isPlaying: boolean
+}
+
+/** What a page's Play does now, by whether the queue plays from that page and is playing. */
+export const pagePlayOf = ({ source, queued, isPlaying }: PagePlayOfProps): PagePlay => {
+  const isFromPage =
+    source !== undefined && sourceIdOf({ source: queued ?? null, kind: source.kind }) === source.id
+  if (!isFromPage) return PAGE_PLAYS.start
+  return isPlaying ? PAGE_PLAYS.pause : PAGE_PLAYS.resume
+}

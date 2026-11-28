@@ -30,7 +30,7 @@ import {
   useSongCount,
   useMusicLibraries,
 } from '@raven/wren-native'
-import { WREN_ROUTES, libraryHref } from '@raven/wren-native/headless'
+import { WREN_ROUTES, albumsInOrderHref, libraryHref } from '@raven/wren-native/headless'
 import { TAB_TILE_COLUMNS } from '@/shell/layout'
 import { useWrenPrefs } from '@/stores/wrenPrefs'
 import { RADIUS, SIZE, SPACE, TYPE } from '@/theme/tvTokens'
@@ -181,7 +181,7 @@ type RecentAlbumsProps = { session: WrenSession }
 
 /**
  * Every music library's newest albums, six rows of them, by when they were added or when they
- * came out, as the choices under the title set; See all opens Albums.
+ * came out, as the choices under the title set; See all opens Albums in that same order.
  */
 function RecentAlbums({ session }: RecentAlbumsProps) {
   const page = usePageStyles()
@@ -199,7 +199,7 @@ function RecentAlbums({ session }: RecentAlbumsProps) {
         action={{
           text: KIT_COPY.seeAll,
           label: KIT_COPY.seeAllOf(HOME_RECENT_TITLES[sort]),
-          onPress: () => router.push(libraryHref(LIBRARY_SEGMENTS.albums)),
+          onPress: () => router.push(albumsInOrderHref({ sort })),
         }}
         title={HOME_RECENT_TITLES[sort]}
       />

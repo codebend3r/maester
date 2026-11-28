@@ -268,6 +268,21 @@ GROUPS: tuple[Group, ...] = (
                 "Xcode",
             ),
             Command(
+                "app:play:android",
+                "A signed App Bundle of the phone app for Google Play, under the upload key.",
+                "Android SDK",
+            ),
+            Command(
+                "app:play:android-tv",
+                "A signed App Bundle of the Android TV app for Google Play, under the upload key.",
+                "Android SDK",
+            ),
+            Command(
+                "app:play:upload-key",
+                "Makes Google Play's upload key once and keeps its password in the Keychain.",
+                "Android SDK",
+            ),
+            Command(
                 "app:deploy:android-tv",
                 "Builds the Release APK and puts it on the Android TV over adb, found over mDNS.",
                 "Android SDK",

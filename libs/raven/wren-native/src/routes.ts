@@ -1,4 +1,11 @@
-import { type LibrarySegment, RECENT_KINDS, type RecentPage } from '@raven/wren'
+import {
+  ALBUMS_ORDER_PARAM,
+  LIBRARY_SEGMENTS,
+  type LibrarySegment,
+  RECENT_KINDS,
+  type RecentPage,
+  type RecentSort,
+} from '@raven/wren'
 
 /** Wren's route paths, one per file under `app/`. */
 export const WREN_ROUTES = {
@@ -30,6 +37,14 @@ export const libraryHref = (segment: LibrarySegment) => ({
   pathname: COLLECTION_PAGE,
   params: { [WREN_ROUTE_PARAMS.kind]: segment },
 })
+
+type AlbumsInOrderHrefProps = { sort: RecentSort }
+
+/** Albums, opened in the order Home's albums were in, so See all keeps the order it showed. */
+export const albumsInOrderHref = ({ sort }: AlbumsInOrderHrefProps) => {
+  const albums = libraryHref(LIBRARY_SEGMENTS.albums)
+  return { ...albums, params: { ...albums.params, [ALBUMS_ORDER_PARAM]: sort } }
+}
 
 /** A category page's address as it shows in the path, for telling which one is open. */
 export const collectionPathOf = (segment: LibrarySegment): string =>

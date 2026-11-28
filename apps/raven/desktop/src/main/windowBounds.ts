@@ -25,9 +25,15 @@ type WithinProps = {
 const within = ({ start, length, area, areaLength }: WithinProps): number =>
   Math.min(Math.max(start, area), area + areaLength - length)
 
+/*
+ * The room the default size leaves around it on a screen smaller than it. Windows reads a
+ * transparent window that fills the work area as maximized, so the first window never does.
+ */
+const FIT_MARGIN = 32
+
 const centred = (workArea: Rect): Rect => {
-  const width = Math.min(DEFAULT_SIZE.width, workArea.width)
-  const height = Math.min(DEFAULT_SIZE.height, workArea.height)
+  const width = Math.min(DEFAULT_SIZE.width, workArea.width - 2 * FIT_MARGIN)
+  const height = Math.min(DEFAULT_SIZE.height, workArea.height - 2 * FIT_MARGIN)
   return {
     x: Math.round(workArea.x + (workArea.width - width) / 2),
     y: Math.round(workArea.y + (workArea.height - height) / 2),

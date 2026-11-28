@@ -1,7 +1,7 @@
 ---
 name: run-all-e2e
 description: >-
-  Use when every end to end suite should run locally to confirm they all pass, or to find which one broke: "run all the e2e tests", "run every e2e locally", "verify all end to end tests pass", "which e2e is failing", "run the E2E Tests workflow here", "run bun run e2e", before merging a change to the E2E Tests workflow, or when a push to main turned several E2E jobs red. Covers the one command, the sixteen suites and their order, what to check first, reading the results, rerunning one suite, and the Windows suite.
+  Use when every end to end suite should run locally to confirm they all pass, or to find which one broke: "run all the e2e tests", "run every e2e locally", "verify all end to end tests pass", "which e2e is failing", "run the 🎬 E2E Tests workflow here", "run bun run e2e", before merging a change to the 🎬 E2E Tests workflow, or when a push to main turned several E2E jobs red. Covers the one command, the sixteen suites and their order, what to check first, reading the results, rerunning one suite, and the Windows suite.
 ---
 
 # Run every end to end suite locally

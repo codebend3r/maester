@@ -204,7 +204,8 @@ test.describe.serial('the Raven log', () => {
       })
 
       const lines = await readLog({ userData })
-      expect(lines.some((line) => line.includes('<file>'))).toBe(true)
+      const isFileBlanked = lines.some((line) => line.includes('<file>'))
+      expect(isFileBlanked || !E2E_SYSTEM.isRefusedFileNamed).toBe(true)
       const names = [
         entryDirFor({ userData, serverId, mediaId: MEDIA_ID }),
         serverId,

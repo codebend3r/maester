@@ -21,7 +21,7 @@ import { WrenLockup } from '@/components/WrenLockup/WrenLockup'
 import { api } from '@/lib/api'
 import { usePlaylists, useRecentAlbums, useSongCount } from '@/music/listings'
 import { useMusicLibraries } from '@/music/musicLibraries'
-import { COLLECTION_KINDS, collectionPath } from '@/routes'
+import { COLLECTION_KINDS, albumsInOrderPath, collectionPath } from '@/routes'
 import { ContinueCard } from '@/screens/Home/ContinueCard'
 import { ShortcutCard } from '@/screens/Home/ShortcutCard'
 import { Page } from '@/shell/Page/Page'
@@ -116,7 +116,7 @@ function Shortcuts({ formFactor }: ShortcutsProps) {
 
 /*
  * Every music library's newest albums, six rows of them, by when they were added or when they
- * came out, as the control under the title sets; See all opens Albums.
+ * came out, as the control under the title sets; See all opens Albums in that same order.
  */
 function RecentlyAdded() {
   const sort = useWrenPrefs((state) => state.homeSort)
@@ -124,10 +124,7 @@ function RecentlyAdded() {
   const limit = RECENT_ROWS * RECENT_COLUMNS[useFormFactor()]
   const { albums, listing } = useRecentAlbums({ sort, limit })
   return (
-    <Section
-      seeAll={{ href: collectionPath(COLLECTION_KINDS.albums) }}
-      title={HOME_RECENT_TITLES[sort]}
-    >
+    <Section seeAll={{ href: albumsInOrderPath({ sort }) }} title={HOME_RECENT_TITLES[sort]}>
       <SegmentedControl
         choices={HOME_RECENT_CHOICES}
         label={HOME_COPY.sortAlbums}

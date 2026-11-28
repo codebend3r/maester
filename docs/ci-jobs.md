@@ -26,14 +26,14 @@ Rows 1, 2, 3 and 6 were measured with each job building the app and running its 
 | 14 | 🔦 Lighthouse Raven web | PR checks | 4m 13s | 0m 31s | 6m 19s | 66 | Yes | The pass, while the web app and the server are unchanged |
 | 15 | 🎬 Build Raven Windows app | PR checks | 4m 07s | 2m 54s | 5m 36s | 76 | Partly | The app's build; not the installer, its audit or its smoke test |
 | 16 | 🧠 Evals | Sparrow evals | 3m 05s | 2m 49s | 3m 29s | 7 | Nightly | The last pass, on the nightly run; a run from the Actions tab always runs |
-| 17 | 🎬 E2E Raven Mac desktop | E2E Tests | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
+| 17 | 🎬 E2E Raven Mac desktop | 🎬 E2E Tests | 3m 00s | 0m 35s | 6m 07s | 65 | Yes | The builds and the tests' pass |
 | 18 | 🎬 Build Raven Windows native | PR checks | 2m 31s | 1m 48s | 4m 40s | 80 | Yes | The libmpv fetch, the addon, its audit and the native tests |
 | 19 | 🧪 Unit tests | PR checks | 2m 07s | 0m 34s | 4m 34s | 71 | Yes | Each project's pass |
 | 20 | 🎬 Build Raven Mac app | PR checks | 2m 05s | 1m 23s | 3m 15s | 67 | Partly | The app's build; not the packaged app, its audit or its smoke test |
-| 21 | 🌐 E2E Raven web | E2E Tests | 1m 30s | 0m 33s | 2m 40s | 67 | Yes | The pass, while the web app and the server are unchanged |
+| 21 | 🌐 E2E Raven web | 🎬 E2E Tests | 1m 30s | 0m 33s | 2m 40s | 67 | Yes | The pass, while the web app and the server are unchanged |
 | 22 | 🧪 Test Raven Mac player | PR checks | 1m 17s | 0m 30s | 2m 06s | 67 | Yes | The tests' pass |
 | 23 | 🗄️ Supabase | PR checks | 1m 11s | 0m 23s | 2m 01s | 76 | Yes | The Edge Function checks, and the database tests and lint with the stack they start |
-| 24 | 📸 Screen tests | E2E Tests | 1m 06s | 0m 20s | 2m 13s | 73 | Yes | Each project's pass |
+| 24 | 📸 Screen tests | 🎬 E2E Tests | 1m 06s | 0m 20s | 2m 13s | 73 | Yes | Each project's pass |
 | 25 | 🩺 raven build and health check | PR checks, main smoke test | 1m 00s | 0m 45s | 1m 35s | 101 | No | Nothing: a Docker image build and a health check, which run no Nx task |
 | 26 | 📦 Publish raven | Main smoke test | 1m 00s | 0m 44s | 1m 37s | 25 | No | Nothing: an image publish, which runs no Nx task |
 

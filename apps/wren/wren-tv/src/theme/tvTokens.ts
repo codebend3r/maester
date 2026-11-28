@@ -42,7 +42,7 @@ export const TYPE = {
   tileTitle: { fontFamily: FONTS.display, fontSize: tvSize(28), lineHeight: tvSize(36) },
   tileLine: { fontFamily: FONTS.bodySemiBold, fontSize: tvSize(24), lineHeight: tvSize(32) },
   row: { fontFamily: FONTS.bodyMedium, fontSize: tvSize(30), lineHeight: tvSize(38) },
-  button: { fontFamily: FONTS.bodySemiBold, fontSize: tvSize(28), lineHeight: tvSize(36) },
+  button: { fontFamily: FONTS.bodySemiBold, fontSize: tvSize(25), lineHeight: tvSize(32) },
   body: { fontFamily: FONTS.body, fontSize: tvSize(28), lineHeight: tvSize(38) },
   meta: { fontFamily: FONTS.body, fontSize: tvSize(24), lineHeight: tvSize(32) },
   lyric: { fontFamily: FONTS.display, fontSize: tvSize(44), lineHeight: tvSize(58) },
@@ -66,9 +66,9 @@ export const SIZE = {
   /** The ring a focused control wears, and how far a focused tile stands out. */
   focusRing: tvSize(5),
   focusScale: 1.06,
-  button: tvSize(80),
-  icon: tvSize(40),
-  iconSmall: tvSize(30),
+  button: tvSize(68),
+  icon: tvSize(34),
+  iconSmall: tvSize(26),
   row: tvSize(96),
   rowArt: tvSize(72),
   tile: tvSize(260),
@@ -80,7 +80,10 @@ export const SIZE = {
   coverExtraLarge: tvSize(440),
   artistPhoto: tvSize(220),
   headArt: tvSize(440),
+  /** Now Playing's cover at its largest; it gives way on a TV too short for it and the controls. */
   playerArt: tvSize(560),
+  /** Now Playing's player column, wide enough for the transport's five buttons in one row. */
+  playerColumn: tvSize(760),
   sidebarOpen: tvSize(360),
   sidebarClosed: tvSize(128),
   logo: tvSize(56),

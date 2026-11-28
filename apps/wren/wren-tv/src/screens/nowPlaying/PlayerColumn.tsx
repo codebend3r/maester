@@ -16,7 +16,10 @@ import {
   type SongActions,
   TRACK_MENU_COPY,
 } from '@raven/wren'
-import { Text, View } from 'react-native'
+import { useState } from 'react'
+import { type LayoutChangeEvent, Text, View } from 'react-native'
+
+import type { Cover } from '@raven/wren-native'
 
 import { Scrubber } from '@/player/Scrubber'
 import { Transport } from '@/player/Transport'
@@ -31,7 +34,9 @@ import { FocusButton } from '@/ui/FocusButton'
 import { QualityChips } from '@/ui/QualityChips'
 
 const useStyles = themedStyles(({ colors }) => ({
-  column: { gap: SPACE.s4, width: SIZE.playerArt },
+  column: { gap: SPACE.s4, width: SIZE.playerColumn },
+  // The room the column leaves once its words and controls are drawn, which the cover fills.
+  artRoom: { flex: 1, minHeight: 0 },
   source: { gap: SPACE.s1 / 2 },
   overline: { ...TYPE.overline, color: colors.text3 },
   sourceName: { ...TYPE.meta, color: colors.text2 },
@@ -135,13 +140,33 @@ function Speeds() {
   )
 }
 
+type FittedArtProps = { cover: Cover | null }
+
+/**
+ * The cover, as large as the column leaves room for and never larger than `SIZE.playerArt`: the
+ * song, the scrubber and the transport keep their sizes, so they stay on the TV whatever its
+ * height, the title's lines or an audiobook's speeds.
+ */
+function FittedArt({ cover }: FittedArtProps) {
+  const styles = useStyles()
+  const [room, setRoom] = useState(0)
+  const measure = ({ nativeEvent }: LayoutChangeEvent) =>
+    setRoom(Math.min(nativeEvent.layout.width, nativeEvent.layout.height, SIZE.playerArt))
+  return (
+    <View onLayout={measure} style={styles.artRoom}>
+      {room > 0 && <AlbumArt cover={cover} size={room} />}
+    </View>
+  )
+}
+
 type PlayerColumnProps = { playing: Playing; actions: SongActions }
 
 /**
  * The player, as the tablet's first column draws it: where the queue plays from, the cover large,
  * the song with its heart, Add to playlist and More beside its name, what it plays as, the
  * scrubber over its times, then Previous, Play or Pause and Next with the queue's Shuffle and
- * Repeat, and an audiobook's speed. The remote starts on Play or Pause.
+ * Repeat, and an audiobook's speed. The cover gives way so every control is on the TV, and the
+ * remote starts on Play or Pause.
  */
 export function PlayerColumn({ playing, actions }: PlayerColumnProps) {
   const styles = useStyles()
@@ -150,7 +175,7 @@ export function PlayerColumn({ playing, actions }: PlayerColumnProps) {
   return (
     <View style={styles.column}>
       <SourceName playing={playing} />
-      <AlbumArt cover={playing.cover} size={SIZE.playerArt} />
+      <FittedArt cover={playing.cover} />
       <View style={styles.titled}>
         <View style={styles.song}>
           <Text accessibilityRole="header" numberOfLines={2} style={styles.name}>

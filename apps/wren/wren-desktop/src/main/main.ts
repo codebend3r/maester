@@ -91,6 +91,7 @@ const openWindow = async (): Promise<BrowserWindow> => {
   const bounds = placeWindow({
     saved: await readSavedBounds(),
     areas: screen.getAllDisplays().map(({ workArea }) => workArea),
+    primary: screen.getPrimaryDisplay().workArea,
   })
   const window = new BrowserWindow({
     ...bounds,

@@ -10,6 +10,8 @@ name: Open the fixture server on a clean install
 # name says nothing of the shelves. On a TV a show left on Binge by a flow that failed part way
 # stands first as a card that pushes the shelves below the screen, so its episode line (S01E01
 # with its name, which no shelf card writes) says Home is drawn too, and healHome takes it off.
+# On an Android phone the hero fills the screen and the shelves start below it, so its overline
+# ("Featured in Films", drawn in capitals there) says Home is drawn; each flow scrolls from it.
 - extendedWaitUntil:
-    visible: 'Films|S\d\dE\d\d · .*'
+    visible: 'Films|FEATURED IN .*|Featured in .*|S\d\dE\d\d · .*'
     timeout: 60000

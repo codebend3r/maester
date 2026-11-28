@@ -1,5 +1,10 @@
 import { oneOf, orElse } from '@raven/core'
-import { LIBRARY_SEGMENTS, type SharedSegment } from '@raven/wren'
+import {
+  ALBUMS_ORDER_PARAM,
+  LIBRARY_SEGMENTS,
+  type RecentSort,
+  type SharedSegment,
+} from '@raven/wren'
 import { generatePath } from 'react-router-dom'
 
 /** Wren's pages, one per file under the phone and tablet apps' `app/`, by the same names. */
@@ -63,3 +68,9 @@ export const collectionKindOf = orElse<CollectionKind>({
 /** Where one of Library's lists is: its category page, `/collection/albums`. */
 export const collectionPath = (kind: CollectionKind): string =>
   generatePath(WREN_ROUTES.collection, { [WREN_ROUTE_PARAMS.kind]: kind })
+
+type AlbumsInOrderPathProps = { sort: RecentSort }
+
+/** Albums, opened in the order Home's albums were in, so See all keeps the order it showed. */
+export const albumsInOrderPath = ({ sort }: AlbumsInOrderPathProps): string =>
+  `${collectionPath(COLLECTION_KINDS.albums)}?${new URLSearchParams({ [ALBUMS_ORDER_PARAM]: sort })}`
