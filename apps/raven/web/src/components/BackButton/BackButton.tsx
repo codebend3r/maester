@@ -5,7 +5,7 @@ import { BACK_BUTTON_COPY } from '@/components/BackButton/copy'
 import styles from '@/components/BackButton/BackButton.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { APP_PATHS } from '@/lib/appPaths'
-import { MUSIC_PATHS } from '@/lib/music'
+import { MUSIC_PATHS } from '@/lib/musicPaths'
 
 /** Where a page goes back to when nothing of the app is behind it, and what it is called. */
 export type BackFallback = { to: string; label: string }

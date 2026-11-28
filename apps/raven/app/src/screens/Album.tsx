@@ -54,6 +54,7 @@ const AlbumPage = ({ session, details }: AlbumPageProps) => {
   const source = { kind: QUEUE_SOURCE_KINDS.album, id: album.id } as const
   return (
     <AlbumLayout
+      albumId={album.id}
       artists={album.artists}
       cover={cover}
       discs={albumDiscsOf({ tracks, discCount })}

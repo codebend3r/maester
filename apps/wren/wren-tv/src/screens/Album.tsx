@@ -47,7 +47,6 @@ function AlbumPage({ session, details }: AlbumPageProps) {
     title,
     data,
   }))
-  const [artist] = album.artists
   const toggleFavourite = () =>
     favourite.attempt({ variables: !isFavourite, onRefused: toastFailure })
   const renderRow = ({ item }: RenderRowProps) => (
@@ -75,7 +74,11 @@ function AlbumPage({ session, details }: AlbumPageProps) {
           }
           byline={<ArtistLinks artists={album.artists} />}
           cover={cover}
-          menu={{ canAddToPlaylist: true, line: artistNames(album), places: { artist } }}
+          menu={{
+            canAddToPlaylist: true,
+            line: artistNames(album),
+            places: { artists: album.artists },
+          }}
           meta={albumMetaOf({ details })}
           session={session}
           source={source}

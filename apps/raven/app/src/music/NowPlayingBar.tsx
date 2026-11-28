@@ -73,6 +73,7 @@ export const NowPlayingBar = ({ session: { server, api } }: NowPlayingBarProps) 
         onToggle={toggle}
         quality={quality}
         title={track.title}
+        track={track}
       />
     )
   )

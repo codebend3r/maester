@@ -19,22 +19,27 @@ import { LikeButton } from '@/ui/LikeButton/LikeButton'
 import { Pressable } from '@/ui/Pressable/Pressable'
 import styles from '@/ui/SongRow/SongRow.module.scss'
 
-type LeadProps = { lead: ShownLead<Cover>; isPlaying: boolean }
+type LeadProps = {
+  lead: ShownLead<Cover>
+  isPlaying: boolean
+  /** What holding the art does, where the row leads with it. */
+  onArtHold?: () => void
+}
 
-function ArtLead({ lead }: LeadProps) {
+function ArtLead({ lead, onArtHold }: LeadProps) {
   return (
     lead.kind === SONG_LEADS.art && (
-      <AlbumArt cover={lead.cover} radius={RADII.xs} size={SIZES.rowArt} />
+      <AlbumArt cover={lead.cover} onHold={onArtHold} radius={RADII.xs} size={SIZES.rowArt} />
     )
   )
 }
 
 /** The queue's track in a list of covers: its cover under a veil, the equalizer over it. */
-function ArtEqualizerLead({ lead, isPlaying }: LeadProps) {
+function ArtEqualizerLead({ lead, isPlaying, onArtHold }: LeadProps) {
   return (
     lead.kind === SONG_LEADS.artEqualizer && (
       <span className={styles.artEqualizer}>
-        <AlbumArt cover={lead.cover} radius={RADII.xs} size={SIZES.rowArt} />
+        <AlbumArt cover={lead.cover} onHold={onArtHold} radius={RADII.xs} size={SIZES.rowArt} />
         <span className={styles.veil}>
           <EqualizerIndicator isOnPicture isPlaying={isPlaying} />
         </span>
@@ -85,6 +90,8 @@ type SongRowProps = {
   onPress: () => void
   /** More: the track's menu, which the apps also open by holding the row. */
   onMore?: () => void
+  /** What holding the row's art does: the song's cover menu. A short tap still plays. */
+  onArtHold?: () => void
   /** The song's heart, at the row's end: always shown while it is a favourite, else on hover or focus. */
   like?: MenuLike
 }
@@ -103,6 +110,7 @@ export function SongRow({
   label,
   onPress,
   onMore,
+  onArtHold,
   like,
 }: SongRowProps) {
   const shown = songLeadOf({ lead, isCurrent })
@@ -110,7 +118,7 @@ export function SongRow({
   return (
     <div className={styles.row}>
       <Pressable className={styles.main} isCurrent={isCurrent} label={label} onPress={onPress}>
-        <Lead isPlaying={isPlaying} lead={shown} />
+        <Lead isPlaying={isPlaying} lead={shown} onArtHold={onArtHold} />
         <span className={styles.text}>
           <span className={classNames([styles.title, isCurrent && styles.playing])}>{title}</span>
           {subtitle !== null && <span className={styles.subtitle}>{subtitle}</span>}

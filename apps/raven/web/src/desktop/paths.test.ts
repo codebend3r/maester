@@ -10,7 +10,7 @@ import {
   playPathOf,
 } from '@/desktop/paths'
 import { BROWSER_OFFLINE_PAGES, browserPlayPathOf } from '@/browserDownloads/paths'
-import { MUSIC_PATHS } from '@/lib/music'
+import { MUSIC_PATHS } from '@/lib/musicPaths'
 import { FILE_ID } from '@/test/desktop'
 
 const isOffline = (pathname: string): boolean =>

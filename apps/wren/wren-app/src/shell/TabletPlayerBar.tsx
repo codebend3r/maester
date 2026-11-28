@@ -2,6 +2,7 @@ import type { Track } from '@raven/core'
 import { playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { usePlayedQuality } from '@raven/native/headless'
 import { useRouter } from 'expo-router'
+import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -12,8 +13,9 @@ import { useNowPlaying, type WrenSession, useWren } from '@raven/wren-native'
 import { WREN_ROUTES } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SHELL_SIZES, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { AlbumArt } from '@/ui/AlbumArt'
 import { IconButton } from '@/ui/IconButton'
+import { TrackCoverMenu } from '@/ui/CoverMenu'
+import { HeldArt, coverHoldPropsOf } from '@/ui/HeldArt'
 import { pressedStyleOf } from '@/ui/press'
 import { QualityChips } from '@/ui/QualityChips'
 
@@ -43,6 +45,8 @@ type PlayingBarProps = { session: WrenSession; track: Track }
 function PlayingBar({ session, track }: PlayingBarProps) {
   const styles = useStyles()
   const router = useRouter()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const openMenu = () => setIsMenuOpen(true)
   const { bottom } = useSafeAreaInsets()
   const { cover, artists, length, error } = useNowPlaying({ session, track })
   const quality = usePlayedQuality({ track })
@@ -51,12 +55,19 @@ function PlayingBar({ session, track }: PlayingBarProps) {
     <View style={[styles.bar, { paddingBottom: bottom }]}>
       <View style={styles.side}>
         <Pressable
+          {...coverHoldPropsOf(openMenu)}
           accessibilityLabel={PLAYER_COPY.open({ title: track.title, artists })}
           accessibilityRole="button"
           onPress={openNowPlaying}
           style={pressedStyleOf({ style: styles.nowPlaying })}
         >
-          <AlbumArt cover={cover} radius={RADIUS.thumb} size={SHELL_SIZES.barArt} />
+          <HeldArt
+            cover={cover}
+            onHold={openMenu}
+            onPress={openNowPlaying}
+            radius={RADIUS.thumb}
+            size={SHELL_SIZES.barArt}
+          />
           <View style={styles.text}>
             <Text numberOfLines={1} style={styles.title}>
               {track.title}
@@ -77,6 +88,7 @@ function PlayingBar({ session, track }: PlayingBarProps) {
         <IconButton icon={WREN_ICONS.upNext} label={PLAYER_COPY.upNext} onPress={openNowPlaying} />
         <IconButton icon={WREN_ICONS.output} label={PLAYER_COPY.output} onPress={openNowPlaying} />
       </View>
+      {isMenuOpen && <TrackCoverMenu onClose={() => setIsMenuOpen(false)} track={track} />}
     </View>
   )
 }

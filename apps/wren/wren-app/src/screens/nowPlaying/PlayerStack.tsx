@@ -47,7 +47,7 @@ export function PlayerStack({ playing, actions, width }: PlayerStackProps) {
   )
   return (
     <ScrollView contentContainerStyle={styles.player} style={styles.pane}>
-      <PlayerCover cover={playing.cover} size={artSize} />
+      <PlayerCover cover={playing.cover} size={artSize} track={playing.track} />
       <SongTitle like={actions.like} onAddToPlaylist={actions.onAddToPlaylist} playing={playing} />
       <Scrubber kind={SCRUBBERS.player} length={playing.length} />
       <Transport kind={TRANSPORTS.player} />

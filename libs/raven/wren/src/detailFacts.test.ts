@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test'
+import { ALBUM_TYPES, type MusicFact, albumInfoOf, trackInfoOf } from '@raven/core'
 
-import { albumMetaOf, artistMetaOf, lengthOf, playlistMetaOf } from '@/detailFacts'
+import { COVER_FACT_LABELS } from '@/copy/components'
+import {
+  COVER_FACT_WORDING,
+  albumMetaOf,
+  artistMetaOf,
+  lengthOf,
+  playlistMetaOf,
+} from '@/detailFacts'
+import { AIRBAG, OK_COMPUTER, OK_COMPUTER_PAGE } from '@/testing'
 
 describe('lengthOf', () => {
   it('says hours and minutes', () => {
@@ -51,5 +60,69 @@ describe('artistMetaOf', () => {
     expect(artistMetaOf({ artist: { albumCount: 8, trackCount: 132 } })).toBe(
       '8 albums · 132 songs',
     )
+  })
+})
+
+const READ_PAGE = { ...OK_COMPUTER_PAGE, genres: ['Alternative', 'Art rock'], label: 'Parlophone' }
+
+/** A held cover's facts as its sheet labels them. */
+const labelled = (facts: readonly MusicFact[]) =>
+  facts.map(({ key, value }) => ({ label: COVER_FACT_LABELS[key], value }))
+
+describe('COVER_FACT_WORDING', () => {
+  it("says an album's summary before its page is read, and adds the page's facts once it is", () => {
+    expect(
+      labelled(albumInfoOf({ album: OK_COMPUTER, extras: null, wording: COVER_FACT_WORDING })),
+    ).toEqual([
+      { label: COVER_FACT_LABELS.released, value: '1997' },
+      { label: COVER_FACT_LABELS.tracks, value: '3' },
+      { label: COVER_FACT_LABELS.length, value: '15 min' },
+    ])
+    expect(
+      labelled(albumInfoOf({ album: OK_COMPUTER, extras: READ_PAGE, wording: COVER_FACT_WORDING })),
+    ).toEqual([
+      { label: COVER_FACT_LABELS.released, value: '1997' },
+      { label: COVER_FACT_LABELS.genres, value: 'Alternative · Art rock' },
+      { label: COVER_FACT_LABELS.label, value: 'Parlophone' },
+      { label: COVER_FACT_LABELS.tracks, value: '3' },
+      { label: COVER_FACT_LABELS.length, value: '15 min' },
+      { label: COVER_FACT_LABELS.format, value: 'FLAC · 16-bit / 44.1 kHz' },
+    ])
+  })
+
+  it('names a release that is not a plain album first', () => {
+    const ep = { ...OK_COMPUTER, type: ALBUM_TYPES.ep, year: null, trackCount: 0, duration: 0 }
+
+    expect(labelled(albumInfoOf({ album: ep, extras: null, wording: COVER_FACT_WORDING }))).toEqual(
+      [{ label: COVER_FACT_LABELS.kind, value: 'EP' }],
+    )
+  })
+
+  it("says a song's album, length and file's format, then its album's date and genres once read", () => {
+    expect(
+      labelled(
+        trackInfoOf({ track: AIRBAG, details: null, quality: null, wording: COVER_FACT_WORDING }),
+      ),
+    ).toEqual([
+      { label: COVER_FACT_LABELS.album, value: OK_COMPUTER.title },
+      { label: COVER_FACT_LABELS.length, value: '5:00' },
+      { label: COVER_FACT_LABELS.format, value: 'FLAC · 16-bit / 44.1 kHz · 900 kbps' },
+    ])
+    expect(
+      labelled(
+        trackInfoOf({
+          track: AIRBAG,
+          details: READ_PAGE,
+          quality: null,
+          wording: COVER_FACT_WORDING,
+        }),
+      ),
+    ).toEqual([
+      { label: COVER_FACT_LABELS.album, value: OK_COMPUTER.title },
+      { label: COVER_FACT_LABELS.released, value: '1997' },
+      { label: COVER_FACT_LABELS.genres, value: 'Alternative · Art rock' },
+      { label: COVER_FACT_LABELS.length, value: '5:00' },
+      { label: COVER_FACT_LABELS.format, value: 'FLAC · 16-bit / 44.1 kHz · 900 kbps' },
+    ])
   })
 })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, mock } from 'bun:test'
 import { fireEvent } from '@testing-library/react'
 import { useCovers } from '@/music/useCovers'
 import { COVER_VERSION, OK_COMPUTER } from '@/test/music'
@@ -31,5 +31,23 @@ describe('AlbumArt', () => {
     fireEvent.error(container.querySelector('img')!)
 
     expect(container.querySelector('img')).toBeNull()
+  })
+
+  it("opens its menu on a right click in the browser's menu's place, given one", () => {
+    const onHold = mock()
+    const { container } = renderKitWithRoutes(<AlbumArt cover={null} onHold={onHold} />)
+    const cover = container.firstElementChild
+    if (cover === null) throw new Error('the art is drawn')
+
+    expect(fireEvent.contextMenu(cover)).toBe(false)
+    expect(onHold).toHaveBeenCalledTimes(1)
+  })
+
+  it("leaves a cover with nothing to hold to the browser's own menu", () => {
+    const { container } = renderKitWithRoutes(<AlbumArt cover={null} />)
+    const cover = container.firstElementChild
+    if (cover === null) throw new Error('the art is drawn')
+
+    expect(fireEvent.contextMenu(cover)).toBe(true)
   })
 })

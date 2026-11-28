@@ -25,6 +25,14 @@ export type { ProgressSaver } from '@/lib/progressSaver'
 export { Controls } from '@/components/Player/Controls'
 export { NOTIFICATION_ICONS, Toaster } from '@/components/Toaster/Toaster'
 export { AudioHost } from '@/components/AudioHost/AudioHost'
+export {
+  EQUALIZER_MARK,
+  EQUALIZER_SIZES,
+  type EqualizerSize,
+  SOUND_BAR_LEVEL,
+  useSoundBars,
+} from '@/lib/useSoundBars'
+export { LESS_MOTION, asksForLessMotion, useAsksForLessMotion } from '@/lib/lessMotion'
 export { watchPageHide } from '@/components/Player/watchPageHide'
 export { type Toast, useToasts } from '@/stores/toasts'
 export {

@@ -142,3 +142,39 @@ export const makeTrackClip = async (): Promise<{ folder: string; path: string }>
   }
   return { folder, path }
 }
+
+// Pink noise that swells and fades twice a second, so what a meter reads keeps changing.
+const musicArgs = (output: string): string[] => [
+  '-hide_banner',
+  '-loglevel',
+  'error',
+  '-y',
+  '-f',
+  'lavfi',
+  '-i',
+  `anoisesrc=color=pink:amplitude=0.5:sample_rate=44100:duration=${CLIP_SECONDS}`,
+  '-af',
+  "volume='0.1+0.9*abs(sin(2*PI*t))':eval=frame",
+  '-ac',
+  '2',
+  '-c:a',
+  'flac',
+  output,
+]
+
+/** The music clip's file and the temporary folder holding it, which the test removes. */
+type MusicClip = { folder: string; path: string }
+
+/** A 30 second FLAC track whose loudness rises and falls, for the music engine's meter. */
+export const makeMusicClip = async (): Promise<MusicClip> => {
+  const binary = ffmpegBinary()
+  const folder = await makeTempDir('raven-music-clips-')
+  const path = join(folder, 'Swell 01.flac')
+  try {
+    await run({ binary, args: musicArgs(path), output: path })
+  } catch (error) {
+    await rm(folder, { recursive: true, force: true })
+    throw error
+  }
+  return { folder, path }
+}

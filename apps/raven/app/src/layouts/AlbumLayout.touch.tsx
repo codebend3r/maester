@@ -1,7 +1,9 @@
 import { type AlbumTrack } from '@raven/core'
 import { type AccessibilityActionEvent, Pressable, StyleSheet, View } from 'react-native'
 
+import { useTouchCard } from '@/cardMenu/useTouchCard'
 import { MUSIC_COPY } from '@/layouts/copy'
+import { coverHoldOf, holdPropsOf } from '@/layouts/holdProps'
 import { type AlbumLayoutProps, ROW_ACTIONS } from '@/layouts/musicKit'
 import {
   Cover,
@@ -12,6 +14,7 @@ import {
 } from '@/layouts/MusicParts.touch'
 import { openAddToPlaylistSheet } from '@/layouts/playlistSheets'
 import { Text, TEXT_VARIANTS } from '@/layouts/Text'
+import { CARD_SUBJECTS } from '@/queries/cards'
 import { SIZES } from '@/theme/appTheme'
 import { themedStyles } from '@/theme/useTheme'
 import { APP_ICONS } from '@/theme/icons'
@@ -76,9 +79,10 @@ type AddFromProps = { index: number | null; name: string }
 /**
  * An album under the thumb: one page scrolled, the cover over one row of round icon plates
  * (Play filled, Shuffle, Play next, Add to queue, Add to playlist, Favourite, Download) and the
- * tracks.
+ * tracks. A long press on the cover opens what is known of the album, and Go to artist.
  */
 export const AlbumLayout = ({
+  albumId,
   title,
   artists,
   facts,
@@ -101,6 +105,9 @@ export const AlbumLayout = ({
 }: AlbumLayoutProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
+  const coverMenu = useTouchCard({
+    card: { title, subject: { kind: CARD_SUBJECTS.album, albumId, isOnAlbum: true } },
+  })
   const addFrom = ({ index, name }: AddFromProps) =>
     openAddToPlaylistSheet({
       title: MUSIC_COPY.addTrackToPlaylist(name),
@@ -110,7 +117,14 @@ export const AlbumLayout = ({
   return (
     <TouchPage onBack={onBack}>
       <View style={styles.stage}>
-        <Cover cover={cover} title={title} />
+        <Pressable
+          accessibilityLabel={title}
+          accessibilityRole="image"
+          {...holdPropsOf(coverHoldOf(coverMenu))}
+        >
+          <Cover cover={cover} title={title} />
+        </Pressable>
+        {coverMenu.menu}
         <Text variant={TEXT_VARIANTS.display} accessibilityRole="header" style={styles.title}>
           {title}
         </Text>

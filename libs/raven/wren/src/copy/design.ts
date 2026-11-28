@@ -66,8 +66,11 @@ export const DESIGN_COPY = {
     fieldsNote: 'Plain, with an icon, and with what is wrong said under it.',
     status: 'Status chip',
     statusNote: 'Whether the server answers.',
-    motion: 'Spinner and equalizer',
-    motionNote: 'A ring that turns while something is on its way; the now-playing bars.',
+    motion: 'Spinner',
+    motionNote: 'A ring that turns while something is on its way.',
+    equalizers: 'Equalizer',
+    equalizersNote:
+      'The now-playing bars, small, medium and large, each following a band of what plays; still while nothing does.',
     rows: 'Section header and rows',
     rowsNote: 'A section with its link, and the rows that open a page.',
     tiles: 'Art, avatars, tiles and cards',

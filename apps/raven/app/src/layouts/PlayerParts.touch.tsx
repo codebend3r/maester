@@ -3,16 +3,10 @@ import { Icon } from '@raven/native'
 import { useClock, usePlayerPrefs } from '@raven/ui/headless'
 import { type IconName, volumeIconOf } from '@raven/ui/iconDrawings'
 import { type ComponentRef, useRef, useState } from 'react'
-import {
-  type AccessibilityActionInfo,
-  type GestureResponderEvent,
-  Pressable,
-  type PressableProps,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+import { type GestureResponderEvent, Pressable, View, useWindowDimensions } from 'react-native'
 
 import { TouchFactChips } from '@/layouts/FactChips'
+import { type Hold, holdPropsOf } from '@/layouts/holdProps'
 import { pickerLabelOf } from '@/layouts/gridKit'
 import { openPickerSheet } from '@/layouts/Picker.touch'
 import {
@@ -44,12 +38,6 @@ import {
 
 // The touch chrome's parts: the line, its buttons and skips, the volume, the track pickers, the title art and the corner.
 
-/** The screen reader's actions a control may offer; the hint says what each does here. */
-const ACCESSIBILITY_ACTIONS = { longPress: 'longpress' } as const
-
-/** The screen reader's way to what a long press does. */
-const HOLD_ACTIONS: AccessibilityActionInfo[] = [{ name: ACCESSIBILITY_ACTIONS.longPress }]
-
 type ScrubberProps = Pick<Transport, 'position' | 'onSeek'> & { duration: number }
 
 /**
@@ -68,25 +56,6 @@ const Scrubber = ({ position, duration, onSeek }: ScrubberProps) => {
     </View>
   )
 }
-
-/** What a long press on a button does, and how the screen reader is told of it. */
-type Hold = { hint: string; onHold: () => void }
-
-type HoldProps = Pick<
-  PressableProps,
-  'accessibilityActions' | 'accessibilityHint' | 'onAccessibilityAction' | 'onLongPress'
->
-
-/** The long press and the screen reader's action for it, or nothing for a button with no hold. */
-const holdPropsOf = (hold: Hold | undefined): HoldProps =>
-  hold === undefined
-    ? {}
-    : {
-        accessibilityActions: HOLD_ACTIONS,
-        accessibilityHint: hold.hint,
-        onAccessibilityAction: hold.onHold,
-        onLongPress: hold.onHold,
-      }
 
 type IconButtonProps = {
   icon: IconName
@@ -217,7 +186,11 @@ const VolumeControl = ({ isShown }: VolumeControlProps) => {
         </View>
       )}
       <IconButton
-        hold={{ hint: PLAYER_COPY.volumeHint, onHold: () => setOpen((open) => !open) }}
+        hold={{
+          label: PLAYER_COPY.volumeAction,
+          hint: PLAYER_COPY.volumeHint,
+          onHold: () => setOpen((open) => !open),
+        }}
         icon={volumeIconOf({ volume, isMuted })}
         label={isMuted ? PLAYER_COPY.unmute : PLAYER_COPY.mute}
         onPress={() => setVolume({ volume, muted: !isMuted })}

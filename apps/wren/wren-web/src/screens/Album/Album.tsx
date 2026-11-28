@@ -37,7 +37,6 @@ function AlbumPage({ details }: AlbumPageProps) {
     })
   const cover = coverOf({ albumId: album.id, coverVersion: album.coverVersion })
   const discs = albumDiscsOf({ tracks, discCount })
-  const [artist] = album.artists
   const toggleFavourite = () =>
     favourite.attempt({ variables: !isFavourite, onRefused: toastFailure })
   const renderRow = (item: AlbumTrack) => (
@@ -88,7 +87,7 @@ function AlbumPage({ details }: AlbumPageProps) {
           canAddToPlaylist
           head={{ title: album.title, subtitle: artistNames(album), cover }}
           onClose={closeMenu}
-          places={{ artist }}
+          places={{ artists: album.artists }}
           tracksOf={async () => tracks}
         />
       )}

@@ -1,0 +1,37 @@
+appId: app.netlify.wren
+name: Holding a cover opens what the music is, and goes to its artist or its album
+---
+- runFlow: steps/signIn.yaml
+# Home's tile is read out as "Morning Chorus, The Fixture Birds"; the middle of the tile is its
+# cover, which takes the long press in place of the tile.
+- longPressOn: Morning Chorus, The Fixture Birds
+- extendedWaitUntil:
+    visible: Go to artist
+    timeout: 10000
+# Each fact is read out as its label and its value.
+- assertVisible: Songs, 3
+- assertVisible: Format, FLAC.*
+- tapOn: Go to artist
+- extendedWaitUntil:
+    visible: The Fixture Birds
+    timeout: 30000
+- assertNotVisible: Go to artist
+# iOS has no back key to press, so the album's own menu is held again from a fresh launch.
+- runFlow: steps/signIn.yaml
+- longPressOn: Morning Chorus, The Fixture Birds
+- tapOn: Go to album
+- extendedWaitUntil:
+    visible: Shuffle
+    timeout: 30000
+# Now Playing's cover holds the playing song's menu.
+- tapOn:
+    text: Play
+    waitToSettleTimeoutMs: 500
+- tapOn:
+    text: 'Now Playing: First Light.*'
+    waitToSettleTimeoutMs: 500
+- longPressOn: Cover of First Light
+- extendedWaitUntil:
+    visible: Album, Morning Chorus
+    timeout: 10000
+- assertVisible: Go to album

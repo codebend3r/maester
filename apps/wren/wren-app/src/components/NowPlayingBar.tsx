@@ -2,6 +2,7 @@ import type { Track } from '@raven/core'
 import { isPlayingOf, playingTrackOf, useAudioQueue } from '@raven/ui/headless'
 import { progressOf } from '@raven/wren'
 import { useRouter } from 'expo-router'
+import { useState } from 'react'
 import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -11,6 +12,7 @@ import { CHROMES } from '@/shell/chrome'
 import { useChrome } from '@/shell/useShell'
 import { type WrenTheme, themedStyles, useFormFactor } from '@/theme/wrenTheme'
 import { SIZE, SPACE, FORM_FACTORS, type FormFactor } from '@/theme/wrenTokens'
+import { TrackCoverMenu } from '@/ui/CoverMenu'
 import { MiniPlayer } from '@/ui/MiniPlayer'
 
 /** Where a bar is drawn: above the tab bar on a tab, at the foot of a page the stack opened. */
@@ -47,6 +49,7 @@ type TrackBarProps = { session: WrenSession; place: BarPlace; track: Track }
 function TrackBar({ session, place, track }: TrackBarProps) {
   const styles = useStyles()
   const router = useRouter()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const bottom = useSafeAreaInsets().bottom
   const { cover, artists, length, error } = useNowPlaying({ session, track })
   const isPlaying = useAudioQueue(isPlayingOf)
@@ -60,12 +63,14 @@ function TrackBar({ session, place, track }: TrackBarProps) {
         cover={cover}
         error={error}
         isPlaying={isPlaying}
+        onArtHold={() => setIsMenuOpen(true)}
         onNext={next}
         onOpen={() => router.push(WREN_ROUTES.nowPlaying)}
         onToggle={toggle}
         progress={progressOf({ position, length })}
         title={track.title}
       />
+      {isMenuOpen && <TrackCoverMenu onClose={() => setIsMenuOpen(false)} track={track} />}
     </View>
   )
 }
@@ -74,8 +79,9 @@ type NowPlayingBarProps = { place: BarPlace }
 
 /**
  * The phone's mini player while a track is queued: its cover, title and artists, play or
- * pause and next; tapped or swiped up, it opens Now Playing. One sits above the tab bar and
- * one at the foot of the stack's pages, and only the one for the screen showing draws.
+ * pause and next; tapped or swiped up, it opens Now Playing, and its cover held, the song's
+ * cover menu. One sits above the tab bar and one at the foot of the stack's pages, and only the
+ * one for the screen showing draws.
  */
 export function NowPlayingBar({ place }: NowPlayingBarProps) {
   const session = useWren()

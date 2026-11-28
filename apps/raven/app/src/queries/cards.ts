@@ -11,6 +11,7 @@ import {
   type MediaSort,
   type RatingSource,
   type ShowEntry,
+  type Track,
   WATCHED_STATES,
   cardDestination,
   cardTitle,
@@ -47,15 +48,27 @@ export type Picture = { uri: string; headers: Record<string, string> }
 
 /**
  * What a card stands for, for the marks a held select offers on a TV: a show or a season by its
- * item, a movie or an episode by the video it plays, an album by its id. A card with none (a
- * saga, an artist, a playlist, a library) offers no menu.
+ * item, a movie or an episode by the video it plays, an album by its id, and the track playing,
+ * whose cover a long press holds. A card with none (a saga, an artist, a playlist, a library)
+ * offers no menu.
  */
-export const CARD_SUBJECTS = { item: 'item', video: 'video', album: 'album' } as const
+export const CARD_SUBJECTS = {
+  item: 'item',
+  video: 'video',
+  album: 'album',
+  track: 'track',
+} as const
 
 export type CardSubject =
   | { kind: typeof CARD_SUBJECTS.item; itemId: number }
   | { kind: typeof CARD_SUBJECTS.video; mediaId: number }
-  | { kind: typeof CARD_SUBJECTS.album; albumId: number }
+  | {
+      kind: typeof CARD_SUBJECTS.album
+      albumId: number
+      /** Whether it is held on the album's own page, where its menu leaves Go to album out. */
+      isOnAlbum: boolean
+    }
+  | { kind: typeof CARD_SUBJECTS.track; track: Track }
 
 /** One card, on a shelf or in a grid, as both layouts draw it. */
 export type ShelfCard = {

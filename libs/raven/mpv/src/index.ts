@@ -17,6 +17,7 @@ export {
 } from '@/mpv'
 export {
   MPV_CHOICES,
+  MPV_FILTER_LABELS,
   MPV_PROPERTIES,
   MPV_TRACK_TYPES,
   propertyGuards,

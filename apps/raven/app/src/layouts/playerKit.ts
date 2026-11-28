@@ -144,6 +144,7 @@ export const PLAYER_COPY = {
   unmute: 'Unmute',
   volume: 'Volume',
   /** What holding the speaker does, as the screen reader hints it. */
+  volumeAction: 'Show the volume slider',
   volumeHint: 'Hold to show the volume slider',
   back: (seconds: number) => `Back ${seconds} seconds`,
   forward: (seconds: number) => `Forward ${seconds} seconds`,

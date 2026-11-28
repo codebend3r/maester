@@ -2,40 +2,37 @@
   display: grid;
   grid-auto-flow: column;
   align-items: center;
-  gap: var(--space-0);
-  block-size: var(--space-5);
-  padding-inline: var(--space-1);
-
-  span {
-    inline-size: var(--space-0);
-    block-size: 70%;
-    background: var(--color-leaf-bright);
-    border-radius: var(--radius-sm);
-  }
+  gap: var(--equalizer-gap);
+  block-size: var(--equalizer-height);
+  padding-inline: var(--equalizer-pad);
 }
 
-@keyframes waveform {
-  from {
-    transform: scaleY(0.2);
-  }
-  to {
-    transform: scaleY(1);
-  }
+.small {
+  --equalizer-height: var(--space-3);
+  --equalizer-bar: var(--space-hair);
+  --equalizer-gap: var(--space-hair);
+  --equalizer-pad: 0;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .equalizer span {
-    animation: waveform 650ms ease-in-out infinite alternate;
+.medium {
+  --equalizer-height: var(--space-5);
+  --equalizer-bar: var(--space-0);
+  --equalizer-gap: var(--space-0);
+  --equalizer-pad: var(--space-1);
+}
 
-    &:nth-child(2n) {
-      animation-delay: -450ms;
-    }
-    &:nth-child(3n) {
-      animation-delay: -250ms;
-    }
-  }
+.large {
+  --equalizer-height: var(--space-6);
+  --equalizer-bar: var(--space-1);
+  --equalizer-gap: var(--space-0);
+  --equalizer-pad: var(--space-1);
+}
 
-  .still span {
-    animation-play-state: paused;
-  }
+// `--bar-level` is the sound's band, which `useSoundBars` writes on every frame; without it the bar rests.
+.bar {
+  inline-size: var(--equalizer-bar);
+  block-size: 100%;
+  background: var(--color-leaf-bright);
+  border-radius: var(--radius-sm);
+  transform: scaleY(var(--bar-level, 0.7));
 }

@@ -3,6 +3,7 @@ import {
   type Infer,
   isBoolean,
   isNumber,
+  isRecord,
   isString,
   listOf,
   nullable,
@@ -39,6 +40,13 @@ export const isMpvTrack = object({
 })
 export type MpvTrack = Infer<typeof isMpvTrack>
 
+/** The labels raven gives its own filters, so mpv names what they measure `af-metadata/<label>`. */
+export const MPV_FILTER_LABELS = { meter: 'meter' } as const
+
+/** A filter's frame metadata as mpv reports it: each of ffmpeg's keys with its value as text. */
+const isMetadata = (value: unknown): value is Readonly<Record<string, string>> =>
+  isRecord(value) && Object.values(value).every(isString)
+
 export const MPV_PROPERTIES = {
   mpvVersion: 'mpv-version',
   optionsConfig: 'options/config',
@@ -69,6 +77,7 @@ export const MPV_PROPERTIES = {
   decoderFrameDropCount: 'decoder-frame-drop-count',
   displayFpsOverride: 'display-fps-override',
   targetColorspaceHint: 'target-colorspace-hint',
+  afMeter: `af-metadata/${MPV_FILTER_LABELS.meter}`,
 } as const
 
 export type MpvProperty = (typeof MPV_PROPERTIES)[keyof typeof MPV_PROPERTIES]
@@ -111,6 +120,7 @@ export const propertyGuards = {
   [MPV_PROPERTIES.decoderFrameDropCount]: isNumber,
   [MPV_PROPERTIES.displayFpsOverride]: isNumber,
   [MPV_PROPERTIES.targetColorspaceHint]: union(isBoolean, oneOf([MPV_CHOICES.auto])),
+  [MPV_PROPERTIES.afMeter]: isMetadata,
 } as const satisfies { [K in MpvProperty]: Guard<unknown> }
 
 export type MpvPropertyValue<K extends MpvProperty> = Infer<(typeof propertyGuards)[K]>

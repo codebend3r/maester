@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from 'bun:test'
 
 import { TRACK_MENU_COPY } from '@/copy/components'
-import { type MenuLike, type MenuPlaces, menuGroupsOf } from '@/menuGroups'
+import { type MenuLike, type MenuPlaces, menuGroupsOf, placeActionsOf } from '@/menuGroups'
 import { OK_COMPUTER } from '@/testing'
 
 // Each app hands its own drawings; a name stands in for one here.
@@ -63,7 +63,7 @@ describe('menuGroupsOf', () => {
 
   it('lists the places it was given, the album before the artist, each opening its page', () => {
     const { groups, onAlbum, onArtist } = groupsWith({
-      places: { albumId: OK_COMPUTER.id, artist: ARTIST },
+      places: { albumId: OK_COMPUTER.id, artists: OK_COMPUTER.artists },
     })
     const [, goes] = groups
 
@@ -80,7 +80,7 @@ describe('menuGroupsOf', () => {
   })
 
   it('leaves out a place it was not given', () => {
-    const { groups } = groupsWith({ places: { artist: ARTIST } })
+    const { groups } = groupsWith({ places: { artists: OK_COMPUTER.artists } })
 
     expect(labelsOf(groups)[1]).toEqual([TRACK_MENU_COPY.goToArtist])
   })
@@ -114,5 +114,51 @@ describe('menuGroupsOf', () => {
     expect(onAddToQueue).not.toHaveBeenCalled()
     groups[0]?.[1]?.onPress()
     expect(onAddToQueue).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('placeActionsOf', () => {
+  it("offers a held cover's places alone, the album before the artist, each opening its page", () => {
+    const onAlbum = mock()
+    const onArtist = mock()
+    const actions = placeActionsOf({
+      icons: MENU_ICONS,
+      places: { albumId: OK_COMPUTER.id, artists: OK_COMPUTER.artists },
+      onAlbum,
+      onArtist,
+    })
+
+    expect(actions.map((action) => action.label)).toEqual([
+      TRACK_MENU_COPY.goToAlbum,
+      TRACK_MENU_COPY.goToArtist,
+    ])
+    actions[1]?.onPress()
+    expect(onArtist.mock.calls).toEqual([[ARTIST?.id ?? 0]])
+    expect(onAlbum).not.toHaveBeenCalled()
+  })
+
+  it('goes to the first of several artists alone', () => {
+    const onArtist = mock()
+    const actions = placeActionsOf({
+      icons: MENU_ICONS,
+      places: {
+        artists: [
+          { id: 1, name: 'Radiohead' },
+          { id: 2, name: 'Thom Yorke' },
+        ],
+      },
+      onAlbum: mock(),
+      onArtist,
+    })
+
+    expect(actions.map((action) => action.label)).toEqual([TRACK_MENU_COPY.goToArtist])
+    actions[0]?.onPress()
+    expect(onArtist.mock.calls).toEqual([[1]])
+  })
+
+  it('offers nothing for a cover with nowhere to go', () => {
+    expect(
+      placeActionsOf({ icons: MENU_ICONS, places: {}, onAlbum: mock(), onArtist: mock() }),
+    ).toEqual([])
   })
 })

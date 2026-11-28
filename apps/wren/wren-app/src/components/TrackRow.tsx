@@ -10,6 +10,7 @@ import { downloadedOf } from '@/downloads/downloadViews'
 import { type Cover, useTrackLike, type WrenSession, useWren } from '@raven/wren-native'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { RADIUS, SPACE } from '@/theme/wrenTokens'
+import { TrackCoverMenu } from '@/ui/CoverMenu'
 import { SongRow } from '@/ui/SongRow'
 
 const useStyles = themedStyles(({ colors }: WrenTheme) => ({
@@ -53,8 +54,8 @@ type TrackRowProps = {
 
 /**
  * A track in a list: a press plays from it, and holding it, or its More, opens its sheet: Play
- * next, Add to queue, Add to playlist, Go to album and Go to artist. A downloaded track shows a
- * check.
+ * next, Add to queue, Add to playlist, Go to album and Go to artist. Holding its art, where it
+ * leads with one, opens the song's cover menu instead. A downloaded track shows a check.
  */
 export function TrackRow({
   track,
@@ -69,6 +70,7 @@ export function TrackRow({
   const styles = useStyles()
   const session = useWren()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isCoverMenuOpen, setIsCoverMenuOpen] = useState(false)
   const isPlaying = useAudioQueue((store) => isCurrent && isPlayingOf(store))
   const isDownloaded = useIsDownloaded(track.id)
   const openMenu = () => setIsMenuOpen(true)
@@ -81,6 +83,7 @@ export function TrackRow({
         isPlaying={isPlaying}
         label={label}
         lead={lead}
+        onArtHold={() => setIsCoverMenuOpen(true)}
         onLongPress={openMenu}
         onMore={openMenu}
         onPress={onPress}
@@ -89,6 +92,9 @@ export function TrackRow({
       />
       {isMenuOpen && session !== null && (
         <RowMenu onClose={() => setIsMenuOpen(false)} session={session} track={track} />
+      )}
+      {isCoverMenuOpen && (
+        <TrackCoverMenu onClose={() => setIsCoverMenuOpen(false)} track={track} />
       )}
     </View>
   )

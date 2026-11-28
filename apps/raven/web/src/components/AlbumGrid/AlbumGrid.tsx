@@ -9,12 +9,14 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 import { AlbumCover } from '@/components/AlbumCover/AlbumCover'
+import { useAlbumMenu } from '@/components/MusicMenu/useMusicMenu'
 import { Bone } from '@/components/Skeleton/Skeleton'
 import { useMusicLinks } from '@/lib/useMusicLinks'
 import { POSTER_SIZES } from '@/lib/posters'
 import styles from '@/components/AlbumGrid/AlbumGrid.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
 import { useDrawnFirst } from '@/lib/useDrawnFirst'
+import { classNames } from '@raven/ui'
 
 /** What a card's hint is handed: its album, whether the pointer or the focus is on the card, and the id its title is described by. */
 export type AlbumHintProps = { album: AlbumSummary; isShown: boolean; id: string }
@@ -39,11 +41,15 @@ const anchorAt = ({ card, x, y }: AnchorAtProps): void => {
 const follow = (event: PointerEvent<HTMLLIElement>): void =>
   anchorAt({ card: event.currentTarget, x: event.clientX, y: event.clientY })
 
-/** One album: its cover, linking to its page, with its title and artists under. */
+/**
+ * One album: its cover, linking to its page, with its title and artists under. A finger held
+ * on the cover opens what is known of the album, with Go to album and Go to artist.
+ */
 export const AlbumCard = ({ album, hint: Hint }: AlbumCardProps) => {
   const links = useMusicLinks()
   const hintId = useId()
   const [isPeeked, setPeeked] = useState(false)
+  const { coverProps, coverClass, menu } = useAlbumMenu({ album, isOnAlbum: false })
   const hide = (): void => setPeeked(false)
   const peekAtPointer = (event: PointerEvent<HTMLLIElement>): void => {
     follow(event)
@@ -73,9 +79,16 @@ export const AlbumCard = ({ album, hint: Hint }: AlbumCardProps) => {
   return (
     <li className={styles.card} data-entry={`album:${album.id}`} {...peeking}>
       {/* The title under it is the link read aloud; the cover is the same link for the pointer. */}
-      <Link to={links.album(album.id)} className={styles.cover} aria-hidden="true" tabIndex={-1}>
+      <Link
+        to={links.album(album.id)}
+        className={classNames([styles.cover, coverClass])}
+        aria-hidden="true"
+        tabIndex={-1}
+        {...coverProps}
+      >
         <AlbumCover album={album} sizes={POSTER_SIZES.grid} />
       </Link>
+      {menu}
       {Hint && <Hint album={album} isShown={isPeeked} id={hintId} />}
       <p className={styles.title}>
         <Link to={links.album(album.id)} aria-describedby={Hint && isPeeked ? hintId : undefined}>

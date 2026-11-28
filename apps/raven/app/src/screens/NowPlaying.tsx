@@ -80,7 +80,13 @@ const NowPlayingPage = ({ session }: NowPlayingPageProps) => {
   const playing =
     track === null
       ? null
-      : { title: track.title, artists: artistNames(track), album: track.album.title, cover }
+      : {
+          played: track,
+          title: track.title,
+          artists: artistNames(track),
+          album: track.album.title,
+          cover,
+        }
   const nextStart = nextChapterStart({ chapters, at: position })
   const onNextChapter = nextStart === null ? null : () => seekTo(nextStart)
   const book: BookControls | null = isAudiobook

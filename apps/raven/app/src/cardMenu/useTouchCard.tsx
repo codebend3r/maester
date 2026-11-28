@@ -1,17 +1,11 @@
-import { type ReactNode, useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { CardMenu } from '@/cardMenu/CardMenu'
+import type { TouchCard } from '@/cardMenu/touchCard'
 import { touchCardMenu } from '@/layouts/CardMenu.touch'
 import type { ShelfCard } from '@/queries/cards'
 
 type UseTouchCardProps = { card: Pick<ShelfCard, 'title' | 'subject'> }
-
-type TouchCard = {
-  /** The card's `onLongPress`; undefined for a card that stands for nothing, which leaves a hold to the system. */
-  onLongPress: (() => void) | undefined
-  /** The menu, drawn inside the card while it is held: the system's sheet, opened once the title is read. */
-  menu: ReactNode
-}
 
 /**
  * What a card under the thumb does with a long press, whatever it looks like: it opens the

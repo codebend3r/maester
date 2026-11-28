@@ -101,6 +101,9 @@ type ChapterLabelProps = { title: string; at: string }
 
 /** The words both platforms' music pages say. */
 export const MUSIC_COPY = {
+  /** What a long press on a cover does, as the screen reader offers it. */
+  coverHoldAction: 'More about it',
+  coverHoldHint: 'Shows more about it, and goes to its album or artist',
   play: 'Play',
   pause: 'Pause',
   shuffle: 'Shuffle',

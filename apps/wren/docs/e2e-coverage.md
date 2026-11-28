@@ -2,7 +2,7 @@
 
 Which features each Wren app's end to end suite exercises, so the gaps show at a glance. A row is a feature of Wren's; a column is one of the apps Wren ships as. raven's video apps have a table of their own, [raven's end to end coverage](../../raven/docs/e2e-coverage.md). It lists what the suites run, not what unit tests cover.
 
-Read on 2026-11-26 from the suites themselves. A new end to end test, or a new Wren app, changes this table: update it in the same change.
+Read on 2026-11-27 from the suites themselves. A new end to end test, or a new Wren app, changes this table: update it in the same change.
 
 | Mark | Meaning |
 | :-: | --- |
@@ -48,6 +48,11 @@ Every suite opens on `@raven/server`'s `serve:fixture`, whose open music library
 | A list's sort and cover size | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Unmatched albums, In progress and Recently finished | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Back from an album to Albums, and from Albums to Library | ❌ | ✅ | ❌ | ❌ | ❌ | ⚠️ 8 |
+| **Holding a cover** | | | | | | |
+| An album tile's cover opens what the album is, and its Go to artist and Go to album | ✅ | ✅ | ✅ | ✅ | ➖ | ➖ |
+| A short tap on the cover still opens the album | ✅ | ❌ | ❌ | ❌ | ➖ | ➖ |
+| The playing song's cover opens what the song is | ⚠️ 12 | ⚠️ 13 | ⚠️ 13 | ⚠️ 13 | ➖ | ➖ |
+| A song row's art opens the song's menu, the screen reader's long press too | ❌ | ❌ | ❌ | ❌ | ➖ | ➖ |
 | **Favourites and playlists** | | | | | | |
 | Like a song, find it under Favourites, and take it off | ⚠️ 3 | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Like an album, find it under Favourites, and take it off | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -72,6 +77,8 @@ Every suite opens on `@raven/server`'s `serve:fixture`, whose open music library
 | Up next: move a song up or down | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Lyrics | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | A song's menu: Play next and Add to queue | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| The equalizer marks the playing song's playlist row and the player bar | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `/design` shows the equalizer at its three sizes | ✅ | ➖ | ➖ | ➖ | ➖ | ➖ |
 | **Settings** | | | | | | |
 | Pick a theme, and it is still worn after a reload or relaunch | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Name the server, and the status says the name | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -104,10 +111,12 @@ Every suite opens on `@raven/server`'s `serve:fixture`, whose open music library
 9. The Android TV flow finds the album among a search's results for a word of its title, under All; it never picks the Albums filter.
 10. Both TV suites press the remote's play and pause key after playing, and assert nothing of it.
 11. The Apple TV test opens Library from the sidebar; the Android TV flows open Library and Search. Neither opens Home or Settings from it.
+12. The web suite holds the mini player's cover at phone width and follows its Go to artist; it never holds Now Playing's cover or the player bar's.
+13. The flow holds Now Playing's cover and reads the song's album off its menu; it never holds the mini player's or the tablet player bar's, and presses neither place.
 
 ## The widest gaps
 
-- **The iPad and Android phones run only the iPhone's three flows.** They reach the album through the tablet's sidebar, but the two column Now Playing is never driven.
+- **The iPad and Android phones run only the iPhone's four flows.** They reach the album through the tablet's sidebar, but the two column Now Playing is never driven.
 - **Wren signs in nowhere.** Both suites open on the accountless fixture, so the sign-in page, sign out and a refused account are never driven.
 - **The iPhone is tested far less than the web.** It plays, steps, pauses and downloads one album; search, favourites, playlists, Now Playing, Up next and Settings are driven on the web alone, though both apps have them.
 - **Downloads are tested once,** on the iPhone: an album downloaded and listed. Removing one, the storage limit and playing offline are untested.

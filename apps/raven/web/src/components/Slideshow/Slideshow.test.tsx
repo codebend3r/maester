@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, render } from '@testing-library/react'
+import { LESS_MOTION } from '@raven/ui'
 import { SLIDE_MS, Slideshow, slideRoles } from '@/components/Slideshow/Slideshow'
-import { LESS_MOTION } from '@/lib/motion'
 
 const SLIDES = ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg']
 

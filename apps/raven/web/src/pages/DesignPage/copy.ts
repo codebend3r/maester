@@ -212,6 +212,9 @@ export const DESIGN_COPY = {
     watchedNote:
       'A check on a watched video, the number left or a check on a show, season or saga, and the toggle on a page: unpressed, partly and pressed.',
     scanStatus: 'ScanStatus',
+    equalizer: 'Equalizer',
+    equalizerNote:
+      'Small in a track row, medium beside a song title, large where there is room. Each bar follows a band of what plays, low to high, and holds still while nothing does.',
     playbackNote: 'PlaybackNote',
     playbackNoteNote: 'Only for a video this browser cannot play.',
     mediaCard: 'MediaCard',

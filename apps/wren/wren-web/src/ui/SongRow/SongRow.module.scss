@@ -40,6 +40,8 @@
   place-items: center;
   border-radius: var(--radius-xs);
   background: var(--color-picture-veil);
+  // The cover under it takes the long press, so a touch goes through the veil.
+  pointer-events: none;
 }
 
 .text {

@@ -1,8 +1,8 @@
-import type { ArtistCredit } from '@raven/core'
+import { type ArtistCredit, MUSIC_LINKS, type MusicLink, musicLinksOf } from '@raven/core'
 import { TRACK_MENU_COPY } from '@/copy/components'
 
-/** Where the menu can go from what it is about: the album, the artist. */
-export type MenuPlaces = { albumId?: number; artist?: ArtistCredit }
+/** Where the menu can go from what it is about: the album, and the first of its artists. */
+export type MenuPlaces = { albumId?: number; artists?: readonly ArtistCredit[] }
 
 /** One of the menu's rows. `Icon` is each app's own drawing. */
 type MenuAction<Icon> = { icon: Icon; label: string; onPress: () => void }
@@ -53,6 +53,42 @@ type MenuGroupsOfProps<Icon> = {
   onArtist: (artistId: number) => void
 }
 
+type PlaceActionsOfProps<Icon> = Pick<
+  MenuGroupsOfProps<Icon>,
+  'places' | 'onAlbum' | 'onArtist'
+> & { icons: Pick<MenuIcons<Icon>, 'album' | 'artist'> }
+
+type PlaceActionOfProps<Icon> = Omit<PlaceActionsOfProps<Icon>, 'places'> & { link: MusicLink }
+
+/** A link as the menu's row: Go to album or Go to artist, opening its page. */
+const placeActionOf = <Icon>({
+  icons,
+  link,
+  onAlbum,
+  onArtist,
+}: PlaceActionOfProps<Icon>): MenuAction<Icon> =>
+  link.kind === MUSIC_LINKS.album
+    ? { icon: icons.album, label: TRACK_MENU_COPY.goToAlbum, onPress: () => onAlbum(link.albumId) }
+    : {
+        icon: icons.artist,
+        label: TRACK_MENU_COPY.goToArtist,
+        onPress: () => onArtist(link.artistId),
+      }
+
+/**
+ * Go to album and Go to artist, for the places given, the album before the artist: the track
+ * menu's last group, and what a held cover's menu offers under its facts.
+ */
+export const placeActionsOf = <Icon>({
+  icons,
+  places: { albumId, artists },
+  onAlbum,
+  onArtist,
+}: PlaceActionsOfProps<Icon>): readonly MenuAction<Icon>[] =>
+  musicLinksOf({ albumId: albumId ?? null, artists: artists ?? [], isFirstArtistOnly: true }).map(
+    (link) => placeActionOf({ icons, link, onAlbum, onArtist }),
+  )
+
 type LikingOfProps<Icon> = Pick<MenuGroupsOfProps<Icon>, 'icons' | 'like'>
 
 /** A song's Like, or its Unlike while it is a favourite; none where the menu has no like. */
@@ -71,7 +107,7 @@ export const menuGroupsOf = <Icon>({
   icons,
   like,
   canAddToPlaylist,
-  places: { albumId, artist },
+  places,
   onPlayNext,
   onAddToQueue,
   onPlaylists,
@@ -87,17 +123,5 @@ export const menuGroupsOf = <Icon>({
       ? { icon: icons.playlistAdd, label: TRACK_MENU_COPY.addToPlaylist, onPress: onPlaylists }
       : null,
   ]
-  const goes: readonly (MenuAction<Icon> | null)[] = [
-    albumId === undefined
-      ? null
-      : { icon: icons.album, label: TRACK_MENU_COPY.goToAlbum, onPress: () => onAlbum(albumId) },
-    artist === undefined
-      ? null
-      : {
-          icon: icons.artist,
-          label: TRACK_MENU_COPY.goToArtist,
-          onPress: () => onArtist(artist.id),
-        },
-  ]
-  return [queue.filter(isAction), goes.filter(isAction)]
+  return [queue.filter(isAction), placeActionsOf({ icons, places, onAlbum, onArtist })]
 }

@@ -29,13 +29,12 @@ const renderMenu = ({
   tracksOf = async () => OK_COMPUTER_PAGE.tracks,
 }: RenderMenuProps = {}) => {
   const onClose = mock()
-  const [artist] = OK_COMPUTER.artists
   const sheet = (
     <TracksMenu
       canAddToPlaylist={canAddToPlaylist}
       head={{ title: OK_COMPUTER.title, subtitle: RADIOHEAD.name }}
       onClose={onClose}
-      places={{ artist }}
+      places={{ artists: OK_COMPUTER.artists }}
       tracksOf={tracksOf}
     />
   )

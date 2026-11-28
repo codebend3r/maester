@@ -21,3 +21,9 @@
 .raised {
   box-shadow: var(--shadow-raised);
 }
+
+// A cover a finger holds for its menu: no system callout or text selection on the hold.
+.holdable {
+  -webkit-touch-callout: none;
+  user-select: none;
+}

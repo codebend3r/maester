@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { ApiError, type PlaylistDetails, QUEUE_SOURCE_KINDS } from '@raven/core'
-import { useToasts } from '@raven/ui'
-import { useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
+import { EQUALIZER_MARK, useToasts } from '@raven/ui'
+import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ravenPlayer } from '@/lib/ravenPlayer'
@@ -87,6 +87,19 @@ describe('PlaylistPage', () => {
     expect(useAudioQueue.getState().queue.at).toBe(2)
     fireEvent.click(screen.getByRole('button', { name: 'Shuffle' }))
     expect(useAudioQueue.getState().queue.isShuffled).toBe(true)
+  })
+
+  it("shows the equalizer in the queue's track's row alone, playing or paused", async () => {
+    renderPage()
+    await screen.findByRole('heading', { level: 1, name: 'Evening' })
+    const rows = () => within(screen.getByRole('list', { name: 'Tracks' })).getAllByRole('listitem')
+    const withEqualizer = () =>
+      rows().map((row) => row.querySelector(`[${EQUALIZER_MARK}]`) !== null)
+    expect(withEqualizer()).toEqual([false, false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Play Lucky' }))
+    expect(withEqualizer()).toEqual([false, false, true])
+    act(() => useAudioQueue.getState().engine.state(AUDIO_STATES.paused))
+    expect(withEqualizer()).toEqual([false, false, true])
   })
 
   it('moves a track up and takes one out, sending the whole new order', async () => {

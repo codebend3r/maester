@@ -10,7 +10,7 @@ import {
 import { describe, expect, it } from 'bun:test'
 import { createMenuHub } from '@/desktop/menuHub'
 import { type DownloadsPage, playPathOf } from '@/desktop/paths'
-import { MUSIC_PATHS } from '@/lib/music'
+import { MUSIC_PATHS } from '@/lib/musicPaths'
 import {
   ENGINE_NOTES,
   ENGINE_USES,

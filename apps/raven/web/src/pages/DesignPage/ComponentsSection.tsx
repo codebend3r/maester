@@ -1,7 +1,8 @@
 import { DEFAULT_LIBRARY_SETTINGS, type LibrarySettings, ITEM_TYPES } from '@raven/core'
 import { useRef, useState } from 'react'
-import { BUTTON_TONES, Button, ButtonLink, Controls } from '@raven/ui'
+import { BUTTON_TONES, Button, ButtonLink, Controls, EQUALIZER_SIZES } from '@raven/ui'
 import { CastRow } from '@/components/CastRow/CastRow'
+import { Equalizer } from '@/components/Equalizer/Equalizer'
 import { ItemHeader, PICTURE_SHAPES } from '@/components/ItemHeader/ItemHeader'
 import { LibraryToolbar } from '@/components/LibraryToolbar/LibraryToolbar'
 import { MediaCard } from '@/components/MediaCard/MediaCard'
@@ -43,6 +44,8 @@ import { APP_PATHS } from '@/lib/appPaths'
 const COPY = DESIGN_COPY.components
 
 const noop = () => undefined
+
+const SHOWN_EQUALIZER_SIZES = Object.values(EQUALIZER_SIZES)
 
 /** The toolbar with its own state, since here it saves to nothing. */
 const ToolbarDemo = () => {
@@ -162,6 +165,14 @@ export const ComponentsSection = () => (
           </li>
         ))}
       </ul>
+    </Specimen>
+
+    <Specimen name={COPY.equalizer} note={COPY.equalizerNote}>
+      <div className={styles.row}>
+        {SHOWN_EQUALIZER_SIZES.map((size) => (
+          <Equalizer key={size} isPlaying size={size} />
+        ))}
+      </div>
     </Specimen>
 
     <Specimen name={COPY.playbackNote} note={COPY.playbackNoteNote}>

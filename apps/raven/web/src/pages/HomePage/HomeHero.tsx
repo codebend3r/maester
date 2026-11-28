@@ -1,11 +1,17 @@
-import { BUTTON_TONES, Button, ButtonLink, FactParts, classNames } from '@raven/ui'
+import {
+  BUTTON_TONES,
+  Button,
+  ButtonLink,
+  FactParts,
+  classNames,
+  useAsksForLessMotion,
+} from '@raven/ui'
 import { Fragment, type KeyboardEvent, type TouchEvent, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Featured } from '@/pages/HomePage/featured'
 import { HOME_COPY } from '@/pages/HomePage/copy'
 import styles from '@/pages/HomePage/HomeHero.module.scss'
 import { COMMON_COPY } from '@/lib/copy'
-import { useAsksForLessMotion } from '@/lib/motion'
 
 /** How long each arrival holds before the next takes its place. */
 export const HERO_MS = 7000
