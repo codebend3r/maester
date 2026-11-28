@@ -1,11 +1,22 @@
-import type { AlbumDetails, ItemDetails, MediaItem } from '@raven/core'
+import {
+  type AlbumDetails,
+  type ItemDetails,
+  type MediaItem,
+  RAVEN_FACT_WORDING,
+  type Track,
+  albumInfoOf,
+  trackInfoOf,
+} from '@raven/core'
+import { usePlayedQuality } from '@raven/native/headless'
 import { KeyedView, type ViewOf, type ViewsOf } from '@raven/ui/headless'
 import { type UseQueryResult, useQuery } from '@tanstack/react-query'
 import type { ComponentType } from 'react'
 
+import { aboutOf } from '@/cardMenu/menuOptions'
 import {
   useAlbumMenuOptions,
   useItemMenuOptions,
+  useTrackMenuOptions,
   useVideoMenuOptions,
 } from '@/cardMenu/useMenuOptions'
 import type { CardMenuKit, ReadingMenuProps } from '@/layouts/cardMenuKit'
@@ -73,7 +84,7 @@ const ReadMenu = <Data,>({ read, Ready, ...menu }: ReadMenuProps<Data>) => {
 const ItemOptions = ({ title, session, kit, data, onClose }: ReadyProps<ItemDetails>) => {
   const { CardMenuView, canDownload } = kit
   const options = useItemMenuOptions({ session, canDownload, details: data })
-  return <CardMenuView onClose={onClose} options={options} title={title} />
+  return <CardMenuView about={null} onClose={onClose} options={options} title={title} />
 }
 
 type ItemMenuProps = MenuProps & { itemId: number }
@@ -87,7 +98,7 @@ const ItemMenu = ({ itemId, ...menu }: ItemMenuProps) => (
 const VideoOptions = ({ title, session, kit, data, onClose }: ReadyProps<MediaItem>) => {
   const { CardMenuView, canDownload } = kit
   const options = useVideoMenuOptions({ session, canDownload, media: data })
-  return <CardMenuView onClose={onClose} options={options} title={title} />
+  return <CardMenuView about={null} onClose={onClose} options={options} title={title} />
 }
 
 type VideoMenuProps = MenuProps & { mediaId: number }
@@ -101,34 +112,86 @@ const VideoMenu = ({ mediaId, ...menu }: VideoMenuProps) => (
   />
 )
 
-/** An album's options, drawn as the platform draws them. */
-const AlbumOptions = ({ title, session, kit, data, onClose }: ReadyProps<AlbumDetails>) => {
+/** An album's page as its menu reads it, and whether the menu is on that page. */
+type AlbumRead = { details: AlbumDetails; isOnAlbum: boolean }
+
+/** An album's options, drawn as the platform draws them, under what is known of it. */
+const AlbumOptions = ({ title, session, kit, data, onClose }: ReadyProps<AlbumRead>) => {
   const { CardMenuView } = kit
-  const options = useAlbumMenuOptions({ session, details: data })
-  return <CardMenuView onClose={onClose} options={options} title={title} />
+  const { details, isOnAlbum } = data
+  const options = useAlbumMenuOptions({ session, details, isOnAlbum })
+  const about = aboutOf(
+    albumInfoOf({ album: details.album, extras: details, wording: RAVEN_FACT_WORDING }),
+  )
+  return <CardMenuView about={about} onClose={onClose} options={options} title={title} />
 }
 
-type AlbumMenuProps = MenuProps & { albumId: number }
+type AlbumMenuProps = MenuProps & Pick<AlbumRead, 'isOnAlbum'> & { albumId: number }
 
-/** The menu over an album: its page is read for whether it is a favourite. */
-const AlbumMenu = ({ albumId, ...menu }: AlbumMenuProps) => (
-  <ReadMenu
-    {...menu}
-    Ready={AlbumOptions}
-    read={useQuery(menu.session.queries.albumQuery(albumId))}
-  />
-)
+/** The menu over an album: its page is read for whether it is a favourite, its genres and label. */
+const AlbumMenu = ({ albumId, isOnAlbum, ...menu }: AlbumMenuProps) => {
+  const read = useQuery({
+    ...menu.session.queries.albumQuery(albumId),
+    select: (details: AlbumDetails): AlbumRead => ({ details, isOnAlbum }),
+  })
+  return <ReadMenu {...menu} Ready={AlbumOptions} read={read} />
+}
+
+type TrackOptionsProps = Omit<MenuProps, 'session'> & {
+  track: Track
+  /** The track's album page once read, for when it came out; null when the read failed. */
+  details: AlbumDetails | null
+}
+
+/** The playing track's options, drawn as the platform draws them, under what is known of it. */
+const TrackOptions = ({ title, kit, track, details, onClose }: TrackOptionsProps) => {
+  const { CardMenuView } = kit
+  const quality = usePlayedQuality({ track })
+  const options = useTrackMenuOptions({ track })
+  const about = aboutOf(trackInfoOf({ track, details, quality, wording: RAVEN_FACT_WORDING }))
+  return <CardMenuView about={about} onClose={onClose} options={options} title={title} />
+}
+
+/** The track menu's two views: reading its album, and ready with its options. */
+type TrackMenuViewProps = {
+  [MENU_READS.reading]: ReadingProps
+  [MENU_READS.ready]: TrackOptionsProps
+}
+
+const TRACK_MENU_VIEWS = {
+  [MENU_READS.reading]: ReadingMenu,
+  [MENU_READS.ready]: TrackOptions,
+} as const satisfies ViewsOf<TrackMenuViewProps>
+
+type TrackMenuProps = MenuProps & { track: Track }
+
+/**
+ * The menu over the playing track's cover: its album is read first for when it came out, since
+ * a sheet once open cannot change; a read that fails opens it with what the track says.
+ */
+const TrackMenu = ({ track, session, ...menu }: TrackMenuProps) => {
+  const album = useQuery(session.queries.albumQuery(track.albumId))
+  const view: ViewOf<TrackMenuViewProps> = album.isPending
+    ? {
+        key: MENU_READS.reading,
+        props: { kit: menu.kit, title: menu.title, isFailed: false, onClose: menu.onClose },
+      }
+    : { key: MENU_READS.ready, props: { ...menu, track, details: album.data ?? null } }
+  return <KeyedView<TrackMenuViewProps> view={view} views={TRACK_MENU_VIEWS} />
+}
 
 type SubjectMenuViewProps = {
   [CARD_SUBJECTS.item]: ItemMenuProps
   [CARD_SUBJECTS.video]: VideoMenuProps
   [CARD_SUBJECTS.album]: AlbumMenuProps
+  [CARD_SUBJECTS.track]: TrackMenuProps
 }
 
 const SUBJECT_MENUS = {
   [CARD_SUBJECTS.item]: ItemMenu,
   [CARD_SUBJECTS.video]: VideoMenu,
   [CARD_SUBJECTS.album]: AlbumMenu,
+  [CARD_SUBJECTS.track]: TrackMenu,
 } as const satisfies ViewsOf<SubjectMenuViewProps>
 
 type SubjectMenuViewOfProps = MenuProps & { subject: CardSubject }
@@ -144,7 +207,12 @@ const subjectMenuViewOf = ({
     case CARD_SUBJECTS.video:
       return { key: CARD_SUBJECTS.video, props: { ...menu, mediaId: subject.mediaId } }
     case CARD_SUBJECTS.album:
-      return { key: CARD_SUBJECTS.album, props: { ...menu, albumId: subject.albumId } }
+      return {
+        key: CARD_SUBJECTS.album,
+        props: { ...menu, albumId: subject.albumId, isOnAlbum: subject.isOnAlbum },
+      }
+    case CARD_SUBJECTS.track:
+      return { key: CARD_SUBJECTS.track, props: { ...menu, track: subject.track } }
     default: {
       const unknown: never = subject
       return unknown

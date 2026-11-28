@@ -1,15 +1,25 @@
 import { describe, expect, it } from 'bun:test'
-import { ITEM_TYPES, type ItemSummary, WATCHED_STATES } from '@raven/core'
+import {
+  ITEM_TYPES,
+  type ItemSummary,
+  MUSIC_FACTS,
+  MUSIC_LINKS,
+  MUSIC_LINK_COPY,
+  type MusicLink,
+  WATCHED_STATES,
+} from '@raven/core'
 import { mediaItemFor, summaryFor } from '@raven/native/testing'
 
 import {
   CARD_MENU_COPY,
+  aboutOf,
   bingeOptionOf,
   deleteOptionOf,
   downloadOptionOf,
   favouriteOptionOf,
   isOptionBlocked,
   linkOptionOf,
+  musicLinkOptionOf,
   readingNoteOf,
   watchedOptionOf,
 } from '@/cardMenu/menuOptions'
@@ -154,5 +164,43 @@ describe('deleteOptionOf', () => {
     expect(option.isDestructive).toBe(true)
     option.onPress()
     expect(asked).toEqual(['ask'])
+  })
+})
+
+describe('the music menu', () => {
+  it('says an album or a track a fact a line, each by its name', () => {
+    expect(
+      aboutOf([
+        { key: MUSIC_FACTS.artists, value: 'Radiohead' },
+        { key: MUSIC_FACTS.released, value: '1997' },
+      ]),
+    ).toBe('Artist: Radiohead\nReleased: 1997')
+    expect(aboutOf([])).toBeNull()
+  })
+
+  it('goes to the album, to its one artist, or to each of several by name, keyed apart', () => {
+    const opened: MusicLink[] = []
+    const onOpen = (link: MusicLink) => opened.push(link)
+    const album: MusicLink = { kind: MUSIC_LINKS.album, albumId: 7 }
+    const one: MusicLink = {
+      kind: MUSIC_LINKS.artist,
+      artistId: 1,
+      name: 'Radiohead',
+      isNamed: false,
+    }
+    const named: MusicLink = {
+      kind: MUSIC_LINKS.artist,
+      artistId: 2,
+      name: 'Thom Yorke',
+      isNamed: true,
+    }
+    const options = [album, one, named].map((link) => musicLinkOptionOf({ link, onOpen }))
+    expect(options.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: 'album', label: MUSIC_LINK_COPY.goToAlbum },
+      { key: 'artist:1', label: MUSIC_LINK_COPY.goToArtist },
+      { key: 'artist:2', label: 'Go to Thom Yorke' },
+    ])
+    options[2]?.onPress()
+    expect(opened).toEqual([named])
   })
 })

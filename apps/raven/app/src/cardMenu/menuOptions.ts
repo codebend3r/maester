@@ -1,4 +1,15 @@
-import { ITEM_TYPES, type MediaItem, WATCHED_STATES, type WatchedState } from '@raven/core'
+import {
+  ITEM_TYPES,
+  MUSIC_FACT_LABELS,
+  type MediaItem,
+  type MusicFact,
+  type MusicLink,
+  type MusicLinkKey,
+  WATCHED_STATES,
+  type WatchedState,
+  musicLinkKeyOf,
+  musicLinkLabelOf,
+} from '@raven/core'
 
 import {
   DOWNLOAD_ACTIONS,
@@ -31,7 +42,11 @@ export const CARD_MENU_COPY = {
   deleteFailed: (name: string) => `${name} could not be deleted`,
   reading: 'Reading the title',
   failed: 'The title could not be read.',
+  /** A fact of an album or a track as the menu says it: "Released: 1997". */
+  fact: ({ label, value }: FactProps) => `${label}: ${value}`,
 } as const
+
+type FactProps = { label: string; value: string }
 
 /** What a line of the menu does: a mark, the download, the owner's delete, or one of the ways up. */
 const CARD_MENU_ACTIONS = {
@@ -47,7 +62,8 @@ type CardMenuAction = (typeof CARD_MENU_ACTIONS)[keyof typeof CARD_MENU_ACTIONS]
 
 /** One line of a card's menu: what it does, and what blocks it now, if anything does. */
 export type CardMenuOption = {
-  key: CardMenuAction
+  /** What it does; a way to an album or an artist is keyed by which, so several artists stay apart. */
+  key: CardMenuAction | MusicLinkKey
   label: string
   /** What blocks the option now, drawn under it faint; null while it can be taken. */
   blockedBy: string | null
@@ -153,3 +169,23 @@ export const linkOptionOf = ({ link, onOpen }: LinkOptionOfProps): CardMenuOptio
 /** What the menu says while its title is read, or once the read failed. */
 export const readingNoteOf = (isFailed: boolean): string =>
   isFailed ? CARD_MENU_COPY.failed : CARD_MENU_COPY.reading
+
+type MusicLinkOptionOfProps = { link: MusicLink; onOpen: (link: MusicLink) => void }
+
+/** A way from an album or the track playing: to the album's page, or to one of its artists'. */
+export const musicLinkOptionOf = ({ link, onOpen }: MusicLinkOptionOfProps): CardMenuOption => ({
+  key: musicLinkKeyOf(link),
+  label: musicLinkLabelOf(link),
+  blockedBy: null,
+  onPress: () => onOpen(link),
+})
+
+/** What a menu says of its album or track under the title, a fact a line; null with none. */
+export const aboutOf = (facts: readonly MusicFact[]): string | null =>
+  facts.length === 0
+    ? null
+    : facts
+        .map((fact) =>
+          CARD_MENU_COPY.fact({ label: MUSIC_FACT_LABELS[fact.key], value: fact.value }),
+        )
+        .join('\n')

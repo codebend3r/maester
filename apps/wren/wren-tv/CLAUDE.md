@@ -34,6 +34,8 @@ Each of these is intended. Anything else that differs is drift.
 - **No "Streaming on cellular"**, CarPlay or Android Auto: a TV has no mobile network and no car. `useWrenPrefs` keeps the web's values: the theme choice, `homeSort`, `coverSize` and `libraryId`.
 - **No volume and no Output on Now Playing.** The TV's own remote sets the volume, and a TV plays through its own speakers.
 - **Gestures become controls**, as on the web: Up next moves a song with Move up and Move down and takes it off with Remove; the remote has no drag or swipe.
+- **No cover menu.** The phone's and the web's long press on a cover (an album tile's, a song row's art, the mini player's, Now Playing's), which opens what the music is with Go to album and Go to artist, has no TV counterpart: the remote has no long press on a picture, and a tile's or a row's own press, and its More or holding select, already reach the album and the artist.
+- **The equalizer swings on its own loop.** `ui/Equalizer`'s bars loop a fixed swing, as the phone's do, where the web's follow the sound (`apps/wren/wren-web/CLAUDE.md`), since the TV's player hands Wren no levels.
 - **No A to Z rail.** The remote scrolls the artists' grid.
 - **Now Playing is the tablet's sideways layout always**: the player beside one pane of Up next and Lyrics.
 - **Home's shortcuts are the tablet's less Downloads**: Shuffle all and Playlists, beside Continue listening.

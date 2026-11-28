@@ -21,16 +21,18 @@ import {
   useAudioQueue,
   usePlayerPrefs,
   useTrackBitrate,
+  useSoundMeter,
   useTrackRate,
   useWindowedAudioHost,
 } from '@raven/ui/headless'
-import { type ComponentType, useEffect, useEffectEvent, useMemo } from 'react'
+import { type ComponentType, useEffect, useEffectEvent, useMemo, useState } from 'react'
 import { CONNECTION_STATUSES } from '@/desktop/portConnection'
 import {
   type AudioConnection,
   type NativeAudio,
   useAudioConnection,
 } from '@/desktop/audioConnection'
+import { createSoundReader } from '@/desktop/audio/soundLevels'
 
 type ArtworkOfProps = { api: ApiClient; track: Track }
 
@@ -135,6 +137,8 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   const eq = usePlayerPrefs((prefs) => prefs.equalizer.gains)
   const level = track === null ? 1 : levelOf({ track, mode: levelling })
   const nextLevel = next === null ? null : levelOf({ track: next, mode: levelling })
+  // One reader for the host's life, which the levels main sends keep up to date.
+  const [reader] = useState(createSoundReader)
 
   const setRate = useEffectEvent((speed: number) => {
     player.send({ type: AUDIO_COMMANDS.speed, rate: speed }).catch(() => undefined)
@@ -188,6 +192,8 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
         return engine.failed(event.message)
       case AUDIO_EVENTS.remote:
         return runRemoteCommand(event.command)
+      case AUDIO_EVENTS.levels:
+        return reader.take(event.measure)
       default: {
         const unreachable: never = event
         return unreachable
@@ -196,6 +202,12 @@ const NativeAudioHost = ({ api, player }: NativeAudioHostProps) => {
   })
 
   useEffect(() => player.subscribe((event) => onEvent(event)), [player])
+
+  /*
+   * The bars read what mpv measures while this engine is connected. Another host may have taken
+   * the meter since, so the release lets go only of this reader when the engine goes.
+   */
+  useEffect(() => useSoundMeter.getState().claim(reader.levels), [reader])
 
   // What the system shows: the words at once, the cover once its bytes have come.
   const showTrack = useEffectEvent((isCurrent: () => boolean) => {

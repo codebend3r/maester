@@ -15,7 +15,13 @@ import {
   type MpvEvent,
 } from '@/mpv'
 import { MPV_OPTIONS } from '@/options'
-import { MPV_CHOICES, MPV_PROPERTIES, MPV_TRACK_TYPES, propertyGuards } from '@/properties'
+import {
+  MPV_CHOICES,
+  MPV_FILTER_LABELS,
+  MPV_PROPERTIES,
+  MPV_TRACK_TYPES,
+  propertyGuards,
+} from '@/properties'
 import { isWindows, project } from '@/build/context'
 import { isCleanupMode } from '@/test/cleanupModes'
 
@@ -407,6 +413,47 @@ test('an audio surface plays sound alone: no video track is picked, and nothing 
       artwork: null,
     })
     player.clearNowPlaying()
+  } finally {
+    await player.destroy()
+  }
+})
+
+// The meter Raven's music engine ends each track's `af` with; its keys are ffmpeg's.
+const METER_GRAPH =
+  'astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=RMS_level+Peak_level,' +
+  'aspectralstats=win_size=1024:measure=centroid'
+/** The keys the meter's frame metadata carries: the overall RMS level and the first channel's centroid. */
+const METER_FIELDS = {
+  rms: 'lavfi.astats.Overall.RMS_level',
+  centroid: 'lavfi.aspectralstats.1.centroid',
+} as const
+
+const METER_KEYS = Object.values(METER_FIELDS)
+
+type MeteredProps = { player: Mpv; remaining?: number }
+
+/** What the meter measured once it has measured a frame; it is unavailable until the file opens. */
+const metered = async ({ player, remaining = 100 }: MeteredProps) => {
+  const metadata = await player.read({ name: MPV_PROPERTIES.afMeter }).catch(() => null)
+  if (metadata !== null && METER_KEYS.every((key) => Object.hasOwn(metadata, key))) return metadata
+  if (remaining === 0) throw new Error('The meter never measured a frame')
+  await sleep(50)
+  return metered({ player, remaining: remaining - 1 })
+}
+
+test('a labelled meter in af reports what plays through af-metadata', async () => {
+  const player = await openMpv({ surface: { kind: MPV_SURFACE_KINDS.audio }, onEvent: () => {} })
+  try {
+    await player.set({ name: MPV_OPTIONS.ao, value: TEST_AUDIO_OUTPUTS.null })
+    await player.set({
+      name: MPV_OPTIONS.af,
+      value: `@${MPV_FILTER_LABELS.meter}:lavfi=[${METER_GRAPH}]`,
+    })
+    await player.command({ args: [MPV_COMMANDS.loadfile, clip] })
+    const metadata = await metered({ player })
+    // The fixture's first audio track is a 440 Hz sine at ffmpeg's default amplitude.
+    assert.ok(Number(metadata[METER_FIELDS.rms]) > -40)
+    assert.ok(Number(metadata[METER_FIELDS.centroid]) > 0)
   } finally {
     await player.destroy()
   }

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, jest, spyOn } from 'bun:test'
 import { act, cleanup, fireEvent, screen, within } from '@testing-library/react'
+import { LESS_MOTION } from '@raven/ui'
 import {
   FACT_PART_KINDS,
   PICTURE_RANGES,
@@ -10,7 +11,6 @@ import {
 } from '@raven/core'
 import { type Featured } from '@/pages/HomePage/featured'
 import { HERO_MS, HomeHero, WASH_SIZES, titleSize } from '@/pages/HomePage/HomeHero'
-import { LESS_MOTION } from '@/lib/motion'
 import { matchedMovie } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 

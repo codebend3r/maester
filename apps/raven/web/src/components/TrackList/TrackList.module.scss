@@ -119,4 +119,19 @@
   .number {
     display: none;
   }
+
+  // The queue's row keeps its lead, so the equalizer still shows where the numbers are gone.
+  .row.current {
+    grid-template-columns: 2rem var(--control-size) minmax(0, 1fr) auto auto;
+    grid-template-areas: 'number play title length trail';
+  }
+
+  .withCover.current {
+    grid-template-columns: 2.5rem 2rem var(--control-size) minmax(0, 1fr) auto auto;
+    grid-template-areas: 'cover number play title length trail';
+  }
+
+  .current .number {
+    display: grid;
+  }
 }

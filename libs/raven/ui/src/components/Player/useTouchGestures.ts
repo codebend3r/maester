@@ -1,6 +1,7 @@
 import {
   DOUBLE_TAP_MS,
   type SurfaceTap,
+  TOUCH_DRIFT_PX,
   TOUCH_HOLD_DELAY_MS,
   TOUCH_HOLD_RATE,
   TOUCH_REWIND_TICK_MS,
@@ -14,9 +15,6 @@ import { type EngineHandle, SURFACE_SELECTOR } from '@/components/Player/engine'
 
 /** The pointer the gestures are for; a mouse keeps its click and double click. */
 const POINTER_TYPES = { touch: 'touch' } as const
-
-/** How far a resting finger may drift, in CSS pixels, and still start a hold. */
-const DRIFT_PX = 10
 
 /** A click this soon after a hold ended is the lifting finger's, not a tap. */
 const HOLD_CLICK_MS = 500
@@ -159,7 +157,8 @@ export const useTouchGestures = (props: UseTouchGesturesProps) => {
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {
     const from = press.current
     if (from === null || running.current !== null) return
-    if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > DRIFT_PX) stop(TIMERS.hold)
+    if (Math.hypot(event.clientX - from.x, event.clientY - from.y) > TOUCH_DRIFT_PX)
+      stop(TIMERS.hold)
   }
 
   const onPointerEnd = () => {

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
-import { APP_CLIENT_CALLS, HTTP_METHODS, TRACK_STREAM_KINDS } from '@raven/core'
+import { APP_CLIENT_CALLS, HTTP_METHODS, TRACK_STREAM_KINDS, MUSIC_LINK_COPY } from '@raven/core'
 import type * as Native from '@raven/native'
 import { AUDIO_STATES, useAudioQueue, usePlayerPrefs } from '@raven/ui/headless'
-import { act, fireEvent, screen } from '@testing-library/react-native'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native'
 import { type HeardRequest, pathWithId } from '@raven/native/testing'
 
 import { NowPlaying } from '@/screens/NowPlaying'
@@ -19,7 +19,10 @@ import {
   PARANOID_LYRICS,
   musicApi,
 } from '@/test/musicServer'
-import { answerSheet } from '@/test/actionSheet'
+import { answerSheet, answerSheetShown } from '@/test/actionSheet'
+import { MUSIC_COPY } from '@/layouts/copy'
+import { ROUTE_TARGETS, hrefOf } from '@/routes'
+import { NATIVE_EVENTS } from '@/test/nativeEvents'
 import { createScreenClient, renderScreen, untilIdle, untilSettled } from '@/test/renderScreen'
 
 const mockHeard: HeardRequest[] = []
@@ -33,8 +36,10 @@ const PHONE = { width: 390, height: 844 }
 const TABLET = { width: 1180, height: 820 }
 const mockWindow = jest.fn(() => PHONE)
 
+const mockPush = jest.fn()
+
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, back: jest.fn() }),
 }))
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
   __esModule: true,
@@ -102,6 +107,40 @@ describe('Now Playing under the thumb', () => {
     await fireEvent.press(cover, left)
     expect(useAudioQueue.getState().seek?.seconds).toBe(110)
     expect(screen.getByLabelText('Back 10 seconds')).toBeTruthy()
+  })
+
+  it("opens the playing track's facts on a long press of its cover, and goes to its album", async () => {
+    const sheets = answerSheetShown({ answer: MUSIC_LINK_COPY.goToAlbum })
+    useAudioQueue.getState().playTracks({ tracks: [AIRBAG] })
+    await renderPlayingAt({ at: 0 })
+    await fireEvent(screen.getByRole('button', { name: /equalizer/ }), NATIVE_EVENTS.longPress)
+    await waitFor(() => expect(sheets).toHaveLength(1))
+    expect(sheets).toEqual([
+      {
+        title: AIRBAG.title,
+        message: ['Artist: Radiohead', 'Album: OK Computer', 'Released: 1997', 'Length: 5:00'].join(
+          '\n',
+        ),
+        options: [MUSIC_LINK_COPY.goToAlbum, MUSIC_LINK_COPY.goToArtist, 'Cancel'],
+      },
+    ])
+    expect(mockPush).toHaveBeenCalledWith(
+      hrefOf({ kind: ROUTE_TARGETS.album, albumId: AIRBAG.albumId }),
+    )
+  })
+
+  it("offers the screen reader the cover's long press, and goes to the track's artist", async () => {
+    answerSheetShown({ answer: MUSIC_LINK_COPY.goToArtist })
+    useAudioQueue.getState().playTracks({ tracks: [AIRBAG] })
+    await renderPlayingAt({ at: 0 })
+    const cover = screen.getByRole('button', { name: /equalizer/ })
+    expect(cover.props.accessibilityHint).toBe(MUSIC_COPY.coverHoldHint)
+    await fireEvent(cover, 'accessibilityAction', { nativeEvent: { actionName: 'longpress' } })
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        hrefOf({ kind: ROUTE_TARGETS.artist, artistId: AIRBAG.artists[0]?.id ?? 0 }),
+      ),
+    )
   })
 
   it('says how long each track in the queue runs', async () => {

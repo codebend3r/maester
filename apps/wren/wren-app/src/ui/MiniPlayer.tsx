@@ -5,7 +5,7 @@ import { PLAYER_COPY, WREN_ICONS } from '@raven/wren'
 import { type Cover } from '@raven/wren-native'
 import { type WrenTheme, themedStyles, useWrenTheme, shadowOf } from '@/theme/wrenTheme'
 import { RADIUS, SHADOWS, SIZE, SPACE, TYPE } from '@/theme/wrenTokens'
-import { AlbumArt } from '@/ui/AlbumArt'
+import { HeldArt, coverHoldPropsOf } from '@/ui/HeldArt'
 import { IconButton } from '@/ui/IconButton'
 import { pressedStyleOf } from '@/ui/press'
 
@@ -50,6 +50,8 @@ type MiniPlayerProps = {
   onOpen: () => void
   onToggle: () => void
   onNext: () => void
+  /** What holding the cover does: the song's cover menu, the screen reader's long press too. */
+  onArtHold: () => void
 }
 
 /**
@@ -67,6 +69,7 @@ export function MiniPlayer({
   onOpen,
   onToggle,
   onNext,
+  onArtHold,
 }: MiniPlayerProps) {
   const styles = useStyles()
   const { colors } = useWrenTheme()
@@ -82,12 +85,19 @@ export function MiniPlayer({
       <View style={styles.card}>
         <View style={styles.row}>
           <Pressable
+            {...coverHoldPropsOf(onArtHold)}
             accessibilityLabel={PLAYER_COPY.open({ title, artists })}
             accessibilityRole="button"
             onPress={onOpen}
             style={pressedStyleOf({ style: styles.open })}
           >
-            <AlbumArt cover={cover} radius={RADIUS.thumb} size={SIZE.miniArt} />
+            <HeldArt
+              cover={cover}
+              onHold={onArtHold}
+              onPress={onOpen}
+              radius={RADIUS.thumb}
+              size={SIZE.miniArt}
+            />
             <View style={styles.text}>
               <Text numberOfLines={1} style={styles.title}>
                 {title}

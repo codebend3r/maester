@@ -1,3 +1,5 @@
+import type { MusicFactKey } from '@raven/core'
+
 import { KIT_COPY } from '@/copy/kit'
 
 /** The brand's name, as the lockup is read out. */
@@ -30,6 +32,31 @@ export const TRACK_MENU_COPY = {
   /** A playlist row as it is read out: "Mixtape, 2 songs". */
   playlistRow: ({ name, count }: PlaylistRowLabelProps) =>
     count === '' ? name : KIT_COPY.labelled({ label: name, value: count }),
+} as const
+
+/** What each fact of a held cover's menu is called beside its value. */
+export const COVER_FACT_LABELS = {
+  artists: 'Artist',
+  album: 'Album',
+  released: 'Released',
+  kind: 'Type',
+  genres: 'Genre',
+  label: 'Label',
+  tracks: 'Songs',
+  length: 'Length',
+  quality: 'Quality',
+  format: 'Format',
+  plays: 'Plays',
+} as const satisfies Record<MusicFactKey, string>
+
+/** How the menu a held cover opens is told aloud. */
+export const COVER_MENU_COPY = {
+  /** What Now Playing's cover is called aloud: "Cover of Airbag". */
+  cover: (title: string) => `Cover of ${title}`,
+  /** The name of a cover's long press in the screen reader's list of actions. */
+  holdAction: 'More about it',
+  /** The screen reader's hint for a cover that holds its menu. */
+  holdHint: 'Hold for more about it, and to go to its album or artist',
 } as const
 
 type DownloadingProps = { done: number; total: number }

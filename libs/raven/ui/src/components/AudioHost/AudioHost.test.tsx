@@ -19,6 +19,7 @@ import type { DeviceSpotOf } from '@/components/AudioHost/useAudiobookSpot'
 import { AUDIO_STATES, useAudioQueue } from '@/stores/audioQueue'
 import { useMediaOrigin } from '@/stores/mediaOrigin'
 import { MUSIC_QUALITIES, usePlayerPrefs } from '@/stores/playerPrefs'
+import { useSoundMeter } from '@/stores/soundMeter'
 import { fakeContexts, installAudioContext, removeAudioContext } from '@/test/fakeAudioContext'
 import { queryKeys } from '@/query/queryClient'
 import { library, mediaItem } from '@/test/fixtures'
@@ -326,6 +327,7 @@ describe('AudioHost sound', () => {
       crossfade: 0,
       equalizer: FLAT_EQUALIZER,
     })
+    useSoundMeter.setState({ levels: null })
     store().clear()
   })
 
@@ -371,19 +373,44 @@ describe('AudioHost sound', () => {
     expect(current.volume).toBe(0.8)
   })
 
-  it('routes nothing through Web Audio while the equalizer is flat and crossfade is off', () => {
-    installAudioContext()
+  it('plays as plain audio, with no CORS and no meter, where the browser has no Web Audio', () => {
     renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
-    act(() => fireEvent(bothElements()[0], new Event('ended')))
-    expect(fakeContexts()).toHaveLength(0)
     expect(bothElements().map((element) => element.getAttribute('crossorigin'))).toEqual([
       null,
       null,
     ])
+    expect(useSoundMeter.getState().levels).toBeNull()
   })
 
-  it('equalises through ten bands once a preset is picked, reloading the playing track with CORS where it was', () => {
+  it('routes through Web Audio with the equalizer flat and crossfade off, and meters the sound until it goes', () => {
+    installAudioContext()
+    const { unmount } = renderHost({ api: apiWith([]) })
+    expect(bothElements().map((element) => element.crossOrigin)).toEqual(['anonymous', 'anonymous'])
+    expect(useSoundMeter.getState().levels).toBeNull()
+    act(() => store().playTracks({ tracks: ALBUM }))
+    const [context] = fakeContexts()
+    expect(fakeContexts()).toHaveLength(1)
+    expect(context?.filters.every((filter) => filter.gain.value === 0)).toBe(true)
+    const [analyser] = context?.analysers ?? []
+    analyser?.spectrum.fill(255)
+    expect(useSoundMeter.getState().levels?.({ count: 4 })).toEqual([1, 1, 1, 1])
+    unmount()
+    expect(context?.isClosed).toBe(true)
+    expect(useSoundMeter.getState().levels).toBeNull()
+  })
+
+  it('leaves the meter to another engine that took it', () => {
+    installAudioContext()
+    const { unmount } = renderHost({ api: apiWith([]) })
+    act(() => store().playTracks({ tracks: ALBUM }))
+    const other = () => [0.5]
+    useSoundMeter.getState().claim(other)
+    unmount()
+    expect(useSoundMeter.getState().levels).toBe(other)
+  })
+
+  it('equalises through ten bands once a preset is picked, on the graph the first play built', () => {
     installAudioContext()
     renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
@@ -394,8 +421,8 @@ describe('AudioHost sound', () => {
         .getState()
         .setEqualizer({ preset: EQ_PRESET_NAMES.vocal, gains: EQ_PRESETS.vocal }),
     )
-    expect(current.crossOrigin).toBe('anonymous')
     expect(current.currentTime).toBe(30)
+    expect(current.src).toContain('/api/media/1/file')
     const [context] = fakeContexts()
     expect(context?.filters.map((filter) => filter.gain.value)).toEqual([...EQ_PRESETS.vocal])
     expect(context?.resumes).toBeGreaterThanOrEqual(1)
@@ -406,9 +433,6 @@ describe('AudioHost sound', () => {
 
   it('resumes a context left suspended on the next gesture', () => {
     installAudioContext()
-    usePlayerPrefs
-      .getState()
-      .setEqualizer({ preset: EQ_PRESET_NAMES.bassBoost, gains: EQ_PRESETS.bassBoost })
     renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     const [context] = fakeContexts()
@@ -423,9 +447,6 @@ describe('AudioHost sound', () => {
 
   it('swaps tracks on the one element at the end with crossfade off', () => {
     installAudioContext()
-    usePlayerPrefs
-      .getState()
-      .setEqualizer({ preset: EQ_PRESET_NAMES.bassBoost, gains: EQ_PRESETS.bassBoost })
     renderHost({ api: apiWith([]) })
     act(() => store().playTracks({ tracks: ALBUM }))
     const [current, preload] = bothElements()

@@ -6,6 +6,9 @@ export const DOUBLE_TAP_MS = 300
 /** How long a finger rests on the picture before its hold starts. */
 export const TOUCH_HOLD_DELAY_MS = 500
 
+/** How far a resting finger may drift, in CSS pixels, and still be held rather than scrolling. */
+export const TOUCH_DRIFT_PX = 10
+
 /** How fast a hold plays, forward on the right and backwards on the left. */
 export const TOUCH_HOLD_RATE = 2
 

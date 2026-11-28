@@ -134,7 +134,20 @@ export const AUDIO_EVENTS = {
   ended: 'ended',
   error: 'error',
   remote: 'remote',
+  levels: 'levels',
 } as const
+
+/**
+ * What mpv measured of the sound as it left the equalizer, a moment ago: its RMS and peak
+ * level in dBFS, and its spectral centroid in Hz, null while there is nothing to centre on.
+ */
+const isSoundMeasure = object({
+  rms: isNumber,
+  peak: isNumber,
+  centroid: nullable(isNumber),
+})
+
+export type SoundMeasure = Infer<typeof isSoundMeasure>
 
 export const isAudioEvent = union(
   object({ type: literal(AUDIO_EVENTS.time), time: isNumber }),
@@ -151,6 +164,8 @@ export const isAudioEvent = union(
     message: isString,
   }),
   object({ type: literal(AUDIO_EVENTS.remote), command: isRemoteCommand }),
+  // Sent only while music plays, a few dozen times a second at most.
+  object({ type: literal(AUDIO_EVENTS.levels), measure: isSoundMeasure }),
 )
 
 export type AudioEvent = Infer<typeof isAudioEvent>

@@ -128,7 +128,6 @@ type TrackMenuProps = Pick<TracksMenuProps, 'onClose' | 'startsOn'> & {
  */
 export function TrackMenu({ track, like, startsOn, onClose }: TrackMenuProps) {
   const { trackCoverOf } = useCovers()
-  const [artist] = track.artists
   return (
     <TracksMenu
       canAddToPlaylist
@@ -139,7 +138,7 @@ export function TrackMenu({ track, like, startsOn, onClose }: TrackMenuProps) {
       }}
       like={like}
       onClose={onClose}
-      places={{ albumId: track.albumId, artist }}
+      places={{ albumId: track.albumId, artists: track.artists }}
       startsOn={startsOn}
       tracksOf={async () => [track]}
     />

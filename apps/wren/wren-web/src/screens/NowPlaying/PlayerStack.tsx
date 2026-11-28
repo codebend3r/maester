@@ -24,7 +24,7 @@ type PlayerStackProps = {
 export function PlayerStack({ playing, actions, className }: PlayerStackProps) {
   return (
     <div className={classNames([styles.player, className])}>
-      <PlayerCover className={styles.cover} cover={playing.cover} />
+      <PlayerCover className={styles.cover} cover={playing.cover} track={playing.track} />
       <SongTitle like={actions.like} onAddToPlaylist={actions.onAddToPlaylist} playing={playing} />
       <Scrubber kind={SCRUBBERS.player} length={playing.length} />
       <Transport kind={TRANSPORTS.player} />

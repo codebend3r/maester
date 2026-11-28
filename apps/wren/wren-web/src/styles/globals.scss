@@ -259,10 +259,19 @@
   --size-lockup: 2.125rem;
   --size-scrub-track: 5px;
   --size-scrub-thumb: 0.875rem;
+  // The now-playing bars at each of their sizes: small (a row's, the player's), medium and large.
   --size-equalizer: 0.875rem;
   --size-equalizer-bar: 3px;
   --size-equalizer-gap: 2px;
   --size-equalizer-radius: 2px;
+  --size-equalizer-medium: 1.25rem;
+  --size-equalizer-bar-medium: 4px;
+  --size-equalizer-gap-medium: 3px;
+  --size-equalizer-radius-medium: 2px;
+  --size-equalizer-large: 2rem;
+  --size-equalizer-bar-large: 6px;
+  --size-equalizer-gap-large: 4px;
+  --size-equalizer-radius-large: 3px;
   // The spinner a waiting button shows in its label's place.
   --size-spinner: 1.25rem;
   // How wide the centred dialog a sheet becomes at 48rem and wider grows.

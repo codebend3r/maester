@@ -1,13 +1,15 @@
 import { type AlbumSummary, artistNames } from '@raven/core'
 import { useRouter } from 'expo-router'
+import { type ReactNode, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
 import { KIT_COPY } from '@raven/wren'
-import { type Cover, type CoverOf } from '@raven/wren-native'
+import { type CoverOf } from '@raven/wren-native'
 import { WREN_PAGES, pageHref } from '@raven/wren-native/headless'
 import { type WrenTheme, themedStyles } from '@/theme/wrenTheme'
 import { SPACE, TYPE } from '@/theme/wrenTokens'
-import { AlbumArt } from '@/ui/AlbumArt'
+import { AlbumCoverMenu } from '@/ui/CoverMenu'
+import { HeldArt, coverHoldPropsOf } from '@/ui/HeldArt'
 import { pressedStyleOf } from '@/ui/press'
 
 /** A title wraps to this many lines; the rest is cut with an ellipsis. */
@@ -29,11 +31,14 @@ type AlbumTileProps = {
   subtitle: string
   /** A third line, where the place adds one: the date Home's albums are ordered by. */
   detail?: string
-  cover: Cover | null
+  /** The square art at the tile's width: a cover, or one held for its menu. */
+  art: ReactNode
   width: number
   /** What the tile is called aloud: "OK Computer, Radiohead". */
   label: string
   onPress: () => void
+  /** What holding the cover does: an album's menu, which the screen reader offers as the tile's long press. */
+  onArtHold?: () => void
 }
 
 /** An album or a playlist as a tile: its square art, its title (up to four lines) and the line under it (up to two). */
@@ -41,20 +46,22 @@ export function AlbumTile({
   title,
   subtitle,
   detail,
-  cover,
+  art,
   width,
   label,
   onPress,
+  onArtHold,
 }: AlbumTileProps) {
   const styles = useStyles()
   return (
     <Pressable
+      {...coverHoldPropsOf(onArtHold)}
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
       style={pressedStyleOf({ style: [styles.tile, { width }] })}
     >
-      <AlbumArt cover={cover} size={width} />
+      {art}
       <View>
         <Text numberOfLines={TITLE_LINES} style={styles.title}>
           {title}
@@ -84,7 +91,10 @@ type AlbumTileOfProps = {
   onPress?: (album: AlbumSummary) => void
 }
 
-/** An album as a tile, read out by its title, artists and any third line, that opens its page. */
+/**
+ * An album as a tile, read out by its title, artists and any third line, that opens its page.
+ * Holding its cover opens the album's menu: what it is, Go to album and Go to artist.
+ */
 export function AlbumTileOf({
   album,
   coverOf,
@@ -94,18 +104,32 @@ export function AlbumTileOf({
   onPress,
 }: AlbumTileOfProps) {
   const router = useRouter()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const artists = artistNames(album)
   const label = KIT_COPY.labelled({ label: album.title, value: artists })
   const open = () => router.push(pageHref({ page: WREN_PAGES.album, id: album.id }))
+  const press = () => (onPress === undefined ? open() : onPress(album))
+  const openMenu = () => setIsMenuOpen(true)
   return (
-    <AlbumTile
-      cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
-      detail={detail}
-      label={detail === undefined ? label : KIT_COPY.labelled({ label, value: detail })}
-      onPress={() => (onPress === undefined ? open() : onPress(album))}
-      subtitle={subtitle ?? artists}
-      title={album.title}
-      width={width}
-    />
+    <>
+      <AlbumTile
+        art={
+          <HeldArt
+            cover={coverOf({ albumId: album.id, coverVersion: album.coverVersion })}
+            onHold={openMenu}
+            onPress={press}
+            size={width}
+          />
+        }
+        detail={detail}
+        label={detail === undefined ? label : KIT_COPY.labelled({ label, value: detail })}
+        onPress={press}
+        subtitle={subtitle ?? artists}
+        onArtHold={openMenu}
+        title={album.title}
+        width={width}
+      />
+      {isMenuOpen && <AlbumCoverMenu album={album} onClose={() => setIsMenuOpen(false)} />}
+    </>
   )
 }

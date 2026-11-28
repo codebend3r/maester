@@ -3,7 +3,11 @@ import {
   ITEM_TYPES,
   type ItemDetails,
   type MediaItem,
+  MUSIC_LINKS,
+  type MusicLink,
+  type Track,
   episodesOf,
+  musicLinksOf,
   mediaLabel,
   seasonsOf,
 } from '@raven/core'
@@ -20,6 +24,7 @@ import {
   downloadOptionOf,
   favouriteOptionOf,
   linkOptionOf,
+  musicLinkOptionOf,
   watchedOptionOf,
 } from '@/cardMenu/menuOptions'
 import { itemTargetOf, videoTargetOf } from '@/downloads/downloadTargets'
@@ -31,7 +36,7 @@ import type { AppQueries } from '@/queries/useAppQueries'
 import { useDownloadLibrary } from '@/queries/useDownloadLibrary'
 import { useItemMarks, useVideoMarks } from '@/queries/useMarks'
 import { useVideoLinks } from '@/queries/useVideoLinks'
-import { hrefOf } from '@/routes'
+import { ROUTE_TARGETS, hrefOf } from '@/routes'
 
 /** What every menu's options are built from: the server, and whether this device downloads. */
 type MenuOptionsProps = {
@@ -141,13 +146,49 @@ export const useVideoMenuOptions = ({
   ]
 }
 
-type UseAlbumMenuOptionsProps = { session: AppQueries; details: AlbumDetails }
+/** Opens the album's page or the artist's a music menu's line goes to. */
+const useOpenMusicLink = (): ((link: MusicLink) => void) => {
+  const router = useRouter()
+  return (link) =>
+    router.push(
+      hrefOf(
+        link.kind === MUSIC_LINKS.album
+          ? { kind: ROUTE_TARGETS.album, albumId: link.albumId }
+          : { kind: ROUTE_TARGETS.artist, artistId: link.artistId },
+      ),
+    )
+}
 
-/** An album's one mark: Favourite. */
+type UseAlbumMenuOptionsProps = {
+  session: AppQueries
+  details: AlbumDetails
+  /** On the album's own page, where Go to album is left out. */
+  isOnAlbum: boolean
+}
+
+/** An album's menu: its one mark, Favourite, then Go to album and Go to each of its artists. */
 export const useAlbumMenuOptions = ({
   session,
   details,
+  isOnAlbum,
 }: UseAlbumMenuOptionsProps): CardMenuOption[] => {
   const favourite = useServerAlbumFavourite({ api: session.api, albumId: details.album.id })
-  return [favouriteOptionOf({ isOn: details.isFavourite, onToggle: favourite.mutate })]
+  const onOpen = useOpenMusicLink()
+  const { album } = details
+  return [
+    favouriteOptionOf({ isOn: details.isFavourite, onToggle: favourite.mutate }),
+    ...musicLinksOf({ albumId: isOnAlbum ? null : album.id, artists: album.artists }).map((link) =>
+      musicLinkOptionOf({ link, onOpen }),
+    ),
+  ]
+}
+
+type UseTrackMenuOptionsProps = { track: Track }
+
+/** The playing track's menu: Go to its album and Go to each of its artists. */
+export const useTrackMenuOptions = ({ track }: UseTrackMenuOptionsProps): CardMenuOption[] => {
+  const onOpen = useOpenMusicLink()
+  return musicLinksOf({ albumId: track.albumId, artists: track.artists }).map((link) =>
+    musicLinkOptionOf({ link, onOpen }),
+  )
 }

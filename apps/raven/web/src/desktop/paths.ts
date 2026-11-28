@@ -1,7 +1,8 @@
 import { DESKTOP_PATHS, isPagePath, object, oneOf, PAGE_PATHS } from '@raven/core'
 import { generatePath, matchPath } from 'react-router-dom'
 import { BROWSER_PLAY_PATH } from '@/browserDownloads/paths'
-import { MUSIC_PATHS, isMusicPath } from '@/lib/music'
+import { isMusicPath } from '@/lib/music'
+import { MUSIC_PATHS } from '@/lib/musicPaths'
 
 /** A download playing, by the id main granted for its file. */
 export const playPathOf = (fileId: string): string => generatePath(DESKTOP_PATHS.play, { fileId })

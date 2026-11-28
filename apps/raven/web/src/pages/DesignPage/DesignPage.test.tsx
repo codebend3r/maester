@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { THEMES, parseTokens } from '@raven/core'
+import { EQUALIZER_MARK, EQUALIZER_SIZES } from '@raven/ui'
 import { useTheme } from '@/stores/theme'
 import { Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { renderWithProviders } from '@/test/render'
@@ -218,6 +219,7 @@ describe('DesignPage', () => {
     expect(names).toEqual(
       expect.arrayContaining([
         'Button',
+        'Equalizer',
         'Icon',
         'MediaCard',
         'MediaList',
@@ -226,6 +228,16 @@ describe('DesignPage', () => {
         'Skeleton',
       ]),
     )
+  })
+
+  it('shows the equalizer at each of its three sizes', () => {
+    renderWithProviders({ ui: <DesignPage /> })
+    const components = screen.getByRole('region', { name: 'Components' })
+    expect(
+      Array.from(components.querySelectorAll(`[${EQUALIZER_MARK}]`)).map((bars) =>
+        bars.getAttribute(EQUALIZER_MARK),
+      ),
+    ).toEqual(Object.values(EQUALIZER_SIZES))
   })
 
   it('copies an icon’s name, and says so', async () => {

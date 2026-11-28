@@ -20,6 +20,7 @@ import {
   MPV_COMMANDS,
   MPV_END_FILE_REASONS,
   MPV_EVENTS,
+  MPV_FILTER_LABELS,
   MPV_LOADFILE_MODES,
   MPV_OPTIONS,
   MPV_PLAYLIST_END,
@@ -48,6 +49,7 @@ import { PLAYER_PHASES } from '@/main/player/phases'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
 import type { MusicResolveProps } from '@/main/player/musicSource'
 import { createQuietMpv } from '@/main/player/quietMpv'
+import { createSoundMeter, METER_FILTERS } from '@/main/player/soundMeter'
 import {
   applyOutputOptions,
   createCommandHandler,
@@ -57,6 +59,7 @@ import {
 } from '@/main/player/serviceKit'
 import { quietly } from '@/main/log/quietly'
 import { messageOf } from '@/shared/messageOf'
+import type { Timers } from '@shared/desktop'
 
 /** The properties the music engine follows. */
 export const AUDIO_OBSERVED = [
@@ -92,6 +95,8 @@ type CreateAudioServiceProps = {
   canChooseAo: boolean
   platform: DesktopPlatform
   onPlaying: (isPlaying: boolean) => void
+  /** What times the reads of mpv's meter and the levels sent to the page. */
+  timers: Timers
   warn: (message: string) => void
 }
 
@@ -185,16 +190,17 @@ type SoundFilterOfProps = { level: number; eq: EqGains }
 
 /**
  * mpv's `af` for how a track sounds: its levelling factor as a gain in dB first, then the
- * equalizer's ten bands, each an octave wide. A track left as it is (level 1, a flat
- * equalizer) has no filter at all.
+ * equalizer's ten bands, each an octave wide, then the meter, which changes nothing it hears.
+ * A track left as it is (level 1, a flat equalizer) has the meter alone. The graph is labelled,
+ * so what the meter measured is mpv's `af-metadata/<label>`.
  */
 export const soundFilterOf = ({ level, eq }: SoundFilterOfProps): string => {
   const volume = level === 1 ? [] : [`volume=${(20 * Math.log10(level)).toFixed(2)}dB`]
   const bands = isFlatEq(eq)
     ? []
     : EQ_BANDS.map((frequency, index) => `equalizer=f=${frequency}:t=o:w=1:g=${eq[index] ?? 0}`)
-  const filters = [...volume, ...bands]
-  return filters.length === 0 ? '' : `lavfi=[${filters.join(',')}]`
+  const filters = [...volume, ...bands, METER_FILTERS]
+  return `@${MPV_FILTER_LABELS.meter}:lavfi=[${filters.join(',')}]`
 }
 
 const remoteOf = (event: Extract<MpvEvent, { type: typeof MPV_EVENTS.remote }>): RemoteCommand =>
@@ -216,6 +222,7 @@ export const createAudioService = ({
   canChooseAo,
   platform,
   onPlaying: reportPlaying,
+  timers,
   warn: reportWarning,
 }: CreateAudioServiceProps): AudioService => {
   let state: AudioState = IDLE
@@ -246,6 +253,13 @@ export const createAudioService = ({
   const mpv = guardedMpv(unguarded)
   const { setEach, harden } = createQuietMpv({ mpv, warn })
   const isDead = () => state.phase === PLAYER_PHASES.dead
+  const meter = createSoundMeter({
+    mpv,
+    timers,
+    send: (measure) => emit({ type: AUDIO_EVENTS.levels, measure }),
+  })
+  // The meter is read only while a track plays: never paused, stopped or with the engine gone.
+  const syncMeter = () => meter.set(hasTrack(state) && !isPaused)
 
   const showNowPlaying = () => {
     if (shown === null || isDead()) return
@@ -289,6 +303,7 @@ export const createAudioService = ({
     retire(track?.playing ?? null)
     retire(track?.queued ?? null)
     onPlaying(false)
+    syncMeter()
   }
 
   const onEngineStopped = () => {
@@ -300,6 +315,14 @@ export const createAudioService = ({
       reason: PLAYER_ERROR_REASONS.engine,
       message: PLAYER_MESSAGES.engineStopped,
     })
+  }
+
+  const reportPause = (paused: boolean) => {
+    isPaused = paused
+    emit({ type: AUDIO_EVENTS.paused, paused })
+    onPlaying(!paused)
+    syncMeter()
+    showNowPlaying()
   }
 
   const onProperty = (event: Extract<MpvEvent, { type: typeof MPV_EVENTS.property }>) => {
@@ -318,11 +341,7 @@ export const createAudioService = ({
         showNowPlaying()
         return
       case MPV_PROPERTIES.pause:
-        isPaused = event.data
-        emit({ type: AUDIO_EVENTS.paused, paused: event.data })
-        onPlaying(!event.data)
-        showNowPlaying()
-        return
+        return reportPause(event.data)
       case MPV_PROPERTIES.pausedForCache:
         emit({ type: AUDIO_EVENTS.waiting, waiting: event.data ?? false })
         return
@@ -336,6 +355,11 @@ export const createAudioService = ({
     const { pendingFilter: filter, ...track } = state
     const isNews = filter !== null && filter !== track.filter
     state = { ...track, phase: PLAYER_PHASES.loaded, filter: isNews ? filter : track.filter }
+    /*
+     * mpv says `pause` only when it changes, and a load into an engine that was already playing
+     * changes nothing, so the page hears here that the track it asked for now plays.
+     */
+    reportPause(isPaused)
     if (!isNews) return
     mpv.set({ name: MPV_OPTIONS.af, value: filter }).catch((error: unknown) => {
       warn(`mpv af failed: ${messageOf(error)}`)
@@ -485,13 +509,12 @@ export const createAudioService = ({
   const queueNext = async ({ next }: QueueNextProps): Promise<PlayerOutcome> => {
     if (!hasTrack(state)) return OK
     const { queued } = state
-    const filter = next === null ? '' : soundFilterOf({ level: next.level, eq })
     if (
       next !== null &&
       queued !== null &&
       queued.mediaId === next.mediaId &&
       queued.kbps === next.kbps &&
-      queued.filter === filter
+      queued.filter === soundFilterOf({ level: next.level, eq })
     ) {
       return OK
     }
@@ -504,6 +527,7 @@ export const createAudioService = ({
     retire(previous)
     updateTrack({ queued: null })
     if (next === null) return OK
+    const filter = soundFilterOf({ level: next.level, eq })
     const resolved = await resolve({ mediaId: next.mediaId, kbps: next.kbps })
     if (token !== epoch) {
       if (resolved.ok) retire({ mediaId: next.mediaId, target: resolved.target })
@@ -556,6 +580,7 @@ export const createAudioService = ({
       lastTime: start,
       duration: null,
     }
+    syncMeter()
     await mpv.set({ name: MPV_PROPERTIES.pause, value: false })
     if (token !== epoch) return overtaken()
     await loadfile({ target: resolved.target, mode: MPV_LOADFILE_MODES.replace, start, filter })

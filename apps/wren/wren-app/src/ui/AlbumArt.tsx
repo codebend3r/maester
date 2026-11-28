@@ -23,7 +23,7 @@ const useStyles = themedStyles(({ colors }: WrenTheme) => ({
   },
 }))
 
-type AlbumArtProps = {
+export type AlbumArtProps = {
   /** The server's cover, or null for an album that has none. */
   cover: Cover | null
   size: number

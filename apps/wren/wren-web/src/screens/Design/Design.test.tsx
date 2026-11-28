@@ -1,4 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test'
+import { EQUALIZER_MARK, EQUALIZER_SIZES } from '@raven/ui'
 import { SETTINGS_COPY, WREN_THEMES } from '@raven/wren'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -91,5 +92,14 @@ describe('Design', () => {
     await userEvent.click(within(sort).getByLabelText('Artist'))
     expect(within(sort).getByRole('radio', { name: 'Artist', checked: true })).toBeTruthy()
     expect(screen.getByRole('list', { name: 'Icons' })).toBeTruthy()
+  })
+
+  it('shows the equalizer at each of its three sizes', () => {
+    const { container } = renderDesign()
+    expect(
+      Array.from(container.querySelectorAll(`[${EQUALIZER_MARK}]`)).map((bars) =>
+        bars.getAttribute(EQUALIZER_MARK),
+      ),
+    ).toEqual(Object.values(EQUALIZER_SIZES))
   })
 })

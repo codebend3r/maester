@@ -142,14 +142,13 @@ type TrackMenuProps = Pick<TracksMenuProps, 'onClose' | 'startsOn'> & {
 type TrackMenuOfProps = TrackMenuProps & { session: WrenSession }
 
 function TrackMenuOf({ session, track, like, startsOn, onClose }: TrackMenuOfProps) {
-  const [artist] = track.artists
   return (
     <TracksMenu
       canAddToPlaylist
       head={{ title: track.title, line: factsLineOf([artistNames(track), track.album.title]) }}
       like={like}
       onClose={onClose}
-      places={{ albumId: track.albumId, artist }}
+      places={{ albumId: track.albumId, artists: track.artists }}
       session={session}
       startsOn={startsOn}
       tracksOf={async () => [track]}

@@ -25,6 +25,8 @@ type PlayingSummaryProps = {
   /** Where the place it sits in sets it, and the room between the art and the words. */
   className: string
   onOpen: () => void
+  /** What holding the cover does: the song's cover menu. A short tap still opens Now Playing. */
+  onArtHold?: () => void
 }
 
 /**
@@ -42,6 +44,7 @@ export function PlayingSummary({
   artSize,
   className,
   onOpen,
+  onArtHold,
 }: PlayingSummaryProps) {
   return (
     <Pressable
@@ -49,7 +52,7 @@ export function PlayingSummary({
       label={PLAYER_COPY.open({ title, artists })}
       onPress={onOpen}
     >
-      <AlbumArt cover={cover} radius={RADII.thumb} size={artSize} />
+      <AlbumArt cover={cover} onHold={onArtHold} radius={RADII.thumb} size={artSize} />
       <span className={styles.text}>
         <span className={styles.heading}>
           <EqualizerIndicator isPlaying={isPlaying} />

@@ -13,7 +13,7 @@ const resolutionOf = ({ bitDepth, sampleRate }: AudioQuality): string | null =>
  * The format and quality of what is playing as one sentence: "FLAC · 16-bit / 44.1 kHz · 912 kbps",
  * the transcode's "AAC · 256 kbps", or the download's with "Downloaded" after it.
  */
-const qualityLineOf = (quality: AudioQuality): string =>
+export const qualityLineOf = (quality: AudioQuality): string =>
   factsLineOf([
     quality.format,
     resolutionOf(quality),

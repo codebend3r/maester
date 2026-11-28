@@ -1,3 +1,4 @@
+import { EQUALIZER_SIZES } from '@raven/ui'
 import { useState } from 'react'
 import { DESIGN_COPY, WREN_ICONS } from '@raven/wren'
 import { DesignSection, Specimen } from '@/screens/Design/DesignSection'
@@ -147,8 +148,18 @@ function Motion() {
   return (
     <div className={styles.row}>
       <Spinner />
-      <EqualizerIndicator isPlaying />
-      <EqualizerIndicator isPlaying={false} />
+    </div>
+  )
+}
+
+const SHOWN_SIZES = Object.values(EQUALIZER_SIZES)
+
+function Equalizers() {
+  return (
+    <div className={styles.row}>
+      {SHOWN_SIZES.map((size) => (
+        <EqualizerIndicator isPlaying key={size} size={size} />
+      ))}
     </div>
   )
 }
@@ -250,6 +261,9 @@ export function ComponentsSection() {
       </Specimen>
       <Specimen name={COPY.motion} note={COPY.motionNote}>
         <Motion />
+      </Specimen>
+      <Specimen name={COPY.equalizers} note={COPY.equalizersNote}>
+        <Equalizers />
       </Specimen>
       <Specimen name={COPY.rows} note={COPY.rowsNote}>
         <Rows />

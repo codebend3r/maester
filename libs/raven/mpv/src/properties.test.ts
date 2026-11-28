@@ -57,6 +57,7 @@ const examples = {
   [MPV_PROPERTIES.decoderFrameDropCount]: 0,
   [MPV_PROPERTIES.displayFpsOverride]: 60,
   [MPV_PROPERTIES.targetColorspaceHint]: false,
+  [MPV_PROPERTIES.afMeter]: { 'lavfi.astats.Overall.RMS_level': '-18.5' },
 } as const satisfies { [K in MpvProperty]: MpvPropertyValue<K> }
 
 test('every named native property accepts its shape and rejects malformed values', () => {
@@ -97,6 +98,11 @@ test('every named native property accepts its shape and rejects malformed values
     }),
   ).toBe(false)
   expect(propertyGuards[MPV_PROPERTIES.audioDeviceList]([{ name: AUDIO_DEVICES.auto }])).toBe(false)
+  expect(propertyGuards[MPV_PROPERTIES.afMeter]({})).toBe(true)
+  expect(propertyGuards[MPV_PROPERTIES.afMeter]({ 'lavfi.astats.Overall.RMS_level': -18 })).toBe(
+    false,
+  )
+  expect(propertyGuards[MPV_PROPERTIES.afMeter](['-18'])).toBe(false)
 })
 
 test('track-list narrows optional mpv fields at the native boundary', () => {

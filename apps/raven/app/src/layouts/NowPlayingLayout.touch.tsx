@@ -3,8 +3,10 @@ import { type ComponentType, useState } from 'react'
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { useTrackCoverMenu } from '@/cardMenu/useTrackCoverMenu'
 import { Chip } from '@/layouts/Chip.touch'
 import { MUSIC_COPY } from '@/layouts/copy'
+import { coverHoldOf } from '@/layouts/holdProps'
 import {
   type NowPlayingLayoutProps,
   PLAYING_PANES,
@@ -107,11 +109,14 @@ const Player = ({
 }: PlayerProps) => {
   const styles = useMusicStyles()
   const own = useStyles()
+  const coverMenu = useTrackCoverMenu({ track: track?.played ?? null })
   return (
     track !== null && (
       <View style={[own.player, { width: size }]}>
+        {coverMenu.menu}
         <PlayingCover
           cover={track.cover}
+          hold={coverHoldOf(coverMenu)}
           isPlaying={isPlaying}
           onSeek={onSeek}
           position={position}

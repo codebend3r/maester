@@ -2,6 +2,7 @@ import { touchSideOf } from '@raven/core'
 import { Pressable, StyleSheet, View } from 'react-native'
 
 import { Equalizer } from '@/layouts/Equalizer'
+import { type Hold, holdPropsOf } from '@/layouts/holdProps'
 import { Cover } from '@/layouts/MusicParts.touch'
 import { coverLabelOf, equalizerBandOf, useEqualizerShown } from '@/layouts/playingCoverKit'
 import { SkipMark } from '@/layouts/PlayerMark.touch'
@@ -19,6 +20,8 @@ type PlayingCoverProps = SkipTarget & {
   title: string
   size: number
   isPlaying: boolean
+  /** The long press that opens the playing track's menu. */
+  hold: Hold | undefined
 }
 
 /** The cover's mark sits over the cover itself, which has no insets to keep clear of. */
@@ -30,7 +33,8 @@ const NO_SIDES = {} as const
  * press hides the equalizer or shows it again, which this device keeps. Its taps are the video
  * player's (`useTapLadder`): a double tap on its right half skips forward and on its left half
  * back, 10 seconds and then 20 and 30 as the taps go on, the pair leaving the equalizer as it
- * was, and how far it went shows in the middle of the cover.
+ * was, and how far it went shows in the middle of the cover. A long press opens the playing
+ * track's menu.
  */
 export const PlayingCover = ({
   cover,
@@ -39,6 +43,7 @@ export const PlayingCover = ({
   isPlaying,
   position,
   onSeek,
+  hold,
 }: PlayingCoverProps) => {
   const { isShown, toggle } = useEqualizerShown()
   const styles = useStyles()
@@ -50,6 +55,7 @@ export const PlayingCover = ({
       accessibilityLabel={coverLabelOf({ hasCover, isShown })}
       accessibilityRole="button"
       accessibilityState={{ selected: isShown }}
+      {...holdPropsOf(hold)}
       onPress={({ nativeEvent }) =>
         taps.tap(touchSideOf({ x: nativeEvent.locationX, width: size }))
       }

@@ -5,6 +5,8 @@ import type { CardMenuOption } from '@/cardMenu/menuOptions'
 /** A card's menu once its title is read: the title over it, and what can be done to the title. */
 export type CardMenuViewProps = {
   title: string
+  /** What is known of an album or the track playing, a fact a line, under the title; null for a video's menu. */
+  about: string | null
   options: readonly CardMenuOption[]
   onClose: () => void
 }

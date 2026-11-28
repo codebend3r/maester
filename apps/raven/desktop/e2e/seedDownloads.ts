@@ -9,6 +9,7 @@ import {
   DOWNLOAD_STATUS_KINDS,
   type DownloadGroup,
   downloadGroupKey,
+  type Track,
 } from '@raven/core'
 import { CLIP_SECONDS } from '@/e2e/clips'
 import { containerOf } from '@/e2e/fixtureServer'
@@ -42,6 +43,8 @@ type SeededClip = {
   shouldAutoDelete?: boolean
   /** When it was watched to its end, in milliseconds since the epoch; never, when left out. */
   watchedAt?: number
+  /** A track's `Track`, which Downloads queues it by in the music queue; none for a video. */
+  track?: Track
 }
 
 type SeedDownloadsProps = {
@@ -91,6 +94,7 @@ const entryOf = async ({ clip, serverId, at }: EntryOfProps): Promise<DownloadEn
     serverPosition: 0,
     pending: NO_PENDING,
     createdAt: at - SEEDED_AGO_MS,
+    ...(clip.track === undefined ? {} : { track: clip.track }),
   }
 }
 

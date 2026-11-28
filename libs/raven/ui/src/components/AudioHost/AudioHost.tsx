@@ -1,6 +1,6 @@
-import { type ApiClient, type Track, artistNames, isFlatEq, levelOf } from '@raven/core'
+import { type ApiClient, type Track, artistNames, levelOf } from '@raven/core'
 import { useQuery } from '@tanstack/react-query'
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useMemo, useRef } from 'react'
 import { failureMessage } from '@/components/Player/useMediaSource'
 import { useMediaPlane } from '@/components/Player/useMediaPlane'
 import { useVideoEvents } from '@/components/Player/useVideoEvents'
@@ -100,29 +100,27 @@ type UsePreloadProps = {
   ref: ElementRef
   id: number | null
   src: string | null
-  /** Whether the load asks for CORS, as Web Audio needs. */
-  isCors: boolean
   loads: RefObject<ElementLoads>
 }
 
 /** Loads the next track into the element that does not lead, so the swap at the end is near gapless, or a fade can start it. */
-const usePreload = ({ ref, id, src, isCors, loads }: UsePreloadProps) => {
+const usePreload = ({ ref, id, src, loads }: UsePreloadProps) => {
   useEffect(() => {
     const element = ref.current
     if (!element) return
     const loaded = loads.current.get(element)
     if (id === null) {
-      if (!loaded) return
+      if (loaded === undefined) return
       loads.current.delete(element)
       element.removeAttribute('src')
       element.load()
       return
     }
-    if (src === null || (loaded?.id === id && loaded.isCors === isCors)) return
-    loads.current.set(element, { id, isCors })
+    if (src === null || loaded === id) return
+    loads.current.set(element, id)
     element.src = src
     element.load()
-  }, [ref, id, src, isCors, loads])
+  }, [ref, id, src, loads])
 }
 
 type UseMediaSessionProps = {
@@ -201,8 +199,6 @@ type UseAudioElementProps = {
   start: number | null
   /** How fast it plays: an audiobook's chosen speed, else 1. */
   rate: number
-  /** Whether the load asks for CORS, as Web Audio needs. */
-  isCors: boolean
   loads: RefObject<ElementLoads>
   play: (element: HTMLMediaElement) => void
   crossfade: Crossfade
@@ -213,9 +209,8 @@ type UseAudioElementProps = {
  * what it does back. The source is attached once per track: a renewed
  * ticket makes a new address, which the playing element need not take, as
  * the ticket that opened its file keeps opening it, and it starts at
- * `start`, waiting for it. A track loaded before its sound went through Web
- * Audio loads again with CORS, from where it was. Play and pause follow the
- * store, and the speed `rate` says.
+ * `start`, waiting for it. Play and pause follow the store, and the speed
+ * `rate` says.
  */
 const useAudioElement = ({
   ref,
@@ -224,7 +219,6 @@ const useAudioElement = ({
   src,
   start,
   rate,
-  isCors,
   loads,
   play,
   crossfade,
@@ -245,16 +239,14 @@ const useAudioElement = ({
       return
     }
     if (src === null || start === null) return
-    if (loaded?.id !== id || loaded.isCors !== isCors) {
-      const isSameTrack = loaded?.id === id
-      const from = isSameTrack ? element.currentTime : start
-      loads.current.set(element, { id, isCors })
+    if (loaded !== id) {
+      loads.current.set(element, id)
       element.src = src
       element.load()
       // Set before the file is read, it is where the element starts once it is.
-      if (from > 0) {
-        element.currentTime = from
-        if (!isSameTrack) engine.time({ position: from, duration: null })
+      if (start > 0) {
+        element.currentTime = start
+        engine.time({ position: start, duration: null })
       }
     }
     if (shouldPlay) {
@@ -262,7 +254,7 @@ const useAudioElement = ({
       return
     }
     element.pause()
-  }, [ref, id, src, start, shouldPlay, isCors, loads, play, engine])
+  }, [ref, id, src, start, shouldPlay, loads, play, engine])
 
   useEffect(() => {
     const element = ref.current
@@ -318,31 +310,17 @@ type AudioHostProps = {
 }
 
 /**
- * Whether the elements' sound goes through Web Audio: from the first time
- * the equalizer or a crossfade needs it, for as long as the host lives, as
- * an element once routed cannot be taken back out. Until then nothing is
- * routed and no context is made, so the elements play as plain `<audio>`
- * and fetch without CORS.
- */
-const useIsRouted = (): boolean => {
-  const gains = usePlayerPrefs((prefs) => prefs.equalizer.gains)
-  const crossfade = usePlayerPrefs((prefs) => prefs.crossfade)
-  const [isRouted, setRouted] = useState(false)
-  if (!isRouted && hasWebAudio() && (crossfade > 0 || !isFlatEq(gains))) setRouted(true)
-  return isRouted
-}
-
-/**
  * The web's audio engine: two `<audio>` elements, one playing the queue's
  * track and the other preloading the next, mounted once by the page's player
  * layer, over every shell, so playback carries on from page to page and from
  * mode to mode. Tracks play
  * through the web host or the picked media origin, as videos do. Each
- * element's volume is levelled by its track's gain. With the equalizer on or
- * a crossfade set, both play through one Web Audio graph, and a crossfade
- * starts the preloaded element under the end of the playing one, which hands
- * it the lead; with neither, the playing element takes the next track itself
- * at the end. It tells the media session what plays and counts a listen at
+ * element's volume is levelled by its track's gain. Both play through one
+ * Web Audio graph, the equalizer and the meter's analyser in it, wherever
+ * the browser has Web Audio. With a crossfade set, the preloaded element
+ * starts under the end of the playing one, which hands it the lead; with
+ * none, the playing element takes the next track itself at the end. It
+ * tells the media session what plays and counts a listen at
  * half the track or four minutes. An audiobook plays at the speed the prefs
  * hold, starts where it was left and saves its spot as it plays, and never
  * crossfades, in or out; music saves none, and starts where `deviceSpotOf`
@@ -362,10 +340,9 @@ export const AudioHost = ({ api, deviceSpotOf }: AudioHostProps) => {
   const isAudiobook = useIsAudiobook({ api, track })
   const isNextAudiobook = useIsAudiobook({ api, track: upNext })
   const start = startOf(useAudiobookSpot({ api, track, watchHide: watchPageHide, deviceSpotOf }))
-  const isRouted = useIsRouted()
   const gains = usePlayerPrefs((prefs) => prefs.equalizer.gains)
   const seconds = usePlayerPrefs((prefs) => prefs.crossfade)
-  const route = useSoundGraph({ elements, isRouted, gains })
+  const route = useSoundGraph({ elements, gains })
   const { wake } = route
   const play = useCallback(
     (element: HTMLMediaElement) => {
@@ -392,17 +369,17 @@ export const AudioHost = ({ api, deviceSpotOf }: AudioHostProps) => {
     src,
     start,
     rate,
-    isCors: isRouted,
     loads,
     play,
     crossfade,
   })
-  usePreload({ ref: other, id: upNext?.id ?? null, src: preload, isCors: isRouted, loads })
+  usePreload({ ref: other, id: upNext?.id ?? null, src: preload, loads })
   useLevelledVolume({ ref: lead, track })
   useLevelledVolume({ ref: other, track: upNext })
   useMediaSession({ api, track, rate })
   useTrackListening({ api, track })
-  const crossOrigin = isRouted ? CROSS_ORIGIN : undefined
+  // Web Audio reads only CORS media, so wherever the graph can be built the elements fetch with CORS.
+  const crossOrigin = hasWebAudio() ? CROSS_ORIGIN : undefined
   return (
     <div className={styles.host} aria-hidden="true">
       {/* Music has no captions to offer; Now Playing shows the lyrics. */}

@@ -13,12 +13,19 @@ import {
   PLAYER_SOURCE_KINDS,
   REMOTE_COMMANDS,
 } from '@raven/core'
-import { MPV_COMMANDS, MPV_END_FILE_REASONS, MPV_EVENTS, MPV_PROPERTIES } from '@raven/mpv'
+import {
+  MPV_COMMANDS,
+  MPV_END_FILE_REASONS,
+  MPV_EVENTS,
+  MPV_FILTER_LABELS,
+  MPV_PROPERTIES,
+} from '@raven/mpv'
 import { AUDIO_OBSERVED, createAudioService, soundFilterOf } from '@/main/player/audioService'
 import { HARDENED_OPTIONS } from '@/main/player/engine'
 import type { FailureExplainer, ResolvedSource, ServerTarget } from '@/main/player/loadTarget'
 import { PLAYER_MESSAGES } from '@/main/player/playerMessages'
-import { createFakeMpv } from '@/main/test/playerFakes'
+import { METER_FILTERS } from '@/main/player/soundMeter'
+import { createFakeMpv, fakeTimers } from '@/main/test/playerFakes'
 
 const BASE = 'http://127.0.0.1:41234'
 
@@ -43,6 +50,7 @@ type SetupProps = { explain?: FailureExplainer; downloaded?: readonly number[] }
 
 const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {}) => {
   const fake = createFakeMpv()
+  const clock = fakeTimers()
   const resolved: number[] = []
   const bitrates: (number | null)[] = []
   const closed: string[] = []
@@ -72,6 +80,7 @@ const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {
     onPlaying: (isPlaying) => {
       playing.push(isPlaying)
     },
+    timers: clock.timers,
     warn: (message) => {
       warnings.push(message)
     },
@@ -83,6 +92,7 @@ const setup = ({ explain = async () => LOCKED, downloaded = [] }: SetupProps = {
   return {
     service,
     fake,
+    clock,
     shown: fake.shown,
     resolved,
     bitrates,
@@ -109,10 +119,13 @@ const queueOf = (mediaId: number | null) =>
     next: mediaId === null ? null : { mediaId, level: 1, kbps: null },
   }) as const
 
+/** The `af` of a track left as it is: the meter alone. */
+const METER_ONLY = `@${MPV_FILTER_LABELS.meter}:lavfi=[${METER_FILTERS}]`
+
 type LoadfileOfProps = { mediaId: number; mode: string; start: number; filter?: string }
 
 /** A `loadfile` as the fake logs it, its `af` quoted with mpv's byte count. */
-const loadfileOf = ({ mediaId, mode, start, filter = '' }: LoadfileOfProps) =>
+const loadfileOf = ({ mediaId, mode, start, filter = METER_ONLY }: LoadfileOfProps) =>
   `loadfile ${BASE}/secret-${mediaId}/file ${mode} -1 start=${start},stream-lavf-o=%37%max_redirects=0,reconnect_delay_max=3,network-timeout=15,replaygain=no,af=%${filter.length}%${filter}`
 
 describe('loading', () => {
@@ -178,6 +191,7 @@ describe('loading', () => {
       canChooseAo: true,
       platform: DESKTOP_PLATFORMS.mac,
       onPlaying: () => {},
+      timers: fakeTimers().timers,
       warn: () => {},
     })
     await settle()
@@ -255,7 +269,10 @@ describe('what follows', () => {
     await service.handle(LOAD)
     fake.emit({ type: MPV_EVENTS.fileLoaded })
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
-    expect(events).toEqual([{ type: AUDIO_EVENTS.advanced }])
+    expect(events).toEqual([
+      { type: AUDIO_EVENTS.paused, paused: false },
+      { type: AUDIO_EVENTS.advanced },
+    ])
     expect(closed).toEqual(['7'])
     // The page now names what follows the new track; the old next is what plays.
     fake.log.length = 0
@@ -277,7 +294,10 @@ describe('what follows', () => {
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
     release()
     expect(await queuing).toEqual({ ok: true })
-    expect(events).toEqual([{ type: AUDIO_EVENTS.advanced }])
+    expect(events).toEqual([
+      { type: AUDIO_EVENTS.paused, paused: false },
+      { type: AUDIO_EVENTS.advanced },
+    ])
     expect(closed).toEqual(['7'])
     expect(fake.log).toEqual([MPV_COMMANDS.playlistClear])
   })
@@ -318,6 +338,15 @@ describe('what mpv reports', () => {
     ])
   })
 
+  test('a track loaded into an engine that plays already tells the page it plays', async () => {
+    const { service, fake, events, playing } = setup()
+    await service.handle(LOAD)
+    expect(events).toEqual([])
+    fake.emit({ type: MPV_EVENTS.fileLoaded })
+    expect(events).toEqual([{ type: AUDIO_EVENTS.paused, paused: false }])
+    expect(playing).toEqual([true])
+  })
+
   test("a track that fails is explained by the server's words, and the relay load retired", async () => {
     const asked: Parameters<FailureExplainer>[0][] = []
     const { service, fake, events, closed } = setup({
@@ -355,7 +384,9 @@ describe('what mpv reports', () => {
   test('a downloaded track plays its file, queued after a server one, and its end retires no load', async () => {
     const { service, fake, closed, events } = setup({ downloaded: [8] })
     await service.handle(LOAD)
-    expect(fake.log).toContain(`loadfile ${fileOf(8)} append-play -1 start=0,replaygain=no,af=%0%`)
+    expect(fake.log).toContain(
+      `loadfile ${fileOf(8)} append-play -1 start=0,replaygain=no,af=%${METER_ONLY.length}%${METER_ONLY}`,
+    )
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
     fake.emit({ type: MPV_EVENTS.endFile, reason: MPV_END_FILE_REASONS.eof, error: 0 })
     expect(closed).toEqual(['7'])
@@ -524,9 +555,19 @@ describe('commands', () => {
 describe('the sound', () => {
   const BASS = EQ_PRESETS.bassBoost
 
-  test('a level is a gain in dB first in the chain, and nothing at all for level 1 and a flat EQ', () => {
-    expect(soundFilterOf({ level: 0.5, eq: EQ_PRESETS.flat })).toBe('lavfi=[volume=-6.02dB]')
-    expect(soundFilterOf({ level: 1, eq: EQ_PRESETS.flat })).toBe('')
+  test('a level is a gain in dB first in the labelled chain, and the meter alone for level 1 and a flat EQ', () => {
+    expect(soundFilterOf({ level: 0.5, eq: EQ_PRESETS.flat })).toBe(
+      `@meter:lavfi=[volume=-6.02dB,${METER_FILTERS}]`,
+    )
+    expect(soundFilterOf({ level: 1, eq: EQ_PRESETS.flat })).toBe(METER_ONLY)
+  })
+
+  test('the meter is last, so it hears the sound after the levelling and the equalizer', () => {
+    expect(METER_FILTERS).toBe(
+      'astats=metadata=1:reset=1:measure_perchannel=none:measure_overall=RMS_level+Peak_level,' +
+        'aspectralstats=win_size=1024:measure=centroid',
+    )
+    expect(soundFilterOf({ level: 0.5, eq: BASS }).endsWith(`,${METER_FILTERS}]`)).toBe(true)
   })
 
   test('an EQ that is not flat appends its ten bands, an octave wide each', () => {
@@ -534,9 +575,11 @@ describe('the sound', () => {
       (frequency, index) => `equalizer=f=${frequency}:t=o:w=1:g=${BASS[index]}`,
     )
     expect(soundFilterOf({ level: 0.5, eq: BASS })).toBe(
-      `lavfi=[volume=-6.02dB,${bands.join(',')}]`,
+      `@meter:lavfi=[volume=-6.02dB,${bands.join(',')},${METER_FILTERS}]`,
     )
-    expect(soundFilterOf({ level: 1, eq: BASS })).toBe(`lavfi=[${bands.join(',')}]`)
+    expect(soundFilterOf({ level: 1, eq: BASS })).toBe(
+      `@meter:lavfi=[${bands.join(',')},${METER_FILTERS}]`,
+    )
   })
 
   test('each track opens with replaygain off and its own af, the queued one at its level', async () => {
@@ -593,10 +636,10 @@ describe('the sound', () => {
     } as const
     expect(await service.handle(sound)).toEqual({ ok: true })
     await service.handle(sound)
-    expect(fake.log).toEqual(['set af lavfi=[volume=-6.02dB]'])
+    expect(fake.log).toEqual([`set af @meter:lavfi=[volume=-6.02dB,${METER_FILTERS}]`])
     fake.log.length = 0
     await service.handle({ ...sound, level: 1 })
-    expect(fake.log).toEqual(['set af '])
+    expect(fake.log).toEqual([`set af ${METER_ONLY}`])
     expect(fake.log.some((entry) => entry.startsWith(MPV_COMMANDS.aoReload))).toBe(false)
   })
 
@@ -699,5 +742,58 @@ describe('now playing', () => {
     fake.log.length = 0
     await service.applyOutput({ output: PCM, devices: [] })
     expect(fake.log).toEqual([])
+  })
+})
+
+describe('the meter', () => {
+  const METADATA = {
+    'lavfi.astats.Overall.RMS_level': '-18.5',
+    'lavfi.astats.Overall.Peak_level': '-3.25',
+    'lavfi.aspectralstats.1.centroid': '1200',
+    'lavfi.aspectralstats.2.centroid': '1000',
+  } as const
+  const LEVELS = {
+    type: AUDIO_EVENTS.levels,
+    measure: { rms: -18.5, peak: -3.25, centroid: 1100 },
+  } as const
+
+  const levelsOf = (events: readonly AudioEvent[]) =>
+    events.filter((event) => event.type === AUDIO_EVENTS.levels)
+
+  test('reads what mpv measured while a track plays and sends it to the page', async () => {
+    const { service, fake, clock, events } = setup()
+    fake.values.set(MPV_PROPERTIES.afMeter, METADATA)
+    await service.handle({ ...LOAD, next: null })
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: false })
+    clock.fire()
+    await settle()
+    expect(fake.reads).toContain(MPV_PROPERTIES.afMeter)
+    expect(levelsOf(events)).toEqual([LEVELS])
+  })
+
+  test('stops reading once paused or stopped, and reads nothing with no track', async () => {
+    const { service, fake, clock, events } = setup()
+    fake.values.set(MPV_PROPERTIES.afMeter, METADATA)
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: false })
+    expect(clock.pending.size).toBe(0)
+    await service.handle({ ...LOAD, next: null })
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: true })
+    expect(clock.pending.size).toBe(0)
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: false })
+    expect(clock.pending.size).toBe(1)
+    await service.handle({ type: AUDIO_COMMANDS.stop })
+    expect(clock.pending.size).toBe(0)
+    expect(levelsOf(events)).toEqual([])
+  })
+
+  test('a meter that is not there yet sends nothing and keeps reading', async () => {
+    const { service, fake, clock, events, warnings } = setup()
+    await service.handle({ ...LOAD, next: null })
+    fake.emit({ type: MPV_EVENTS.property, name: MPV_PROPERTIES.pause, data: false })
+    clock.fire()
+    await settle()
+    expect(levelsOf(events)).toEqual([])
+    expect(clock.pending.size).toBe(1)
+    expect(warnings).toEqual([])
   })
 })

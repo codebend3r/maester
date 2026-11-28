@@ -4,6 +4,8 @@
  * same from one source.
  */
 export {
+  COVER_FACT_LABELS,
+  COVER_MENU_COPY,
   DOWNLOAD_BUTTON_COPY,
   DOWNLOAD_COPY,
   TRACK_MENU_COPY,
@@ -43,7 +45,7 @@ export { NAME_SAVES, type ServerNameSave, serverNameSaveOf } from '@/serverName'
 export { themePickerLabelOf, themeSlotLabelOf } from '@/themePickerLabel'
 export { aboutFactsOf, hasAbout } from '@/artistAbout'
 export { countValueOf, countsLineOf, lineValueOf } from '@/counts'
-export { albumMetaOf, artistMetaOf, playlistMetaOf } from '@/detailFacts'
+export { COVER_FACT_WORDING, albumMetaOf, artistMetaOf, playlistMetaOf } from '@/detailFacts'
 export { detailNoticeOf } from '@/detailNotice'
 export { greetingOf } from '@/greeting'
 export { firstAtLetter } from '@/library/artistIndex'
@@ -204,6 +206,7 @@ export {
   type MenuView,
   type SongActions,
   menuGroupsOf,
+  placeActionsOf,
 } from '@/menuGroups'
 export { SONG_LEADS, type ShownLead, type SongLead, type SongLeadOf, songLeadOf } from '@/songLead'
 export { TOP_RESULT_KINDS, type TopResult, topResultOf } from '@/search/topResult'
