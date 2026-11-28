@@ -36,13 +36,13 @@ has() {
 
 echo "run_id=$run"
 echo "sha=$head"
-if has raven-app-ios-simulator raven-app-tvos-simulator raven-app-tvos-simulator-test-project raven-app-android-tv; then
+if has raven-app-ios-simulator raven-app-tvos-simulator raven-app-tvos-simulator-test-project raven-app-android-tv raven-app-android; then
   echo app=true
 fi
-if has raven-music-ios-simulator wren-tv-tvos-simulator wren-tv-tvos-simulator-test-project wren-tv-android-tv; then
+if has raven-music-ios-simulator raven-music-android wren-tv-tvos-simulator wren-tv-tvos-simulator-test-project wren-tv-android-tv; then
   echo music=true
 fi
-if has raven-native-handoff; then
+if has raven-native-handoff raven-native-win32-x64; then
   echo desktop=true
 fi
 

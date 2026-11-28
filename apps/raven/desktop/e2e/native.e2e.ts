@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import {
   DEFAULT_CAPTION_STYLE,
@@ -21,6 +20,7 @@ import {
   withApp,
 } from '@/e2e/harness'
 import { lastReplyOf, postOnPort, repliesTo, tapPlayerPort, trafficOf } from '@/e2e/playerPort'
+import { isAlive, processTree } from '@/e2e/processTree'
 import { episodeGroup, playDownload, seedDownloads } from '@/e2e/seedDownloads'
 import {
   PLAYER_MENUS,
@@ -54,7 +54,6 @@ const NEXT_WAIT_MS = 15_000
  */
 const NIGHT = '#15201E'
 const CLEAR = '#000000'
-const ERROR_CODES = { eperm: 'EPERM' } as const
 
 // The seeded downloads, by the title each row and the player's heading carry.
 const LABELS = { first: 'Clip 01', second: 'Clip 02 Été', tracks: 'Tracks 01' } as const
@@ -83,40 +82,6 @@ const lastVolumeSent = async (page: Page): Promise<number | null> => {
     command.type === PLAYER_COMMANDS.volume ? [Math.round(command.volume * 100)] : [],
   )
   return volumes.at(-1) ?? null
-}
-
-type ChildrenOfProps = { pid: number }
-
-/** The pids `pgrep` lists as children of `pid`; it exits 1, with no output, when there are none. */
-const childrenOf = ({ pid }: ChildrenOfProps) =>
-  new Promise<number[]>((resolve) => {
-    execFile('pgrep', ['-P', `${pid}`], (_error, stdout) =>
-      resolve(
-        stdout
-          .split('\n')
-          .filter((line) => line.trim() !== '')
-          .map(Number),
-      ),
-    )
-  })
-
-type ProcessTreeProps = { pid: number }
-
-/** The app's process and every process under it (Electron's helpers), by pid. */
-const processTree = async ({ pid }: ProcessTreeProps): Promise<number[]> => {
-  const children = await childrenOf({ pid })
-  const below = await Promise.all(children.map((child) => processTree({ pid: child })))
-  return [pid, ...below.flat()]
-}
-
-// Signal 0 only asks whether the process exists; EPERM means it does, under another user.
-const isAlive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error instanceof Error && 'code' in error && error.code === ERROR_CODES.eperm
-  }
 }
 
 /** The window's background as Electron reports it: night behind a page, clear under a video. */

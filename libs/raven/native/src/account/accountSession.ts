@@ -18,6 +18,8 @@ type SignInProps = { email: string; password: string }
 type AccountSessionState = {
   session: AccountSession | null
   signIn: (input: SignInProps) => Promise<AuthOutcome>
+  /** Takes a session made elsewhere as this device's own: the one a scanned code was approved for. */
+  adopt: (session: AccountSession) => void
   /** A new access token, or null when there is none to give (signed out, or Supabase unreachable). */
   refresh: () => Promise<string | null>
   signOut: () => void
@@ -51,6 +53,7 @@ export const createAccountSession = ({ storageKey }: CreateAccountSessionProps) 
           if (outcome.kind === AUTH_OUTCOMES.ok) set({ session: outcome.session })
           return outcome
         },
+        adopt: (session) => set({ session }),
         refresh: () => {
           running ??= (async () => {
             const { session } = get()

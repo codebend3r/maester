@@ -6,7 +6,7 @@ description: >-
 
 # Run the Desktop end to end check locally
 
-The `🎬 E2E Raven Mac desktop` job (`desktop-e2e` in `.github/workflows/native-checks.yml`, which CI runs on main once a pull request merges), on macOS with Apple silicon. One command runs every step, from the repo root:
+The `🎬 E2E Raven Mac desktop` job (`desktop-e2e` in `.github/workflows/e2e-tests.yml`, which CI runs on main once a pull request merges), on macOS with Apple silicon. One command runs every step, from the repo root:
 
 ```bash
 bun run ci:desktop:e2e

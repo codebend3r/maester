@@ -7,7 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { keyboardFor } from '@raven/native/headless'
+import { autofillFor, keyboardFor } from '@raven/native/headless'
 
 import {
   type FieldProps,
@@ -58,6 +58,7 @@ const Field = ({
         accessibilityLabel={label}
         autoCapitalize="none"
         autoCorrect={false}
+        {...autofillFor({ isSecret, isEmail })}
         keyboardType={keyboardFor({ isSecret, isEmail, isNumber })}
         onChangeText={onChangeText}
         onSubmitEditing={({ nativeEvent }) => onSubmit({ text: nativeEvent.text })}
@@ -101,11 +102,15 @@ const FormButton = ({ label, onPress, tone, isDisabled = false }: FormButtonProp
   )
 }
 
+/** A phone signs in under the thumb, with its keyboard and its password manager: it shows no code. */
+const NoScanPanel = () => null
+
 /** The phone and tablet form: one column under the thumb, lifted clear of the keyboard. */
 export const touchForm: FormKit = {
   Form,
   Field,
   FormButton,
+  ScanPanel: NoScanPanel,
   useFormStyles: useTouchFormStyles,
 }
 

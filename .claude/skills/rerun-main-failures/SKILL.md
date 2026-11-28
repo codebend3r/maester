@@ -5,7 +5,7 @@ description: Use when asked to re-run the failed or cancelled GitHub Actions job
 
 # Re-run main's failed jobs
 
-Main's workflows run on every merge: `🚀 Main smoke test and release` (`main-smoke-test.yml`), `🧱 Native checks` (`native-checks.yml`) and `🗃️ App build caches` (`app-caches.yml`). Native checks has been the usual red one, and often not because of a test: its macOS jobs (`runs-on: macos-26`) wait for a hosted runner, and when GitHub has no macOS arm64 capacity the job is cancelled with "The job was not acquired by Runner of type hosted even after multiple attempts". Those jobs never ran, so re-running them is the fix.
+Main's workflows run on every merge: `🚀 Main smoke test and release` (`main-smoke-test.yml`), `E2E Tests` (`e2e-tests.yml`) and `🗃️ App build caches` (`app-caches.yml`). Native checks has been the usual red one, and often not because of a test: its macOS jobs (`runs-on: macos-26`) wait for a hosted runner, and when GitHub has no macOS arm64 capacity the job is cancelled with "The job was not acquired by Runner of type hosted even after multiple attempts". Those jobs never ran, so re-running them is the fix.
 
 This skill touches main's runs only. For a PR's checks, use `fix-ci-until-green`.
 

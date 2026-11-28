@@ -4,7 +4,7 @@ description: >-
   each one: whether the commit selected it, whether to build it in this run, and which run and
   commit hold its builds. The caller checks out the commit with its whole history first.
 
-# The 🔎 Select affected native checks job of native-checks.yml, whose native jobs read this plan
+# The 🔎 Select affected E2E tests job of e2e-tests.yml, whose native jobs read this plan
 # and nothing else; a pull request selects nothing and builds every group. A push to main diffs
 # against its last green run, a base, when one is given, against that base, and a push with no
 # green ancestor selects every group. A change to a shared file, a workflow or a script

@@ -7,7 +7,7 @@ description: >-
   `compiles` off: the same tools and environment, without the compile's caches or the NDK.
 
 # The single definition of how the app is built, shared by the app jobs in pull-request-checks.yml
-# and native-checks.yml, by device-release.yml and by app-caches.yml, which builds on main and
+# and e2e-tests.yml, by device-release.yml and by app-caches.yml, which builds on main and
 # saves the caches: ccache hashes the compiler and its flags, so a setting either side changed
 # alone would leave every PR compiling cold. A pull request's caches are scoped to its own ref,
 # so a PR saving its own copy would fill the repo's cache with duplicates; main's are readable

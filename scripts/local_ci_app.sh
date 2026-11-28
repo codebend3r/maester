@@ -189,11 +189,11 @@ apple_runtime() {
   [ -n "$SIM_RUNTIME" ] || { echo "No $1 $SIM_SDK simulator runtime: run the job's tools step first." >&2; exit 1; }
 }
 
-# find_iphone_type: sets IPHONE_TYPE to CI's iPhone 16 on SIM_RUNTIME, or the runtime's newest
-# iPhone when it has none.
-find_iphone_type() {
+# find_device_type <family> <CI's type>: sets DEVICE_TYPE to CI's device type of that product
+# family (iPhone, iPad) on SIM_RUNTIME, or the runtime's newest of the family when it has none.
+find_device_type() {
   # shellcheck disable=SC2034  # read by the scripts that source this
-  IPHONE_TYPE="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$SIM_RUNTIME" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == "iPhone")] | (map(select(.identifier | endswith(".iPhone-16"))) + .) | first | .identifier')"
+  DEVICE_TYPE="$(xcrun simctl list -j runtimes iOS | jq -er --arg runtime "$SIM_RUNTIME" --arg family "$1" --arg type ".$2" '.runtimes[] | select(.identifier == $runtime) | [.supportedDeviceTypes[] | select(.productFamily == $family)] | (map(select(.identifier | endswith($type))) + .) | first | .identifier')"
 }
 
 # find_simulator <name> <device type>: sets SIM_DEVICE to the simulator of that name on

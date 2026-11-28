@@ -13,7 +13,9 @@ import {
   stubBrowser,
   withApp,
 } from '@/e2e/harness'
+import { e2eTarget } from '@/e2e/platform'
 import { type ReleasesFixture, startReleasesFixture } from '@/e2e/releasesFixture'
+import { appAssetNameFor } from '@/main/updates'
 
 const CONFIG_FILE = 'desktop-config.json'
 const NOTICE_WAIT_MS = 10_000
@@ -33,14 +35,19 @@ const appVersion = async (): Promise<string> => {
 type ReleaseProps = {
   tag: string
   isPrerelease?: boolean
-  dmg?: string | null
+  /** Whether the release carries the app for the system the suite runs on. */
+  hasApp?: boolean
 }
 
-const release = ({ tag, isPrerelease = false, dmg = null }: ReleaseProps) => ({
+/** The app a release of `tag` attaches for this system, as main's check names it: the dmg, or Windows' installer. */
+const appAssetOf = (tag: string): string =>
+  appAssetNameFor({ version: tag.slice(1), target: e2eTarget() })
+
+const release = ({ tag, isPrerelease = false, hasApp = false }: ReleaseProps) => ({
   tag_name: tag,
   draft: false,
   prerelease: isPrerelease,
-  assets: dmg === null ? [] : [{ name: dmg }],
+  assets: hasApp ? [{ name: appAssetOf(tag) }] : [],
 })
 
 /** The toast main's notice of a newer release raises, over whatever page is open. */
@@ -111,7 +118,7 @@ const withFixture = async ({ releases, pages, run }: WithFixtureProps): Promise<
 test.describe('the release check', () => {
   test('tells you about a newer release and opens its page', async () => {
     await withFixture({
-      releases: [release({ tag: 'v99.0.0', dmg: 'raven-player-99.0.0-arm64.dmg' })],
+      releases: [release({ tag: 'v99.0.0', hasApp: true })],
       run: async ({ fixture, userData }) => {
         await withApp({
           userData,
@@ -139,13 +146,9 @@ test.describe('the release check', () => {
     await withFixture({
       releases: [
         release({ tag: 'v99.0.0.1' }),
-        release({
-          tag: 'v99.1.0-rc.1',
-          isPrerelease: true,
-          dmg: 'raven-player-99.1.0-rc.1-arm64.dmg',
-        }),
+        release({ tag: 'v99.1.0-rc.1', isPrerelease: true, hasApp: true }),
         release({ tag: 'v98.0.0' }),
-        release({ tag: `v${version}`, dmg: `raven-player-${version}-arm64.dmg` }),
+        release({ tag: `v${version}`, hasApp: true }),
       ],
       run: async ({ fixture, userData }) => {
         await withApp({
@@ -171,7 +174,7 @@ test.describe('the release check', () => {
       release({ tag: `v99.0.0.${40 - index}` }),
     )
     await withFixture({
-      pages: [builds, [release({ tag: 'v99.0.0', dmg: 'raven-player-99.0.0-arm64.dmg' })]],
+      pages: [builds, [release({ tag: 'v99.0.0', hasApp: true })]],
       run: async ({ fixture, userData }) => {
         await withApp({
           userData,
@@ -217,7 +220,7 @@ test.describe('the release check', () => {
   test('never asks GitHub with the switch off', async () => {
     const version = await appVersion()
     await withFixture({
-      releases: [release({ tag: `v${version}`, dmg: `raven-player-${version}-arm64.dmg` })],
+      releases: [release({ tag: `v${version}`, hasApp: true })],
       run: async ({ fixture, userData }) => {
         const env = { RAVEN_DESKTOP_RELEASES_URL: fixture.url }
         await withApp({

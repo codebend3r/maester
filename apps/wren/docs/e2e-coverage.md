@@ -19,8 +19,9 @@ Every suite opens on `@raven/server`'s `serve:fixture`, whose open music library
 | --- | --- | --- | --- |
 | Web | `apps/wren/wren-web/e2e` | Playwright in Google Chrome, wide and at phone width | 🎵 E2E Wren web |
 | iPhone | `apps/wren/wren-app/e2e` | Maestro on an iPhone simulator | 🎵 E2E Wren iPhone |
-| iPad | None | | The iPhone flows never run on an iPad simulator |
-| Android phone | None | | 🎵 Build Wren Android builds the APK only |
+| iPad | The iPhone's flows | Maestro on an iPad simulator, by the tablet's sidebar | 🎵 E2E Wren iPad |
+| Android phone | The iPhone's flows | Maestro on an Android phone emulator | 🎵 E2E Wren Android |
+| Mac | `apps/wren/wren-desktop/e2e` | Playwright driving Electron: the window, the menu, the loopback host's security and the window's state | 🎵 E2E Wren Mac desktop |
 | Apple TV | `apps/wren/wren-tv/tvos-e2e` | An XCUITest the Siri Remote drives, on an Apple TV simulator | 🎵 E2E Wren Apple TV |
 | Android TV | `apps/wren/wren-tv/e2e` | Maestro on the Android TV emulator, by the remote's keys alone | 🎵 E2E Wren Android TV |
 
@@ -106,7 +107,7 @@ Every suite opens on `@raven/server`'s `serve:fixture`, whose open music library
 
 ## The widest gaps
 
-- **Two of Wren's six apps have no suite:** the iPad and Android phones. The iPhone flows never run on an iPad, so the tablet's sidebar and two column Now Playing are never driven.
+- **The iPad and Android phones run only the iPhone's three flows.** They reach the album through the tablet's sidebar, but the two column Now Playing is never driven.
 - **Wren signs in nowhere.** Both suites open on the accountless fixture, so the sign-in page, sign out and a refused account are never driven.
 - **The iPhone is tested far less than the web.** It plays, steps, pauses and downloads one album; search, favourites, playlists, Now Playing, Up next and Settings are driven on the web alone, though both apps have them.
 - **Downloads are tested once,** on the iPhone: an album downloaded and listed. Removing one, the storage limit and playing offline are untested.

@@ -1,9 +1,14 @@
-import type { ButtonTone } from '@raven/native/headless'
+import type { ButtonTone, ScanPanelProps } from '@raven/native/headless'
 import type { ReactNode } from 'react'
 
 import type { FormStyles } from '@/layouts/formStyles'
 
-export type FormProps = { title: string; children: ReactNode }
+export type FormProps = {
+  title: string
+  children: ReactNode
+  /** What stands beside the form on a TV, as sign-in's code to scan; a phone has no room and no need. */
+  aside?: ReactNode
+}
 
 type OnSubmitProps = { text: string }
 
@@ -40,5 +45,7 @@ export type FormKit = {
   Form: (props: FormProps) => ReactNode
   Field: (props: FieldProps) => ReactNode
   FormButton: (props: FormButtonProps) => ReactNode
+  /** Sign-in's code to scan with a phone, which only a TV draws. */
+  ScanPanel: (props: ScanPanelProps) => ReactNode
   useFormStyles: () => FormStyles
 }

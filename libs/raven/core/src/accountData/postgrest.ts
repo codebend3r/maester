@@ -7,7 +7,7 @@ import {
   readJson,
 } from '@/apiClient/transport'
 import { AUTH_HEADERS, AUTH_SCHEME } from '@/contract'
-import { pathWithQuery } from '@/query'
+import { pathWithQuery, withoutTrailingSlash } from '@/query'
 import { type Guard } from '@/schema'
 
 /** Where PostgREST serves the tables, under the project's address. */
@@ -21,6 +21,12 @@ export const POSTGREST = {
   onConflict: 'on_conflict',
   ascending: '.asc',
 } as const
+
+// Where a function is called, under the tables' own root.
+const RPC_ROOT = 'rpc/'
+
+/** Where a project answers a function's call: the function's name follows. */
+export const ACCOUNT_RPC_PATH = `${ACCOUNT_REST_PATH}${RPC_ROOT}`
 
 /** What a write asks PostgREST to answer: the row written, nothing, or nothing for a row already there. */
 const PREFERENCES = {
@@ -54,7 +60,8 @@ export type RowsRead<T> = { select: string; guard: Guard<T> }
 type Where = Record<string, string | number>
 
 type RequestProps = {
-  table: string
+  /** A table's name, or a function's place under `RPC_ROOT`. */
+  path: string
   method: HttpMethod
   query: Record<string, string>
   body?: Record<string, unknown>
@@ -85,6 +92,8 @@ type UpdateProps<T> = {
 
 type RemoveProps = { table: string; where: Where }
 
+type RpcProps<T> = { name: string; args: Record<string, unknown>; guard: Guard<T> }
+
 type ReadRowsProps<T> = { response: FetchResponse; guard: Guard<T> }
 
 /** The rows of an answer that pass `guard`; one that does not is left out alone. */
@@ -112,17 +121,17 @@ export const createPostgrest = ({
   accessToken,
   fetch,
 }: CreatePostgrestProps) => {
-  const root = `${supabaseUrl.replace(/\/+$/, '')}${ACCOUNT_REST_PATH}`
+  const root = `${withoutTrailingSlash(supabaseUrl)}${ACCOUNT_REST_PATH}`
 
   const request = async ({
-    table,
+    path,
     method,
     query,
     body,
     prefer,
   }: RequestProps): Promise<FetchResponse> => {
     const token = await accessToken()
-    const response = await fetch(`${root}${pathWithQuery({ path: table, query })}`, {
+    const response = await fetch(`${root}${pathWithQuery({ path, query })}`, {
       method,
       headers: {
         [HEADERS.accept]: CONTENT_TYPES.json,
@@ -144,7 +153,7 @@ export const createPostgrest = ({
     /** A table's rows the caller may see, ordered by one column, lowest first. */
     list: async <T>({ table, select, guard, orderBy }: ListProps<T>): Promise<T[]> => {
       const response = await request({
-        table,
+        path: table,
         method: HTTP_METHODS.get,
         query: {
           [POSTGREST.select]: select,
@@ -157,7 +166,7 @@ export const createPostgrest = ({
     /** Adds a row and answers it as the table wrote it. */
     insert: async <T>({ table, row, returning }: InsertProps<T>): Promise<T[]> => {
       const response = await request({
-        table,
+        path: table,
         method: HTTP_METHODS.post,
         query: { [POSTGREST.select]: returning.select },
         body: row,
@@ -169,7 +178,7 @@ export const createPostgrest = ({
     /** Adds a row; one already there under the same key changes nothing. */
     insertOnce: async ({ table, row }: InsertOnceProps): Promise<void> => {
       await request({
-        table,
+        path: table,
         method: HTTP_METHODS.post,
         query: {},
         body: row,
@@ -180,7 +189,7 @@ export const createPostgrest = ({
     /** Adds a row, or changes the one already there under the same key, and answers it as the table wrote it. */
     upsert: async <T>({ table, row, returning, onConflict }: UpsertProps<T>): Promise<T[]> => {
       const response = await request({
-        table,
+        path: table,
         method: HTTP_METHODS.post,
         query: {
           [POSTGREST.onConflict]: onConflict.join(','),
@@ -195,7 +204,7 @@ export const createPostgrest = ({
     /** Changes the rows `where` names and answers each as it now reads; none when no row matched. */
     update: async <T>({ table, where, changes, returning }: UpdateProps<T>): Promise<T[]> => {
       const response = await request({
-        table,
+        path: table,
         method: HTTP_METHODS.patch,
         query: { ...filtersOf(where), [POSTGREST.select]: returning.select },
         body: changes,
@@ -207,11 +216,26 @@ export const createPostgrest = ({
     /** Removes the rows `where` names; none matching changes nothing. */
     remove: async ({ table, where }: RemoveProps): Promise<void> => {
       await request({
-        table,
+        path: table,
         method: HTTP_METHODS.delete,
         query: filtersOf(where),
         prefer: PREFERENCES.nothing,
       })
+    },
+
+    /** Calls one of the database's functions and answers what it returned, held to `guard`. */
+    rpc: async <T>({ name, args, guard }: RpcProps<T>): Promise<T> => {
+      const response = await request({
+        path: `${RPC_ROOT}${name}`,
+        method: HTTP_METHODS.post,
+        query: {},
+        body: args,
+      })
+      const body = await readJson(response)
+      if (!guard(body)) {
+        throw new ApiError({ status: response.status, message: PROBLEMS.notUnderstood })
+      }
+      return body
     },
   }
 }

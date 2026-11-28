@@ -5,8 +5,15 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["bun"],
     "paths": {
+      "@/e2e/*": ["./e2e/*"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../../tooling/web/assets.d.ts"]
+  "include": [
+    "src",
+    "e2e",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "../../../tooling/web/assets.d.ts"
+  ]
 }

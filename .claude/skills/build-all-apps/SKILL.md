@@ -38,14 +38,13 @@ Run the steps **one after another, never at once**: every device deploy regenera
 
 Steps 2 to 5b are one command, `bun run deploy:devices` (`bun run --sequential app:deploy:android-tv app:deploy:tvos app:deploy:ios wren:deploy:ios wren:tv:deploy:android-tv wren:tv:deploy:tvos`). `bun run --sequential` stops at the first failure, so when one deploy fails, fix it and run the ones after it on their own. The devices come first: the Mac package waits until every device has its builds, and it is only ever built.
 
-Before the device steps, export Xcode and Android Studio's JDK:
+Before the device steps, export Xcode:
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ```
 
-The shell's own `JAVA_HOME` is Homebrew's newest Java, which Gradle refuses, and the scripts default to Android Studio's only when the shell sets none. `xcode-select` may point at the Command Line Tools, where `devicectl` and Forge's `actool` do not exist (`tool 'actool' requires Xcode`); `DEVELOPER_DIR` settles it for the shell without changing the system setting.
+The shell's own `JAVA_HOME` is Homebrew's newest Java, which Gradle refuses, so the Android builds (`apps/raven/app/scripts/assemble_android.sh`) run Gradle on Android Studio's JDK whatever the shell names. `xcode-select` may point at the Command Line Tools, where `devicectl` and Forge's `actool` do not exist (`tool 'actool' requires Xcode`); `DEVELOPER_DIR` settles it for the shell without changing the system setting.
 
 Stop at the first failure and report it, unless the user said to keep going; then note it and run the next device. A device that is off or out of reach is not a failure of the others: say which one and go on.
 
@@ -97,7 +96,7 @@ Never put a key, a password or a `.p8` in the repo, a log line or a commit.
 `desktop:make` runs `stage:mpv`, which copies libmpv and the addon from `libs/raven/mpv/resources/darwin-arm64`. Get them first:
 
 1. If `libs/raven/mpv/resources/darwin-arm64/raven_mpv.node` exists, use it.
-2. Otherwise `bun run ci:desktop:e2e` downloads CI's native handoff from a recent `native-checks.yml` run whose addon sources match this checkout and unpacks it in place (it needs `gh auth login`), then runs the desktop e2e.
+2. Otherwise `bun run ci:desktop:e2e` downloads CI's native handoff from a recent `e2e-tests.yml` run whose addon sources match this checkout and unpacks it in place (it needs `gh auth login`), then runs the desktop e2e.
 3. If no run has a matching handoff, build them from source as the `raven-desktop-native` action does: `brew install cmake ninja meson pkgconf`, `xcodebuild -downloadComponent MetalToolchain` when `xcrun metal --version` fails, then `bunx nx run @raven/mpv:fetch:libmpv` and `bunx nx run @raven/mpv:build:native`. The `get-started` skill covers this toolchain.
 
 Then `bun run mpv:native` audits them and runs the headless libmpv tests, as CI does.
@@ -116,5 +115,4 @@ Report per device and per app: the branch and commit (`git log --oneline -1`), w
 - Deploying raven and leaving Wren out: every device gets both.
 - Treating a `ci:app:*` run as a deploy: it installs the fixture build, never on a device, and that build cannot reach a real server.
 - Running two deploys at once: the prebuilds collide.
-- Leaving the shell's Homebrew `JAVA_HOME` in place for the Android TV build.
 - Asking before taking a TV, a tablet or a phone over, or asking for a device's address: the scripts find them.

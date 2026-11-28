@@ -17,71 +17,15 @@
 #   bun run ci:app:fixture:wait                 waits for the fixture server
 #   bun run ci:app:ios:e2e                      the Maestro flows (takes --skip-nx-cache)
 set -euo pipefail
-# shellcheck source=scripts/local_ci_app.sh
-source "$(dirname "$0")/local_ci_app.sh"
 
-export MAESTRO_DRIVER_STARTUP_TIMEOUT=300000
-export MAESTRO_CLI_NO_ANALYTICS=1
-FAILURE_HINT="Maestro's screenshots and logs: ~/.maestro/tests; $FAILURE_HINT"
-# Maestro runs on Java; a shell that has not read ~/.zshrc may have none on its path.
-if [ -z "${JAVA_HOME:-}" ] && [ -d /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home ]; then
-  export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
-fi
-
+JOB=ci:app:ios
+DEVICE=iPhone
 SIMULATOR=raven-phone
-APP=apps/raven/app/build/ios/Build/Products/Release-iphonesimulator/raven.app
+FAMILY=iPhone
+CI_TYPE=iPhone-16
+E2E_TARGET=@raven/app:e2e
 
-# Sets IPHONE_TYPE (find_iphone_type) and SIM_DEVICE to the simulator of that type.
-find_iphone() {
-  apple_runtime iOS iphonesimulator
-  find_iphone_type
-  find_simulator "$SIMULATOR" "$IPHONE_TYPE"
-}
-
-step_tools() {
-  require_apple_tools iOS iphonesimulator
-  install_maestro
-}
-
-step_simulator() {
-  step 'Boot the iPhone simulator'
-  find_iphone
-  boot_simulator "$SIMULATOR" "$IPHONE_TYPE"
-}
-
-step_build() {
-  step 'Build for the iPhone and iPad simulator'
-  CURL_HOME="$WORK" bunx nx run @raven/app:build:ios --excludeTaskDependencies
-}
-
-# `expo prebuild` exits 0 when `pod install` fails.
-step_pods() {
-  step 'Check the iPhone and iPad pods'
-  cmp apps/raven/app/ios/Podfile.lock apps/raven/app/ios/Pods/Manifest.lock
-}
-
-step_install() {
-  step 'Install the build on the iPhone simulator'
-  find_iphone
-  xcrun simctl bootstatus "$SIM_DEVICE" -b
-  skip_keyboard_tutorial
-  xcrun simctl install "$SIM_DEVICE" "$APP"
-}
-
-step_e2e() {
-  step 'App end to end'
-  bunx nx run @raven/app:e2e "$@"
-}
-
-# The whole job, each step through its own root script.
-run_job() {
-  start_job ci:app:ios:tools
-  bun run ci:app:ios:simulator
-  bun run ci:app:ios:build
-  bun run ci:app:ios:pods
-  bun run ci:app:ios:install
-  bun run ci:app:fixture:wait
-  bun run ci:app:ios:e2e "$@"
-}
+# shellcheck source=scripts/local_ci_ios.sh
+source "$(dirname "$0")/local_ci_ios.sh"
 
 run_steps "$@"

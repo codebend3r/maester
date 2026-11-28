@@ -63,6 +63,9 @@ const DesktopHost = lazyPage(() =>
 const FavouritesPage = lazyPage(() =>
   import('@/pages/FavouritesPage/FavouritesPage').then((module) => module.FavouritesPage),
 )
+const LinkPage = lazyPage(() =>
+  import('@/pages/LinkPage/LinkPage').then((module) => module.LinkPage),
+)
 const HistoryPage = lazyPage(() =>
   import('@/pages/HistoryPage/HistoryPage').then((module) => module.HistoryPage),
 )
@@ -320,6 +323,8 @@ export const AppRoutes = () => {
             </Route>
             {/* The player takes the whole screen, outside the browsing frame, as a file Raven plays does. */}
             <Route path={APP_PATHS.watch} element={<WatchPage />} />
+            {/* A TV's scanned code: behind the gate, which sends a signed-out phone to sign in and back. */}
+            <Route path={APP_PATHS.link} element={<LinkPage />} />
             {isDesktop && <Route path={DESKTOP_PATHS.play} element={<PlayRoute />} />}
             {engine !== null && <Route path={BROWSER_PLAY_PATH} element={<BrowserPlayRoute />} />}
           </Route>

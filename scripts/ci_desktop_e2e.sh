@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the 🎬 E2E Raven Mac desktop check, which CI runs on main (native-checks.yml), on this Mac:
+# Runs the 🎬 E2E Raven Mac desktop check, which CI runs on main (e2e-tests.yml), on this Mac:
 # Playwright drives the unpackaged Raven against the fixture servers and fake Auth the
 # tests start themselves. Without libmpv's addon, CI's native handoff is downloaded
 # from a recent run; the e2e target's `@raven/mpv:build:native` dependency then rebuilds
@@ -43,7 +43,7 @@ else
       break
     fi
   done < <(
-    for workflow in native-checks.yml pull-request-checks.yml; do
+    for workflow in e2e-tests.yml pull-request-checks.yml; do
       gh run list --workflow "$workflow" --limit 20 --json databaseId,headSha --jq '.[] | "\(.databaseId) \(.headSha)"'
     done
   )

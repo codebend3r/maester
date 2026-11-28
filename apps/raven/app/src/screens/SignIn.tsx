@@ -1,5 +1,6 @@
 import { apiFor } from '@raven/native'
 import {
+  type DeviceLink,
   RAVEN_SERVER,
   SIGN_IN_ERRORS,
   SIGN_IN_STEPS,
@@ -13,9 +14,11 @@ import { useRouter } from 'expo-router'
 import type { Dispatch, SetStateAction } from 'react'
 
 import { Text } from '@/layouts/Text'
-import { BUTTON_TONES, Field, Form, FormButton, useFormStyles } from '@/layouts'
+import { BUTTON_TONES, Field, Form, FormButton, ScanPanel, useFormStyles } from '@/layouts'
 import { useAccountSession } from '@/account/session'
 import { TEST_ACCOUNT } from '@/account/testAccount'
+import { DEVICE_PLATFORM } from '@/platform/devicePlatform'
+import { APP_PLATFORMS, type AppPlatform } from '@/platform/platform'
 import { APP_ROUTES } from '@/routes'
 import { SIGN_IN_COPY } from '@/screens/copy'
 import { useActiveServer } from '@/stores/activeServer'
@@ -28,6 +31,28 @@ const SIGN_IN_ERROR_COPY = {
   [SIGN_IN_ERRORS.full]: SIGN_IN_COPY.full,
   [SIGN_IN_ERRORS.notAdded]: SIGN_IN_COPY.notAdded,
 } as const satisfies SignInErrorCopy
+
+/*
+ * What each TV calls itself to the phone approving its code. A phone or a tablet has none: it
+ * signs in with its own keyboard, so it starts no code and shows none.
+ */
+const DEVICE_NAMES = {
+  [APP_PLATFORMS.tvos]: SIGN_IN_COPY.deviceNames.tvos,
+  [APP_PLATFORMS.androidTv]: SIGN_IN_COPY.deviceNames.androidTv,
+  [APP_PLATFORMS.ios]: null,
+  [APP_PLATFORMS.androidPhone]: null,
+} as const satisfies Record<AppPlatform, string | null>
+
+/** How to fill a field without the remote's keyboard, where the remote has no button for it on screen. */
+const ENTRY_HINTS = {
+  [APP_PLATFORMS.tvos]: SIGN_IN_COPY.appleTvHint,
+  // Android TV draws a "say it" button under each field (`ListenButton`), which says it all.
+  [APP_PLATFORMS.androidTv]: null,
+  [APP_PLATFORMS.ios]: null,
+  [APP_PLATFORMS.androidPhone]: null,
+} as const satisfies Record<AppPlatform, string | null>
+
+const ENTRY_HINT = ENTRY_HINTS[DEVICE_PLATFORM]
 
 type ErrorLineProps = { error: string | null }
 
@@ -51,9 +76,11 @@ type AccountFormProps = {
   error: string | null
   isBusy: boolean
   onSubmit: (typedPassword?: string) => void
+  link: DeviceLink | null
+  onRenewLink: () => void
 }
 
-/** The account's email and password. */
+/** The account's email and password, and on a TV the code a phone scans to skip both. */
 const AccountForm = ({
   email,
   setEmail,
@@ -62,36 +89,45 @@ const AccountForm = ({
   error,
   isBusy,
   onSubmit,
-}: AccountFormProps) => (
-  <Form title={SIGN_IN_COPY.title}>
-    <Field
-      isEmail
-      isFirst={TEST_ACCOUNT === null}
-      label={SIGN_IN_COPY.email}
-      onChangeText={setEmail}
-      onSubmit={({ text }) => setEmail(text)}
-      value={email}
-    />
-    <Field
-      isSecret
-      label={SIGN_IN_COPY.password}
-      onChangeText={setPassword}
-      onSubmit={({ text }) => {
-        setPassword(text)
-        onSubmit(text)
-      }}
-      value={password}
-    />
-    <ErrorLine error={error} />
-    <FormButton
-      isDisabled={isBusy}
-      isFirst={TEST_ACCOUNT !== null}
-      label={SIGN_IN_COPY.signIn}
-      onPress={() => onSubmit()}
-      tone={BUTTON_TONES.primary}
-    />
-  </Form>
-)
+  link,
+  onRenewLink,
+}: AccountFormProps) => {
+  const formStyles = useFormStyles()
+  return (
+    <Form
+      aside={link !== null && <ScanPanel link={link} onRenew={onRenewLink} />}
+      title={SIGN_IN_COPY.title}
+    >
+      <Field
+        isEmail
+        isFirst={TEST_ACCOUNT === null}
+        label={SIGN_IN_COPY.email}
+        onChangeText={setEmail}
+        onSubmit={({ text }) => setEmail(text)}
+        value={email}
+      />
+      <Field
+        isSecret
+        label={SIGN_IN_COPY.password}
+        onChangeText={setPassword}
+        onSubmit={({ text }) => {
+          setPassword(text)
+          onSubmit(text)
+        }}
+        value={password}
+      />
+      {ENTRY_HINT !== null && <Text style={formStyles.note}>{ENTRY_HINT}</Text>}
+      <ErrorLine error={error} />
+      <FormButton
+        isDisabled={isBusy}
+        isFirst={TEST_ACCOUNT !== null}
+        label={SIGN_IN_COPY.signIn}
+        onPress={() => onSubmit()}
+        tone={BUTTON_TONES.primary}
+      />
+    </Form>
+  )
+}
 
 type TicketsOffFormProps = { onContinue: () => void }
 
@@ -150,17 +186,29 @@ const useSignInFlow = signInFlowFor({
 
 /**
  * The first launch: the account's email and password (the web's Supabase sign-in, against the
- * one server the app talks to), over `@raven/native`'s `signInFlowFor`. It never asks for a PIN.
+ * one server the app talks to), over `@raven/native`'s `signInFlowFor`, and on a TV a code to
+ * scan with a phone instead of typing either. It never asks for a PIN.
  */
 export const SignIn = () => {
   const router = useRouter()
   // From Settings, Home is under it in the stack: go back down to it rather than stack another.
   const goHome = () => router.dismissTo(APP_ROUTES.home)
-  const { step, email, setEmail, password, setPassword, isBusy, error, submitAccount } =
-    useSignInFlow({
-      initial: { email: TEST_ACCOUNT?.email ?? '', password: TEST_ACCOUNT?.password ?? '' },
-      onDone: goHome,
-    })
+  const {
+    step,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    isBusy,
+    error,
+    submitAccount,
+    link,
+    renewLink,
+  } = useSignInFlow({
+    initial: { email: TEST_ACCOUNT?.email ?? '', password: TEST_ACCOUNT?.password ?? '' },
+    onDone: goHome,
+    deviceName: DEVICE_NAMES[DEVICE_PLATFORM] ?? undefined,
+  })
 
   const view = signInViewOf({
     step,
@@ -172,6 +220,8 @@ export const SignIn = () => {
       error: error === null ? null : signInErrorTextOf({ error, copy: SIGN_IN_ERROR_COPY }),
       isBusy,
       onSubmit: (typedPassword) => submitAccount({ password: typedPassword }),
+      link,
+      onRenewLink: renewLink,
     },
     ticketsOff: { onContinue: goHome },
   })

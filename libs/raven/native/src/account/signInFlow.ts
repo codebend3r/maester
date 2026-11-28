@@ -8,7 +8,8 @@ import {
   type SignInStep,
   finishSignIn,
 } from '@/account/signInSteps'
-import { AUTH_OUTCOMES } from '@/account/supabaseAuth'
+import { AUTH_OUTCOMES, accountSessionOf } from '@/account/supabaseAuth'
+import { useDeviceLink } from '@/account/useDeviceLink'
 import { useSubmit } from '@/account/useSubmit'
 import type { ActiveServerStore } from '@/servers/activeServerStore'
 import type { AppServer } from '@/servers/serverList'
@@ -25,14 +26,20 @@ type UseSignInFlowProps = {
   initial: { email: string; password: string }
   /** Where a finished sign-in goes, and the tickets-off Continue. */
   onDone: () => void
+  /**
+   * What a TV calls itself to whoever approves its code, as "Raven on Apple TV". Given, the
+   * screen also offers a code to scan (`link`); left out, as a phone leaves it, nothing is asked.
+   */
+  deviceName?: string
 }
 
 type SubmitAccountProps = { password?: string }
 
 /**
- * The hook that runs sign-in's steps, as both apps do: the account's email and password, and
- * nothing more; no client ever asks for a PIN. Each screen keeps its fields, its layout and its copy,
- * and says the flow's `error`, a `SignInError`, in its own words (`signInErrorTextOf`).
+ * The hook that runs sign-in's steps, as both apps do: the account's email and password, or on
+ * a TV a code scanned and approved on a phone (`useDeviceLink`), and nothing more; no client ever
+ * asks for a PIN. Each screen keeps its fields, its layout and its copy, and says the flow's
+ * `error`, a `SignInError`, in its own words (`signInErrorTextOf`).
  * Made per app at module scope, since a store handed to a hook at render reads to the hooks
  * rule as a hook used as a value.
  */
@@ -42,7 +49,7 @@ export const signInFlowFor = ({
   apiOf,
   server: ravenServer,
 }: SignInFlowForProps) => {
-  const useSignInFlow = ({ initial, onDone }: UseSignInFlowProps) => {
+  const useSignInFlow = ({ initial, onDone, deviceName }: UseSignInFlowProps) => {
     const [step, setStep] = useState<SignInStep>({ kind: SIGN_IN_STEPS.account })
     const [email, setEmail] = useState(initial.email)
     const [password, setPassword] = useState(initial.password)
@@ -96,7 +103,22 @@ export const signInFlowFor = ({
       })
     }
 
+    const { link, renewLink } = useDeviceLink({
+      origin: ravenServer.origin,
+      deviceName,
+      isAsking: step.kind === SIGN_IN_STEPS.account,
+      // A code was approved: the session is this device's now, and sign-in ends as a typed one does.
+      onApproved: (session) => {
+        account.getState().adopt(accountSessionOf({ ...session, now: Date.now() }))
+        run(() => finish(ravenServer))
+      },
+    })
+
     return {
+      /** A TV's code to scan, or null where there is none to show. */
+      link,
+      /** Asks for a new code once the last ran out. */
+      renewLink,
       step,
       email,
       setEmail,

@@ -55,3 +55,7 @@ export const serverFetchFor = ({ server, jar, fetch }: ServerFetchForProps): Fet
     return response
   }
 }
+
+/** React Native's `fetch` for a call that carries no server's cookies, leaving the system's alone too. */
+export const openFetch: FetchLike = (url, init = {}) =>
+  fetch(url, { ...init, credentials: FETCH_CREDENTIALS.omit })

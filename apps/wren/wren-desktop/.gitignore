@@ -1,2 +1,4 @@
 /dist/
 /out/
+/test-results/
+/playwright-report/

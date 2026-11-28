@@ -4,8 +4,15 @@ name: Open the fixture's album from Library's Albums
 - extendedWaitUntil:
     visible: Recently added
     timeout: 30000
-- tapOn: Library.*
-# Library lists its categories, each read out with what it holds: "Albums, 1".
+# A phone reaches the categories through its Library tab; a tablet's sidebar lists them itself,
+# so it has no Library to press.
+- runFlow:
+    when:
+      visible: Library.*
+    commands:
+      - tapOn: Library.*
+# Library lists its categories, each read out with what it holds: "Albums, 1"; the sidebar's
+# says "Albums".
 - tapOn: Albums.*
 - extendedWaitUntil:
     visible: Morning Chorus.*

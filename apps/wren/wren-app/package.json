@@ -10,12 +10,16 @@
     "#plugins/*": "./plugins/*.ts"
   },
   "scripts": {
-    "build:android": "./android/gradlew -p android assembleRelease",
+    "build:android": "../../raven/app/scripts/assemble_android.sh",
     "build:ios": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild -workspace ios/Wren.xcworkspace -scheme Wren -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ios ARCHS=arm64 ONLY_ACTIVE_ARCH=NO CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO build",
     "deploy:ios": "./scripts/deploy_ios.sh",
     "dev:android": "APP_VARIANT=development expo run:android",
     "dev:ios": "APP_VARIANT=development NODE_PATH=$PWD/node_modules DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} expo run:ios --device wren-phone",
     "e2e": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} maestro test --platform ios e2e",
+    "e2e:android": "bun run --sequential e2e:reverse e2e:android:flows",
+    "e2e:android:flows": "maestro test --platform android --udid ${ANDROID_SERIAL:?set ANDROID_SERIAL to the Android phone emulator, as bun run ci:wren:android does} e2e",
+    "e2e:ipad": "bun run e2e",
+    "e2e:reverse": "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK folder}/platform-tools/adb reverse tcp:8490 tcp:8490",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint:ts": "oxlint",
@@ -117,6 +121,8 @@
       "test",
       "test:screens",
       "e2e",
+      "e2e:ipad",
+      "e2e:android",
       "dev:ios",
       "dev:android"
     ],
@@ -166,7 +172,8 @@
           "default",
           "^production",
           "expoVariant",
-          "gradle"
+          "gradle",
+          "{workspaceRoot}/apps/raven/app/scripts/assemble_android.sh"
         ],
         "outputs": [
           "{projectRoot}/android/app/build/outputs/apk/release"
@@ -217,6 +224,29 @@
           "^production",
           "expoVariant",
           "xcode",
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "againstServer"
+        ],
+        "cache": true
+      },
+      "e2e:ipad": {
+        "inputs": [
+          "default",
+          "^production",
+          "expoVariant",
+          "xcode",
+          "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
+          "againstServer"
+        ],
+        "cache": true
+      },
+      "e2e:android": {
+        "inputs": [
+          "default",
+          "^production",
+          "expoVariant",
+          "gradle",
+          "{workspaceRoot}/.github/actions/raven-android-avd/**/*",
           "{workspaceRoot}/.github/actions/raven-app-setup/**/*",
           "againstServer"
         ],

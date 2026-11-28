@@ -7,6 +7,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "e2e:browser": "playwright test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "lint:css": "gale \"src/**/*.scss\"",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@codebend3r/gale": "0.4.1",
+    "@playwright/test": "1.65.0",
     "@types/bun": "1.4.4",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "oxfmt": "0.77.0",
@@ -43,6 +45,7 @@
       "dev",
       "build",
       "preview",
+      "e2e:browser",
       "typecheck",
       "lint:ts",
       "lint:ts:fix",
@@ -52,6 +55,18 @@
       "format:check",
       "test",
       "test:watch"
-    ]
+    ],
+    "targets": {
+      "e2e:browser": {
+        "cache": true,
+        "dependsOn": [
+          "build"
+        ],
+        "inputs": [
+          "default",
+          "^production"
+        ]
+      }
+    }
   }
 }

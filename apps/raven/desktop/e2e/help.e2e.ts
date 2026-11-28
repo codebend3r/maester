@@ -1,3 +1,4 @@
+import { posix, win32 } from 'node:path'
 import { type ElectronApplication, expect, type Page, test } from '@playwright/test'
 import {
   expectOffline,
@@ -89,7 +90,7 @@ const copiedDiagnostics = async ({ mpv, ready }: CopiedDiagnosticsProps): Promis
   }
 }
 
-// Show Logs and Show Crash Reports open Finder windows, so only their unit tests cover them.
+// Show Logs and Show Crash Reports open the system's file manager, so only their unit tests cover them.
 test.describe('the Help menu', () => {
   test('copies diagnostics from the Help menu', async () => {
     const text = await copiedDiagnostics({
@@ -106,7 +107,9 @@ test.describe('the Help menu', () => {
     expect(text.startsWith('Raven ')).toBe(true)
     expect(text).toContain('Video engine: mpv v0.')
     expect(text).toContain('hwdec=auto')
-    expect(text).not.toContain('/')
+    // Neither system's separator, so no path whichever one it runs on.
+    expect(text).not.toContain(posix.sep)
+    expect(text).not.toContain(win32.sep)
   })
 
   test('copies diagnostics that say why the engine is unavailable', async () => {

@@ -222,6 +222,11 @@ export const SIGN_IN_COPY = {
   ticketsOff:
     "This server can't hand out media tickets. Set RAVEN_MEDIA_SECRET on it to play in the app",
   continue: 'Continue',
+  /** What a signed-in phone is shown before it approves a TV's code. */
+  deviceNames: { tvos: 'Raven on Apple TV', androidTv: 'Raven on Android TV' },
+  /** Apple's remote has no key for a field; its microphone button and a nearby iPhone do the typing. */
+  appleTvHint:
+    'Typing with the remote? Hold its microphone button to say a field, or type on your iPhone when it offers its keyboard.',
 } as const
 
 export const ALBUM_COPY = {

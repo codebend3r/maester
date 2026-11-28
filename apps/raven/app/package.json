@@ -8,7 +8,7 @@
     "#package": "./package.json"
   },
   "scripts": {
-    "assemble:android": "ANDROID_HOME=${ANDROID_HOME:-$HOME/Library/Android/sdk} JAVA_HOME=\"${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}\" ./android/gradlew -p android assembleRelease",
+    "assemble:android": "./scripts/assemble_android.sh",
     "build:android": "bun run assemble:android",
     "build:android-tv": "bun run assemble:android",
     "banner:tv": "./scripts/tv_banner.sh",
@@ -31,6 +31,7 @@
     "e2e:android:flows": "maestro test --platform android --udid ${ANDROID_SERIAL:?set ANDROID_SERIAL to the phone emulator, as bun run ci:app:android does} --include-tags touch e2e",
     "e2e:android-tv": "bun run --sequential e2e:reverse e2e:android-tv:flows",
     "e2e:android-tv:flows": "maestro test --platform android --udid ${ANDROID_SERIAL:?set ANDROID_SERIAL to the Android TV emulator, as bun run ci:app:android-tv does} --exclude-tags touch e2e",
+    "e2e:ipad": "bun run e2e",
     "e2e:reverse": "${ANDROID_HOME:?set ANDROID_HOME to the Android SDK folder}/platform-tools/adb reverse tcp:8490 tcp:8490",
     "e2e:tvos": "DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer} xcodebuild test -project ios/Raven.xcodeproj -scheme RavenRemoteTests -destination \"platform=tvOS Simulator,name=${TVOS_SIMULATOR:-Apple TV 4K (3rd generation)}\" -derivedDataPath build/tvos-e2e CODE_SIGNING_ALLOWED=NO",
     "format": "oxfmt .",
@@ -158,6 +159,7 @@
       "e2e:tvos",
       "e2e:android-tv",
       "e2e:android",
+      "e2e:ipad",
       "dev:ios",
       "dev:ipad",
       "dev:tvos",
@@ -339,6 +341,16 @@
         ],
         "cache": true
       },
+      "e2e:ipad": {
+        "inputs": [
+          "default",
+          "^production",
+          "nativeApp",
+          "xcode",
+          "againstServer"
+        ],
+        "cache": true
+      },
       "e2e:android-tv": {
         "inputs": [
           "default",
@@ -356,6 +368,7 @@
           "^production",
           "nativeApp",
           "gradle",
+          "{workspaceRoot}/.github/actions/raven-android-avd/**/*",
           "againstServer"
         ],
         "cache": true

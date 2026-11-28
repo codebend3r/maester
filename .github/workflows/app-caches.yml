@@ -2,7 +2,7 @@ name: 🗃️ App build caches
 
 # Builds raven's device app, Wren and Wren on TV on main and saves what the next build reads: ccache's
 # objects, CocoaPods' and Gradle's downloads, Gradle's build cache, Homebrew's and apt's
-# packages, and the Android TV emulator's snapshot. A pull request's caches are scoped
+# packages, and the Android TV and Android phone emulators' snapshots. A pull request's caches are scoped
 # to its own ref, so a PR saving its own would fill the repo's cache with copies;
 # main's are readable by every PR, whose app jobs in pull-request-checks.yml only
 # restore. The two set up through the same actions, raven-app-setup and
@@ -145,23 +145,37 @@ jobs:
             target: '@wren/tv:build:android-tv'
     steps: *build-steps
 
-  android-tv-avd:
-    name: 📺 Android TV emulator cache
+  # One leg per emulator main's end to end jobs boot: the Android TV raven and Wren on TV share,
+  # and the Android phone raven and Wren share.
+  android-avd:
+    name: ${{ matrix.emulator.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        emulator:
+          - name: 📺 Android TV emulator cache
+            target: android-tv
+            profile: tv_1080p
+          - name: 📱 Android phone emulator cache
+            target: google_apis
+            profile: pixel_7
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
       # Makes and boots the AVD when main has no snapshot under the current key; when it
       # has one, only checks, rather than downloading 2.7 GB to learn it.
-      - name: 📺 Android TV AVD
+      - name: 📺 Android AVD
         id: avd
         uses: ./.github/actions/raven-android-avd
         with:
+          target: ${{ matrix.emulator.target }}
+          profile: ${{ matrix.emulator.profile }}
           lookup-only: 'true'
 
-      - name: 💾 Save the Android TV AVD
+      - name: 💾 Save the Android AVD
         if: steps.avd.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:

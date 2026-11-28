@@ -5,6 +5,12 @@
 export { accountIdOf, forgetOnAccountChange } from '@/account/accountChange'
 export { SIGN_IN_STEPS, type SignInStep } from '@/account/signInSteps'
 export { AUTH_OUTCOMES, type AccountSession, type AuthOutcome } from '@/account/supabaseAuth'
+export {
+  DEVICE_LINK_STATES,
+  DEVICE_SCAN_COPY,
+  type DeviceLink,
+  type ScanPanelProps,
+} from '@/account/deviceLink'
 export { signInFlowFor } from '@/account/signInFlow'
 export {
   SIGN_IN_ERRORS,
@@ -34,7 +40,7 @@ export {
   folderOfPath,
   inFolder,
 } from '@/downloads/downloadPaths'
-export { BUTTON_TONES, type ButtonTone, keyboardFor } from '@/form/formFields'
+export { BUTTON_TONES, type ButtonTone, autofillFor, keyboardFor } from '@/form/formFields'
 export { IGNORED } from '@/lib/ignore'
 export {
   BROWSE_KINDS,

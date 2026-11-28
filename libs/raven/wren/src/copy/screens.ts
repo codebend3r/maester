@@ -26,6 +26,8 @@ export const SIGN_IN_COPY = {
   family: 'Part of Maester',
   signIn: 'Sign in',
   continue: 'Continue',
+  /** What the phone approving the TV's code to scan is told is asking. */
+  tvName: 'Wren on your TV',
 } as const
 
 type RemoveAllBodyProps = { size: string; server: string }

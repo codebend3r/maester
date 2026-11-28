@@ -91,3 +91,7 @@ inactivity_timeout = "720h"
 # The database calls it with a shared secret from Vault, not a user's JWT.
 [functions.signup-alert]
 verify_jwt = false
+
+# A signed-out TV calls it with the secret it was handed, which is what the function checks.
+[functions.device-sign-in]
+verify_jwt = false

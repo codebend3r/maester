@@ -10,5 +10,6 @@ export {
   pathWithId,
   responseOf,
 } from '@/test/fixtureFetch'
+export { fakeDeviceSignInServer } from '@/test/deviceSignInServer'
 export { mediaItemFor, summaryFor } from '@/test/mediaItem'
 export { healthOf } from '@/test/serverHealth'

@@ -1,0 +1,8 @@
+{
+  // The end to end suite runs in Node and writes functions the page runs, so it has the DOM's types too.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["e2e", "playwright.config.ts"]
+}

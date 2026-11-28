@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals'
 import type * as Native from '@raven/native'
-import { AUTH_OUTCOMES, type AuthOutcome, RAVEN_SERVER } from '@raven/native/headless'
+import {
+  AUTH_OUTCOMES,
+  type AuthOutcome,
+  DEVICE_SCAN_COPY,
+  RAVEN_SERVER,
+} from '@raven/native/headless'
+import { fakeDeviceSignInServer } from '@raven/native/testing'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 
 import { useAccountSession } from '@/account/session'
@@ -115,5 +121,51 @@ describe('SignIn on a TV', () => {
     await fireEvent.changeText(field, 'hunt')
     await fireEvent(field, NATIVE_EVENTS.submitEditing, { nativeEvent: { text: 'hunter2' } })
     expect(mockSignIn).toHaveBeenCalledWith({ email: 'viewer@example.com', password: 'hunter2' })
+  })
+
+  describe('with a server that offers a code', () => {
+    const offline = globalThis.fetch
+    const server = fakeDeviceSignInServer()
+
+    beforeEach(() => {
+      server.reset()
+      globalThis.fetch = server.fetch
+    })
+
+    afterEach(() => {
+      globalThis.fetch = offline
+    })
+
+    it('shows the code to scan beside the form, with the address to type instead', async () => {
+      await render(<SignIn />)
+      expect(await screen.findByText(DEVICE_SCAN_COPY.title)).toBeTruthy()
+      expect(screen.getByLabelText(DEVICE_SCAN_COPY.qrLabel)).toBeTruthy()
+      expect(screen.getByText(DEVICE_SCAN_COPY.orOpen(server.address))).toBeTruthy()
+      expect(screen.getByLabelText(`Code ${server.spokenCode}`)).toBeTruthy()
+      // The remote still opens on the form, which stays whole.
+      expect(askedFor()).toEqual(['Email'])
+    })
+
+    it('signs in with the session a phone approved the code for, with nothing typed', async () => {
+      await render(<SignIn />)
+      await screen.findByText(DEVICE_SCAN_COPY.title)
+      server.approve({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresIn: 3600,
+        userId: 'u2',
+        email: 'phone@example.com',
+      })
+      await waitFor(() =>
+        expect(useAccountSession.getState().session?.email).toBe('phone@example.com'),
+      )
+      expect(mockSignIn).not.toHaveBeenCalled()
+    })
+  })
+
+  it('shows no code where the server offers none', async () => {
+    await render(<SignIn />)
+    await waitFor(() => expect(askedFor()).toEqual(['Email']))
+    expect(screen.queryByText(DEVICE_SCAN_COPY.title)).toBeNull()
   })
 })

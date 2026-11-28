@@ -43,5 +43,17 @@ tags:
 # A show library's cards are shows, so it has no sort by a file's size.
 - tapOn: 'Sort: Release date'
 - assertNotVisible: File size
-- tapOn: Cancel
+# An iPhone's sheet has a Cancel; an iPad's is a popover with none, put away by a press outside it.
+- runFlow:
+    when:
+      visible: Cancel
+    commands:
+      - tapOn: Cancel
+- runFlow:
+    when:
+      visible: Date changed
+    commands:
+      - tapOn:
+          point: 50%,90%
+- assertNotVisible: Date changed
 - assertVisible: 'Sort: Release date'
